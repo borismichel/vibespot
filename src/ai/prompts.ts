@@ -8,6 +8,22 @@ export function getConversionGuide(): string {
   }
 }
 
+export function getDesignGuide(): string {
+  try {
+    return readFile(resolveAsset("design-guide.md"));
+  } catch {
+    return "";
+  }
+}
+
+export function getContentGuide(): string {
+  try {
+    return readFile(resolveAsset("content-guide.md"));
+  } catch {
+    return "";
+  }
+}
+
 export function buildSystemPrompt(conversionGuide: string): string {
   return `You are a HubSpot CMS expert converting React/Tailwind pages to native HubSpot modules.
 

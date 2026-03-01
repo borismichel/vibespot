@@ -181,6 +181,51 @@ function detectInteractions(dir: string): string[] {
   return interactions;
 }
 
+/**
+ * Headless source analysis — called from the vibe server (no interactive prompts).
+ * Clones the repo if it's a URL, then analyzes components.
+ */
+export function analyzeSource(input: string): SourceAnalysis {
+  let sourceDir: string;
+  let wasCloned = false;
+
+  if (input.startsWith("http") || input.startsWith("git@")) {
+    wasCloned = true;
+    const repoName =
+      basename(input.replace(/\.git$/, "")) || "react-source";
+    sourceDir = join(process.cwd(), "workspace", repoName);
+
+    if (!fileExists(sourceDir)) {
+      const result = run(`git clone --depth 1 "${input}" "${sourceDir}"`);
+      if (!result.success) {
+        throw new Error(`Failed to clone ${input}: ${result.stderr}`);
+      }
+    }
+  } else {
+    sourceDir = input;
+    if (!fileExists(sourceDir)) {
+      throw new Error(`Directory not found: ${sourceDir}`);
+    }
+  }
+
+  const components = findComponents(sourceDir);
+  const hasTailwind =
+    fileExists(join(sourceDir, "tailwind.config.ts")) ||
+    fileExists(join(sourceDir, "tailwind.config.js"));
+  const { varCount, fonts } = analyzeCSS(sourceDir);
+  const interactions = detectInteractions(sourceDir);
+
+  return {
+    sourceDir,
+    wasCloned,
+    components,
+    hasTailwind,
+    cssVarCount: varCount,
+    fonts,
+    interactions,
+  };
+}
+
 export async function setupSource(): Promise<SourceAnalysis> {
   await ui.intro("Source Project");
 

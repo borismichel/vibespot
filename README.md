@@ -1,165 +1,107 @@
-# hubVibes
+# vibeSpot
 
-Convert Lovable/React landing pages to HubSpot CMS — AI-powered CLI tool.
+AI-powered HubSpot CMS landing page builder — vibe coding & React converter.
 
 ```
-  ██  ██ ██  ██ █████  ≋≋≋≋≋≋≋≋  ██  ██ ██ █████  ▄▄▄▄▄ ▄▄▄▄▄
-  ██  ██ ██  ██ ██  ██  ≋≋≋≋≋≋   ██  ██ ██ ██  ██ ██    ██
-  ██▀▀██ ██  ██ █████    ≋≋≋≋    ██  ██ ██ █████  ████  ▀▀▀▄
-  ██  ██ ██  ██ ██  ██  ≋≋≋≋≋≋    █▄▄█▀ ██ ██  ██ ██       ██
-  ██  ██  ████  █████  ≋≋≋≋≋≋≋≋    ▀▀▀  ██ █████  ▀▀▀▀▀ ▀▀▀▀
-
-  Lovable / React  →  HubSpot CMS
+  ≋ vibeSpot — Build HubSpot Landing Pages with AI
 ```
 
 ## What It Does
 
-hubVibes takes a React landing page (built with Lovable, v0, Bolt, or any React-based builder) and converts it into native HubSpot CMS modules — fully editable in the HubSpot page editor. No coding knowledge required.
+vibeSpot lets you build HubSpot landing pages by chatting with AI. Describe what you want, and it generates native HubSpot CMS modules — fully editable in the HubSpot page editor. No coding knowledge required.
 
-It handles everything:
-- Checks your environment and installs missing tools
-- Clones your React repo from GitHub (or uses a local folder)
-- Analyzes the component structure
-- Uses AI to convert each section into a HubSpot module
-- Uploads the result to your HubSpot portal
-- Guides you through creating your landing page
+It also converts existing React landing pages (built with Lovable, v0, Bolt, or any React-based builder) into HubSpot-native modules.
+
+### Vibe Coding Mode (Default)
+
+```bash
+npx vibespot
+```
+
+Opens a browser with:
+- **Chat on the left** — describe your landing page in natural language
+- **Live preview on the right** — see your page render in real-time
+- **Starter templates** — SaaS, Portfolio, Restaurant, Event
+- **GitHub import** — convert existing React projects
+- **Field editor** — tweak text, colors, images directly
+- **Upload to HubSpot** — one button when you're ready
+
+### Classic Wizard Mode
+
+```bash
+npx vibespot wizard
+```
+
+Step-by-step CLI wizard for converting an existing React project to HubSpot modules.
 
 ## Setup Guide
 
 ### 1. Check if Node.js is installed
 
-Open a terminal and run:
-
 ```bash
 node -v
 ```
 
-**Mac:** Open **Terminal** (press `Cmd + Space`, type "Terminal", press Enter).
-**Windows:** Open **PowerShell** (press `Win + X`, choose "PowerShell") or **Command Prompt** (press `Win + R`, type `cmd`, press Enter).
-
-If you see a version number like `v18.x.x` or higher — you're good, skip to step 2.
-
-If you see "command not found" or an error, you need to install Node.js:
-
-**Mac:**
-```bash
-# Option A: Download the installer from https://nodejs.org (pick the LTS version)
-
-# Option B: If you have Homebrew installed:
-brew install node
-```
-
-**Windows:**
-1. Go to [nodejs.org](https://nodejs.org)
-2. Download the **LTS** version (the big green button)
-3. Run the installer — accept all defaults
-4. **Close and reopen** your terminal so it picks up the new install
-
-After installing, run `node -v` again to confirm it works.
+If you see `v18.x.x` or higher, you're good. Otherwise install from [nodejs.org](https://nodejs.org).
 
 ### 2. Install an AI Engine
 
-hubVibes needs an AI coding assistant to power the conversion. Install **one** of these (using `npm`, which comes bundled with Node.js):
+vibeSpot needs an AI engine to generate code. Use **one** of these:
 
 | Engine | Install | Notes |
 |--------|---------|-------|
-| [Claude Code](https://claude.ai/code) | `npm install -g @anthropic-ai/claude-code` | Recommended — uses your Claude subscription |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @anthropic-ai/gemini-cli` | Uses your Google AI account |
+| Anthropic API | No install — just need an API key | Get one at [console.anthropic.com](https://console.anthropic.com) |
+| [Claude Code](https://claude.ai/code) | `npm install -g @anthropic-ai/claude-code` | Uses your Claude subscription |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` | Uses your Google AI account |
 | [OpenAI Codex](https://github.com/openai/codex) | `npm install -g @openai/codex` | Uses your OpenAI account |
-| Anthropic API | No install — just need an API key | Get a key at [console.anthropic.com](https://console.anthropic.com) |
 
-### 3. Run hubVibes
+### 3. Run vibeSpot
 
 ```bash
-npx hubvibes
+npx vibespot
 ```
 
-The first time you run this, npm will ask:
+The browser opens automatically. Enter your API key in the setup screen, create or open a theme, and start chatting.
 
-```
-Need to install the following packages: hubvibes
-Ok to proceed? (y)
-```
+## After Building Your Page
 
-Type **y** and press Enter. It downloads hubVibes and starts the wizard, which walks you through connecting to HubSpot, picking your AI engine, and converting your page.
+Once your modules are ready:
 
-> **Tip:** `npx` comes with Node.js. It downloads and runs tools without installing them permanently. After the first download, subsequent runs start immediately.
-
-## After the Conversion
-
-Once hubVibes finishes uploading, your theme and modules are in HubSpot — but you still need to **create a landing page** that uses them:
-
-1. Go to **HubSpot** → **Content** → **Landing Pages** → **Create**
-2. Choose **your uploaded theme** from the theme picker
-3. Select the landing page template that was just created
-4. Your converted modules will appear — drag them onto the page
-5. Click each section to edit text, images, and colors
-6. Upload images via **File Manager** (Settings → Files)
-7. Preview and publish!
+1. Click **Upload to HubSpot** in the toolbar
+2. Go to **HubSpot** → **Content** → **Landing Pages** → **Create**
+3. Choose your uploaded theme
+4. Drag your modules onto the page
+5. Edit text, images, and colors in the page editor
+6. Preview and publish!
 
 ## Commands
 
 ```bash
-hubvibes              # Full interactive wizard (default)
-hubvibes init         # Check and install required tools
-hubvibes convert      # Convert a React project (no upload)
-hubvibes upload       # Upload theme to HubSpot
-hubvibes doctor       # Diagnose environment issues
+vibespot              # Vibe coding web UI (default)
+vibespot wizard       # Classic CLI wizard
+vibespot init         # Check and install required tools
+vibespot convert      # Convert a React project (no upload)
+vibespot upload       # Upload theme to HubSpot
+vibespot doctor       # Diagnose environment issues
 ```
 
-Most users only need `npx hubvibes` — the wizard handles everything.
-
-## How It Works
-
-### Environment Check
-
-hubVibes checks for Node.js and the HubSpot CLI. If the HubSpot CLI is missing, it installs it for you via npm. If you're not authenticated, it runs `hs init` to connect your HubSpot portal.
-
-### Source Setup
-
-Paste your GitHub URL or point to a local folder. hubVibes analyzes the component structure — counting components, detecting Tailwind, identifying interactive patterns (carousels, accordions, animations).
-
-> **Note:** Cloning from GitHub requires Git. If you don't have Git installed, download your project as a ZIP, unzip it, and provide the local folder path instead.
-
-### Theme Setup
-
-Fetch your existing HubSpot theme or create a new one from the boilerplate. hubVibes validates the theme structure and auto-patches `base.html` to support custom CSS/JS loading if needed.
-
-### AI Conversion
-
-Your chosen AI engine analyzes the React code and creates the HubSpot theme files. When using Claude Code, you can choose between Sonnet (fast), Opus (most capable), and Haiku (fastest/cheapest). The conversion creates:
-- **Shared CSS** — Design system variables, theme overrides, utilities
-- **Shared JS** — Scroll animations, interactive features (vanilla JS)
-- **Modules** — One per visual section, each with `fields.json`, `meta.json`, `module.html`, `module.css`
-- **Page template** — Assembles all modules in a drag-and-drop area
-
-### Upload & Auto-Fix
-
-hubVibes uploads everything to HubSpot. If uploads fail (common with field type issues), it auto-fixes known problems and retries:
-- `textarea` → `text` (deprecated field type)
-- `"name": "name"` → `"name": "item_name"` (reserved name)
-- `now()` → `local_dt` (invalid HubL function)
+Most users only need `npx vibespot` — the web UI handles everything.
 
 ## Configuration
 
-Settings are saved in `~/.hubvibes/config.json` so you don't have to re-enter them:
+Settings are saved in `~/.vibespot/config.json`:
 - `aiEngine` — Your preferred AI engine (`claude-code`, `gemini-cli`, `codex-cli`, or `api`)
+- `anthropicApiKey` — Your Anthropic API key
 - `lastThemePath` — Last used theme directory
 - `lastSourcePath` — Last used source directory
 
 ## Troubleshooting
 
-**"command not found: node"** — Node.js isn't installed or isn't in your PATH. Re-install from [nodejs.org](https://nodejs.org) and restart your terminal.
+**"command not found: node"** — Install Node.js from [nodejs.org](https://nodejs.org) and restart your terminal.
 
-**"hubVibes has not been built yet"** — You're running from source. Use `npx hubvibes` instead, or run `npm run build` first.
+**"vibeSpot has not been built yet"** — Use `npx vibespot` instead, or run `npm run build` first.
 
-**HubSpot upload keeps failing** — Run `hubvibes doctor` to check your setup. Make sure `hs accounts list` shows your portal.
-
-**AI conversion is slow or times out** — This is normal for large pages. The conversion can take 2-5 minutes depending on the number of components.
-
-## Related
-
-- [Conversion Guide](https://github.com/borismichel/lovable-to-hubspot) — Detailed technical guide for the React → HubSpot conversion process
+**HubSpot upload keeps failing** — Run `vibespot doctor` to check your setup. Make sure `hs accounts list` shows your portal.
 
 ## License
 

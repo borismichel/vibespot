@@ -1,19 +1,19 @@
 import { theme } from "./theme.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 export function printBanner() {
-  const o = theme.accent; // HubSpot orange for "hub"
-  const v = theme.vibes;  // purple for "Vibes" + wave
+  const v = theme.vibes;
+  const o = theme.accent; // HubSpot orange for "Spot"
   const m = theme.muted;
 
-  // Block-pixel ASCII art: "hub ≋ Vibes"
+  // Block-pixel ASCII art: "vibe ≋ Spot"
   const lines = [
-    `${o("██  ██ ██  ██ █████ ")}${v(" ≋≋≋≋≋≋≋≋  ")}${v("██  ██ ██ █████  ▄▄▄▄▄ ▄▄▄▄▄")}`,
-    `${o("██  ██ ██  ██ ██  ██")}${v("  ≋≋≋≋≋≋   ")}${v("██  ██ ██ ██  ██ ██    ██   ")}`,
-    `${o("██▀▀██ ██  ██ █████ ")}${v("   ≋≋≋≋    ")}${v("██  ██ ██ █████  ████  ▀▀▀▄ ")}`,
-    `${o("██  ██ ██  ██ ██  ██")}${v("  ≋≋≋≋≋≋   ")}${v(" █▄▄█▀ ██ ██  ██ ██       ██")}`,
-    `${o("██  ██  ████  █████ ")}${v(" ≋≋≋≋≋≋≋≋  ")}${v("  ▀▀▀  ██ █████  ▀▀▀▀▀ ▀▀▀▀ ")}`,
+    `${v("██  ██ ██ █████  ▄▄▄▄▄")}${v(" ≋≋≋≋≋≋≋≋  ")}${o("▄▄▄▄▄ █████   ▄▄▄▄  ▀▀██▀▀")}`,
+    `${v("██  ██ ██ ██  ██ ██   ")}${v("  ≋≋≋≋≋≋   ")}${o("██    ██  ██ ██  ██   ██  ")}`,
+    `${v("██  ██ ██ █████  ████ ")}${v("   ≋≋≋≋    ")}${o("▀▀▀▄  █████  ██  ██   ██  ")}`,
+    `${v(" █▄▄█▀ ██ ██  ██ ██   ")}${v("  ≋≋≋≋≋≋   ")}${o("   ██ ██     ██  ██   ██  ")}`,
+    `${v("  ▀▀▀  ██ █████  ▀▀▀▀▀")}${v(" ≋≋≋≋≋≋≋≋  ")}${o("▀▀▀▀  ██      ▀▀▀▀    ██  ")}`,
   ];
 
   console.log();
@@ -21,6 +21,6 @@ export function printBanner() {
     console.log(`  ${line}`);
   }
   console.log();
-  console.log(`  ${m("Lovable / React  →  HubSpot CMS")}    ${theme.dim(`v${VERSION}`)}`);
+  console.log(`  ${m("AI-powered HubSpot Landing Pages")}    ${theme.dim(`v${VERSION}`)}`);
   console.log();
 }

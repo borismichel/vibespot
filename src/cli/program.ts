@@ -4,16 +4,22 @@ import { initCommand } from "../commands/init.js";
 import { convertCommand } from "../commands/convert.js";
 import { uploadCommand } from "../commands/upload.js";
 import { doctorCommand } from "../commands/doctor.js";
+import { vibeCommand } from "../commands/vibe.js";
 
 export function buildProgram(): Command {
   const program = new Command();
 
   program
-    .name("hubvibes")
+    .name("vibespot")
     .description(
-      "Convert Lovable/React landing pages to HubSpot CMS — AI-powered CLI tool"
+      "AI-powered HubSpot CMS landing page builder"
     )
-    .version("0.2.0")
+    .version("0.3.0")
+    .action(vibeCommand);
+
+  program
+    .command("wizard")
+    .description("Classic CLI wizard — step-by-step conversion flow")
     .action(wizardCommand);
 
   program

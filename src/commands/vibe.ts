@@ -1,0 +1,78 @@
+/**
+ * `vibespot vibe` — Vibe coding mode.
+ * Immediately starts a local server and opens the browser.
+ * All setup happens in the web UI — zero CLI prompts.
+ */
+
+import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { execSync } from "node:child_process";
+import chalk from "chalk";
+import { startServer } from "../server/server.js";
+import { saveSession } from "../server/session.js";
+
+const DEFAULT_PORT = 4200;
+
+export async function vibeCommand(): Promise<void> {
+  const purple = chalk.hex("#7C3AED");
+  const dim = chalk.dim;
+
+  console.log("");
+  console.log(purple("  ≋ vibeSpot"));
+  console.log(dim("  Starting...\n"));
+
+  const uiDir = resolveUiDir();
+  if (!uiDir) {
+    console.error(chalk.red("  Could not find UI assets. Is the package installed correctly?"));
+    process.exit(1);
+  }
+
+  try {
+    const { port, close } = await startServer({ port: DEFAULT_PORT, uiDir });
+    const url = `http://localhost:${port}`;
+
+    console.log(purple(`  ≋ ${url}`));
+    console.log(dim("  Press Ctrl+C to stop\n"));
+
+    // Auto-open browser
+    try {
+      const openCmd =
+        process.platform === "darwin"
+          ? "open"
+          : process.platform === "win32"
+            ? "start"
+            : "xdg-open";
+      execSync(`${openCmd} ${url}`, { stdio: "ignore" });
+    } catch {
+      // Browser open failed — user can open manually
+    }
+
+    // Keep running until Ctrl+C
+    await new Promise<void>((resolve) => {
+      process.on("SIGINT", () => {
+        console.log(dim("\n  Saving session..."));
+        saveSession();
+        close();
+        console.log(dim("  Goodbye!\n"));
+        resolve();
+      });
+    });
+  } catch (err) {
+    console.error(chalk.red(`  Failed to start: ${err instanceof Error ? err.message : String(err)}`));
+    process.exit(1);
+  }
+}
+
+function resolveUiDir(): string | null {
+  const candidates = [
+    join(import.meta.dirname, "../../ui"),
+    join(import.meta.dirname, "../ui"),
+    join(process.cwd(), "ui"),
+  ];
+
+  for (const dir of candidates) {
+    if (existsSync(join(dir, "index.html"))) return dir;
+  }
+
+  return null;
+}

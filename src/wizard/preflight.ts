@@ -128,6 +128,9 @@ export async function runPreflight(): Promise<PreflightResult> {
   const engineLabels: Record<AIEngineType, string> = {
     "claude-code": "Claude Code",
     "api": "Anthropic API",
+    "anthropic-api": "Anthropic API",
+    "openai-api": "OpenAI API",
+    "gemini-api": "Gemini API",
     "gemini-cli": "Gemini CLI",
     "codex-cli": "OpenAI Codex",
   };

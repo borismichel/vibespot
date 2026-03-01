@@ -102,7 +102,7 @@ export async function runConversion(opts: {
   }
 
   // Offer to clean up log file
-  const logPath = join(opts.themePath, "..", "hubvibes-conversion.log");
+  const logPath = join(opts.themePath, "..", "vibespot-conversion.log");
   if (fileExists(logPath)) {
     const keepLog = await ui.confirm({
       message: "Keep conversion log file for debugging?",

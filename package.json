@@ -1,16 +1,17 @@
 {
-  "name": "hubvibes",
-  "version": "0.2.0",
-  "description": "Convert Lovable/React landing pages to HubSpot CMS — AI-powered CLI tool",
+  "name": "vibespot",
+  "version": "0.3.0",
+  "description": "AI-powered HubSpot CMS landing page builder — vibe coding & React converter",
   "type": "module",
   "bin": {
-    "hubvibes": "bin/hubvibes.mjs"
+    "vibespot": "bin/vibespot.mjs"
   },
   "main": "./dist/index.js",
   "files": [
     "dist",
     "bin",
-    "assets"
+    "assets",
+    "ui"
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
@@ -22,27 +23,31 @@
     "@clack/prompts": "^0.9.1",
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
-    "execa": "^9.5.2"
+    "execa": "^9.5.2",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
     "tsup": "^8.4.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   },
   "keywords": [
     "hubspot",
+    "vibe-coding",
+    "landing-page",
+    "cms",
+    "ai",
     "lovable",
     "react",
-    "cms",
     "converter",
-    "landing-page",
     "cli"
   ],
   "author": "Boris Michel",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/borismichel/hubvibes.git"
+    "url": "git+https://github.com/borismichel/vibespot.git"
   }
 }
