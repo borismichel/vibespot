@@ -376,6 +376,9 @@ export function writeModulesToDisk(): void {
     );
   }
 
+  // Patch base.html to load template_js (animations won't work without this)
+  patchBaseTemplate();
+
   // Populate theme.json with proper metadata
   updateThemeJson();
 }
@@ -436,6 +439,41 @@ export function reloadModulesFromDisk(): void {
 // ---------------------------------------------------------------------------
 // Theme metadata — populate theme.json + validate template annotations
 // ---------------------------------------------------------------------------
+
+/**
+ * Patch base.html to load template_js (the boilerplate only loads template_css).
+ * Without this, shared animations JS never runs and scroll-animate elements stay invisible.
+ */
+function patchBaseTemplate(): void {
+  if (!activeSession) return;
+  const basePath = join(activeSession.themePath, "templates", "layouts", "base.html");
+  if (!existsSync(basePath)) return;
+
+  try {
+    let content = readFileSync(basePath, "utf-8");
+    // Already patched?
+    if (content.includes("template_js")) return;
+
+    // Insert {% if template_js %} block right after the main.js require line
+    const mainJsLine = '{{ require_js(get_asset_url("../../js/main.js")) }}';
+    if (content.includes(mainJsLine)) {
+      content = content.replace(
+        mainJsLine,
+        mainJsLine + '\n    {% if template_js %}\n      {{ require_js(get_asset_url(template_js)) }}\n    {% endif %}'
+      );
+    } else {
+      // Fallback: insert before standard_footer_includes
+      content = content.replace(
+        "{{ standard_footer_includes }}",
+        '{% if template_js %}\n      {{ require_js(get_asset_url(template_js)) }}\n    {% endif %}\n    {{ standard_footer_includes }}'
+      );
+    }
+
+    writeFileSync(basePath, content, "utf-8");
+  } catch {
+    // Non-critical — the generated template has its own require_js fallback
+  }
+}
 
 /**
  * Update theme.json with proper name/label and ensure template annotations.
@@ -513,6 +551,7 @@ ${sections}
 
   {% end_dnd_area %}
 </div>
+{{ require_js(get_asset_url("../../js/${name}-animations.js")) }}
 {% endblock body %}
 
 {% block footer %}

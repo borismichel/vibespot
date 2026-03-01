@@ -108,6 +108,21 @@ ${getHubspotRules()}`;
 - Use CSS custom properties for the design system
 - Make content editable through fields.json (headlines, text, colors, images, links)
 
+## Scroll Animation CSS Fallback (IMPORTANT)
+When using scroll-animate classes (opacity: 0 → visible), you MUST include a CSS-only fallback animation in sharedCss that auto-reveals elements after a delay. This ensures content is visible even if the JS file fails to load:
+\`\`\`css
+@keyframes scroll-animate-fallback {
+  to { opacity: 1; transform: none; }
+}
+.scroll-animate {
+  animation: scroll-animate-fallback 0.1s 3s forwards;
+}
+.scroll-animate.visible {
+  animation: none;
+}
+\`\`\`
+This makes elements appear after 3 seconds if JS never adds the .visible class. Once JS runs normally and adds .visible, the animation is cancelled.
+
 ## Design Guide
 ${getDesignGuide()}
 
