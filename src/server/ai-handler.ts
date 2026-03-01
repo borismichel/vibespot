@@ -6,7 +6,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { spawn, execSync } from "node:child_process";
-import { getConversionGuide, getDesignGuide, getContentGuide } from "../ai/prompts.js";
+import { getConversionGuide, getDesignGuide, getContentGuide, getHubspotRules } from "../ai/prompts.js";
 import { loadConfig, getApiKeyForEngine, type AIEngineType } from "../utils/config.js";
 import {
   getSession,
@@ -21,14 +21,14 @@ import type { ModuleFiles } from "../ai/engine.js";
 // System prompt for vibe coding mode
 // ---------------------------------------------------------------------------
 
-function buildVibeSystemPrompt(conversionGuide: string, themeName: string): string {
-  return `You are vibeSpot, an AI that builds HubSpot CMS landing pages from natural language descriptions.
+function buildVibeSystemPrompt(conversionGuide: string, themeName: string, editMode: boolean = false): string {
+  const core = `You are vibeSpot, an AI that builds HubSpot CMS landing pages from natural language descriptions.
 
 ## Your Role
 You generate native HubSpot CMS modules directly from user descriptions. Every module you create is immediately compatible with HubSpot's drag-and-drop page editor.
 
-## Output Format
-For each module you create or modify, include a JSON code block with this structure:
+## Output Format — CRITICAL
+You MUST include a \`\`\`vibespot-modules code block with ALL module data as JSON. This is the ONLY way modules get created. A text summary, table, or description of modules does NOT work — you must output the actual JSON.
 
 \`\`\`vibespot-modules
 {
@@ -47,11 +47,19 @@ For each module you create or modify, include a JSON code block with this struct
 }
 \`\`\`
 
+NEVER respond with only a text summary. The vibespot-modules JSON block is mandatory.
+
 ## Rules
 - fieldsJson, metaJson must be valid JSON strings
 - moduleHtml uses HubL template syntax ({{ module.field_name }})
 - moduleCss is vanilla CSS (no Tailwind, no Sass)
 - moduleJs is optional vanilla JS (wrapped in IIFE)
+- NEVER use CDN imports (@import url(), <link> to external CDNs like Google Fonts, cdnjs, unpkg, jsdelivr)
+- For fonts, use system font stacks with good fallbacks. Define them as CSS custom properties in sharedCss:
+  --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'SF Mono', SFMono-Regular, Consolas, monospace;
+- All assets must be self-contained — no external HTTP requests in CSS or HTML
 - Use "type": "text" (NEVER "textarea" — it's deprecated)
 - NEVER use "name": "name" (reserved) — use "item_name" instead
 - Wrap style fields in a "styles" group with "tab": "STYLE"
@@ -61,11 +69,37 @@ For each module you create or modify, include a JSON code block with this struct
 - For repeater groups, use "occurrence": { "min": 0, "max": 100 } and iterate with {% for %}
 - Color fields: type "color", default { "color": "#hex", "opacity": 100 }
 - Link fields: type "link", default { "url": { "href": "#", "type": "EXTERNAL" }, "open_in_new_tab": false, "no_follow": false }
-- Image fields: type "image", default { "src": "", "alt": "" }
+- Image fields: type "image", default { "src": "https://placehold.co/800x600/1a1a2e/ffffff?text=Replace+in+HubSpot", "alt": "Placeholder image", "width": 800, "height": 600 }
+
+## Images & Media
+- All images are managed through HubSpot's file manager — users will replace placeholders after publishing
+- ALWAYS use image fields (type "image") so users can swap images in the page editor
+- Use placehold.co URLs as defaults so the preview looks complete (e.g. https://placehold.co/800x600/1a1a2e/ffffff?text=Hero+Image)
+- In module.html, render images with: <img src="{{ module.field_name.src }}" alt="{{ module.field_name.alt }}" width="{{ module.field_name.width }}" height="{{ module.field_name.height }}">
+- For background images in CSS, use inline styles: style="background-image: url('{{ module.field_name.src }}')"
+- Size placeholders appropriately for their context (hero: 1920x800, cards: 600x400, icons: 200x200, avatars: 150x150)
+
+## Navigation & Anchor Links
+- Each module is automatically wrapped with an id derived from its moduleName (lowercase, hyphens for spaces)
+- For navigation/menu modules, use anchor links that match module names: e.g. if a module is named "Features", link to href="#features"
+- The id is the moduleName lowercased with non-alphanumeric chars replaced by hyphens (e.g. "Pricing Cards" → id="pricing-cards")
+- Always include smooth scrolling behavior in navigation link clicks
+- For nav modules, make menu items editable via a repeater group with "label" (text) and "anchor" (text) fields
 
 ## When modifying existing modules
 When the user asks to change something, include ONLY the modules that changed. Keep module names consistent.
-If the change affects shared CSS or JS, include those too.
+If the change affects shared CSS or JS, include those too.`;
+
+  // For follow-up edits (modules already exist), skip the heavy guides
+  if (editMode) {
+    return core + `
+
+## HubSpot CMS Rules
+${getHubspotRules()}`;
+  }
+
+  // Full prompt for initial generation
+  return core + `
 
 ## Design Quality
 - Use modern, clean design with proper spacing and typography
@@ -79,6 +113,9 @@ ${getDesignGuide()}
 
 ## Content & Copywriting Guide
 ${getContentGuide()}
+
+## HubSpot CMS Rules
+${getHubspotRules()}
 
 ## Conversion Guide Reference
 ${conversionGuide}`;
@@ -210,6 +247,13 @@ function buildMessagesWithContext(userMessage: string): Array<{ role: "user" | "
   return messages;
 }
 
+/** Callback for parse warnings — set by the WebSocket handler. */
+let parseWarningCallback: ((warning: string) => void) | null = null;
+
+export function setParseWarningCallback(cb: ((warning: string) => void) | null): void {
+  parseWarningCallback = cb;
+}
+
 function finishResponse(fullResponse: string): void {
   addMessage("assistant", fullResponse);
   parseAndApplyModules(fullResponse);
@@ -229,6 +273,8 @@ async function streamWithAnthropicAPI(
 ): Promise<void> {
   const client = new Anthropic({ apiKey });
   const conversionGuide = getConversionGuide();
+  const session = getSession()!;
+  const editMode = session.modules.length > 0;
   const messages = buildMessagesWithContext(userMessage);
 
   let fullResponse = "";
@@ -236,7 +282,7 @@ async function streamWithAnthropicAPI(
   const stream = client.messages.stream({
     model,
     max_tokens: 16384,
-    system: buildVibeSystemPrompt(conversionGuide, themeName),
+    system: buildVibeSystemPrompt(conversionGuide, themeName, editMode),
     messages,
   });
 
@@ -266,6 +312,7 @@ async function streamWithOpenAIAPI(
   onChunk: (chunk: string) => void
 ): Promise<void> {
   const conversionGuide = getConversionGuide();
+  const editMode = getSession()!.modules.length > 0;
   const messages = buildMessagesWithContext(userMessage);
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -279,7 +326,7 @@ async function streamWithOpenAIAPI(
       max_tokens: 16384,
       stream: true,
       messages: [
-        { role: "system", content: buildVibeSystemPrompt(conversionGuide, themeName) },
+        { role: "system", content: buildVibeSystemPrompt(conversionGuide, themeName, editMode) },
         ...messages,
       ],
     }),
@@ -334,6 +381,7 @@ async function streamWithGeminiAPI(
 ): Promise<void> {
   const conversionGuide = getConversionGuide();
   const session = getSession()!;
+  const editMode = session.modules.length > 0;
   const stateContext = buildStateContext();
 
   // Build conversation for Gemini format
@@ -359,7 +407,7 @@ async function streamWithGeminiAPI(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: buildVibeSystemPrompt(conversionGuide, themeName) }] },
+      systemInstruction: { parts: [{ text: buildVibeSystemPrompt(conversionGuide, themeName, editMode) }] },
       contents,
       generationConfig: { maxOutputTokens: 16384 },
     }),
@@ -488,8 +536,9 @@ async function generateWithClaudeCode(
 ): Promise<void> {
   const conversionGuide = getConversionGuide();
   const config = loadConfig();
+  const editMode = getSession()!.modules.length > 0;
 
-  let prompt = buildVibeSystemPrompt(conversionGuide, themeName);
+  let prompt = buildVibeSystemPrompt(conversionGuide, themeName, editMode);
   prompt += "\n\n## User Request\n" + userMessage;
   prompt += buildStateContext();
 
@@ -530,8 +579,9 @@ async function generateWithCLI(
   onStatus?: (status: string) => void
 ): Promise<void> {
   const conversionGuide = getConversionGuide();
+  const editMode = getSession()!.modules.length > 0;
 
-  let prompt = buildVibeSystemPrompt(conversionGuide, themeName);
+  let prompt = buildVibeSystemPrompt(conversionGuide, themeName, editMode);
   prompt += "\n\n## User Request\n" + userMessage;
   prompt += buildStateContext();
 
@@ -571,19 +621,64 @@ async function generateWithCLI(
 // ---------------------------------------------------------------------------
 
 /**
+ * Try JSON.parse, and if it fails, attempt to repair common AI JSON issues
+ * (unescaped quotes inside string values) and retry.
+ */
+function tryParseJSON(raw: string): unknown | null {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // Fall through to repair
+  }
+
+  // Repair: the AI often forgets to escape literal " chars inside JSON string values
+  // (e.g. ">"{{ some_var }}"" where the inner quotes are decorative HTML).
+  // Strategy: iteratively find the parse error position, escape the offending quote, retry.
+  let repaired = raw;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      return JSON.parse(repaired);
+    } catch (err) {
+      if (!(err instanceof SyntaxError)) return null;
+      // Extract position from error message
+      const posMatch = /position (\d+)/.exec(err.message);
+      if (!posMatch) return null;
+      const pos = parseInt(posMatch[1], 10);
+      // Check if there's an unescaped quote nearby that should be escaped
+      // Look backwards from pos for the offending "
+      const searchStart = Math.max(0, pos - 5);
+      const nearSlice = repaired.slice(searchStart, pos + 1);
+      const lastQuote = nearSlice.lastIndexOf('"');
+      if (lastQuote === -1) return null;
+      const absPos = searchStart + lastQuote;
+      // Don't escape if preceded by backslash (already escaped)
+      if (absPos > 0 && repaired[absPos - 1] === "\\") return null;
+      // Escape this quote
+      repaired = repaired.slice(0, absPos) + '\\"' + repaired.slice(absPos + 1);
+      // Shift won't cause infinite loop because we move past the fixed position
+    }
+  }
+  return null;
+}
+
+/**
  * Parse vibespot-modules JSON blocks from an AI response and update the session.
  */
 function parseAndApplyModules(response: string): void {
+  let modulesApplied = false;
+
   // Look for ```vibespot-modules ... ``` blocks
   const blockPattern = /```vibespot-modules\s*\n([\s\S]*?)```/g;
   let match;
 
   while ((match = blockPattern.exec(response)) !== null) {
     try {
-      const data = JSON.parse(match[1]);
+      const data = tryParseJSON(match[1]);
+      if (!data || typeof data !== "object") throw new Error("Invalid JSON after repair");
 
-      if (data.modules && Array.isArray(data.modules)) {
-        const modules: ModuleFiles[] = data.modules.map((m: Record<string, unknown>) => ({
+      const obj = data as Record<string, unknown>;
+      if (obj.modules && Array.isArray(obj.modules)) {
+        const modules: ModuleFiles[] = obj.modules.map((m: Record<string, unknown>) => ({
           moduleName: String(m.moduleName || ""),
           fieldsJson: typeof m.fieldsJson === "string"
             ? m.fieldsJson
@@ -598,24 +693,27 @@ function parseAndApplyModules(response: string): void {
 
         updateModules({
           modules,
-          sharedCss: data.sharedCss !== undefined ? String(data.sharedCss) : undefined,
-          sharedJs: data.sharedJs !== undefined ? String(data.sharedJs) : undefined,
+          sharedCss: obj.sharedCss !== undefined ? String(obj.sharedCss) : undefined,
+          sharedJs: obj.sharedJs !== undefined ? String(obj.sharedJs) : undefined,
         });
+        modulesApplied = true;
       }
-    } catch {
-      // Invalid JSON in block — skip
+    } catch (err) {
+      console.warn("[parse] Failed to parse vibespot-modules block:", err instanceof Error ? err.message : String(err));
+      console.warn("[parse] Block content (first 200 chars):", match[1].slice(0, 200));
     }
   }
 
   // Also try to find standalone JSON that looks like module data
-  // (in case the AI doesn't use the exact code fence format)
-  if (!blockPattern.test(response)) {
+  if (!modulesApplied) {
     const jsonPattern = /```(?:json)?\s*\n(\{[\s\S]*?"modules"\s*:\s*\[[\s\S]*?\})\s*```/g;
     while ((match = jsonPattern.exec(response)) !== null) {
       try {
-        const data = JSON.parse(match[1]);
-        if (data.modules && Array.isArray(data.modules)) {
-          const modules: ModuleFiles[] = data.modules.map((m: Record<string, unknown>) => ({
+        const data = tryParseJSON(match[1]);
+        if (!data || typeof data !== "object") throw new Error("Invalid JSON after repair");
+        const obj = data as Record<string, unknown>;
+        if (obj.modules && Array.isArray(obj.modules)) {
+          const modules: ModuleFiles[] = obj.modules.map((m: Record<string, unknown>) => ({
             moduleName: String(m.moduleName || ""),
             fieldsJson: typeof m.fieldsJson === "string"
               ? m.fieldsJson
@@ -630,12 +728,31 @@ function parseAndApplyModules(response: string): void {
 
           updateModules({
             modules,
-            sharedCss: data.sharedCss !== undefined ? String(data.sharedCss) : undefined,
-            sharedJs: data.sharedJs !== undefined ? String(data.sharedJs) : undefined,
+            sharedCss: obj.sharedCss !== undefined ? String(obj.sharedCss) : undefined,
+            sharedJs: obj.sharedJs !== undefined ? String(obj.sharedJs) : undefined,
           });
+          modulesApplied = true;
         }
-      } catch {
-        // Not valid module JSON — skip
+      } catch (err) {
+        console.warn("[parse] Failed to parse JSON module block:", err instanceof Error ? err.message : String(err));
+      }
+    }
+  }
+
+  // Warn user if the response looked like it should contain modules but parsing failed
+  if (!modulesApplied) {
+    const hasModuleRef = response.includes("vibespot-modules") || response.includes('"modules"');
+    // Detect when the AI describes modules in prose (e.g. a summary table) without providing JSON
+    const describesProse = /\bmodule|modul/i.test(response) &&
+      (/\bcreated?\b|\berstellt\b|\bgenerat/i.test(response) || /\|.*\|.*\|/m.test(response));
+
+    if (hasModuleRef || describesProse) {
+      const msg = hasModuleRef
+        ? "Module changes could not be applied — the AI response contained invalid JSON. Try sending your request again."
+        : "The AI described modules but did not include the required structured data. Try sending your request again.";
+      console.warn("[parse] " + msg);
+      if (parseWarningCallback) {
+        parseWarningCallback(msg);
       }
     }
   }

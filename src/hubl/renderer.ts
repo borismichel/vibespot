@@ -113,10 +113,43 @@ export function assemblePreview(opts: {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 ${styleBlocks}
+<style>
+html{scroll-behavior:smooth}
+.vsp-img-wrap{position:relative;display:inline-block}
+.vsp-img-badge{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.75);color:#fff;font:500 11px/1 -apple-system,sans-serif;padding:5px 8px;border-radius:4px;pointer-events:none;opacity:.85;white-space:nowrap;z-index:10}
+</style>
 </head>
 <body>
 ${body}
 ${scriptBlocks}
+<script>
+// Anchor link handler — smooth scroll to module sections
+document.addEventListener('click',function(e){
+  var a=e.target.closest('a[href^="#"]');
+  if(!a)return;
+  var id=a.getAttribute('href').slice(1);
+  if(!id)return;
+  var el=document.getElementById(id);
+  if(el){
+    e.preventDefault();
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+});
+// Placeholder image badges
+document.querySelectorAll('img').forEach(function(img){
+  var src=img.src||img.getAttribute('src')||'';
+  if(src.indexOf('placehold')!==-1){
+    var w=document.createElement('span');
+    w.className='vsp-img-wrap';
+    img.parentNode.insertBefore(w,img);
+    w.appendChild(img);
+    var b=document.createElement('span');
+    b.className='vsp-img-badge';
+    b.textContent='Placeholder — replace in HubSpot';
+    w.appendChild(b);
+  }
+});
+</script>
 </body>
 </html>`;
 }
@@ -159,45 +192,76 @@ function stripDirectives(tpl: string): string {
 
 /**
  * Process {% for VAR in PATH %}...{% endfor %} loops.
- * Supports nested loops.
+ * Uses balanced tag matching to handle nested for-loops correctly.
  */
 function processForLoops(tpl: string, context: RenderContext): string {
-  // Match outermost for-loops first (non-greedy within, but handle nesting)
-  const forPattern = /\{%[-\s]*for\s+(\w+)\s+in\s+([\w.]+)\s*%\}([\s\S]*?)\{%[-\s]*endfor\s*%\}/g;
-
   let result = tpl;
   let safety = 0;
 
-  // Repeat until no more for-loops (handles nested)
-  while (forPattern.test(result) && safety < 20) {
+  while (safety < 30) {
     safety++;
-    result = result.replace(forPattern, (_match, varName: string, path: string, body: string) => {
-      const items = resolvePath(context, path);
+    const match = findOutermostFor(result);
+    if (!match) break;
 
-      if (!Array.isArray(items)) return "";
+    const { varName, iterExpr, body, start, end } = match;
+    const items = resolveIterable(iterExpr, context);
 
-      return items
+    let rendered = "";
+    if (Array.isArray(items)) {
+      rendered = items
         .map((item, index) => {
-          // Create a sub-context with the loop variable + loop helpers
           const loopContext: RenderContext = {
             ...context,
             [varName]: item,
             loop: { index: index + 1, index0: index, first: index === 0, last: index === items.length - 1, length: items.length },
           };
 
-          // Recursively process nested for-loops & conditionals in the body
-          let rendered = processForLoops(body, loopContext);
-          rendered = processConditionals(rendered, loopContext);
-          rendered = resolveExpressions(rendered, loopContext);
-          return rendered;
+          let out = processForLoops(body, loopContext);
+          out = processConditionals(out, loopContext);
+          out = resolveExpressions(out, loopContext);
+          return out;
         })
         .join("");
-    });
+    }
 
-    forPattern.lastIndex = 0;
+    result = result.slice(0, start) + rendered + result.slice(end);
   }
 
   return result;
+}
+
+/**
+ * Find the first outermost {% for %}...{% endfor %} block with balanced nesting.
+ */
+function findOutermostFor(tpl: string): { varName: string; iterExpr: string; body: string; start: number; end: number } | null {
+  const openTag = /\{%[-\s]*for\s+(\w+)\s+in\s+([\w.]+(?:\([^)]*\))?(?:\|[\w(),"' ]+)*)\s*-?%\}/g;
+  const forOrEndfor = /\{%[-\s]*(for\s|endfor)\s*.*?-?%\}/g;
+
+  const firstOpen = openTag.exec(tpl);
+  if (!firstOpen) return null;
+
+  const varName = firstOpen[1];
+  const iterExpr = firstOpen[2];
+  const bodyStart = firstOpen.index + firstOpen[0].length;
+
+  // Find matching endfor by counting nesting depth
+  forOrEndfor.lastIndex = bodyStart;
+  let depth = 1;
+  let m: RegExpExecArray | null;
+
+  while ((m = forOrEndfor.exec(tpl)) !== null) {
+    if (m[1].startsWith("for")) {
+      depth++;
+    } else {
+      depth--;
+      if (depth === 0) {
+        const body = tpl.slice(bodyStart, m.index);
+        return { varName, iterExpr, body, start: firstOpen.index, end: m.index + m[0].length };
+      }
+    }
+  }
+
+  return null; // Unmatched for-loop
 }
 
 /**
@@ -206,7 +270,7 @@ function processForLoops(tpl: string, context: RenderContext): string {
  */
 function processConditionals(tpl: string, context: RenderContext): string {
   // Process from innermost out
-  const ifPattern = /\{%[-\s]*if\s+(.*?)\s*%\}([\s\S]*?)\{%[-\s]*endif\s*%\}/g;
+  const ifPattern = /\{%[-\s]*if\s+(.*?)\s*-?%\}([\s\S]*?)\{%[-\s]*endif\s*-?%\}/g;
 
   let result = tpl;
   let safety = 0;
@@ -215,12 +279,12 @@ function processConditionals(tpl: string, context: RenderContext): string {
     safety++;
     result = result.replace(ifPattern, (_match, condition: string, body: string) => {
       // Split on {% else %} and {% elif %}
-      const elseMatch = body.split(/\{%[-\s]*else\s*%\}/);
+      const elseMatch = body.split(/\{%[-\s]*else\s*-?%\}/);
       const ifBody = elseMatch[0];
       const elseBody = elseMatch[1] || "";
 
       // Check for {% elif %} (treat as nested if-else)
-      const elifParts = ifBody.split(/\{%[-\s]*elif\s+(.*?)\s*%\}/);
+      const elifParts = ifBody.split(/\{%[-\s]*elif\s+(.*?)\s*-?%\}/);
 
       if (elifParts.length > 1) {
         // Has elif branches
@@ -283,6 +347,53 @@ function cleanupRemaining(tpl: string): string {
   // Remove any remaining {{ ... }} that reference unknown paths
   tpl = tpl.replace(/\{\{.*?\}\}/gs, "");
   return tpl;
+}
+
+/**
+ * Resolve an iterable expression for {% for %} loops.
+ * Handles dotted paths (module.services) and range(start, end) calls.
+ */
+function resolveIterable(expr: string, context: RenderContext): unknown {
+  // Handle range(start, end) — with possible filter on args
+  const rangeMatch = expr.match(/^range\(\s*(.+?)\s*,\s*(.+?)\s*\)$/);
+  if (rangeMatch) {
+    const start = resolveNumericArg(rangeMatch[1], context);
+    const end = resolveNumericArg(rangeMatch[2], context);
+    const arr: number[] = [];
+    for (let i = start; i < end; i++) arr.push(i);
+    return arr;
+  }
+
+  // Handle split('...') filter: "value|split('\n')"
+  const splitMatch = expr.match(/^(.+?)\|split\(['"](.+?)['"]\)$/);
+  if (splitMatch) {
+    const val = resolvePath(context, splitMatch[1].trim());
+    if (typeof val === "string") return val.split(splitMatch[2]);
+    return [];
+  }
+
+  return resolvePath(context, expr);
+}
+
+/**
+ * Resolve a numeric argument that may be a literal, a path, or a path|filter.
+ */
+function resolveNumericArg(arg: string, context: RenderContext): number {
+  const trimmed = arg.trim();
+
+  // Apply filters (e.g. "item.rating|int")
+  const filterParts = trimmed.split("|");
+  const path = filterParts[0].trim();
+
+  // Literal number
+  if (!isNaN(Number(path))) return Number(path);
+
+  // Path lookup
+  let value = resolvePath(context, path);
+  for (let i = 1; i < filterParts.length; i++) {
+    value = applyFilter(value, filterParts[i].trim());
+  }
+  return Number(value) || 0;
 }
 
 /**

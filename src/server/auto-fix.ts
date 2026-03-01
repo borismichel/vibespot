@@ -78,6 +78,7 @@ export function applyAutoFixes(themePath: string): string[] {
   if (fixNowFunction(themePath)) fixes.push('now() → local_dt');
   if (fixHubDbTemplates(themePath)) fixes.push('Removed HubDB templates');
   if (fixLinkFieldDefaults(themePath)) fixes.push('Fixed link field defaults');
+  if (fixCdnImports(themePath)) fixes.push('Stripped CDN @import statements');
   return fixes;
 }
 
@@ -184,6 +185,63 @@ export function fixLinkFieldDefaults(themePath: string): boolean {
       // Skip malformed JSON
     }
   }
+  return fixed;
+}
+
+/**
+ * Strip external CDN @import statements from all CSS files.
+ * Google Fonts and other CDN imports can fail in HubSpot's editor
+ * and cause content to appear invisible.
+ */
+export function fixCdnImports(themePath: string): boolean {
+  let fixed = false;
+
+  // Check shared CSS files
+  const cssDir = join(themePath, "css");
+  if (fileExists(cssDir)) {
+    for (const file of readdirSync(cssDir)) {
+      if (!file.endsWith(".css")) continue;
+      const filePath = join(cssDir, file);
+      let content = readFile(filePath);
+      const cleaned = content.replace(/@import\s+url\(['"]?https?:\/\/[^)]+['"]?\)\s*;?/gi, "");
+      if (cleaned !== content) {
+        writeFile(filePath, cleaned);
+        fixed = true;
+      }
+    }
+  }
+
+  // Check module CSS files
+  const modulesDir = join(themePath, "modules");
+  if (fileExists(modulesDir)) {
+    for (const entry of readdirSync(modulesDir)) {
+      if (!entry.endsWith(".module")) continue;
+      const cssPath = join(modulesDir, entry, "module.css");
+      if (!fileExists(cssPath)) continue;
+      let content = readFile(cssPath);
+      const cleaned = content.replace(/@import\s+url\(['"]?https?:\/\/[^)]+['"]?\)\s*;?/gi, "");
+      if (cleaned !== content) {
+        writeFile(cssPath, cleaned);
+        fixed = true;
+      }
+    }
+  }
+
+  // Check module HTML for <link> tags to external CDNs
+  if (fileExists(modulesDir)) {
+    for (const entry of readdirSync(modulesDir)) {
+      if (!entry.endsWith(".module")) continue;
+      const htmlPath = join(modulesDir, entry, "module.html");
+      if (!fileExists(htmlPath)) continue;
+      let content = readFile(htmlPath);
+      const cleaned = content.replace(/<link[^>]+href=['"]https?:\/\/[^'"]+['"][^>]*>/gi, "");
+      if (cleaned !== content) {
+        writeFile(htmlPath, cleaned);
+        fixed = true;
+      }
+    }
+  }
+
   return fixed;
 }
 

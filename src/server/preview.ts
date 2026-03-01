@@ -31,6 +31,11 @@ export function buildPreviewHtml(): string {
   const moduleJsArray: string[] = [];
 
   for (const mod of modules) {
+    // Skip template-like content that was accidentally stored as a module
+    if (mod.moduleHtml.includes("dnd_area") || mod.moduleHtml.includes("extends ")) {
+      continue;
+    }
+
     // Build context from fields.json defaults
     let context: { module: Record<string, unknown> };
     try {
@@ -43,9 +48,10 @@ export function buildPreviewHtml(): string {
     // Render HubL template with context
     const rendered = renderHubL(mod.moduleHtml, context);
 
-    // Wrap each module in a container with a data attribute for identification
+    // Wrap each module in a container with id + data attribute for anchor links
+    const anchorId = mod.moduleName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     renderedModules.push(
-      `<div class="vibespot-module" data-module="${mod.moduleName}">${rendered}</div>`
+      `<div class="vibespot-module" id="${anchorId}" data-module="${mod.moduleName}">${rendered}</div>`
     );
 
     if (mod.moduleCss) moduleCssArray.push(mod.moduleCss);

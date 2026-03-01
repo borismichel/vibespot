@@ -4,110 +4,116 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>vibeSpot — Build HubSpot Landing Pages with AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-
-  <!-- Menu dropdown -->
-  <div class="menu-dropdown hidden" id="menu-dropdown">
-    <div class="menu__section">
-      <div class="menu__section-title">Themes</div>
-      <div class="menu__theme-list" id="menu-theme-list"></div>
-      <div class="menu__create-row">
-        <input type="text" class="menu__input" id="menu-new-theme" placeholder="new-theme-name" />
-        <button class="menu__btn menu__btn--primary" id="menu-create-btn">Create</button>
-      </div>
-    </div>
-    <div class="menu__divider"></div>
-    <div class="menu__section">
-      <button class="menu__action-item" id="menu-settings">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-        Settings
-      </button>
-      <button class="menu__action-item" id="menu-upload">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Deploy to HubSpot
-      </button>
-    </div>
-  </div>
 
   <!-- ============================================================ -->
   <!-- SETUP SCREEN — shown until a session is created              -->
   <!-- ============================================================ -->
   <div class="setup-topbar" id="setup-topbar">
-    <button class="topbar__hamburger" title="Menu">
-      <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><line x1="1" y1="2" x2="17" y2="2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="7" x2="17" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="12" x2="17" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-    </button>
-    <span class="setup-topbar__logo">≋ <strong>vibeSpot</strong></span>
+    <div class="topbar__brand">
+      <div class="topbar__logo-icon">v</div>
+      <span class="topbar__brand-name">vibeSpot</span>
+    </div>
   </div>
   <div class="setup" id="setup-screen">
-    <div class="setup__container">
-      <div class="setup__logo">≋</div>
-      <h1 class="setup__title">vibeSpot</h1>
-      <p class="setup__subtitle">Build HubSpot landing pages with AI</p>
-
-      <!-- Environment info (populated by JS) -->
-      <div class="setup__alerts" id="setup-alerts"></div>
-
-      <!-- Walkthrough (shown on first run when environment is not configured) -->
-      <div class="walkthrough hidden" id="walkthrough">
-        <div class="walkthrough__progress" id="walkthrough-progress"></div>
-        <div class="walkthrough__content" id="walkthrough-content"></div>
+    <!-- Left sidebar: project list -->
+    <aside class="setup-sidebar" id="setup-sidebar">
+      <div class="setup-sidebar__header">
+        <span class="setup-sidebar__title">Projects</span>
+        <span class="setup-sidebar__count" id="sidebar-project-count">0</span>
       </div>
-
-      <!-- Settings link (shown on setup screen) -->
-      <div class="setup__settings-link hidden" id="setup-settings-link">
-        <button class="setup__settings-btn" id="btn-setup-settings">Configure AI & Tools</button>
+      <div class="setup-sidebar__list" id="sidebar-project-list">
+        <!-- Populated by setup.js -->
       </div>
+      <div class="setup-sidebar__footer">
+        <button class="setup-sidebar__settings-btn" id="btn-setup-settings">
+          <svg width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M7.5 1.5h3l.4 2.1a5.5 5.5 0 0 1 1.3.7l2-.8 1.5 2.6-1.6 1.3a5.5 5.5 0 0 1 0 1.5l1.6 1.3-1.5 2.6-2-.8a5.5 5.5 0 0 1-1.3.7l-.4 2.1h-3l-.4-2.1a5.5 5.5 0 0 1-1.3-.7l-2 .8-1.5-2.6 1.6-1.3a5.5 5.5 0 0 1 0-1.5L2.3 6.1l1.5-2.6 2 .8a5.5 5.5 0 0 1 1.3-.7L7.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
+          Settings
+        </button>
+      </div>
+    </aside>
 
-      <!-- Main options -->
-      <div class="setup__options" id="setup-options">
-        <!-- Previous sessions -->
-        <div class="setup__section hidden" id="section-recent">
-          <p class="setup__label">Pick up where you left off</p>
-          <div class="setup__cards" id="recent-sessions"></div>
+    <!-- Right side: main content -->
+    <div class="setup__main">
+      <div class="setup__container">
+        <div class="setup__symbol">&#10022;</div>
+        <h1 class="setup__title">vibeSpot</h1>
+        <p class="setup__subtitle">Build HubSpot landing pages with AI</p>
+
+        <!-- Environment info (populated by JS) -->
+        <div class="setup__alerts" id="setup-alerts"></div>
+
+        <!-- Walkthrough (shown on first run when environment is not configured) -->
+        <div class="walkthrough hidden" id="walkthrough">
+          <div class="walkthrough__progress" id="walkthrough-progress"></div>
+          <div class="walkthrough__content" id="walkthrough-content"></div>
         </div>
 
-        <!-- Local themes on disk -->
-        <div class="setup__section hidden" id="section-local">
-          <p class="setup__label">Open a theme you already have</p>
-          <div class="setup__cards" id="local-themes"></div>
-        </div>
+        <!-- Settings link (hidden — now in sidebar footer) -->
+        <div class="setup__settings-link hidden" id="setup-settings-link"></div>
 
-        <!-- Create new -->
-        <div class="setup__section">
-          <p class="setup__label">Start a new project</p>
-          <div class="setup__row">
-            <input type="text" class="setup__input setup__input--wide" id="new-theme-name" placeholder="my-landing-page" />
-            <button class="btn btn--primary" id="btn-create-theme">Create</button>
+        <!-- Main options -->
+        <div class="setup__options" id="setup-options">
+          <!-- Previous sessions (hidden — now shown in sidebar) -->
+          <div class="setup__section hidden" id="section-recent">
+            <div class="setup__cards" id="recent-sessions"></div>
+          </div>
+
+          <!-- Local themes (hidden — now shown in sidebar) -->
+          <div class="setup__section hidden" id="section-local">
+            <div class="setup__cards" id="local-themes"></div>
+          </div>
+
+          <!-- Create new -->
+          <div class="setup__section">
+            <p class="setup__label">Start a new project</p>
+            <div class="setup__row">
+              <input type="text" class="setup__input setup__input--wide" id="new-theme-name" placeholder="my-landing-page" />
+              <button class="btn btn--primary" id="btn-create-theme">Create</button>
+            </div>
+          </div>
+
+          <!-- Fetch from HubSpot (only shown if hs is installed) -->
+          <div class="setup__section hidden" id="section-fetch">
+            <p class="setup__label">Download from HubSpot</p>
+            <div class="setup__row">
+              <input type="text" class="setup__input setup__input--wide" id="fetch-theme-name" placeholder="theme-name-in-hubspot" />
+              <button class="btn btn--secondary" id="btn-fetch-theme">Fetch</button>
+            </div>
+          </div>
+
+          <!-- Import from GitHub -->
+          <div class="setup__section">
+            <p class="setup__label">Import from GitHub</p>
+            <div class="setup__row">
+              <input type="text" class="setup__input setup__input--wide" id="import-url" placeholder="https://github.com/user/my-landing-page" />
+              <button class="btn btn--secondary" id="import-btn">Import</button>
+            </div>
+            <p class="setup__hint">Convert a React/Lovable project to HubSpot</p>
+          </div>
+
+          <!-- Open folder -->
+          <div class="setup__section">
+            <p class="setup__label">Open from disk</p>
+            <div class="setup__row">
+              <input type="text" class="setup__input setup__input--wide" id="open-theme-path" placeholder="/path/to/my-theme" />
+              <button class="btn btn--secondary" id="btn-open-theme">Open</button>
+            </div>
           </div>
         </div>
 
-        <!-- Fetch from HubSpot (only shown if hs is installed) -->
-        <div class="setup__section hidden" id="section-fetch">
-          <p class="setup__label">Download a theme from your HubSpot account</p>
-          <div class="setup__row">
-            <input type="text" class="setup__input setup__input--wide" id="fetch-theme-name" placeholder="theme-name-in-hubspot" />
-            <button class="btn btn--secondary" id="btn-fetch-theme">Fetch</button>
-          </div>
+        <div class="setup__loading hidden" id="setup-loading">
+          <div class="setup__spinner"></div>
+          <span id="setup-loading-text">Setting up...</span>
         </div>
 
-        <!-- Open folder -->
-        <div class="setup__section">
-          <p class="setup__label">Open a theme folder from your computer</p>
-          <div class="setup__row">
-            <input type="text" class="setup__input setup__input--wide" id="open-theme-path" placeholder="/path/to/my-theme" />
-            <button class="btn btn--secondary" id="btn-open-theme">Open</button>
-          </div>
-        </div>
+        <div class="setup__error hidden" id="setup-error"></div>
       </div>
-
-      <div class="setup__loading hidden" id="setup-loading">
-        <div class="setup__spinner"></div>
-        <span id="setup-loading-text">Setting up...</span>
-      </div>
-
-      <div class="setup__error hidden" id="setup-error"></div>
     </div>
   </div>
 
@@ -117,12 +123,11 @@
   <div class="app hidden" id="app-screen">
     <header class="topbar">
       <div class="topbar__left">
-        <button class="topbar__hamburger" title="Menu">
-          <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><line x1="1" y1="2" x2="17" y2="2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="7" x2="17" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="12" x2="17" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        </button>
-        <span class="topbar__logo">≋ <strong>vibeSpot</strong></span>
-        <span class="topbar__divider"></span>
-        <span class="topbar__theme" id="theme-name">—</span>
+        <div class="topbar__brand">
+          <div class="topbar__logo-icon">v</div>
+          <span class="topbar__brand-name">vibeSpot</span>
+        </div>
+        <span class="topbar__project-pill" id="theme-name"></span>
       </div>
       <div class="topbar__center">
         <div class="responsive-toggle" id="responsive-toggle">
@@ -138,11 +143,14 @@
         </div>
       </div>
       <div class="topbar__right">
+        <button class="topbar__icon-btn" id="btn-history" title="Version History" style="display:none">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </button>
         <button class="topbar__icon-btn" id="btn-settings" title="Settings">
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M7.5 1.5h3l.4 2.1a5.5 5.5 0 0 1 1.3.7l2-.8 1.5 2.6-1.6 1.3a5.5 5.5 0 0 1 0 1.5l1.6 1.3-1.5 2.6-2-.8a5.5 5.5 0 0 1-1.3.7l-.4 2.1h-3l-.4-2.1a5.5 5.5 0 0 1-1.3-.7l-2 .8-1.5-2.6 1.6-1.3a5.5 5.5 0 0 1 0-1.5L2.3 6.1l1.5-2.6 2 .8a5.5 5.5 0 0 1 1.3-.7L7.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
         <button class="btn btn--primary" id="btn-upload" title="Deploy theme to HubSpot">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:-2px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:-2px"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
           Deploy
         </button>
       </div>
@@ -161,7 +169,7 @@
         <div class="chat">
           <div class="chat__messages" id="chat-messages">
             <div class="chat__welcome" id="chat-welcome">
-              <p>Describe what you want, pick a template, or import from GitHub.</p>
+              <p>Describe what you want or pick a template to get started.</p>
 
               <div class="chat__section-label">Templates</div>
               <div class="chat__starters" id="starter-templates">
@@ -169,15 +177,6 @@
                 <button class="starter-btn" data-prompt="Create a portfolio landing page with a hero section, a project gallery grid, an about/bio section, a skills section, and a contact form section.">Portfolio</button>
                 <button class="starter-btn" data-prompt="Create a restaurant landing page with a hero section featuring a food image background, a menu section with categories, a reservations section, a reviews section, and a location/hours section.">Restaurant</button>
                 <button class="starter-btn" data-prompt="Create an event landing page with a countdown hero, a speakers section with photos and bios, a schedule/agenda section, a sponsors section with logos, and a registration CTA section.">Event / Conference</button>
-              </div>
-
-              <div class="chat__section-label">Import from GitHub</div>
-              <div class="chat__import">
-                <div class="import-row">
-                  <input type="text" class="import-input" id="import-url" placeholder="https://github.com/user/my-landing-page" />
-                  <button class="btn btn--primary import-btn" id="import-btn">Import</button>
-                </div>
-                <p class="import-hint">Convert a React/Lovable project to HubSpot</p>
               </div>
             </div>
           </div>
@@ -194,7 +193,17 @@
 
       <main class="panel panel--right" id="panel-right">
         <div class="preview" id="preview-container">
-          <iframe id="preview-frame" class="preview__frame" sandbox="allow-scripts allow-same-origin"></iframe>
+          <div class="browser-chrome" id="browser-chrome">
+            <div class="browser-chrome__bar">
+              <div class="browser-chrome__dots">
+                <span class="browser-chrome__dot"></span>
+                <span class="browser-chrome__dot"></span>
+                <span class="browser-chrome__dot"></span>
+              </div>
+              <div class="browser-chrome__url" id="browser-url">vibespot.app</div>
+            </div>
+            <iframe id="preview-frame" class="browser-chrome__frame" sandbox="allow-scripts allow-same-origin"></iframe>
+          </div>
         </div>
         <aside class="field-editor" id="field-editor">
           <div class="field-editor__header">
@@ -202,6 +211,13 @@
             <button class="field-editor__close" id="field-editor-close">&times;</button>
           </div>
           <div class="field-editor__content" id="field-editor-content"></div>
+        </aside>
+        <aside class="history-panel hidden" id="history-panel">
+          <div class="history-panel__header">
+            <h3>Version History</h3>
+            <button class="history-panel__close" id="history-panel-close">&times;</button>
+          </div>
+          <div class="history-panel__list" id="history-list"></div>
         </aside>
       </main>
     </div>
@@ -246,7 +262,6 @@
 
   <script src="/setup.js"></script>
   <script src="/settings.js"></script>
-  <script src="/menu.js"></script>
   <script src="/upload-panel.js"></script>
   <script src="/chat.js"></script>
   <script src="/preview.js"></script>

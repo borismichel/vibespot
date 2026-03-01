@@ -5,6 +5,9 @@
 let uploadState = "idle";
 let uploadAttempt = 0;
 let lastUploadErrors = [];
+let lastUploadPortalId = "";
+let lastUploadDataCenter = "na1";
+let lastUploadThemeName = "";
 const MAX_UPLOAD_ATTEMPTS = 3;
 
 function startUpload() {
@@ -81,6 +84,17 @@ function setUploadState(state, data) {
       dismissBtn.textContent = "Dismiss";
       dismissBtn.addEventListener("click", () => setUploadState("idle"));
       actions.appendChild(dismissBtn);
+
+      // Show the Create Page button
+      if (lastUploadPortalId) {
+        const createBtn = document.createElement("button");
+        createBtn.className = "upload-action-btn upload-action-btn--primary";
+        createBtn.textContent = "Create Page in HubSpot";
+        createBtn.addEventListener("click", () => {
+          window.open(buildHubSpotPagesUrl(lastUploadPortalId, lastUploadDataCenter), "_blank");
+        });
+        actions.insertBefore(createBtn, dismissBtn);
+      }
       break;
 
     case "failed":
@@ -206,6 +220,8 @@ function handleUploadWsMessage(msg) {
       // Update status bar
       const statusText = document.getElementById("status-text");
       if (statusText) statusText.textContent = "Upload complete!";
+      // Show celebration popup
+      showDeploySuccessPopup(msg.portalId, msg.dataCenter || "na1", msg.themeName);
       break;
 
     case "upload_failed":
@@ -241,6 +257,90 @@ function handleUploadWsMessage(msg) {
       setUploadState("fix_done");
       break;
   }
+}
+
+function buildHubSpotPagesUrl(portalId, dataCenter) {
+  const host = dataCenter === "eu1" ? "app-eu1.hubspot.com" : "app.hubspot.com";
+  return `https://${host}/page-ui/${portalId}/management/pages/landing`;
+}
+
+function showDeploySuccessPopup(portalId, dataCenter, themeName) {
+  lastUploadPortalId = portalId || "";
+  lastUploadDataCenter = dataCenter || "na1";
+  lastUploadThemeName = themeName || "";
+
+  const name = themeName || "your theme";
+  const lpLabel = `${name} Landing Page`;
+  const pagesUrl = portalId ? buildHubSpotPagesUrl(portalId, dataCenter) : "";
+
+  // Spawn confetti
+  spawnConfetti();
+
+  const overlay = document.createElement("div");
+  overlay.className = "confirm-overlay";
+  overlay.innerHTML = `
+    <div class="deploy-success">
+      <div class="deploy-success__icon">&#127881;</div>
+      <h2 class="deploy-success__title">Theme deployed!</h2>
+      <p class="deploy-success__subtitle">"${esc(name)}" is now live on HubSpot.</p>
+      <div class="deploy-success__steps">
+        <div class="deploy-success__step"><span class="deploy-success__num">1</span> Go to <strong>Content &rarr; Landing Pages</strong></div>
+        <div class="deploy-success__step"><span class="deploy-success__num">2</span> Click <strong>"Create" &rarr; "Landing page"</strong></div>
+        <div class="deploy-success__step"><span class="deploy-success__num">3</span> Select the <strong>"${esc(lpLabel)}"</strong> template</div>
+      </div>
+      <div class="deploy-success__actions">
+        ${pagesUrl ? `<a href="${pagesUrl}" target="_blank" class="btn btn--primary deploy-success__link">Create Page in HubSpot &rarr;</a>` : ""}
+        <button class="btn btn--secondary" id="deploy-success-dismiss">Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById("deploy-success-dismiss").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+}
+
+function esc(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function spawnConfetti() {
+  const colors = ["#e8613a", "#f2825f", "#4ade80", "#f59e0b", "#818cf8", "#fb7185"];
+  const container = document.createElement("div");
+  container.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:10000;overflow:hidden";
+  document.body.appendChild(container);
+
+  for (let i = 0; i < 60; i++) {
+    const piece = document.createElement("div");
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const left = Math.random() * 100;
+    const delay = Math.random() * 0.6;
+    const size = 6 + Math.random() * 6;
+    const drift = (Math.random() - 0.5) * 120;
+    piece.style.cssText = `
+      position:absolute;top:-10px;left:${left}%;
+      width:${size}px;height:${size * 0.6}px;
+      background:${color};border-radius:2px;
+      animation:confettiFall ${1.8 + Math.random() * 1.2}s ease-out ${delay}s forwards;
+      --drift:${drift}px;
+    `;
+    container.appendChild(piece);
+  }
+
+  // Inject keyframes once
+  if (!document.getElementById("confetti-style")) {
+    const style = document.createElement("style");
+    style.id = "confetti-style";
+    style.textContent = `
+      @keyframes confettiFall {
+        0% { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(100vh) translateX(var(--drift)) rotate(720deg); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  setTimeout(() => container.remove(), 4000);
 }
 
 // Toggle panel collapse

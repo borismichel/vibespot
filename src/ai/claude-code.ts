@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { join, basename } from "node:path";
 import { readdirSync, statSync, writeFileSync } from "node:fs";
 import type { AIEngine, GeneratedAssets, ModuleFiles } from "./engine.js";
-import { getConversionGuide } from "./prompts.js";
+import { getConversionGuide, getHubspotRules } from "./prompts.js";
 import { readFile, fileExists } from "../utils/fs.js";
 
 /** Boilerplate modules from `hs create website-theme` — used to distinguish AI-generated modules. */
@@ -311,6 +311,9 @@ STEP-BY-STEP PROCESS:
 CSS QUALITY: The converted page must visually match the original React page. Every module.css must be self-contained with complete styling for that section.
 
 Do NOT run hs upload — I will handle that separately.
+
+HUBSPOT CMS RULES:
+${getHubspotRules()}
 
 CONVERSION GUIDE:
 ${guide}`;

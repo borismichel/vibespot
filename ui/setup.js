@@ -15,63 +15,24 @@ async function initSetup() {
     const res = await fetch("/api/setup");
     const info = await res.json();
 
-    // If there's already an active session, skip setup
-    if (info.hasActiveSession) {
-      showApp(info.activeSession.themeName);
-      return;
-    }
+    // Populate sidebar with all projects (sessions + local themes)
+    populateSidebar(info);
 
     // Show environment alerts
     const alerts = document.getElementById("setup-alerts");
+    alerts.innerHTML = ""; // Clear on re-init
     if (!info.aiAvailable) {
       alerts.innerHTML += `<div class="setup__alert setup__alert--warn">No AI engine configured. <a href="#" id="alert-setup-link">Set up an AI engine</a> to start building.</div>`;
-      // Wire up alert link to open settings
       setTimeout(() => {
         const link = document.getElementById("alert-setup-link");
         if (link) link.addEventListener("click", (e) => { e.preventDefault(); openSettings(); });
       }, 0);
     }
 
-    // Always show settings link
-    document.getElementById("setup-settings-link").classList.remove("hidden");
-
     // Check if we should show the walkthrough (fresh environment)
     if (!info.aiAvailable && info.sessions.length === 0 && info.localThemes.length === 0) {
       showWalkthrough(info);
       return;
-    }
-
-    // Show previous sessions
-    if (info.sessions.length > 0) {
-      const section = document.getElementById("section-recent");
-      section.classList.remove("hidden");
-      const container = document.getElementById("recent-sessions");
-
-      for (const s of info.sessions) {
-        const card = document.createElement("button");
-        card.className = "setup__card";
-        card.innerHTML = `
-          <span class="setup__card-name">${esc(s.themeName)}</span>
-          <span class="setup__card-meta">${timeAgo(s.updatedAt)}</span>
-        `;
-        card.addEventListener("click", () => resumeSession(s.id));
-        container.appendChild(card);
-      }
-    }
-
-    // Show local themes
-    if (info.localThemes.length > 0) {
-      const section = document.getElementById("section-local");
-      section.classList.remove("hidden");
-      const container = document.getElementById("local-themes");
-
-      for (const name of info.localThemes) {
-        const card = document.createElement("button");
-        card.className = "setup__card";
-        card.innerHTML = `<span class="setup__card-name">${esc(name)}</span>`;
-        card.addEventListener("click", () => openTheme(name));
-        container.appendChild(card);
-      }
     }
 
     // Show fetch section if hs is installed
@@ -82,6 +43,139 @@ async function initSetup() {
   } catch (err) {
     showError("Could not connect to server. Is vibeSpot running?");
   }
+}
+
+// ---------------------------------------------------------------------------
+// Sidebar — project list (like Lovable)
+// ---------------------------------------------------------------------------
+
+function populateSidebar(info) {
+  const list = document.getElementById("sidebar-project-list");
+  const countEl = document.getElementById("sidebar-project-count");
+  list.innerHTML = "";
+
+  // Build a combined, deduplicated list of projects
+  const projects = [];
+  const seen = new Set();
+
+  // Add sessions first (most recent)
+  for (const s of info.sessions || []) {
+    if (!seen.has(s.themeName)) {
+      seen.add(s.themeName);
+      projects.push({
+        name: s.themeName,
+        type: "session",
+        sessionId: s.id,
+        updatedAt: s.updatedAt,
+      });
+    }
+  }
+
+  // Add local themes that aren't already sessions
+  for (const name of info.localThemes || []) {
+    if (!seen.has(name)) {
+      seen.add(name);
+      projects.push({ name, type: "local", sessionId: null, updatedAt: null });
+    }
+  }
+
+  countEl.textContent = projects.length;
+
+  if (projects.length === 0) {
+    list.innerHTML = `<div class="setup-sidebar__empty">No projects yet.<br>Create one to get started.</div>`;
+    return;
+  }
+
+  for (const p of projects) {
+    const item = document.createElement("div");
+    item.className = "setup-sidebar__item";
+    const initial = p.name.charAt(0).toUpperCase();
+    const meta = p.updatedAt ? timeAgo(p.updatedAt) : "on disk";
+
+    const openBtn = document.createElement("button");
+    openBtn.className = "setup-sidebar__item-open";
+    openBtn.innerHTML = `
+      <div class="setup-sidebar__item-icon">${esc(initial)}</div>
+      <div class="setup-sidebar__item-info">
+        <span class="setup-sidebar__item-name">${esc(p.name)}</span>
+        <span class="setup-sidebar__item-meta">${meta}</span>
+      </div>
+    `;
+    openBtn.addEventListener("click", () => {
+      if (p.sessionId) {
+        resumeSession(p.sessionId);
+      } else {
+        openTheme(p.name);
+      }
+    });
+    item.appendChild(openBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "setup-sidebar__item-delete";
+    delBtn.innerHTML = "&times;";
+    delBtn.title = "Delete project";
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      confirmDeleteProject(p);
+    });
+    item.appendChild(delBtn);
+
+    list.appendChild(item);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Delete project confirmation
+// ---------------------------------------------------------------------------
+
+function confirmDeleteProject(project) {
+  // Build a custom confirm dialog
+  const overlay = document.createElement("div");
+  overlay.className = "confirm-overlay";
+  overlay.innerHTML = `
+    <div class="confirm-dialog">
+      <div class="confirm-dialog__title">Delete "${esc(project.name)}"?</div>
+      <label class="confirm-dialog__check">
+        <input type="checkbox" id="confirm-delete-files" checked />
+        <span>Also delete local files</span>
+      </label>
+      <p class="confirm-dialog__warn">Deleting local files cannot be undone.</p>
+      <div class="confirm-dialog__actions">
+        <button class="btn btn--secondary" id="confirm-cancel">Cancel</button>
+        <button class="btn btn--danger" id="confirm-delete">Delete</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById("confirm-cancel").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+  document.getElementById("confirm-delete").addEventListener("click", async () => {
+    const deleteFiles = document.getElementById("confirm-delete-files").checked;
+    overlay.remove();
+
+    try {
+      if (project.sessionId) {
+        await fetch("/api/themes", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: project.sessionId, deleteFiles }),
+        });
+      } else if (deleteFiles) {
+        // Local-only theme (no session) — delete via dedicated endpoint
+        await fetch("/api/themes/delete-local", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ themeName: project.name }),
+        });
+      }
+      // Refresh the sidebar
+      initSetup();
+    } catch {
+      showError("Failed to delete project.");
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -317,10 +411,24 @@ async function resumeSession(sessionId) {
 // UI transitions
 // ---------------------------------------------------------------------------
 
+let currentAppTheme = "";
+
 function showApp(themeName) {
   setupScreen.classList.add("hidden");
+  document.getElementById("setup-topbar").classList.add("hidden");
   appScreen.classList.remove("hidden");
   document.getElementById("theme-name").textContent = themeName;
+
+  // Update browser chrome URL bar
+  const urlEl = document.getElementById("browser-url");
+  if (urlEl) urlEl.textContent = themeName + ".vibespot.app";
+
+  // Push route (avoid duplicate pushes)
+  currentAppTheme = themeName;
+  const target = "#/app/" + encodeURIComponent(themeName);
+  if (location.hash !== target) {
+    history.pushState(null, "", target);
+  }
 
   // Connect WebSocket (defined in chat.js)
   if (typeof connectWebSocket === "function") {
@@ -332,6 +440,31 @@ function showApp(themeName) {
     refreshPreview();
   }
 }
+
+function showSetup() {
+  appScreen.classList.add("hidden");
+  setupScreen.classList.remove("hidden");
+  document.getElementById("setup-topbar").classList.remove("hidden");
+  currentAppTheme = "";
+
+  if (location.hash && location.hash !== "#/") {
+    history.pushState(null, "", "#/");
+  }
+
+  // Re-fetch setup info to refresh sessions / themes
+  initSetup();
+}
+
+// Logo click → go back to setup (home)
+document.querySelectorAll(".topbar__brand").forEach((el) => {
+  el.style.cursor = "pointer";
+  el.addEventListener("click", () => {
+    // Only navigate back if we're in the app screen
+    if (!appScreen.classList.contains("hidden")) {
+      showSetup();
+    }
+  });
+});
 
 function showLoading(text) {
   hideError();
@@ -378,6 +511,64 @@ document.getElementById("open-theme-path").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); document.getElementById("btn-open-theme").click(); }
 });
 
+// Import from GitHub (on setup screen)
+document.getElementById("import-btn").addEventListener("click", async () => {
+  const urlInput = document.getElementById("import-url");
+  const url = urlInput.value.trim();
+  if (!url) return;
+
+  // Extract repo name to use as theme name
+  const repoMatch = url.match(/github\.com\/[\w.-]+\/([\w.-]+)/);
+  const themeName = repoMatch ? repoMatch[1].replace(/\.git$/, "") : "imported-project";
+
+  showLoading(`Importing ${themeName}...`);
+  urlInput.disabled = true;
+  document.getElementById("import-btn").disabled = true;
+
+  try {
+    // First create the theme
+    const setupRes = await fetch("/api/setup/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ themeName }),
+    });
+    const setupData = await setupRes.json();
+    if (setupData.error) {
+      showError(`Failed to create theme: ${setupData.error}`);
+      urlInput.disabled = false;
+      document.getElementById("import-btn").disabled = false;
+      return;
+    }
+
+    // Now import
+    const importRes = await fetch("/api/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const importData = await importRes.json();
+    if (importData.error) {
+      showError(`Import failed: ${importData.error}`);
+      urlInput.disabled = false;
+      document.getElementById("import-btn").disabled = false;
+      return;
+    }
+
+    // Show the app and send conversion prompt
+    showApp(themeName);
+    if (typeof sendMessage === "function" && importData.conversionPrompt) {
+      sendMessage(importData.conversionPrompt);
+    }
+  } catch (err) {
+    showError(`Import failed: ${err.message}`);
+    urlInput.disabled = false;
+    document.getElementById("import-btn").disabled = false;
+  }
+});
+document.getElementById("import-url").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("import-btn").click(); }
+});
+
 // API key is now handled in the settings panel (settings.js)
 
 // ---------------------------------------------------------------------------
@@ -401,7 +592,37 @@ function timeAgo(timestamp) {
 }
 
 // ---------------------------------------------------------------------------
-// Initialize
+// Hash router — enables bookmarks and browser back/forward
 // ---------------------------------------------------------------------------
 
-initSetup();
+function handleRoute() {
+  const hash = location.hash || "#/";
+
+  // #/app/{themeName} → open that theme
+  const appMatch = hash.match(/^#\/app\/(.+)$/);
+  if (appMatch) {
+    const themeName = decodeURIComponent(appMatch[1]);
+    // Already showing this theme — nothing to do
+    if (currentAppTheme === themeName && !appScreen.classList.contains("hidden")) return;
+    // Try to open the theme
+    openTheme(themeName);
+    return;
+  }
+
+  // Default: show setup
+  if (!appScreen.classList.contains("hidden")) {
+    showSetup();
+  }
+}
+
+window.addEventListener("popstate", handleRoute);
+
+// ---------------------------------------------------------------------------
+// Initialize — check URL hash first, fall back to setup screen
+// ---------------------------------------------------------------------------
+
+if (location.hash && location.hash.startsWith("#/app/")) {
+  handleRoute();
+} else {
+  initSetup();
+}

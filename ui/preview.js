@@ -31,7 +31,7 @@ function scrollPreviewToModule(moduleName) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
 
       // Brief highlight effect
-      el.style.outline = "2px solid #7C3AED";
+      el.style.outline = "2px solid #e8613a";
       el.style.outlineOffset = "4px";
       el.style.transition = "outline-color 0.5s ease";
       setTimeout(() => {
@@ -61,9 +61,9 @@ function showGeneratingPreview() {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #0f0f14;
-    color: #999;
+    font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0c0a09;
+    color: rgba(255,255,255,0.45);
   }
   .gen {
     text-align: center;
@@ -80,8 +80,8 @@ function showGeneratingPreview() {
     width: 44px;
     height: 44px;
     margin: 0 auto 1.5rem;
-    border: 3px solid rgba(124, 58, 237, 0.12);
-    border-top-color: rgba(124, 58, 237, 0.7);
+    border: 3px solid rgba(232, 97, 58, 0.12);
+    border-top-color: rgba(232, 97, 58, 0.7);
     border-radius: 50%;
     animation: spin 0.9s linear infinite;
   }
@@ -95,24 +95,21 @@ function showGeneratingPreview() {
 </div>
 <script>
   var lines = [
-    "Building the future of HubSpot, one module at a time\\u2026",
-    "Teaching pixels to speak HubL\\u2026",
-    "Converting caffeine into landing pages\\u2026",
-    "Crafting CMS modules with questionable amounts of AI\\u2026",
-    "Your landing page is being forged in the cloud\\u2026",
-    "Making HubSpot designers nervous since 2025\\u2026",
-    "Turning vibes into valid HTML\\u2026",
-    "Somewhere, a designer just lost their job to a chat prompt\\u2026",
-    "Generating responsive CSS that actually works\\u2026",
-    "Hold tight \\u2014 great things take a few seconds\\u2026",
-    "Aligning divs so you don\\u2019t have to\\u2026",
-    "Your modules are marinating in the AI kitchen\\u2026",
-    "Sprinkling HubL magic on your components\\u2026",
-    "Converting your dreams into fields.json\\u2026",
-    "Making drag-and-drop editors jealous\\u2026",
-    "This is way faster than doing it manually, trust us\\u2026",
-    "BEM-naming things so they stay classy\\u2026",
-    "Wrangling meta.json into submission\\u2026"
+    "Choosing the perfect fonts\\u2026 no Comic Sans, we promise",
+    "Writing headlines that hit different\\u2026",
+    "Crafting testimonials that sound real, not robotic\\u2026",
+    "Setting up a pricing section\\u2026 transparent, no hidden fees",
+    "Adding the finishing touches\\u2026 micro-animations & hover states",
+    "Picking colors that actually work together\\u2026",
+    "Building your hero section\\u2026 first impressions matter",
+    "Creating a navigation that just makes sense\\u2026",
+    "Hold tight \\u2014 great pages take a moment\\u2026",
+    "Generating responsive layouts that look good everywhere\\u2026",
+    "Making your page scroll-stoppingly good\\u2026",
+    "Assembling your FAQ section\\u2026 answering questions before they\\u2019re asked",
+    "Designing call-to-action buttons people actually want to click\\u2026",
+    "Adding trust signals\\u2026 because credibility matters",
+    "Polishing the footer\\u2026 every detail counts"
   ];
   var idx = Math.floor(Math.random() * lines.length);
   var el = document.getElementById("msg");

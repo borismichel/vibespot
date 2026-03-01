@@ -7,6 +7,7 @@ import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, rmSync
 import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import type { ModuleFiles, GeneratedAssets } from "../ai/engine.js";
+import { ensureGitRepo } from "./project-git.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -56,6 +57,7 @@ export function createSession(themePath: string, themeName: string): VibeSession
   };
 
   activeSession = session;
+  ensureGitRepo(themePath);
   return session;
 }
 
@@ -67,6 +69,7 @@ export function addMessage(role: "user" | "assistant", content: string): void {
   if (!activeSession) return;
   activeSession.messages.push({ role, content, timestamp: Date.now() });
   activeSession.updatedAt = Date.now();
+  saveChatToTheme();
 }
 
 /**
@@ -176,6 +179,15 @@ export function getOrderedModules(): ModuleFiles[] {
 export function scanThemeFromDisk(themePath: string): void {
   if (!activeSession) return;
 
+  // Load persisted chat from theme directory (if session has no messages yet)
+  const chatFromDisk = loadChatFromTheme(themePath);
+  if (chatFromDisk.length > 0 && activeSession.messages.length === 0) {
+    activeSession.messages = chatFromDisk;
+  }
+
+  // Ensure git repo exists (handles themes created before this feature)
+  ensureGitRepo(themePath);
+
   const modulesDir = join(themePath, "modules");
   if (!existsSync(modulesDir)) return;
 
@@ -269,18 +281,38 @@ export function listSessions(): Array<{ id: string; themeName: string; updatedAt
 export function deleteSession(sessionId: string, deleteFiles = false): void {
   const filePath = join(SESSIONS_DIR, sessionId + ".json");
 
+  // Read the session to get themeName (needed to find sibling sessions)
+  let themeName = "";
   if (deleteFiles) {
     try {
       const data = JSON.parse(readFileSync(filePath, "utf-8"));
+      themeName = data.themeName || "";
       if (data.themePath && existsSync(data.themePath)) {
         rmSync(data.themePath, { recursive: true, force: true });
       }
+    } catch { /* ignore */ }
+  } else {
+    try {
+      const data = JSON.parse(readFileSync(filePath, "utf-8"));
+      themeName = data.themeName || "";
     } catch { /* ignore */ }
   }
 
   try {
     if (existsSync(filePath)) rmSync(filePath);
   } catch { /* ignore */ }
+
+  // Also delete all other sessions for the same theme (prevents ghost entries)
+  if (themeName && existsSync(SESSIONS_DIR)) {
+    for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith(".json"))) {
+      try {
+        const data = JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf-8"));
+        if (data.themeName === themeName) {
+          rmSync(join(SESSIONS_DIR, f));
+        }
+      } catch { /* ignore */ }
+    }
+  }
 
   if (activeSession?.id === sessionId) {
     activeSession = null;
@@ -330,15 +362,162 @@ export function writeModulesToDisk(): void {
     );
   }
 
-  if (activeSession.template) {
+  // Always generate the page template from the current module order
+  // (the AI in vibe mode doesn't produce one, so we build it deterministically)
+  if (activeSession.modules.length > 0) {
+    const template = activeSession.template || generateTemplateFromModules();
     const templatesDir = join(themePath, "templates");
     mkdirSync(templatesDir, { recursive: true });
+    const annotated = ensureTemplateAnnotations(template, activeSession.themeName);
     writeFileSync(
       join(templatesDir, `lp-${activeSession.themeName}.html`),
-      activeSession.template,
+      annotated,
       "utf-8"
     );
   }
+
+  // Populate theme.json with proper metadata
+  updateThemeJson();
+}
+
+// ---------------------------------------------------------------------------
+// Chat persistence — store chat in theme directory
+// ---------------------------------------------------------------------------
+
+/**
+ * Persist chat to {themePath}/.vibespot/chat.json (gitignored).
+ */
+function saveChatToTheme(): void {
+  if (!activeSession) return;
+  try {
+    const chatDir = join(activeSession.themePath, ".vibespot");
+    mkdirSync(chatDir, { recursive: true });
+    const chatData = {
+      sessionId: activeSession.id,
+      themeName: activeSession.themeName,
+      messages: activeSession.messages,
+      updatedAt: Date.now(),
+    };
+    writeFileSync(join(chatDir, "chat.json"), JSON.stringify(chatData, null, 2), "utf-8");
+  } catch {
+    // Non-critical — don't block on chat persistence errors
+  }
+}
+
+/**
+ * Load chat history from a theme's .vibespot/chat.json.
+ */
+function loadChatFromTheme(themePath: string): ChatMessage[] {
+  const chatPath = join(themePath, ".vibespot", "chat.json");
+  if (!existsSync(chatPath)) return [];
+  try {
+    const data = JSON.parse(readFileSync(chatPath, "utf-8"));
+    return Array.isArray(data.messages) ? data.messages : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Clear in-memory modules and re-scan from disk.
+ * Used after a git rollback to sync session state with restored files.
+ */
+export function reloadModulesFromDisk(): void {
+  if (!activeSession) return;
+  activeSession.modules = [];
+  activeSession.moduleOrder = [];
+  activeSession.sharedCss = "";
+  activeSession.sharedJs = "";
+  activeSession.template = "";
+  scanThemeFromDisk(activeSession.themePath);
+  activeSession.updatedAt = Date.now();
+}
+
+// ---------------------------------------------------------------------------
+// Theme metadata — populate theme.json + validate template annotations
+// ---------------------------------------------------------------------------
+
+/**
+ * Update theme.json with proper name/label and ensure template annotations.
+ * Called during writeModulesToDisk.
+ */
+function updateThemeJson(): void {
+  if (!activeSession) return;
+  const themeJsonPath = join(activeSession.themePath, "theme.json");
+  if (!existsSync(themeJsonPath)) return;
+
+  try {
+    const themeData = JSON.parse(readFileSync(themeJsonPath, "utf-8"));
+    themeData.label = activeSession.themeName;
+    themeData.name = activeSession.themeName;
+    writeFileSync(themeJsonPath, JSON.stringify(themeData, null, 2), "utf-8");
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * Ensure the page template has proper HubSpot annotations.
+ */
+function ensureTemplateAnnotations(templateContent: string, themeName: string): string {
+  // Check if annotations already exist
+  if (templateContent.includes("templateType")) return templateContent;
+
+  const annotations = `<!--
+  templateType: page
+  isAvailableForNewContent: true
+  label: "${themeName} Landing Page"
+-->\n`;
+  return annotations + templateContent;
+}
+
+// ---------------------------------------------------------------------------
+// Template generation — build a page template from the current module order
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a HubSpot page template that assembles all modules in display order.
+ * Used in vibe mode where the AI only generates modules, not the page template.
+ */
+function generateTemplateFromModules(): string {
+  if (!activeSession || activeSession.modules.length === 0) return "";
+
+  const name = activeSession.themeName;
+  const ordered = getOrderedModules();
+
+  const sections = ordered.map((mod) => {
+    return `    {% dnd_section padding={"top":"0","bottom":"0","left":"0","right":"0"}, full_width=true %}
+      {% dnd_module path="../modules/${mod.moduleName}.module" %}
+      {% end_dnd_module %}
+    {% end_dnd_section %}`;
+  }).join("\n\n");
+
+  return `<!--
+  templateType: page
+  isAvailableForNewContent: true
+  label: "${name} Landing Page"
+-->
+{% extends "./layouts/base.html" %}
+
+{% set template_css = "../../css/${name}-theme.css" %}
+{% set template_js = "../../js/${name}-animations.js" %}
+
+{% block header %}
+{% endblock header %}
+
+{% block body %}
+<div class="${name}-page">
+  {% dnd_area "main_content" label="${name} Landing Page" %}
+
+${sections}
+
+  {% end_dnd_area %}
+</div>
+{% endblock body %}
+
+{% block footer %}
+{% endblock footer %}
+`;
 }
 
 // ---------------------------------------------------------------------------

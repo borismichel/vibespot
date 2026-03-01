@@ -21,10 +21,13 @@ npx vibespot
 Opens a browser with:
 - **Chat on the left** — describe your landing page in natural language
 - **Live preview on the right** — see your page render in real-time
+- **Project sidebar** — create, open, resume, or delete projects
+- **Module management** — reorder via drag-and-drop, edit fields, delete modules
 - **Starter templates** — SaaS, Portfolio, Restaurant, Event
 - **GitHub import** — convert existing React projects
 - **Field editor** — tweak text, colors, images directly
-- **Upload to HubSpot** — one button when you're ready
+- **Upload to HubSpot** — celebration popup with direct link to create pages
+- **Version history** — automatic git commits after each AI generation
 
 ### Classic Wizard Mode
 
@@ -51,6 +54,8 @@ vibeSpot needs an AI engine to generate code. Use **one** of these:
 | Engine | Install | Notes |
 |--------|---------|-------|
 | Anthropic API | No install — just need an API key | Get one at [console.anthropic.com](https://console.anthropic.com) |
+| OpenAI API | No install — just need an API key | Any OpenAI model |
+| Gemini API | No install — just need an API key | Google Gemini models |
 | [Claude Code](https://claude.ai/code) | `npm install -g @anthropic-ai/claude-code` | Uses your Claude subscription |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` | Uses your Google AI account |
 | [OpenAI Codex](https://github.com/openai/codex) | `npm install -g @openai/codex` | Uses your OpenAI account |
@@ -68,11 +73,12 @@ The browser opens automatically. Enter your API key in the setup screen, create 
 Once your modules are ready:
 
 1. Click **Upload to HubSpot** in the toolbar
-2. Go to **HubSpot** → **Content** → **Landing Pages** → **Create**
-3. Choose your uploaded theme
-4. Drag your modules onto the page
-5. Edit text, images, and colors in the page editor
-6. Preview and publish!
+2. The celebration popup shows a direct link to your HubSpot portal (EU and NA regions auto-detected)
+3. In HubSpot: **Content** → **Landing Pages** → **Create**
+4. Choose your uploaded theme
+5. Drag your modules onto the page
+6. Edit text, images, and colors in the page editor
+7. Preview and publish!
 
 ## Commands
 
@@ -90,8 +96,10 @@ Most users only need `npx vibespot` — the web UI handles everything.
 ## Configuration
 
 Settings are saved in `~/.vibespot/config.json`:
-- `aiEngine` — Your preferred AI engine (`claude-code`, `gemini-cli`, `codex-cli`, or `api`)
+- `aiEngine` — Your preferred AI engine (`anthropic-api`, `openai-api`, `gemini-api`, `claude-code`, `gemini-cli`, `codex-cli`)
 - `anthropicApiKey` — Your Anthropic API key
+- `openaiApiKey` — Your OpenAI API key
+- `geminiApiKey` — Your Gemini API key
 - `lastThemePath` — Last used theme directory
 - `lastSourcePath` — Last used source directory
 
@@ -102,6 +110,8 @@ Settings are saved in `~/.vibespot/config.json`:
 **"vibeSpot has not been built yet"** — Use `npx vibespot` instead, or run `npm run build` first.
 
 **HubSpot upload keeps failing** — Run `vibespot doctor` to check your setup. Make sure `hs accounts list` shows your portal.
+
+**Preview shows default template instead of modules** — Delete the boilerplate modules (button, card, menu, pricing-card, social-follow) using the × button on each module in the sidebar.
 
 ## License
 

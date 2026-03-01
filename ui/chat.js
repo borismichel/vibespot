@@ -10,6 +10,8 @@ let ws = null;
 let isStreaming = false;
 let streamingMsgEl = null;
 let streamBuffer = "";
+let streamStartTime = 0;
+let streamTimerInterval = null;
 
 const messagesEl = document.getElementById("chat-messages");
 const inputEl = document.getElementById("chat-input");
@@ -61,8 +63,27 @@ function handleWsMessage(msg) {
         refreshPreview();
       }
       statusEngine.textContent = msg.engine || "";
-      // Populate HubSpot account pill in statusbar
       fetchHsAccountStatus();
+
+      // Restore chat history from server
+      if (msg.messages && msg.messages.length > 0) {
+        const welcome = messagesEl.querySelector(".chat__welcome");
+        if (welcome) welcome.remove();
+        for (const m of msg.messages) {
+          if (m.role === "user") {
+            appendUserMessage(m.content);
+          } else if (m.role === "assistant") {
+            appendRestoredAssistantMessage(m.content);
+          }
+        }
+        scrollToBottom();
+      }
+
+      // Show/hide version history button
+      const historyBtn = document.getElementById("btn-history");
+      if (historyBtn) {
+        historyBtn.style.display = msg.gitAvailable ? "" : "none";
+      }
       break;
 
     case "stream":
@@ -84,6 +105,14 @@ function handleWsMessage(msg) {
         updateModuleList(msg.modules);
       }
       refreshPreview();
+      break;
+
+    case "version_created":
+      if (historyPanelOpen) refreshHistoryPanel();
+      break;
+
+    case "parse_warning":
+      appendSystemMessage(msg.message || "Module changes could not be applied.");
       break;
 
     case "error":
@@ -139,6 +168,7 @@ function startStreaming() {
   isStreaming = true;
   streamBuffer = "";
   sendBtn.disabled = true;
+  streamStartTime = Date.now();
 
   // Show generating preview with spinner + fun messages
   if (typeof showGeneratingPreview === "function") {
@@ -151,6 +181,9 @@ function startStreaming() {
   messagesEl.appendChild(div);
   streamingMsgEl = div.querySelector(".chat-msg__bubble");
   scrollToBottom();
+
+  // Start the running clock
+  startStreamTimer();
 }
 
 function handleStreamChunk(text) {
@@ -170,10 +203,38 @@ function handleStreamStatus(status) {
   if (!statusEl) {
     statusEl = document.createElement("div");
     statusEl.className = "stream-status";
+    statusEl.innerHTML = '<span class="stream-status__text"></span><span class="stream-status__timer"></span>';
     streamingMsgEl.appendChild(statusEl);
   }
-  statusEl.textContent = status;
+  const textEl = statusEl.querySelector(".stream-status__text");
+  if (textEl) textEl.textContent = status;
   scrollToBottom();
+}
+
+function startStreamTimer() {
+  stopStreamTimer();
+  streamTimerInterval = setInterval(() => {
+    // Update the timer in the stream status element
+    const timerEl = streamingMsgEl && streamingMsgEl.querySelector(".stream-status__timer");
+    if (timerEl) {
+      timerEl.textContent = formatDuration(Date.now() - streamStartTime);
+    }
+  }, 1000);
+}
+
+function stopStreamTimer() {
+  if (streamTimerInterval) {
+    clearInterval(streamTimerInterval);
+    streamTimerInterval = null;
+  }
+}
+
+function formatDuration(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  if (totalSec < 60) return totalSec + "s";
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return min + "m " + (sec < 10 ? "0" : "") + sec + "s";
 }
 
 function clearStreamStatus() {
@@ -187,12 +248,23 @@ function finishStreaming() {
   isStreaming = false;
   sendBtn.disabled = false;
 
+  // Stop the timer and capture duration
+  stopStreamTimer();
+  const durationMs = Date.now() - streamStartTime;
+  const durationStr = formatDuration(durationMs);
+
   clearStreamStatus();
 
   // Remove streaming cursor
   const streamingEl = messagesEl.querySelector(".chat-msg--streaming");
   if (streamingEl) {
     streamingEl.classList.remove("chat-msg--streaming");
+
+    // Add duration metadata beneath the bubble
+    const meta = document.createElement("div");
+    meta.className = "chat-msg__meta";
+    meta.textContent = durationStr;
+    streamingEl.appendChild(meta);
   }
 
   // Final render of the full response
@@ -273,6 +345,123 @@ function setStatus(text) {
 }
 
 // ---------------------------------------------------------------------------
+// Restored / system messages
+// ---------------------------------------------------------------------------
+
+function appendRestoredAssistantMessage(text) {
+  const div = document.createElement("div");
+  div.className = "chat-msg chat-msg--assistant";
+  div.innerHTML = `<div class="chat-msg__bubble">${renderMarkdown(text)}</div>`;
+  messagesEl.appendChild(div);
+}
+
+function appendSystemMessage(text) {
+  const div = document.createElement("div");
+  div.className = "chat-msg chat-msg--system";
+  div.innerHTML = `<div class="chat-msg__system">${escapeHtml(text)}</div>`;
+  messagesEl.appendChild(div);
+  scrollToBottom();
+}
+
+// ---------------------------------------------------------------------------
+// Version history panel
+// ---------------------------------------------------------------------------
+
+let historyPanelOpen = false;
+
+function toggleHistoryPanel() {
+  const panel = document.getElementById("history-panel");
+  if (!panel) return;
+  historyPanelOpen = !historyPanelOpen;
+  panel.classList.toggle("hidden", !historyPanelOpen);
+  if (historyPanelOpen) refreshHistoryPanel();
+}
+
+async function refreshHistoryPanel() {
+  const list = document.getElementById("history-list");
+  if (!list) return;
+  list.innerHTML = '<div class="history__loading">Loading...</div>';
+
+  try {
+    const res = await fetch("/api/history");
+    const data = await res.json();
+
+    if (!data.available) {
+      list.innerHTML = '<div class="history__empty">Git not available</div>';
+      return;
+    }
+    if (data.commits.length === 0) {
+      list.innerHTML = '<div class="history__empty">No versions yet</div>';
+      return;
+    }
+
+    list.innerHTML = "";
+    for (const commit of data.commits) {
+      const isInitial = commit.message.startsWith("Initial ");
+      const isRollback = commit.message.startsWith("Rollback to:");
+
+      const item = document.createElement("div");
+      item.className = "history-item" + (isRollback ? " history-item--rollback" : "");
+      item.innerHTML = `
+        <div class="history-item__header">
+          <span class="history-item__hash">${escapeHtml(commit.hash)}</span>
+          <span class="history-item__date">${timeAgoShort(commit.timestamp)}</span>
+        </div>
+        <div class="history-item__msg">${escapeHtml(commit.message)}</div>
+        ${!isInitial ? `<button class="history-item__rollback" data-hash="${escapeHtml(commit.fullHash)}">Restore</button>` : ""}
+      `;
+      list.appendChild(item);
+    }
+
+    list.querySelectorAll(".history-item__rollback").forEach((btn) => {
+      btn.addEventListener("click", () => doRollback(btn.dataset.hash));
+    });
+  } catch {
+    list.innerHTML = '<div class="history__empty">Error loading history</div>';
+  }
+}
+
+async function doRollback(hash) {
+  if (!confirm("Restore this version? Your current files will be replaced, but chat history is preserved.")) return;
+  setStatus("Rolling back...");
+
+  try {
+    const res = await fetch("/api/rollback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hash }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      alert("Rollback failed: " + data.error);
+      setStatus("Ready");
+      return;
+    }
+
+    if (data.modules) updateModuleList(data.modules);
+    refreshPreview();
+    appendSystemMessage("Restored to version " + hash.slice(0, 7));
+    refreshHistoryPanel();
+    setStatus("Ready");
+  } catch (err) {
+    alert("Rollback failed: " + err.message);
+    setStatus("Ready");
+  }
+}
+
+function timeAgoShort(timestamp) {
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return mins + "m";
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return hours + "h";
+  const days = Math.floor(hours / 24);
+  return days + "d";
+}
+
+// ---------------------------------------------------------------------------
 // Module list
 // ---------------------------------------------------------------------------
 
@@ -291,6 +480,7 @@ function updateModuleList(moduleNames) {
       <span class="module-item__drag">⠿</span>
       <span class="module-item__name">${escapeHtml(name)}</span>
       <span class="module-item__edit" title="Edit fields">⚙</span>
+      <span class="module-item__delete" title="Delete module">&times;</span>
     `;
 
     // Click to scroll to module in preview
@@ -306,6 +496,12 @@ function updateModuleList(moduleNames) {
       highlightModuleItem(name);
     });
 
+    // Click × to delete module
+    item.querySelector(".module-item__delete").addEventListener("click", (e) => {
+      e.stopPropagation();
+      confirmDeleteModule(name);
+    });
+
     itemsEl.appendChild(item);
   }
 
@@ -316,6 +512,44 @@ function updateModuleList(moduleNames) {
 function highlightModuleItem(name) {
   document.querySelectorAll(".module-item").forEach((el) => {
     el.classList.toggle("active", el.dataset.module === name);
+  });
+}
+
+function confirmDeleteModule(moduleName) {
+  const overlay = document.createElement("div");
+  overlay.className = "confirm-overlay";
+  overlay.innerHTML = `
+    <div class="confirm-dialog">
+      <div class="confirm-dialog__title">Delete "${escapeHtml(moduleName)}"?</div>
+      <p class="confirm-dialog__warn">This cannot be undone.</p>
+      <div class="confirm-dialog__actions">
+        <button class="btn btn--secondary" id="confirm-cancel">Cancel</button>
+        <button class="btn btn--danger" id="confirm-delete">Delete</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById("confirm-cancel").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+  document.getElementById("confirm-delete").addEventListener("click", async () => {
+    overlay.remove();
+    try {
+      await fetch("/api/modules", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ moduleName }),
+      });
+      // Remove from list and refresh preview
+      const item = document.querySelector(`.module-item[data-module="${CSS.escape(moduleName)}"]`);
+      if (item) item.remove();
+      const countEl = document.getElementById("module-count");
+      countEl.textContent = document.querySelectorAll(".module-item").length;
+      refreshPreview();
+    } catch {
+      // silently fail
+    }
   });
 }
 
@@ -399,49 +633,14 @@ document.getElementById("starter-templates").addEventListener("click", (e) => {
   if (btn) sendMessage(btn.dataset.prompt);
 });
 
-// Import from GitHub button
-document.getElementById("import-btn").addEventListener("click", async () => {
-  const urlInput = document.getElementById("import-url");
-  const url = urlInput.value.trim();
-  if (!url) return;
-
-  setStatus("Importing project...");
-  urlInput.disabled = true;
-  document.getElementById("import-btn").disabled = true;
-
-  try {
-    const res = await fetch("/api/import", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-    });
-    const data = await res.json();
-
-    if (data.error) {
-      setStatus(`Import failed: ${data.error}`);
-      urlInput.disabled = false;
-      document.getElementById("import-btn").disabled = false;
-      return;
-    }
-
-    setStatus(`Imported ${data.componentCount} components. Converting...`);
-
-    // Send the AI conversion prompt as a chat message
-    sendMessage(data.conversionPrompt);
-  } catch (err) {
-    setStatus(`Import failed: ${err.message}`);
-    urlInput.disabled = false;
-    document.getElementById("import-btn").disabled = false;
-  }
+// Version history
+document.getElementById("btn-history")?.addEventListener("click", toggleHistoryPanel);
+document.getElementById("history-panel-close")?.addEventListener("click", () => {
+  historyPanelOpen = false;
+  document.getElementById("history-panel")?.classList.add("hidden");
 });
 
-// Also allow Enter in the import input
-document.getElementById("import-url").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    document.getElementById("import-btn").click();
-  }
-});
+// Import from GitHub is now on the setup screen (setup.js)
 
 // Upload button — triggers the upload panel
 document.getElementById("btn-upload").addEventListener("click", () => {
@@ -481,10 +680,14 @@ document.getElementById("responsive-toggle").addEventListener("click", (e) => {
   document.querySelectorAll(".responsive-btn").forEach((b) => b.classList.remove("active"));
   btn.classList.add("active");
 
-  const frame = document.getElementById("preview-frame");
+  const chrome = document.getElementById("browser-chrome");
   const width = btn.dataset.width;
-  frame.style.width = width;
-  frame.style.maxWidth = "100%";
+  chrome.style.maxWidth = width === "100%" ? "none" : width;
+
+  // Update browser URL bar with theme name
+  const urlEl = document.getElementById("browser-url");
+  const themeName = document.getElementById("theme-name")?.textContent || "vibespot.app";
+  if (urlEl) urlEl.textContent = themeName + ".vibespot.app";
 });
 
 // ---------------------------------------------------------------------------

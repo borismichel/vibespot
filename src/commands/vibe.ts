@@ -14,11 +14,11 @@ import { saveSession } from "../server/session.js";
 const DEFAULT_PORT = 4200;
 
 export async function vibeCommand(): Promise<void> {
-  const purple = chalk.hex("#7C3AED");
+  const accent = chalk.hex("#e8613a");
   const dim = chalk.dim;
 
   console.log("");
-  console.log(purple("  ≋ vibeSpot"));
+  console.log(accent("  v vibeSpot"));
   console.log(dim("  Starting...\n"));
 
   const uiDir = resolveUiDir();
@@ -31,7 +31,7 @@ export async function vibeCommand(): Promise<void> {
     const { port, close } = await startServer({ port: DEFAULT_PORT, uiDir });
     const url = `http://localhost:${port}`;
 
-    console.log(purple(`  ≋ ${url}`));
+    console.log(accent(`  v ${url}`));
     console.log(dim("  Press Ctrl+C to stop\n"));
 
     // Auto-open browser

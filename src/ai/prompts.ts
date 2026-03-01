@@ -24,6 +24,14 @@ export function getContentGuide(): string {
   }
 }
 
+export function getHubspotRules(): string {
+  try {
+    return readFile(resolveAsset("hubspot-rules.md"));
+  } catch {
+    return "";
+  }
+}
+
 export function buildSystemPrompt(conversionGuide: string): string {
   return `You are a HubSpot CMS expert converting React/Tailwind pages to native HubSpot modules.
 
@@ -40,6 +48,9 @@ Follow the conversion guide below EXACTLY. Key rules:
 - Use IntersectionObserver for scroll animations (add .visible class)
 - Convert Tailwind utilities to vanilla CSS with BEM naming
 - Convert React hooks to vanilla JS (no React, no npm packages)
+
+## HubSpot CMS Rules
+${getHubspotRules()}
 
 ## Conversion Guide
 ${conversionGuide}`;

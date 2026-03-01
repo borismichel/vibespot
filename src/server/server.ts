@@ -24,12 +24,14 @@ import {
   loadSession,
   listSessions,
   deleteSession,
+  reloadModulesFromDisk,
 } from "./session.js";
+import { commitThemeState, getHistory, rollbackToCommit, isGitAvailable } from "./project-git.js";
 import { buildPreviewHtml } from "./preview.js";
-import { handleGenerate, handleGenerateStream } from "./ai-handler.js";
+import { handleGenerate, handleGenerateStream, setParseWarningCallback } from "./ai-handler.js";
 import { analyzeSource, type SourceAnalysis } from "../wizard/source.js";
 import { loadConfig, saveConfig, getApiKeyForEngine, type AIEngineType } from "../utils/config.js";
-import { detectEnvironment, detectHubSpotCLI, detectHubSpotAuth, detectGitHubCLI, detectGitHubAuth } from "../utils/detect.js";
+import { detectEnvironment, detectHubSpotCLI, detectHubSpotAuth, detectDataCenter, detectGitHubCLI, detectGitHubAuth } from "../utils/detect.js";
 import { applyAutoFixes, parseUploadErrors } from "../server/auto-fix.js";
 import { startJob, getJob, startStreamingJob, addJobListener, removeJobListener } from "./process-manager.js";
 import { ensureDir, writeFile } from "../utils/fs.js";
@@ -239,6 +241,21 @@ function handleApiRoute(
 
     case "/api/themes/switch":
       if (method === "POST") handleThemeSwitchRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/themes/delete-local":
+      if (method === "POST") handleDeleteLocalThemeRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/history":
+      if (method === "GET") handleHistoryRoute(res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/rollback":
+      if (method === "POST") handleRollbackRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
@@ -509,9 +526,17 @@ function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse): void
         cwd: WORKSPACE_DIR,
       });
 
+      // Clear boilerplate page templates (keep layouts/ and partials/ for extends)
+      const tplDir = join(themePath, "templates");
+      if (existsSync(tplDir)) {
+        for (const f of readdirSync(tplDir)) {
+          if (f.endsWith(".html")) rmSync(join(tplDir, f));
+        }
+      }
+
+      // Create a fresh session — don't scan boilerplate modules into it
+      // (boilerplate modules stay on disk but the preview shows the welcome screen)
       createSession(themePath, themeName);
-      // Scan the boilerplate modules created by hs create into the session
-      scanThemeFromDisk(themePath);
       saveSession();
 
       jsonResponse(res, 200, {
@@ -1062,6 +1087,83 @@ function handleThemeSwitchRoute(req: IncomingMessage, res: ServerResponse): void
   });
 }
 
+function handleDeleteLocalThemeRoute(req: IncomingMessage, res: ServerResponse): void {
+  readBody(req, (body) => {
+    try {
+      const { themeName } = JSON.parse(body);
+      if (!themeName || typeof themeName !== "string") {
+        jsonResponse(res, 400, { error: "Theme name is required" });
+        return;
+      }
+      const themePath = join(WORKSPACE_DIR, themeName);
+      if (!existsSync(themePath)) {
+        jsonResponse(res, 404, { error: "Theme not found on disk" });
+        return;
+      }
+      rmSync(themePath, { recursive: true, force: true });
+      jsonResponse(res, 200, { ok: true });
+    } catch (err) {
+      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Version history routes
+// ---------------------------------------------------------------------------
+
+function handleHistoryRoute(res: ServerResponse): void {
+  const session = getSession();
+  if (!session) {
+    jsonResponse(res, 404, { error: "No active session" });
+    return;
+  }
+  if (!isGitAvailable()) {
+    jsonResponse(res, 200, { available: false, commits: [] });
+    return;
+  }
+  const commits = getHistory(session.themePath, 50);
+  jsonResponse(res, 200, { available: true, commits });
+}
+
+function handleRollbackRoute(req: IncomingMessage, res: ServerResponse): void {
+  readBody(req, (body) => {
+    try {
+      const session = getSession();
+      if (!session) {
+        jsonResponse(res, 404, { error: "No active session" });
+        return;
+      }
+
+      const { hash } = JSON.parse(body);
+      if (!hash || typeof hash !== "string") {
+        jsonResponse(res, 400, { error: "Commit hash is required" });
+        return;
+      }
+
+      // Add a system message to chat (chat is immutable, always grows)
+      addMessage("assistant", `Rolled back to version ${hash.slice(0, 7)}.`);
+
+      const result = rollbackToCommit(session.themePath, hash);
+      if (!result.success) {
+        jsonResponse(res, 500, { error: result.error || "Rollback failed" });
+        return;
+      }
+
+      // Reload modules from restored files
+      reloadModulesFromDisk();
+      saveSession();
+
+      jsonResponse(res, 200, {
+        ok: true,
+        modules: getOrderedModules().map((m) => m.moduleName),
+      });
+    } catch (err) {
+      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
 // ---------------------------------------------------------------------------
 // WebSocket handler
 // ---------------------------------------------------------------------------
@@ -1084,6 +1186,11 @@ function handleWsConnection(ws: WebSocket): void {
         addMessage("user", userMessage);
         saveSession();
 
+        // Set up parse warning callback for this generation
+        setParseWarningCallback((warning) => {
+          ws.send(JSON.stringify({ type: "parse_warning", message: warning }));
+        });
+
         // Stream AI response back via WebSocket
         try {
           await handleGenerateStream(
@@ -1095,6 +1202,16 @@ function handleWsConnection(ws: WebSocket): void {
               ws.send(JSON.stringify({ type: "stream_status", content: status }));
             }
           );
+
+          // Write modules to disk and commit for version history
+          const currentSession = getSession();
+          if (currentSession) {
+            writeModulesToDisk();
+            const commitHash = commitThemeState(currentSession.themePath, userMessage);
+            if (commitHash) {
+              ws.send(JSON.stringify({ type: "version_created", hash: commitHash }));
+            }
+          }
 
           // After generation, send updated preview
           ws.send(JSON.stringify({ type: "generation_complete" }));
@@ -1151,7 +1268,15 @@ function handleWsConnection(ws: WebSocket): void {
             removeJobListener(jobId, chunkListener);
 
             if (job.status === "completed") {
-              ws.send(JSON.stringify({ type: "upload_complete", output: job.output }));
+              const auth = detectHubSpotAuth();
+              const dc = auth.portalId ? detectDataCenter(auth.portalId) : "na1";
+              ws.send(JSON.stringify({
+                type: "upload_complete",
+                output: job.output,
+                portalId: auth.portalId || "",
+                dataCenter: dc,
+                themeName: session.themeName,
+              }));
             } else {
               const errors = parseUploadErrors(job.output);
               ws.send(JSON.stringify({
@@ -1186,6 +1311,8 @@ IMPORTANT: Be verbose in your response. For each error:
 3. Describe the specific fix you're applying (e.g. "Changing field type from textarea to text" or "Renaming field from 'name' to 'item_name'")
 4. Apply the fix to the module files
 
+CRITICAL: After fixing the reported errors, scan ALL other module files in the theme for the same issues. For example, if you fix "name" → "item_name" in one module, check every other module's fields.json for the same problem. Fix all occurrences, not just the ones in the error log.
+
 After fixing all errors, summarize the changes you made.
 
 Upload log:
@@ -1201,6 +1328,16 @@ ${errorContext}`;
             ws.send(JSON.stringify({ type: "stream", content: chunk }));
             ws.send(JSON.stringify({ type: "upload_fix_stream", content: chunk }));
           });
+
+          // Write fixes to disk and commit
+          const fixSession = getSession();
+          if (fixSession) {
+            writeModulesToDisk();
+            const fixHash = commitThemeState(fixSession.themePath, "AI fix: upload errors");
+            if (fixHash) {
+              ws.send(JSON.stringify({ type: "version_created", hash: fixHash }));
+            }
+          }
 
           ws.send(JSON.stringify({ type: "upload_fix_complete" }));
           ws.send(JSON.stringify({
@@ -1244,6 +1381,8 @@ ${errorContext}`;
       themeName: session.themeName,
       modules: getOrderedModules().map((m) => m.moduleName),
       messageCount: session.messages.length,
+      messages: session.messages,
+      gitAvailable: isGitAvailable(),
       engine: cfg.aiEngine ? engineLabels[cfg.aiEngine] || cfg.aiEngine : "",
     }));
   } else {
