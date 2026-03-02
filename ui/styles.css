@@ -709,27 +709,29 @@ html, body {
 
 .module-item__drag {
   cursor: grab;
-  color: var(--text-muted);
+  color: var(--accent);
+  opacity: 0.5;
   font-size: 11px;
   line-height: 1;
 }
+.module-item:hover .module-item__drag { opacity: 1; }
 
 .module-item__name { flex: 1; }
 
 .module-item__edit {
   opacity: 0;
-  color: var(--text-muted);
+  color: var(--accent);
   font-size: 12px;
   cursor: pointer;
   padding: 2px;
   transition: opacity 0.1s;
 }
 .module-item:hover .module-item__edit { opacity: 1; }
-.module-item__edit:hover { color: var(--accent); }
+.module-item__edit:hover { color: var(--accent-hover); }
 
 .module-item__delete {
   opacity: 0;
-  color: var(--text-muted);
+  color: var(--accent);
   font-size: 15px;
   cursor: pointer;
   padding: 2px;
@@ -737,7 +739,7 @@ html, body {
   line-height: 1;
 }
 .module-item:hover .module-item__delete { opacity: 1; }
-.module-item__delete:hover { color: #e8613a; }
+.module-item__delete:hover { color: var(--accent-hover); }
 
 /* ================================================================
    CHAT

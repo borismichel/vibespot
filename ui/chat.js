@@ -24,6 +24,13 @@ const statusEngine = document.getElementById("status-engine");
 // ---------------------------------------------------------------------------
 
 function connectWebSocket() {
+  // Close any existing connection to prevent duplicates and stale state
+  if (ws) {
+    ws.onclose = null; // prevent auto-reconnect from old socket
+    ws.close();
+    ws = null;
+  }
+
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   ws = new WebSocket(`${protocol}//${location.host}`);
 
@@ -58,6 +65,12 @@ function handleWsMessage(msg) {
   switch (msg.type) {
     case "init":
       document.getElementById("theme-name").textContent = msg.themeName || "—";
+
+      // Clear previous project's chat and module list
+      messagesEl.innerHTML = "";
+      document.getElementById("module-items").innerHTML = "";
+      document.getElementById("module-count").textContent = "0";
+
       if (msg.modules && msg.modules.length > 0) {
         updateModuleList(msg.modules);
         refreshPreview();
@@ -67,8 +80,6 @@ function handleWsMessage(msg) {
 
       // Restore chat history from server
       if (msg.messages && msg.messages.length > 0) {
-        const welcome = messagesEl.querySelector(".chat__welcome");
-        if (welcome) welcome.remove();
         for (const m of msg.messages) {
           if (m.role === "user") {
             appendUserMessage(m.content);
