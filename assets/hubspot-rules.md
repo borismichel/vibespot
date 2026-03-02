@@ -135,6 +135,30 @@ THEMES can only use a LIMITED subset:
   2. Your module folder is missing the .module suffix (see above)
 ```
 
+### Color Field Format (CRITICAL)
+```
+Color fields MUST use this exact default format:
+  { "color": "#rrggbb", "opacity": 100 }
+
+RULES:
+  - "color" MUST be a 6-digit hex string starting with "#" (e.g. "#ffffff")
+  - "opacity" MUST be an integer from 0 to 100 (NOT a float like 0.7)
+  - NEVER use rgba(), rgb(), hsl(), or named colors (e.g. "red", "white")
+
+  ✅ { "color": "#ffffff", "opacity": 70 }
+  ✅ { "color": "#1a2e0d", "opacity": 100 }
+  ❌ { "color": "rgba(255,255,255,0.7)", "opacity": 100 }   ← INVALID
+  ❌ { "color": "white", "opacity": 100 }                    ← INVALID
+  ❌ { "color": "#fff", "opacity": 100 }                     ← INVALID (3-digit)
+  ❌ { "color": "#ffffff", "opacity": 0.7 }                  ← INVALID (float)
+
+HubSpot error: "The format for the color value is invalid"
+This error means you used a non-hex color format in a color field default.
+Convert rgba to hex + opacity:
+  rgba(255,255,255,0.85) → { "color": "#ffffff", "opacity": 85 }
+  rgba(0,0,0,0.5) → { "color": "#000000", "opacity": 50 }
+```
+
 ### Style Fields (tab: "STYLE")
 ```
 - Style fields MUST be wrapped in a group with "tab": "STYLE"
@@ -445,6 +469,7 @@ If your theme uses different names, use alternate_names in theme fields.json:
 
 | Error | Likely Cause |
 |-------|-------------|
+| `The format for the color value is invalid` | Color field default uses rgba/rgb/named color instead of hex `{ "color": "#rrggbb", "opacity": 100 }` |
 | `Cannot resolve property "[missing {{ token }} value]"` | Multiple dnd_modules in a section without width/offset |
 | `"text" fields are not supported in theme fields.json` | Module folder missing .module suffix, OR text field in theme fields.json |
 | `Module inherits standard fields` | Font/color field missing `inherited_value` with `default_value_path` |
@@ -516,6 +541,7 @@ Before deploying any HubSpot CMS code, verify:
 - [ ] No field names collide with dnd reserved parameters (width, offset, label, path, styles)
 - [ ] Field names use snake_case, no spaces or dashes
 - [ ] All fields have `default` values (no empty defaults for required fields)
+- [ ] Color field defaults use hex format `{ "color": "#rrggbb", "opacity": 100 }` — no rgba/rgb/named colors
 - [ ] No Lorem Ipsum in any default values
 - [ ] URL fields accessed via `.href`, image fields via `.src`
 - [ ] Multiple dnd_modules in sections have `width` and `offset` defined

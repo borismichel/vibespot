@@ -8,7 +8,7 @@ import {
   type UploadError,
 } from "../server/auto-fix.js";
 
-/** Count "Uploaded file" lines in hs upload output */
+/** Count "Uploaded file" lines in hs cms upload output */
 function countUploadedFiles(output: string): number {
   return (output.match(/^Uploaded file /gm) || []).length;
 }
@@ -28,11 +28,11 @@ export async function runUpload(themePath: string): Promise<boolean> {
         : `Retrying upload (attempt ${attempt}/${MAX_RETRIES})...`
     );
 
-    const result = run(`hs upload "${themePath}" "${themeName}"`, {
+    const result = run(`hs cms upload "${themePath}" "${themeName}"`, {
       cwd: join(themePath, ".."),
     });
 
-    // Combine stdout + stderr — hs upload logs success lines and errors to both
+    // Combine stdout + stderr — hs cms upload logs success lines and errors to both
     const fullOutput = [result.stdout, result.stderr].filter(Boolean).join("\n");
     const uploadedCount = countUploadedFiles(fullOutput);
 
@@ -115,7 +115,7 @@ export async function runUpload(themePath: string): Promise<boolean> {
     if (!anyFixed) {
       // Try removing stuck modules as last resort
       s.start("Cleaning up stuck modules...");
-      run(`hs remove "${themeName}/modules"`, {
+      run(`hs cms remove "${themeName}/modules"`, {
         cwd: join(themePath, ".."),
       });
       s.stop("Cleaned up modules, retrying...");
@@ -123,7 +123,7 @@ export async function runUpload(themePath: string): Promise<boolean> {
   }
 
   ui.logError(
-    "Upload failed after multiple attempts. Try running `hs upload` manually to see detailed errors."
+    "Upload failed after multiple attempts. Try running `hs cms upload` manually to see detailed errors."
   );
   return false;
 }

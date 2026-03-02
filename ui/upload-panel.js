@@ -10,9 +10,36 @@ let lastUploadDataCenter = "na1";
 let lastUploadThemeName = "";
 const MAX_UPLOAD_ATTEMPTS = 3;
 
-function startUpload() {
+async function startUpload() {
   if (uploadState === "uploading" || uploadState === "ai_fixing") return;
 
+  const uploadBtn = document.getElementById("btn-upload");
+  if (uploadBtn) {
+    uploadBtn.innerHTML = '<span class="upload-spinner"></span>';
+    uploadBtn.disabled = true;
+  }
+
+  // Fetch portal info and ask for confirmation before uploading
+  try {
+    const res = await fetch("/api/settings/status");
+    const data = await res.json();
+    const hs = data.environment?.tools?.hubspot;
+
+    if (hs && hs.authenticated && hs.portalName) {
+      const confirmed = await confirmUpload(hs.portalName, hs.portalId);
+      if (!confirmed) {
+        if (uploadBtn) { uploadBtn.textContent = "Deploy"; uploadBtn.disabled = false; }
+        return;
+      }
+    }
+  } catch {
+    // If we can't detect the portal, proceed without confirmation
+  }
+
+  doUpload();
+}
+
+function doUpload() {
   uploadAttempt = 0;
   const panel = document.getElementById("upload-panel");
   const log = document.getElementById("upload-log");
@@ -29,6 +56,38 @@ function startUpload() {
     appendUploadLog("Error: Not connected to server\n");
     setUploadState("failed");
   }
+}
+
+function confirmUpload(portalName, portalId) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-overlay";
+    overlay.innerHTML = `
+      <div class="confirm-dialog">
+        <div class="confirm-dialog__title">Deploy to HubSpot?</div>
+        <p class="confirm-dialog__detail">
+          Uploading to <strong>${esc(portalName)}</strong>${portalId ? ` (${esc(portalId)})` : ""}
+        </p>
+        <div class="confirm-dialog__actions">
+          <button class="btn btn--secondary" id="confirm-upload-cancel">Cancel</button>
+          <button class="btn btn--primary" id="confirm-upload-go">Deploy</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById("confirm-upload-cancel").addEventListener("click", () => {
+      overlay.remove();
+      resolve(false);
+    });
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) { overlay.remove(); resolve(false); }
+    });
+    document.getElementById("confirm-upload-go").addEventListener("click", () => {
+      overlay.remove();
+      resolve(true);
+    });
+  });
 }
 
 function setUploadState(state, data) {

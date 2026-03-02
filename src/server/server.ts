@@ -355,7 +355,7 @@ async function handleUploadRoute(res: ServerResponse): Promise<void> {
 
     // Start a streaming upload job
     const jobId = startStreamingJob(
-      `hs upload "${session.themePath}" "${session.themeName}"`,
+      `hs cms upload "${session.themePath}" "${session.themeName}"`,
       "Uploading to HubSpot",
       { cwd: join(session.themePath, ".."), timeout: 180_000 }
     );
@@ -1260,7 +1260,7 @@ function handleWsConnection(ws: WebSocket): void {
 
           // Start streaming upload job
           const jobId = startStreamingJob(
-            `hs upload "${session.themePath}" "${session.themeName}"`,
+            `hs cms upload "${session.themePath}" "${session.themeName}"`,
             "Uploading to HubSpot",
             { cwd: join(session.themePath, ".."), timeout: 180_000 }
           );
@@ -1317,7 +1317,7 @@ function handleWsConnection(ws: WebSocket): void {
           break;
         }
 
-        const fixPrompt = `The HubSpot upload ("hs upload") failed. Below is the upload log output containing the errors.
+        const fixPrompt = `The HubSpot upload ("hs cms upload") failed. Below is the upload log output containing the errors.
 
 IMPORTANT: Be verbose in your response. For each error:
 1. State exactly which file has the problem and what the error is

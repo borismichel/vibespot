@@ -68,6 +68,14 @@ export function parseUploadErrors(output: string): UploadError[] {
     });
   }
 
+  if (/format for the color value is invalid/i.test(output)) {
+    errors.push({
+      file: "fields.json",
+      message: "Color field has invalid format (rgba/rgb/named — must be hex)",
+      fixable: true,
+    });
+  }
+
   return errors;
 }
 
@@ -78,6 +86,7 @@ export function applyAutoFixes(themePath: string): string[] {
   if (fixNowFunction(themePath)) fixes.push('now() → local_dt');
   if (fixHubDbTemplates(themePath)) fixes.push('Removed HubDB templates');
   if (fixLinkFieldDefaults(themePath)) fixes.push('Fixed link field defaults');
+  if (fixColorFieldDefaults(themePath)) fixes.push('Fixed rgba/invalid color values → hex');
   if (fixCdnImports(themePath)) fixes.push('Stripped CDN @import statements');
   return fixes;
 }
@@ -89,6 +98,8 @@ export function autoFixError(themePath: string, error: UploadError): boolean {
   if (error.message.includes("HubDB")) return fixHubDbTemplates(themePath);
   if (error.message.includes("invalid default value") || error.message.includes("deserialization"))
     return fixLinkFieldDefaults(themePath);
+  if (error.message.includes("invalid format") && error.message.includes("color"))
+    return fixColorFieldDefaults(themePath);
   return false;
 }
 
@@ -243,6 +254,97 @@ export function fixCdnImports(themePath: string): boolean {
   }
 
   return fixed;
+}
+
+/**
+ * Fix color fields that use rgba(), rgb(), named colors, or 3-digit hex.
+ * HubSpot requires: { "color": "#rrggbb", "opacity": 100 }
+ */
+export function fixColorFieldDefaults(themePath: string): boolean {
+  let fixed = false;
+  const modulesDir = join(themePath, "modules");
+  if (!fileExists(modulesDir)) return false;
+
+  for (const entry of readdirSync(modulesDir)) {
+    if (!entry.endsWith(".module")) continue;
+    const fieldsPath = join(modulesDir, entry, "fields.json");
+    if (!fileExists(fieldsPath)) continue;
+    try {
+      const fields = JSON.parse(readFile(fieldsPath));
+      if (fixColorFieldsRecursive(fields)) {
+        writeFile(fieldsPath, JSON.stringify(fields, null, 2) + "\n");
+        fixed = true;
+      }
+    } catch {
+      // Skip malformed JSON
+    }
+  }
+  return fixed;
+}
+
+function fixColorFieldsRecursive(fields: unknown[]): boolean {
+  let fixed = false;
+  for (const field of fields) {
+    if (typeof field !== "object" || field === null) continue;
+    const f = field as Record<string, unknown>;
+
+    if (f.type === "color" && f.default && typeof f.default === "object") {
+      const def = f.default as Record<string, unknown>;
+      const colorVal = def.color;
+      if (typeof colorVal === "string" && !isValidHexColor(colorVal)) {
+        const converted = convertToHex(colorVal);
+        if (converted) {
+          def.color = converted.hex;
+          // If the rgba had opacity, use that instead of the existing opacity
+          if (converted.opacity !== undefined) {
+            def.opacity = converted.opacity;
+          }
+          fixed = true;
+        }
+      }
+    }
+
+    if (Array.isArray(f.children)) {
+      if (fixColorFieldsRecursive(f.children as unknown[])) fixed = true;
+    }
+  }
+  return fixed;
+}
+
+function isValidHexColor(color: string): boolean {
+  return /^#[0-9a-fA-F]{6}$/.test(color);
+}
+
+function convertToHex(color: string): { hex: string; opacity?: number } | null {
+  // 3-digit hex → 6-digit
+  const hex3 = color.match(/^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/);
+  if (hex3) {
+    return { hex: `#${hex3[1]}${hex3[1]}${hex3[2]}${hex3[2]}${hex3[3]}${hex3[3]}` };
+  }
+
+  // rgba(r, g, b, a)
+  const rgba = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)/i);
+  if (rgba) {
+    const r = Math.min(255, parseInt(rgba[1]));
+    const g = Math.min(255, parseInt(rgba[2]));
+    const b = Math.min(255, parseInt(rgba[3]));
+    const hex = `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+    const opacity = rgba[4] !== undefined ? Math.round(parseFloat(rgba[4]) * 100) : undefined;
+    return { hex, opacity };
+  }
+
+  // Named colors (common ones)
+  const named: Record<string, string> = {
+    white: "#ffffff", black: "#000000", red: "#ff0000", green: "#008000",
+    blue: "#0000ff", yellow: "#ffff00", orange: "#ffa500", purple: "#800080",
+    gray: "#808080", grey: "#808080", transparent: "#000000",
+  };
+  const lower = color.toLowerCase().trim();
+  if (named[lower]) {
+    return { hex: named[lower], opacity: lower === "transparent" ? 0 : undefined };
+  }
+
+  return null;
 }
 
 function fixLinkFieldsRecursive(fields: unknown[]): boolean {
