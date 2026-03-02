@@ -4,7 +4,7 @@
  */
 
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, existsSync, readdirSync, appendFileSync, rmSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, appendFileSync, rmSync, renameSync } from "node:fs";
 import { join, extname, basename } from "node:path";
 import { homedir } from "node:os";
 import { execSync } from "node:child_process";
@@ -519,12 +519,26 @@ function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse): void
         rmSync(themePath, { recursive: true, force: true });
       }
 
-      // Create theme with hs CLI to get the full HubSpot boilerplate
+      // hs create ALWAYS creates in process.cwd(), ignoring execSync's cwd option.
+      // So we create it wherever it lands, then move it to the workspace.
+      const cwdBefore = new Set(readdirSync(process.cwd()));
       execSync(`hs create website-theme "${themeName}"`, {
         encoding: "utf-8",
         stdio: "pipe",
-        cwd: WORKSPACE_DIR,
       });
+
+      // Find where hs create actually put the theme
+      let createdAt = join(process.cwd(), themeName);
+      if (!existsSync(createdAt)) {
+        const cwdAfter = readdirSync(process.cwd());
+        const newDir = cwdAfter.find((e) => !cwdBefore.has(e) && existsSync(join(process.cwd(), e)));
+        if (newDir) createdAt = join(process.cwd(), newDir);
+      }
+
+      // Move to workspace if it was created elsewhere
+      if (createdAt !== themePath && existsSync(createdAt)) {
+        renameSync(createdAt, themePath);
+      }
 
       // Clear boilerplate page templates (keep layouts/ and partials/ for extends)
       const tplDir = join(themePath, "templates");
