@@ -447,6 +447,9 @@ function showSetup() {
   document.getElementById("setup-topbar").classList.remove("hidden");
   currentAppTheme = "";
 
+  // Clear any leftover loading state from previous navigation
+  hideLoading();
+
   if (location.hash && location.hash !== "#/") {
     history.pushState(null, "", "#/");
   }
