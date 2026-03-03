@@ -6,22 +6,44 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { spawn, execSync } from "node:child_process";
-import { getConversionGuide, getDesignGuide, getContentGuide, getHubspotRules } from "../ai/prompts.js";
+import { getConversionGuide, getDesignGuide, getContentGuide, getHubspotRules, getPageTypeGuide } from "../ai/prompts.js";
 import { loadConfig, getApiKeyForEngine, type AIEngineType } from "../utils/config.js";
 import {
   getSession,
   addMessage,
   updateModules,
   saveSession,
+  getActiveTemplate,
+  getModuleLibrary,
   type ChatMessage,
 } from "./session.js";
 import type { ModuleFiles } from "../ai/engine.js";
+
+/**
+ * Get the active template's page type and brand assets from the session.
+ * Used when building the system prompt.
+ */
+function getPromptContext(): { pageType?: string; brandAssets?: { styleguide?: string; brandvoice?: string } } {
+  const session = getSession();
+  if (!session) return {};
+  const tpl = getActiveTemplate();
+  return {
+    pageType: tpl?.pageType,
+    brandAssets: session.brandAssets,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // System prompt for vibe coding mode
 // ---------------------------------------------------------------------------
 
-function buildVibeSystemPrompt(conversionGuide: string, themeName: string, editMode: boolean = false): string {
+function buildVibeSystemPrompt(
+  conversionGuide: string,
+  themeName: string,
+  editMode: boolean = false,
+  pageType?: string,
+  brandAssets?: { styleguide?: string; brandvoice?: string }
+): string {
   const core = `You are vibeSpot, an AI that builds HubSpot CMS landing pages from natural language descriptions.
 
 ## Your Role
@@ -90,16 +112,31 @@ NEVER respond with only a text summary. The vibespot-modules JSON block is manda
 When the user asks to change something, include ONLY the modules that changed. Keep module names consistent.
 If the change affects shared CSS or JS, include those too.`;
 
+  // Page type context (included in both edit and full mode)
+  const pageTypeSection = pageType ? getPageTypeGuide(pageType) : "";
+  const pageTypePrompt = pageTypeSection ? `\n\n## Page Type Context\n${pageTypeSection}` : "";
+
+  // Brand assets (only in full mode to keep edits lean)
+  let brandPrompt = "";
+  if (!editMode && brandAssets) {
+    if (brandAssets.styleguide) {
+      brandPrompt += `\n\n## Brand Style Guide\n${brandAssets.styleguide}`;
+    }
+    if (brandAssets.brandvoice) {
+      brandPrompt += `\n\n## Brand Voice\n${brandAssets.brandvoice}`;
+    }
+  }
+
   // For follow-up edits (modules already exist), skip the heavy guides
   if (editMode) {
-    return core + `
+    return core + pageTypePrompt + `
 
 ## HubSpot CMS Rules
 ${getHubspotRules()}`;
   }
 
   // Full prompt for initial generation
-  return core + `
+  return core + pageTypePrompt + brandPrompt + `
 
 ## Design Quality
 - Use modern, clean design with proper spacing and typography
@@ -242,6 +279,19 @@ function buildStateContext(): string {
       stateContext += `\n### Shared JS\n\`\`\`js\n${session.sharedJs}\n\`\`\`\n`;
     }
   }
+
+  // Add module library context (modules from other templates the user can reuse)
+  const library = getModuleLibrary();
+  const currentModuleNames = new Set(session.modules.map((m) => m.moduleName));
+  const otherModules = library.filter((e) => !currentModuleNames.has(e.module.moduleName));
+  if (otherModules.length > 0) {
+    stateContext += "\n\n## Available modules in this theme (reusable)\n";
+    for (const entry of otherModules) {
+      stateContext += `- ${entry.module.moduleName} (used in: ${entry.usedIn.join(", ")})\n`;
+    }
+    stateContext += "\nThe user can ask to reuse any of these modules by name.\n";
+  }
+
   return stateContext;
 }
 
@@ -297,7 +347,7 @@ async function streamWithAnthropicAPI(
   const stream = client.messages.stream({
     model,
     max_tokens: 16384,
-    system: buildVibeSystemPrompt(conversionGuide, themeName, editMode),
+    system: buildVibeSystemPrompt(conversionGuide, themeName, editMode, getPromptContext().pageType, getPromptContext().brandAssets),
     messages,
   });
 
@@ -341,7 +391,7 @@ async function streamWithOpenAIAPI(
       max_tokens: 16384,
       stream: true,
       messages: [
-        { role: "system", content: buildVibeSystemPrompt(conversionGuide, themeName, editMode) },
+        { role: "system", content: buildVibeSystemPrompt(conversionGuide, themeName, editMode, getPromptContext().pageType, getPromptContext().brandAssets) },
         ...messages,
       ],
     }),
@@ -422,7 +472,7 @@ async function streamWithGeminiAPI(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: buildVibeSystemPrompt(conversionGuide, themeName, editMode) }] },
+      systemInstruction: { parts: [{ text: buildVibeSystemPrompt(conversionGuide, themeName, editMode, getPromptContext().pageType, getPromptContext().brandAssets) }] },
       contents,
       generationConfig: { maxOutputTokens: 16384 },
     }),
@@ -553,7 +603,7 @@ async function generateWithClaudeCode(
   const config = loadConfig();
   const editMode = getSession()!.modules.length > 0;
 
-  let prompt = buildVibeSystemPrompt(conversionGuide, themeName, editMode);
+  let prompt = buildVibeSystemPrompt(conversionGuide, themeName, editMode, getPromptContext().pageType, getPromptContext().brandAssets);
   prompt += "\n\n## User Request\n" + userMessage;
   prompt += buildStateContext();
 
@@ -596,7 +646,7 @@ async function generateWithCLI(
   const conversionGuide = getConversionGuide();
   const editMode = getSession()!.modules.length > 0;
 
-  let prompt = buildVibeSystemPrompt(conversionGuide, themeName, editMode);
+  let prompt = buildVibeSystemPrompt(conversionGuide, themeName, editMode, getPromptContext().pageType, getPromptContext().brandAssets);
   prompt += "\n\n## User Request\n" + userMessage;
   prompt += buildStateContext();
 

@@ -25,9 +25,17 @@ import {
   listSessions,
   deleteSession,
   reloadModulesFromDisk,
+  getActiveTemplate,
+  setActiveTemplate,
+  addTemplate,
+  removeTemplate,
+  getModuleLibrary,
+  migrateSession,
+  type PageType,
+  type TemplateEntry,
 } from "./session.js";
 import { commitThemeState, getHistory, rollbackToCommit, isGitAvailable } from "./project-git.js";
-import { buildPreviewHtml } from "./preview.js";
+import { buildPreviewHtml, buildModulePreviewHtml } from "./preview.js";
 import { handleGenerate, handleGenerateStream, setParseWarningCallback } from "./ai-handler.js";
 import { analyzeSource, type SourceAnalysis } from "../wizard/source.js";
 import { loadConfig, saveConfig, getApiKeyForEngine, type AIEngineType } from "../utils/config.js";
@@ -112,6 +120,15 @@ function handleRequest(req: IncomingMessage, res: ServerResponse, uiDir: string)
     const html = buildPreviewHtml();
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(html);
+    return;
+  }
+
+  // Single-module preview (for dashboard module library)
+  if (url.pathname === "/module-preview") {
+    const moduleName = url.searchParams.get("module") || "";
+    const html = buildModulePreviewHtml(moduleName);
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(html || "<!-- module not found -->");
     return;
   }
 
@@ -259,10 +276,38 @@ function handleApiRoute(
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
+    // Dashboard & template routes
+    case "/api/dashboard":
+      if (method === "GET") handleDashboardRoute(res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/templates":
+      handleTemplatesRoute(method, req, res);
+      break;
+
+    case "/api/templates/activate":
+      if (method === "POST") handleTemplateActivateRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/module-library":
+      if (method === "GET") handleModuleLibraryRoute(res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/brand-assets":
+      handleBrandAssetsRoute(method, req, res);
+      break;
+
     default:
       // Prefix match for job polling: /api/settings/job/:id
       if (path.startsWith("/api/settings/job/") && method === "GET") {
         handleSettingsJobRoute(path, res);
+      }
+      // Prefix match for template add-module: /api/templates/:id/add-module
+      else if (path.match(/^\/api\/templates\/[^/]+\/add-module$/) && method === "POST") {
+        handleAddModuleToTemplateRoute(path, req, res);
       } else {
         jsonResponse(res, 404, { error: "Not found" });
       }
@@ -1179,6 +1224,270 @@ function handleRollbackRoute(req: IncomingMessage, res: ServerResponse): void {
 }
 
 // ---------------------------------------------------------------------------
+// Dashboard & template routes
+// ---------------------------------------------------------------------------
+
+function handleDashboardRoute(res: ServerResponse): void {
+  const session = getSession();
+  if (!session) {
+    jsonResponse(res, 404, { error: "No active session" });
+    return;
+  }
+
+  const library = getModuleLibrary();
+  jsonResponse(res, 200, {
+    themeName: session.themeName,
+    themePath: session.themePath,
+    templates: session.templates.map((t) => ({
+      id: t.id,
+      label: t.label,
+      pageType: t.pageType,
+      moduleCount: t.modules.length,
+      messageCount: t.messages.length,
+    })),
+    activeTemplateId: session.activeTemplateId,
+    moduleLibrary: library.map((entry) => ({
+      moduleName: entry.module.moduleName,
+      usedIn: entry.usedIn,
+    })),
+    brandAssets: {
+      hasStyleguide: !!session.brandAssets?.styleguide,
+      hasBrandvoice: !!session.brandAssets?.brandvoice,
+    },
+  });
+}
+
+function handleTemplatesRoute(method: string, req: IncomingMessage, res: ServerResponse): void {
+  const session = getSession();
+  if (!session) {
+    jsonResponse(res, 404, { error: "No active session" });
+    return;
+  }
+
+  if (method === "GET") {
+    jsonResponse(res, 200, {
+      templates: session.templates.map((t) => ({
+        id: t.id,
+        label: t.label,
+        pageType: t.pageType,
+        moduleCount: t.modules.length,
+      })),
+      activeTemplateId: session.activeTemplateId,
+    });
+    return;
+  }
+
+  if (method === "POST") {
+    readBody(req, (body) => {
+      try {
+        const { pageType, label } = JSON.parse(body);
+        if (!pageType || !label) {
+          jsonResponse(res, 400, { error: "pageType and label are required" });
+          return;
+        }
+        const validTypes: PageType[] = ["landing_page", "blog_post", "website_page", "module_only"];
+        if (!validTypes.includes(pageType)) {
+          jsonResponse(res, 400, { error: `Invalid pageType: ${pageType}` });
+          return;
+        }
+
+        const entry = addTemplate(pageType, label);
+        saveSession();
+
+        jsonResponse(res, 200, {
+          ok: true,
+          template: {
+            id: entry.id,
+            label: entry.label,
+            pageType: entry.pageType,
+          },
+        });
+      } catch (err) {
+        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
+    });
+    return;
+  }
+
+  if (method === "DELETE") {
+    readBody(req, (body) => {
+      try {
+        const { templateId } = JSON.parse(body);
+        if (!templateId) {
+          jsonResponse(res, 400, { error: "templateId is required" });
+          return;
+        }
+        const removed = removeTemplate(templateId);
+        if (!removed) {
+          jsonResponse(res, 404, { error: "Template not found" });
+          return;
+        }
+        saveSession();
+        jsonResponse(res, 200, { ok: true });
+      } catch (err) {
+        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
+    });
+    return;
+  }
+
+  jsonResponse(res, 405, { error: "Method not allowed" });
+}
+
+function handleTemplateActivateRoute(req: IncomingMessage, res: ServerResponse): void {
+  readBody(req, (body) => {
+    try {
+      const { templateId } = JSON.parse(body);
+      if (!templateId) {
+        jsonResponse(res, 400, { error: "templateId is required" });
+        return;
+      }
+      const success = setActiveTemplate(templateId);
+      if (!success) {
+        jsonResponse(res, 404, { error: "Template not found" });
+        return;
+      }
+      saveSession();
+      const session = getSession();
+      jsonResponse(res, 200, {
+        ok: true,
+        modules: getOrderedModules().map((m) => m.moduleName),
+        messageCount: session?.messages.length || 0,
+      });
+    } catch (err) {
+      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
+function handleModuleLibraryRoute(res: ServerResponse): void {
+  const library = getModuleLibrary();
+  jsonResponse(res, 200, {
+    modules: library.map((entry) => ({
+      moduleName: entry.module.moduleName,
+      usedIn: entry.usedIn,
+      fieldsJson: entry.module.fieldsJson,
+    })),
+  });
+}
+
+function handleAddModuleToTemplateRoute(path: string, req: IncomingMessage, res: ServerResponse): void {
+  const session = getSession();
+  if (!session) {
+    jsonResponse(res, 404, { error: "No active session" });
+    return;
+  }
+
+  readBody(req, (body) => {
+    try {
+      const { moduleName } = JSON.parse(body);
+      if (!moduleName) {
+        jsonResponse(res, 400, { error: "moduleName is required" });
+        return;
+      }
+
+      // Find the module in the library (across all templates)
+      const library = getModuleLibrary();
+      const entry = library.find((e) => e.module.moduleName === moduleName);
+      if (!entry) {
+        jsonResponse(res, 404, { error: `Module "${moduleName}" not found in library` });
+        return;
+      }
+
+      // Copy the module into the active template / session
+      const modCopy = { ...entry.module };
+      const existing = session.modules.find((m) => m.moduleName === modCopy.moduleName);
+      if (!existing) {
+        session.modules.push(modCopy);
+        session.moduleOrder.push(modCopy.moduleName);
+        session.updatedAt = Date.now();
+      }
+
+      saveSession();
+      jsonResponse(res, 200, { ok: true });
+    } catch (err) {
+      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
+function handleBrandAssetsRoute(method: string, req: IncomingMessage, res: ServerResponse): void {
+  const session = getSession();
+  if (!session) {
+    jsonResponse(res, 404, { error: "No active session" });
+    return;
+  }
+
+  if (method === "GET") {
+    jsonResponse(res, 200, {
+      styleguide: session.brandAssets?.styleguide || null,
+      brandvoice: session.brandAssets?.brandvoice || null,
+    });
+    return;
+  }
+
+  if (method === "POST") {
+    readBody(req, (body) => {
+      try {
+        const { type, content } = JSON.parse(body);
+        if (!type || !content) {
+          jsonResponse(res, 400, { error: "type and content are required" });
+          return;
+        }
+        if (type !== "styleguide" && type !== "brandvoice") {
+          jsonResponse(res, 400, { error: `Invalid type: ${type}. Must be "styleguide" or "brandvoice"` });
+          return;
+        }
+
+        if (!session.brandAssets) session.brandAssets = {};
+        session.brandAssets[type] = content;
+        session.updatedAt = Date.now();
+
+        // Also persist to theme directory
+        const assetDir = join(session.themePath, ".vibespot");
+        ensureDir(assetDir);
+        writeFile(join(assetDir, `${type}.md`), content);
+
+        saveSession();
+        jsonResponse(res, 200, { ok: true });
+      } catch (err) {
+        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
+    });
+    return;
+  }
+
+  if (method === "DELETE") {
+    readBody(req, (body) => {
+      try {
+        const { type } = JSON.parse(body);
+        if (type !== "styleguide" && type !== "brandvoice") {
+          jsonResponse(res, 400, { error: `Invalid type: ${type}` });
+          return;
+        }
+
+        if (session.brandAssets) {
+          delete session.brandAssets[type];
+        }
+        session.updatedAt = Date.now();
+
+        // Remove from disk too
+        const filePath = join(session.themePath, ".vibespot", `${type}.md`);
+        if (existsSync(filePath)) rmSync(filePath);
+
+        saveSession();
+        jsonResponse(res, 200, { ok: true });
+      } catch (err) {
+        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
+    });
+    return;
+  }
+
+  jsonResponse(res, 405, { error: "Method not allowed" });
+}
+
+// ---------------------------------------------------------------------------
 // WebSocket handler
 // ---------------------------------------------------------------------------
 
@@ -1390,6 +1699,7 @@ ${errorContext}`;
       "codex-cli": "Codex CLI",
       "api": "Anthropic API",
     };
+    const activeTpl = getActiveTemplate();
     ws.send(JSON.stringify({
       type: "init",
       themeName: session.themeName,
@@ -1398,6 +1708,15 @@ ${errorContext}`;
       messages: session.messages,
       gitAvailable: isGitAvailable(),
       engine: cfg.aiEngine ? engineLabels[cfg.aiEngine] || cfg.aiEngine : "",
+      // Multi-template context
+      templateId: activeTpl?.id || null,
+      pageType: activeTpl?.pageType || null,
+      templates: (session.templates || []).map((t) => ({
+        id: t.id,
+        label: t.label,
+        pageType: t.pageType,
+        moduleCount: t.modules.length,
+      })),
     }));
   } else {
     ws.send(JSON.stringify({ type: "needs_setup" }));

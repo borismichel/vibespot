@@ -32,6 +32,40 @@ export function getHubspotRules(): string {
   }
 }
 
+/**
+ * Extract page-type-specific section from page-types.md.
+ * Returns only the relevant section for the given page type.
+ */
+export function getPageTypeGuide(pageType: string): string {
+  try {
+    const fullGuide = readFile(resolveAsset("page-types.md"));
+
+    // Map page type to section header
+    const sectionHeaders: Record<string, string> = {
+      landing_page: "## Landing Page",
+      blog_post: "## Blog Post",
+      website_page: "## Website Page",
+      module_only: "## Module Only",
+    };
+
+    const header = sectionHeaders[pageType];
+    if (!header) return "";
+
+    const startIdx = fullGuide.indexOf(header);
+    if (startIdx < 0) return "";
+
+    // Find the next section (## at start of line) after this one
+    const afterHeader = fullGuide.indexOf("\n## ", startIdx + header.length);
+    const section = afterHeader >= 0
+      ? fullGuide.slice(startIdx, afterHeader).trim()
+      : fullGuide.slice(startIdx).trim();
+
+    return section;
+  } catch {
+    return "";
+  }
+}
+
 export function buildSystemPrompt(conversionGuide: string): string {
   return `You are a HubSpot CMS expert converting React/Tailwind pages to native HubSpot modules.
 

@@ -125,5 +125,45 @@ function welcomePreview(): string {
 </html>`;
 }
 
+/**
+ * Build a preview HTML page for a single module (used by the dashboard module library).
+ */
+export function buildModulePreviewHtml(moduleName: string): string {
+  const session = getSession();
+  if (!session) return "";
+
+  // Find the module across all templates
+  let mod: typeof session.modules[0] | undefined;
+  for (const tpl of session.templates) {
+    mod = tpl.modules.find((m) => m.moduleName === moduleName);
+    if (mod) break;
+  }
+  // Fallback: check flat modules array
+  if (!mod) {
+    mod = session.modules.find((m) => m.moduleName === moduleName);
+  }
+  if (!mod) return "";
+
+  let context: { module: Record<string, unknown> };
+  try {
+    const fields: FieldDef[] = JSON.parse(mod.fieldsJson);
+    context = { module: buildContextFromFields(fields) };
+  } catch {
+    context = { module: {} };
+  }
+
+  const rendered = renderHubL(mod.moduleHtml, context);
+
+  return assemblePreview({
+    renderedModules: [
+      `<div class="vibespot-module" data-module="${mod.moduleName}">${rendered}</div>`,
+    ],
+    sharedCss: session.sharedCss,
+    moduleCssArray: mod.moduleCss ? [mod.moduleCss] : [],
+    sharedJs: session.sharedJs,
+    moduleJsArray: mod.moduleJs ? [mod.moduleJs] : [],
+  });
+}
+
 // Note: The generating screen (spinner + rotating messages) is now
 // rendered client-side in preview.js to avoid an extra server round-trip.

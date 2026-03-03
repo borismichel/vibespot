@@ -414,28 +414,39 @@ async function resumeSession(sessionId) {
 let currentAppTheme = "";
 
 function showApp(themeName) {
+  // Route through dashboard instead of going directly to chat
+  if (typeof showDashboard === "function") {
+    currentAppTheme = themeName;
+    showDashboard(themeName);
+  } else {
+    // Fallback if dashboard.js not loaded
+    showAppDirect(themeName);
+  }
+}
+
+/**
+ * Direct app view — shows chat screen without dashboard.
+ * Used as fallback or when navigating from dashboard to a specific template.
+ */
+function showAppDirect(themeName) {
   setupScreen.classList.add("hidden");
   document.getElementById("setup-topbar").classList.add("hidden");
+  if (typeof hideDashboard === "function") hideDashboard();
   appScreen.classList.remove("hidden");
   document.getElementById("theme-name").textContent = themeName;
 
-  // Update browser chrome URL bar
   const urlEl = document.getElementById("browser-url");
   if (urlEl) urlEl.textContent = themeName + ".vibespot.app";
 
-  // Push route (avoid duplicate pushes)
   currentAppTheme = themeName;
   const target = "#/app/" + encodeURIComponent(themeName);
   if (location.hash !== target) {
     history.pushState(null, "", target);
   }
 
-  // Connect WebSocket (defined in chat.js)
   if (typeof connectWebSocket === "function") {
     connectWebSocket();
   }
-
-  // Load initial preview
   if (typeof refreshPreview === "function") {
     refreshPreview();
   }
@@ -443,26 +454,39 @@ function showApp(themeName) {
 
 function showSetup() {
   appScreen.classList.add("hidden");
+  if (typeof hideDashboard === "function") hideDashboard();
   setupScreen.classList.remove("hidden");
   document.getElementById("setup-topbar").classList.remove("hidden");
   currentAppTheme = "";
 
-  // Clear any leftover loading state from previous navigation
   hideLoading();
 
   if (location.hash && location.hash !== "#/") {
     history.pushState(null, "", "#/");
   }
 
-  // Re-fetch setup info to refresh sessions / themes
   initSetup();
 }
 
-// Logo click → go back to setup (home)
+// Logo click → go back to dashboard (from chat) or setup (from dashboard)
 document.querySelectorAll(".topbar__brand").forEach((el) => {
   el.style.cursor = "pointer";
   el.addEventListener("click", () => {
-    // Only navigate back if we're in the app screen
+    const dashEl = document.getElementById("dashboard-screen");
+    // From chat → go to dashboard
+    if (!appScreen.classList.contains("hidden") && currentAppTheme) {
+      if (typeof showDashboard === "function") {
+        appScreen.classList.add("hidden");
+        showDashboard(currentAppTheme);
+        return;
+      }
+    }
+    // From dashboard → go to setup
+    if (dashEl && !dashEl.classList.contains("hidden")) {
+      showSetup();
+      return;
+    }
+    // Fallback
     if (!appScreen.classList.contains("hidden")) {
       showSetup();
     }
@@ -601,19 +625,44 @@ function timeAgo(timestamp) {
 function handleRoute() {
   const hash = location.hash || "#/";
 
-  // #/app/{themeName} → open that theme
-  const appMatch = hash.match(/^#\/app\/(.+)$/);
+  // #/app/{themeName}/{templateId} → open specific template in chat
+  const appTemplateMatch = hash.match(/^#\/app\/([^/]+)\/(.+)$/);
+  if (appTemplateMatch) {
+    const themeName = decodeURIComponent(appTemplateMatch[1]);
+    const templateId = decodeURIComponent(appTemplateMatch[2]);
+    // Already showing this — nothing to do
+    if (currentAppTheme === themeName && !appScreen.classList.contains("hidden")) return;
+    // Open theme then activate template
+    openTheme(themeName).then(() => {
+      if (typeof showChat === "function") {
+        showChat(themeName, templateId);
+      }
+    });
+    return;
+  }
+
+  // #/app/{themeName} → open theme (goes to dashboard or direct)
+  const appMatch = hash.match(/^#\/app\/([^/]+)$/);
   if (appMatch) {
     const themeName = decodeURIComponent(appMatch[1]);
-    // Already showing this theme — nothing to do
     if (currentAppTheme === themeName && !appScreen.classList.contains("hidden")) return;
-    // Try to open the theme
+    openTheme(themeName);
+    return;
+  }
+
+  // #/dashboard/{themeName} → show dashboard for theme
+  const dashMatch = hash.match(/^#\/dashboard\/(.+)$/);
+  if (dashMatch) {
+    const themeName = decodeURIComponent(dashMatch[1]);
+    const dashEl = document.getElementById("dashboard-screen");
+    if (currentDashboardTheme === themeName && dashEl && !dashEl.classList.contains("hidden")) return;
     openTheme(themeName);
     return;
   }
 
   // Default: show setup
-  if (!appScreen.classList.contains("hidden")) {
+  const dashEl = document.getElementById("dashboard-screen");
+  if (!appScreen.classList.contains("hidden") || (dashEl && !dashEl.classList.contains("hidden"))) {
     showSetup();
   }
 }
@@ -624,7 +673,7 @@ window.addEventListener("popstate", handleRoute);
 // Initialize — check URL hash first, fall back to setup screen
 // ---------------------------------------------------------------------------
 
-if (location.hash && location.hash.startsWith("#/app/")) {
+if (location.hash && (location.hash.startsWith("#/app/") || location.hash.startsWith("#/dashboard/"))) {
   handleRoute();
 } else {
   initSetup();

@@ -433,7 +433,8 @@ async function refreshHistoryPanel() {
 }
 
 async function doRollback(hash) {
-  if (!confirm("Restore this version? Your current files will be replaced, but chat history is preserved.")) return;
+  const ok = await vibeConfirm("Restore this version?", "Your current files will be replaced, but chat history is preserved.", { confirmLabel: "Restore", confirmClass: "btn--primary" });
+  if (!ok) return;
   setStatus("Rolling back...");
 
   try {
@@ -445,7 +446,7 @@ async function doRollback(hash) {
     const data = await res.json();
 
     if (data.error) {
-      alert("Rollback failed: " + data.error);
+      await vibeAlert(data.error, "Rollback failed");
       setStatus("Ready");
       return;
     }
@@ -456,7 +457,7 @@ async function doRollback(hash) {
     refreshHistoryPanel();
     setStatus("Ready");
   } catch (err) {
-    alert("Rollback failed: " + err.message);
+    await vibeAlert(err.message, "Rollback failed");
     setStatus("Ready");
   }
 }
@@ -526,42 +527,110 @@ function highlightModuleItem(name) {
   });
 }
 
-function confirmDeleteModule(moduleName) {
-  const overlay = document.createElement("div");
-  overlay.className = "confirm-overlay";
-  overlay.innerHTML = `
-    <div class="confirm-dialog">
-      <div class="confirm-dialog__title">Delete "${escapeHtml(moduleName)}"?</div>
-      <p class="confirm-dialog__warn">This cannot be undone.</p>
-      <div class="confirm-dialog__actions">
-        <button class="btn btn--secondary" id="confirm-cancel">Cancel</button>
-        <button class="btn btn--danger" id="confirm-delete">Delete</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
+// ---------------------------------------------------------------------------
+// Module library — add modules from other templates
+// ---------------------------------------------------------------------------
 
-  document.getElementById("confirm-cancel").addEventListener("click", () => overlay.remove());
-  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+async function toggleModuleLibraryDropdown() {
+  const dropdown = document.getElementById("module-library-dropdown");
+  if (!dropdown.classList.contains("hidden")) {
+    dropdown.classList.add("hidden");
+    return;
+  }
 
-  document.getElementById("confirm-delete").addEventListener("click", async () => {
-    overlay.remove();
-    try {
-      await fetch("/api/modules", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ moduleName }),
+  try {
+    const res = await fetch("/api/module-library");
+    const data = await res.json();
+    const currentModules = Array.from(document.querySelectorAll(".module-item"))
+      .map((el) => el.dataset.module);
+
+    // Filter to modules not already in current template
+    const available = (data.modules || []).filter(
+      (m) => !currentModules.includes(m.moduleName)
+    );
+
+    if (available.length === 0) {
+      dropdown.innerHTML = `<div class="module-library-dropdown__empty">No other modules available</div>`;
+    } else {
+      dropdown.innerHTML = available.map((m) =>
+        `<button class="module-library-dropdown__item" data-name="${escapeHtml(m.moduleName)}">
+          <span class="module-library-dropdown__name">${escapeHtml(m.moduleName)}</span>
+          <span class="module-library-dropdown__meta">${escapeHtml(m.usedIn.join(", "))}</span>
+        </button>`
+      ).join("");
+
+      dropdown.querySelectorAll(".module-library-dropdown__item").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          addModuleFromLibrary(btn.dataset.name);
+          dropdown.classList.add("hidden");
+        });
       });
-      // Remove from list and refresh preview
-      const item = document.querySelector(`.module-item[data-module="${CSS.escape(moduleName)}"]`);
-      if (item) item.remove();
-      const countEl = document.getElementById("module-count");
-      countEl.textContent = document.querySelectorAll(".module-item").length;
-      refreshPreview();
-    } catch {
-      // silently fail
     }
-  });
+
+    dropdown.classList.remove("hidden");
+  } catch (err) {
+    console.error("Failed to load module library:", err);
+  }
+}
+
+async function addModuleFromLibrary(moduleName) {
+  try {
+    const session = await fetch("/api/session").then((r) => r.json());
+    const templateId = session.activeTemplateId || session.id;
+
+    // Use the templates/activate API to copy module
+    const res = await fetch(`/api/templates/${encodeURIComponent(templateId)}/add-module`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ moduleName }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      console.warn("Add module error:", data.error);
+      return;
+    }
+
+    // Refresh module list and preview
+    const modRes = await fetch("/api/modules");
+    const modData = await modRes.json();
+    updateModuleList(modData.modules.map((m) => m.moduleName));
+    if (typeof refreshPreview === "function") refreshPreview();
+  } catch (err) {
+    console.error("Failed to add module:", err);
+  }
+}
+
+// Add module button listener
+document.getElementById("btn-add-module").addEventListener("click", toggleModuleLibraryDropdown);
+
+// Close dropdown when clicking outside
+document.addEventListener("click", (e) => {
+  const dropdown = document.getElementById("module-library-dropdown");
+  const btn = document.getElementById("btn-add-module");
+  if (!dropdown.contains(e.target) && e.target !== btn) {
+    dropdown.classList.add("hidden");
+  }
+});
+
+async function confirmDeleteModule(moduleName) {
+  const ok = await vibeConfirm(`Delete "${escapeHtml(moduleName)}"?`, "This cannot be undone.", { confirmLabel: "Delete" });
+  if (!ok) return;
+
+  try {
+    await fetch("/api/modules", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ moduleName }),
+    });
+    // Remove from list and refresh preview
+    const item = document.querySelector(`.module-item[data-module="${CSS.escape(moduleName)}"]`);
+    if (item) item.remove();
+    const countEl = document.getElementById("module-count");
+    countEl.textContent = document.querySelectorAll(".module-item").length;
+    refreshPreview();
+  } catch {
+    // silently fail
+  }
 }
 
 // ---------------------------------------------------------------------------

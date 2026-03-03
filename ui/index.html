@@ -118,6 +118,125 @@
   </div>
 
   <!-- ============================================================ -->
+  <!-- DASHBOARD — project overview with templates & brand assets   -->
+  <!-- ============================================================ -->
+  <div class="dashboard hidden" id="dashboard-screen">
+    <header class="topbar">
+      <div class="topbar__left">
+        <button class="topbar__back-btn" id="dashboard-back" title="Back to projects">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="topbar__brand">
+          <div class="topbar__logo-icon">v</div>
+          <span class="topbar__brand-name">vibeSpot</span>
+        </div>
+        <span class="topbar__project-pill" id="dashboard-theme-name"></span>
+      </div>
+      <div class="topbar__right">
+        <button class="topbar__icon-btn" id="dashboard-settings-btn" title="Settings">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M7.5 1.5h3l.4 2.1a5.5 5.5 0 0 1 1.3.7l2-.8 1.5 2.6-1.6 1.3a5.5 5.5 0 0 1 0 1.5l1.6 1.3-1.5 2.6-2-.8a5.5 5.5 0 0 1-1.3.7l-.4 2.1h-3l-.4-2.1a5.5 5.5 0 0 1-1.3-.7l-2 .8-1.5-2.6 1.6-1.3a5.5 5.5 0 0 1 0-1.5L2.3 6.1l1.5-2.6 2 .8a5.5 5.5 0 0 1 1.3-.7L7.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
+        </button>
+        <button class="btn btn--primary" id="dashboard-deploy-btn" title="Deploy entire theme to HubSpot">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:-2px"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
+          Deploy
+        </button>
+      </div>
+    </header>
+
+    <div class="dashboard__body">
+      <div class="dashboard__container">
+
+        <!-- Brand Assets -->
+        <section class="dashboard__section">
+          <div class="dashboard__section-header">
+            <h2 class="dashboard__section-title">Brand Assets</h2>
+            <span class="dashboard__section-hint">Optional — injected into AI prompts</span>
+          </div>
+          <div class="dashboard__brand-assets" id="dashboard-brand-assets">
+            <label class="brand-asset-upload" id="brand-upload-styleguide">
+              <input type="file" accept=".md,.txt" hidden>
+              <span class="brand-asset-upload__icon" id="brand-icon-styleguide">+</span>
+              <span class="brand-asset-upload__label">styleguide.md</span>
+            </label>
+            <label class="brand-asset-upload" id="brand-upload-brandvoice">
+              <input type="file" accept=".md,.txt" hidden>
+              <span class="brand-asset-upload__icon" id="brand-icon-brandvoice">+</span>
+              <span class="brand-asset-upload__label">brandvoice.md</span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Page Type Selector -->
+        <section class="dashboard__section">
+          <div class="dashboard__section-header">
+            <h2 class="dashboard__section-title">Create New Page</h2>
+          </div>
+          <div class="dashboard__page-types" id="dashboard-page-types">
+            <button class="page-type-card" data-type="landing_page">
+              <div class="page-type-card__icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+              </div>
+              <span class="page-type-card__label">Landing Page</span>
+              <span class="page-type-card__desc">Single-page, conversion-focused</span>
+            </button>
+            <button class="page-type-card" data-type="blog_post">
+              <div class="page-type-card__icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v16H4z" rx="2"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h4"/></svg>
+              </div>
+              <span class="page-type-card__label">Blog Post</span>
+              <span class="page-type-card__desc">Article with blog features</span>
+            </button>
+            <button class="page-type-card" data-type="website_page">
+              <div class="page-type-card__icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              </div>
+              <span class="page-type-card__label">Website Page</span>
+              <span class="page-type-card__desc">With navigation & menu</span>
+            </button>
+            <button class="page-type-card" data-type="module_only">
+              <div class="page-type-card__icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+              </div>
+              <span class="page-type-card__label">Module Only</span>
+              <span class="page-type-card__desc">Standalone module, no template</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Template List -->
+        <section class="dashboard__section">
+          <div class="dashboard__section-header">
+            <h2 class="dashboard__section-title">Templates</h2>
+            <span class="dashboard__template-count" id="dashboard-template-count">0</span>
+          </div>
+          <div class="dashboard__template-list" id="dashboard-template-list">
+            <p class="dashboard__empty-state">No templates yet. Choose a page type above to get started.</p>
+          </div>
+        </section>
+
+        <!-- Module Library -->
+        <section class="dashboard__section">
+          <div class="dashboard__section-header">
+            <h2 class="dashboard__section-title">Module Library</h2>
+          </div>
+          <div class="dashboard__module-library" id="dashboard-module-library">
+            <p class="dashboard__empty-state">Modules will appear here as you build pages.</p>
+          </div>
+          <div class="dashboard__module-preview hidden" id="dashboard-module-preview">
+            <div class="dashboard__module-preview-header">
+              <span class="dashboard__module-preview-name" id="dashboard-preview-name"></span>
+              <span class="dashboard__module-preview-used" id="dashboard-preview-used"></span>
+              <button class="dashboard__module-preview-close" id="dashboard-preview-close">&times;</button>
+            </div>
+            <iframe class="dashboard__module-preview-frame" id="dashboard-preview-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
   <!-- MAIN APP — shown after a session is active                   -->
   <!-- ============================================================ -->
   <div class="app hidden" id="app-screen">
@@ -162,8 +281,10 @@
           <div class="module-list__header">
             <span>Modules</span>
             <span class="module-list__count" id="module-count">0</span>
+            <button class="module-list__add-btn" id="btn-add-module" title="Add module from library">+</button>
           </div>
           <div class="module-list__items" id="module-items"></div>
+          <div class="module-library-dropdown hidden" id="module-library-dropdown"></div>
         </div>
 
         <div class="chat">
@@ -260,7 +381,9 @@
     </div>
   </div>
 
+  <script src="/dialog.js"></script>
   <script src="/setup.js"></script>
+  <script src="/dashboard.js"></script>
   <script src="/settings.js"></script>
   <script src="/upload-panel.js"></script>
   <script src="/chat.js"></script>

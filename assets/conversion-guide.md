@@ -683,7 +683,7 @@ For backgrounds with transparency (e.g., glassmorphism cards):
 
 ### Upload & Test
 
-- [ ] `hs upload` succeeds for all modules
+- [ ] `hs cms upload` succeeds for all modules
 - [ ] Template uploads without errors
 - [ ] New page created from template shows all sections
 - [ ] Scroll animations trigger on scroll

@@ -19,16 +19,41 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export type PageType = "landing_page" | "blog_post" | "website_page" | "module_only";
+
+export interface TemplateEntry {
+  id: string;                    // e.g. "lp-main", "blog-post"
+  label: string;                 // "Main Landing Page"
+  pageType: PageType;
+  templateFile: string;          // "templates/lp-main.html"
+  modules: ModuleFiles[];
+  moduleOrder: string[];
+  sharedCss: string;
+  sharedJs: string;
+  template: string;              // HubL template content
+  messages: ChatMessage[];       // per-template chat history
+}
+
 export interface VibeSession {
   id: string;
   themePath: string;
   themeName: string;
+
+  // Multi-template support
+  templates: TemplateEntry[];
+  activeTemplateId: string;
+  brandAssets?: {
+    styleguide?: string;
+    brandvoice?: string;
+  };
+
+  // Legacy flat fields — kept for backward compat, redirected to active template
   messages: ChatMessage[];
   modules: ModuleFiles[];
   sharedCss: string;
   sharedJs: string;
   template: string;
-  moduleOrder: string[]; // module names in display order
+  moduleOrder: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -46,6 +71,8 @@ export function createSession(themePath: string, themeName: string): VibeSession
     id: generateId(),
     themePath,
     themeName,
+    templates: [],
+    activeTemplateId: "",
     messages: [],
     modules: [],
     sharedCss: "",
@@ -61,6 +88,180 @@ export function createSession(themePath: string, themeName: string): VibeSession
   return session;
 }
 
+// ---------------------------------------------------------------------------
+// Template management
+// ---------------------------------------------------------------------------
+
+/**
+ * Migrate a legacy flat session (v0.3.0) into the templates array.
+ * Called when loading a session that has modules but no templates.
+ */
+export function migrateSession(session: VibeSession): void {
+  if (session.templates && session.templates.length > 0) return;
+  if (!session.modules || session.modules.length === 0) {
+    session.templates = [];
+    session.activeTemplateId = "";
+    return;
+  }
+
+  const templateId = `lp-${session.themeName}`;
+  const entry: TemplateEntry = {
+    id: templateId,
+    label: `${session.themeName} Landing Page`,
+    pageType: "landing_page",
+    templateFile: `templates/lp-${session.themeName}.html`,
+    modules: [...session.modules],
+    moduleOrder: [...session.moduleOrder],
+    sharedCss: session.sharedCss || "",
+    sharedJs: session.sharedJs || "",
+    template: session.template || "",
+    messages: [...session.messages],
+  };
+
+  session.templates = [entry];
+  session.activeTemplateId = templateId;
+}
+
+/**
+ * Get the active template entry, or null if none set.
+ */
+export function getActiveTemplate(): TemplateEntry | null {
+  if (!activeSession) return null;
+  if (!activeSession.activeTemplateId || !activeSession.templates?.length) return null;
+  return activeSession.templates.find((t) => t.id === activeSession!.activeTemplateId) || null;
+}
+
+/**
+ * Set the active template by ID. Syncs flat fields from the template.
+ */
+export function setActiveTemplate(templateId: string): boolean {
+  if (!activeSession) return false;
+  const tpl = activeSession.templates.find((t) => t.id === templateId);
+  if (!tpl) return false;
+
+  activeSession.activeTemplateId = templateId;
+  syncFlatFieldsFromTemplate(tpl);
+  activeSession.updatedAt = Date.now();
+  return true;
+}
+
+/**
+ * Create a new template entry and add it to the session.
+ */
+export function addTemplate(pageType: PageType, label: string): TemplateEntry {
+  if (!activeSession) throw new Error("No active session");
+
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  const prefix = pageType === "blog_post" ? "bp" :
+                 pageType === "website_page" ? "wp" :
+                 pageType === "module_only" ? "mo" : "lp";
+  const id = `${prefix}-${slug}`;
+
+  const entry: TemplateEntry = {
+    id,
+    label,
+    pageType,
+    templateFile: pageType === "module_only" ? "" : `templates/${id}.html`,
+    modules: [],
+    moduleOrder: [],
+    sharedCss: "",
+    sharedJs: "",
+    template: "",
+    messages: [],
+  };
+
+  activeSession.templates.push(entry);
+  activeSession.activeTemplateId = id;
+  syncFlatFieldsFromTemplate(entry);
+  activeSession.updatedAt = Date.now();
+  return entry;
+}
+
+/**
+ * Remove a template by ID.
+ */
+export function removeTemplate(templateId: string): boolean {
+  if (!activeSession) return false;
+  const idx = activeSession.templates.findIndex((t) => t.id === templateId);
+  if (idx < 0) return false;
+
+  activeSession.templates.splice(idx, 1);
+
+  // If we removed the active template, switch to the first remaining one
+  if (activeSession.activeTemplateId === templateId) {
+    if (activeSession.templates.length > 0) {
+      setActiveTemplate(activeSession.templates[0].id);
+    } else {
+      activeSession.activeTemplateId = "";
+      activeSession.modules = [];
+      activeSession.moduleOrder = [];
+      activeSession.sharedCss = "";
+      activeSession.sharedJs = "";
+      activeSession.template = "";
+      activeSession.messages = [];
+    }
+  }
+
+  activeSession.updatedAt = Date.now();
+  return true;
+}
+
+/**
+ * Get deduplicated modules across all templates (the module library).
+ */
+export function getModuleLibrary(): Array<{ module: ModuleFiles; usedIn: string[] }> {
+  if (!activeSession) return [];
+  const map = new Map<string, { module: ModuleFiles; usedIn: string[] }>();
+
+  for (const tpl of activeSession.templates) {
+    for (const mod of tpl.modules) {
+      const existing = map.get(mod.moduleName);
+      if (existing) {
+        existing.usedIn.push(tpl.label);
+      } else {
+        map.set(mod.moduleName, { module: mod, usedIn: [tpl.label] });
+      }
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+/**
+ * Sync flat session fields from a template (compatibility layer).
+ * Existing code reads session.modules, session.messages, etc.
+ * This keeps those in sync with the active template.
+ */
+function syncFlatFieldsFromTemplate(tpl: TemplateEntry): void {
+  if (!activeSession) return;
+  activeSession.modules = tpl.modules;
+  activeSession.moduleOrder = tpl.moduleOrder;
+  activeSession.sharedCss = tpl.sharedCss;
+  activeSession.sharedJs = tpl.sharedJs;
+  activeSession.template = tpl.template;
+  activeSession.messages = tpl.messages;
+}
+
+/**
+ * Sync changes from flat session fields back to the active template.
+ * Called after any mutation to session.modules/sharedCss/etc.
+ */
+function syncFlatFieldsToTemplate(): void {
+  if (!activeSession) return;
+  const tpl = getActiveTemplate();
+  if (!tpl) return;
+  tpl.modules = activeSession.modules;
+  tpl.moduleOrder = activeSession.moduleOrder;
+  tpl.sharedCss = activeSession.sharedCss;
+  tpl.sharedJs = activeSession.sharedJs;
+  tpl.template = activeSession.template;
+  tpl.messages = activeSession.messages;
+}
+
 export function getSession(): VibeSession | null {
   return activeSession;
 }
@@ -69,6 +270,7 @@ export function addMessage(role: "user" | "assistant", content: string): void {
   if (!activeSession) return;
   activeSession.messages.push({ role, content, timestamp: Date.now() });
   activeSession.updatedAt = Date.now();
+  syncFlatFieldsToTemplate();
   saveChatToTheme();
 }
 
@@ -98,6 +300,7 @@ export function updateModules(assets: Partial<GeneratedAssets>): void {
   }
 
   activeSession.updatedAt = Date.now();
+  syncFlatFieldsToTemplate();
 }
 
 /**
@@ -107,6 +310,7 @@ export function reorderModules(newOrder: string[]): void {
   if (!activeSession) return;
   activeSession.moduleOrder = newOrder;
   activeSession.updatedAt = Date.now();
+  syncFlatFieldsToTemplate();
 }
 
 /**
@@ -121,6 +325,7 @@ export function removeModule(moduleName: string): void {
     (n) => n !== moduleName
   );
   activeSession.updatedAt = Date.now();
+  syncFlatFieldsToTemplate();
 }
 
 /**
@@ -142,6 +347,7 @@ export function updateFieldValue(
     setFieldDefault(fields, fieldPath, value);
     mod.fieldsJson = JSON.stringify(fields, null, 2);
     activeSession.updatedAt = Date.now();
+    syncFlatFieldsToTemplate();
   } catch {
     // Invalid JSON — skip
   }
@@ -235,6 +441,20 @@ export function scanThemeFromDisk(themePath: string): void {
       activeSession.sharedJs = safeRead(join(jsDir, jsFiles[0]));
     }
   }
+
+  // Load brand assets from .vibespot/ directory
+  const sgPath = join(themePath, ".vibespot", "styleguide.md");
+  const bvPath = join(themePath, ".vibespot", "brandvoice.md");
+  if (existsSync(sgPath) || existsSync(bvPath)) {
+    if (!activeSession.brandAssets) activeSession.brandAssets = {};
+    if (existsSync(sgPath)) activeSession.brandAssets.styleguide = safeRead(sgPath);
+    if (existsSync(bvPath)) activeSession.brandAssets.brandvoice = safeRead(bvPath);
+  }
+
+  // Migrate flat fields to templates if this is a pre-existing theme
+  if (!activeSession.templates) activeSession.templates = [];
+  if (!activeSession.activeTemplateId) activeSession.activeTemplateId = "";
+  migrateSession(activeSession);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,6 +475,14 @@ export function loadSession(sessionId: string): VibeSession | null {
 
   try {
     const data = JSON.parse(readFileSync(filePath, "utf-8"));
+
+    // Ensure templates array exists (backward compat with v0.3.0 sessions)
+    if (!data.templates) data.templates = [];
+    if (!data.activeTemplateId) data.activeTemplateId = "";
+
+    // Migrate flat fields into templates if needed
+    migrateSession(data);
+
     activeSession = data;
     return data;
   } catch {
@@ -328,7 +556,21 @@ export function writeModulesToDisk(): void {
 
   const themePath = activeSession.themePath;
 
+  // Collect all modules from all templates (deduplicated by name)
+  const allModules = new Map<string, ModuleFiles>();
+  if (activeSession.templates.length > 0) {
+    for (const tpl of activeSession.templates) {
+      for (const mod of tpl.modules) {
+        allModules.set(mod.moduleName, mod);
+      }
+    }
+  }
+  // Also include flat session modules (backward compat / active template)
   for (const mod of activeSession.modules) {
+    allModules.set(mod.moduleName, mod);
+  }
+
+  for (const mod of allModules.values()) {
     const modDir = join(themePath, "modules", `${mod.moduleName}.module`);
     mkdirSync(modDir, { recursive: true });
 
@@ -362,13 +604,34 @@ export function writeModulesToDisk(): void {
     );
   }
 
-  // Always generate the page template from the current module order
-  // (the AI in vibe mode doesn't produce one, so we build it deterministically)
-  if (activeSession.modules.length > 0) {
+  // Write page templates for all templates in the session
+  if (activeSession.templates.length > 0) {
+    const templatesDir = join(themePath, "templates");
+    mkdirSync(templatesDir, { recursive: true });
+
+    for (const tpl of activeSession.templates) {
+      if (tpl.pageType === "module_only") continue; // No template for module-only
+      if (tpl.modules.length === 0) continue;
+
+      const templateContent = tpl.template || generateTemplateForEntry(tpl);
+      const annotated = ensureTemplateAnnotations(templateContent, tpl.label, tpl.pageType);
+      writeFileSync(
+        join(templatesDir, `${tpl.id}.html`),
+        annotated,
+        "utf-8"
+      );
+
+      // For blog posts, also generate a listing template
+      if (tpl.pageType === "blog_post") {
+        writeBlogListingTemplate(templatesDir, tpl);
+      }
+    }
+  } else if (activeSession.modules.length > 0) {
+    // Legacy fallback: single template from flat fields
     const template = activeSession.template || generateTemplateFromModules();
     const templatesDir = join(themePath, "templates");
     mkdirSync(templatesDir, { recursive: true });
-    const annotated = ensureTemplateAnnotations(template, activeSession.themeName);
+    const annotated = ensureTemplateAnnotations(template, `${activeSession.themeName} Landing Page`);
     writeFileSync(
       join(templatesDir, `lp-${activeSession.themeName}.html`),
       annotated,
@@ -434,6 +697,7 @@ export function reloadModulesFromDisk(): void {
   activeSession.template = "";
   scanThemeFromDisk(activeSession.themePath);
   activeSession.updatedAt = Date.now();
+  syncFlatFieldsToTemplate();
 }
 
 // ---------------------------------------------------------------------------
@@ -497,25 +761,127 @@ function updateThemeJson(): void {
 /**
  * Ensure the page template has proper HubSpot annotations.
  */
-function ensureTemplateAnnotations(templateContent: string, themeName: string): string {
+function ensureTemplateAnnotations(templateContent: string, label: string, pageType: PageType = "landing_page"): string {
   // Check if annotations already exist
   if (templateContent.includes("templateType")) return templateContent;
 
+  const templateType = pageType === "blog_post" ? "blog_post" : "page";
   const annotations = `<!--
-  templateType: page
+  templateType: ${templateType}
   isAvailableForNewContent: true
-  label: "${themeName} Landing Page"
+  label: "${label}"
 -->\n`;
   return annotations + templateContent;
 }
 
 // ---------------------------------------------------------------------------
-// Template generation — build a page template from the current module order
+// Template generation — build page templates from module data
 // ---------------------------------------------------------------------------
 
 /**
+ * Build a HubSpot page template for a specific TemplateEntry.
+ */
+function generateTemplateForEntry(tpl: TemplateEntry): string {
+  if (tpl.modules.length === 0) return "";
+
+  const name = activeSession!.themeName;
+  const ordered = getOrderedModulesFrom(tpl);
+
+  const sections = ordered.map((mod) => {
+    return `    {% dnd_section padding={"top":"0","bottom":"0","left":"0","right":"0"}, full_width=true %}
+      {% dnd_module path="../modules/${mod.moduleName}.module" %}
+      {% end_dnd_module %}
+    {% end_dnd_section %}`;
+  }).join("\n\n");
+
+  const templateType = tpl.pageType === "blog_post" ? "blog_post" : "page";
+
+  return `<!--
+  templateType: ${templateType}
+  isAvailableForNewContent: true
+  label: "${tpl.label}"
+-->
+{% extends "./layouts/base.html" %}
+
+{% set template_css = "../../css/${name}-theme.css" %}
+{% set template_js = "../../js/${name}-animations.js" %}
+
+{% block header %}
+{% endblock header %}
+
+{% block body %}
+<div class="${name}-page">
+  {% dnd_area "main_content" label="${tpl.label}" %}
+
+${sections}
+
+  {% end_dnd_area %}
+</div>
+{{ require_js(get_asset_url("../../js/${name}-animations.js")) }}
+{% endblock body %}
+
+{% block footer %}
+{% endblock footer %}
+`;
+}
+
+/**
+ * Write a blog listing template alongside a blog post template.
+ */
+function writeBlogListingTemplate(templatesDir: string, tpl: TemplateEntry): void {
+  const listingContent = `<!--
+  templateType: blog_listing
+  isAvailableForNewContent: true
+  label: "${tpl.label} - Listing"
+-->
+{% extends "./layouts/base.html" %}
+
+{% block body %}
+<div class="blog-listing">
+  <h1>{{ group.public_title }}</h1>
+  {% for content in contents %}
+  <article class="blog-listing__post">
+    <h2><a href="{{ content.absolute_url }}">{{ content.name }}</a></h2>
+    {% if content.featured_image %}
+    <img src="{{ content.featured_image }}" alt="{{ content.featured_image_alt_text }}">
+    {% endif %}
+    <p>{{ content.post_summary|truncatewords(30) }}</p>
+    <span class="blog-listing__date">{{ content.publish_date|datetimeformat('%B %d, %Y') }}</span>
+  </article>
+  {% endfor %}
+  {% if next_page_num %}
+  <a href="{{ next_page_url }}">Next Page</a>
+  {% endif %}
+</div>
+{% endblock body %}
+`;
+  writeFileSync(
+    join(templatesDir, `${tpl.id}-listing.html`),
+    listingContent,
+    "utf-8"
+  );
+}
+
+/**
+ * Get modules in display order for a specific template entry.
+ */
+function getOrderedModulesFrom(tpl: TemplateEntry): ModuleFiles[] {
+  const ordered: ModuleFiles[] = [];
+  for (const name of tpl.moduleOrder) {
+    const mod = tpl.modules.find((m) => m.moduleName === name);
+    if (mod) ordered.push(mod);
+  }
+  for (const mod of tpl.modules) {
+    if (!tpl.moduleOrder.includes(mod.moduleName)) {
+      ordered.push(mod);
+    }
+  }
+  return ordered;
+}
+
+/**
  * Build a HubSpot page template that assembles all modules in display order.
- * Used in vibe mode where the AI only generates modules, not the page template.
+ * Legacy — used when no templates array exists (flat session).
  */
 function generateTemplateFromModules(): string {
   if (!activeSession || activeSession.modules.length === 0) return "";

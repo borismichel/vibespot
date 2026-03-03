@@ -119,9 +119,9 @@ function renderSettings(data) {
     }
     modelSelect.appendChild(customOpt);
 
-    modelSelect.addEventListener("change", () => {
+    modelSelect.addEventListener("change", async () => {
       if (modelSelect.value === "__custom__") {
-        const custom = prompt("Enter model name:");
+        const custom = await vibePrompt("Enter model name");
         if (custom) setEngineModel(activeEngine, custom);
         else refreshSettings();
       } else {
