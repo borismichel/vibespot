@@ -4,6 +4,8 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { run } from "./shell.js";
 import { loadConfig, maskApiKey, type AIEngineType } from "./config.js";
 
+const whichCmd = process.platform === "win32" ? "where" : "which";
+
 export interface ToolInfo {
   name: string;
   found: boolean;
@@ -17,7 +19,7 @@ export function detectNode(): ToolInfo {
     name: "Node.js",
     found: result.success,
     version: result.stdout.replace(/^v/, ""),
-    path: run("which node").stdout,
+    path: run(`${whichCmd} node`).stdout,
   };
 }
 
@@ -27,7 +29,7 @@ export function detectGit(): ToolInfo {
     name: "Git",
     found: result.success,
     version: result.stdout.replace("git version ", ""),
-    path: run("which git").stdout,
+    path: run(`${whichCmd} git`).stdout,
   };
 }
 
@@ -37,7 +39,7 @@ export function detectHubSpotCLI(): ToolInfo {
     name: "HubSpot CLI",
     found: result.success,
     version: result.stdout,
-    path: run("which hs").stdout,
+    path: run(`${whichCmd} hs`).stdout,
   };
 }
 
@@ -77,7 +79,7 @@ export function detectClaudeCode(): CLIToolInfo {
     name: "Claude Code",
     found: true,
     version: result.stdout,
-    path: run("which claude").stdout,
+    path: run(`${whichCmd} claude`).stdout,
     authenticated,
     authDetail,
   };
@@ -202,7 +204,7 @@ export function detectGeminiCLI(): CLIToolInfo {
     name: "Gemini CLI",
     found: true,
     version: result.stdout,
-    path: run("which gemini").stdout,
+    path: run(`${whichCmd} gemini`).stdout,
     authenticated,
     authDetail: authenticated ? "Authenticated" : "Run `gemini` to sign in with Google",
   };
@@ -231,7 +233,7 @@ export function detectCodexCLI(): CLIToolInfo {
     name: "OpenAI Codex CLI",
     found: true,
     version: result.stdout,
-    path: run("which codex").stdout,
+    path: run(`${whichCmd} codex`).stdout,
     authenticated,
     authDetail: detail,
   };
@@ -243,7 +245,7 @@ export function detectGitHubCLI(): ToolInfo {
     name: "GitHub CLI",
     found: result.success,
     version: result.stdout.split("\n")[0]?.replace("gh version ", "").split(" ")[0] || "",
-    path: run("which gh").stdout,
+    path: run(`${whichCmd} gh`).stdout,
   };
 }
 
