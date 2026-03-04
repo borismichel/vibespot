@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { readdirSync } from "node:fs";
 import type { AIEngine, GeneratedAssets, ModuleFiles } from "./engine.js";
 import {
@@ -31,7 +31,7 @@ export class ClaudeAPIEngine implements AIEngine {
     const systemPrompt = buildSystemPrompt(conversionGuide);
 
     // Determine a page prefix from the source dir name
-    const dirName = sourceDir.split("/").pop() || "page";
+    const dirName = basename(sourceDir) || "page";
     const pagePrefix = dirName
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "-")

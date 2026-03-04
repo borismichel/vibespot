@@ -36,13 +36,13 @@ export async function vibeCommand(): Promise<void> {
 
     // Auto-open browser
     try {
-      const openCmd =
-        process.platform === "darwin"
-          ? "open"
-          : process.platform === "win32"
-            ? "start"
-            : "xdg-open";
-      execSync(`${openCmd} ${url}`, { stdio: "ignore" });
+      if (process.platform === "darwin") {
+        execSync(`open "${url}"`, { stdio: "ignore" });
+      } else if (process.platform === "win32") {
+        execSync(`cmd /c start "" "${url}"`, { stdio: "ignore" });
+      } else {
+        execSync(`xdg-open "${url}"`, { stdio: "ignore" });
+      }
     } catch {
       // Browser open failed — user can open manually
     }

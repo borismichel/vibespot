@@ -1042,18 +1042,20 @@ function handleSettingsCLIAuthRoute(req: IncomingMessage, res: ServerResponse): 
             const key = apiKey.trim();
             process.env.OPENAI_API_KEY = key;
             saveConfig({ openaiApiKey: key } as any);
-            const profileLine = `export OPENAI_API_KEY="${key}"`;
-            const shellProfile = process.env.SHELL?.includes("zsh")
-              ? join(homedir(), ".zshrc")
-              : join(homedir(), ".bashrc");
-            try {
-              const existing = existsSync(shellProfile)
-                ? readFileSync(shellProfile, "utf-8")
-                : "";
-              if (!existing.includes("OPENAI_API_KEY")) {
-                appendFileSync(shellProfile, `\n# Added by vibeSpot\n${profileLine}\n`);
-              }
-            } catch { /* ignore profile write errors */ }
+            if (process.platform !== "win32") {
+              const profileLine = `export OPENAI_API_KEY="${key}"`;
+              const shellProfile = process.env.SHELL?.includes("zsh")
+                ? join(homedir(), ".zshrc")
+                : join(homedir(), ".bashrc");
+              try {
+                const existing = existsSync(shellProfile)
+                  ? readFileSync(shellProfile, "utf-8")
+                  : "";
+                if (!existing.includes("OPENAI_API_KEY")) {
+                  appendFileSync(shellProfile, `\n# Added by vibeSpot\n${profileLine}\n`);
+                }
+              } catch { /* ignore profile write errors */ }
+            }
             jsonResponse(res, 200, { ok: true, message: "API key saved" });
           } else {
             // OAuth path — run `codex login` as background job

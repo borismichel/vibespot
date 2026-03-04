@@ -92,6 +92,7 @@ export class ClaudeCodeEngine implements AIEngine {
           cwd: themePath,
           stdio: ["pipe", "pipe", "pipe"],
           env,
+          shell: true,
         });
 
         child.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });

@@ -531,6 +531,7 @@ function spawnCLI(
     const child = spawn(bin, args, {
       stdio: ["pipe", "pipe", "pipe"],
       env,
+      shell: true,
     });
 
     let stdout = "";

@@ -25,6 +25,7 @@ export class GeminiCLIEngine implements AIEngine {
         cwd: themePath,
         stdio: ["pipe", "pipe", "pipe"],
         env: { ...process.env },
+        shell: true,
       });
 
       let stdout = "";

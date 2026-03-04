@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { run } from "../utils/shell.js";
 import * as ui from "../prompts/prompter.js";
 import { theme } from "../cli/theme.js";
@@ -16,7 +16,7 @@ function countUploadedFiles(output: string): number {
 export async function runUpload(themePath: string): Promise<boolean> {
   await ui.intro("Uploading to HubSpot");
 
-  const themeName = themePath.split("/").pop() || themePath;
+  const themeName = basename(themePath) || themePath;
   const s = await ui.spinner();
 
   const MAX_RETRIES = 3;
