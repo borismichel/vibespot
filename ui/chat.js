@@ -78,13 +78,19 @@ function handleWsMessage(msg) {
       statusEngine.textContent = msg.engine || "";
       fetchHsAccountStatus();
 
+      // Populate chat header
+      const chatHeaderTitle = document.getElementById("chat-header-title");
+      const chatHeaderContext = document.getElementById("chat-header-context");
+      if (chatHeaderTitle) chatHeaderTitle.textContent = msg.themeName || "Chat";
+      if (chatHeaderContext) chatHeaderContext.textContent = msg.engine || "";
+
       // Restore chat history from server
       if (msg.messages && msg.messages.length > 0) {
         for (const m of msg.messages) {
           if (m.role === "user") {
-            appendUserMessage(m.content);
+            appendUserMessage(m.content, m.timestamp);
           } else if (m.role === "assistant") {
-            appendRestoredAssistantMessage(m.content);
+            appendRestoredAssistantMessage(m.content, m.timestamp);
           }
         }
         scrollToBottom();
@@ -167,10 +173,25 @@ function sendMessage(text) {
 // Message rendering
 // ---------------------------------------------------------------------------
 
-function appendUserMessage(text) {
+function formatMessageTime(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return `${d.getHours()}:${d.getMinutes().toString().padStart(2, "0")}`;
+}
+
+function appendUserMessage(text, timestamp) {
+  const time = formatMessageTime(timestamp || Date.now());
   const div = document.createElement("div");
   div.className = "chat-msg chat-msg--user";
-  div.innerHTML = `<div class="chat-msg__bubble">${escapeHtml(text)}</div>`;
+  div.innerHTML = `
+    <div class="chat-msg__content">
+      <div class="chat-msg__header">
+        <span class="chat-msg__sender">You</span>
+        <span class="chat-msg__time">${time}</span>
+      </div>
+      <div class="chat-msg__bubble">${escapeHtml(text)}</div>
+    </div>
+    <div class="chat-msg__avatar chat-msg__avatar--user">Y</div>`;
   messagesEl.appendChild(div);
   scrollToBottom();
 }
@@ -186,9 +207,18 @@ function startStreaming() {
     showGeneratingPreview();
   }
 
+  const time = formatMessageTime(streamStartTime);
   const div = document.createElement("div");
   div.className = "chat-msg chat-msg--assistant chat-msg--streaming";
-  div.innerHTML = `<div class="chat-msg__bubble"></div>`;
+  div.innerHTML = `
+    <div class="chat-msg__avatar chat-msg__avatar--ai">AI</div>
+    <div class="chat-msg__content">
+      <div class="chat-msg__header">
+        <span class="chat-msg__sender">vibeSpot AI</span>
+        <span class="chat-msg__time">${time}</span>
+      </div>
+      <div class="chat-msg__bubble"></div>
+    </div>`;
   messagesEl.appendChild(div);
   streamingMsgEl = div.querySelector(".chat-msg__bubble");
   scrollToBottom();
@@ -271,11 +301,12 @@ function finishStreaming() {
   if (streamingEl) {
     streamingEl.classList.remove("chat-msg--streaming");
 
-    // Add duration metadata beneath the bubble
+    // Add duration metadata beneath the bubble (inside .chat-msg__content)
     const meta = document.createElement("div");
     meta.className = "chat-msg__meta";
     meta.textContent = durationStr;
-    streamingEl.appendChild(meta);
+    const contentEl = streamingEl.querySelector(".chat-msg__content") || streamingEl;
+    contentEl.appendChild(meta);
   }
 
   // Final render of the full response
@@ -290,11 +321,20 @@ function finishStreaming() {
 }
 
 function appendAssistantError(message) {
+  const time = formatMessageTime(Date.now());
   const div = document.createElement("div");
   div.className = "chat-msg chat-msg--assistant";
-  div.innerHTML = `<div class="chat-msg__bubble" style="border-left: 3px solid var(--error);">
-    <strong>Error:</strong> ${escapeHtml(message)}
-  </div>`;
+  div.innerHTML = `
+    <div class="chat-msg__avatar chat-msg__avatar--ai">AI</div>
+    <div class="chat-msg__content">
+      <div class="chat-msg__header">
+        <span class="chat-msg__sender">vibeSpot AI</span>
+        <span class="chat-msg__time">${time}</span>
+      </div>
+      <div class="chat-msg__bubble" style="border-left: 3px solid var(--error);">
+        <strong>Error:</strong> ${escapeHtml(message)}
+      </div>
+    </div>`;
   messagesEl.appendChild(div);
   scrollToBottom();
 }
@@ -359,10 +399,16 @@ function setStatus(text) {
 // Restored / system messages
 // ---------------------------------------------------------------------------
 
-function appendRestoredAssistantMessage(text) {
+function appendRestoredAssistantMessage(text, timestamp) {
+  const time = formatMessageTime(timestamp);
   const div = document.createElement("div");
   div.className = "chat-msg chat-msg--assistant";
-  div.innerHTML = `<div class="chat-msg__bubble">${renderMarkdown(text)}</div>`;
+  div.innerHTML = `
+    <div class="chat-msg__avatar chat-msg__avatar--ai">AI</div>
+    <div class="chat-msg__content">
+      ${time ? `<div class="chat-msg__header"><span class="chat-msg__sender">vibeSpot AI</span><span class="chat-msg__time">${time}</span></div>` : ""}
+      <div class="chat-msg__bubble">${renderMarkdown(text)}</div>
+    </div>`;
   messagesEl.appendChild(div);
 }
 
@@ -711,6 +757,12 @@ inputEl.addEventListener("input", () => {
 document.getElementById("starter-templates").addEventListener("click", (e) => {
   const btn = e.target.closest(".starter-btn");
   if (btn) sendMessage(btn.dataset.prompt);
+});
+
+// Templates icon in input area — toggle welcome section visibility
+document.getElementById("btn-starter-templates")?.addEventListener("click", () => {
+  const welcome = document.getElementById("chat-welcome");
+  if (welcome) welcome.classList.toggle("hidden");
 });
 
 // Version history

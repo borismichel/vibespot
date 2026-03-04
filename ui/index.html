@@ -288,6 +288,10 @@
         </div>
 
         <div class="chat">
+          <div class="chat__header" id="chat-header">
+            <span class="chat__header-title" id="chat-header-title">Chat</span>
+            <span class="chat__header-context" id="chat-header-context"></span>
+          </div>
           <div class="chat__messages" id="chat-messages">
             <div class="chat__welcome" id="chat-welcome">
               <p>Describe what you want or pick a template to get started.</p>
@@ -302,10 +306,17 @@
             </div>
           </div>
           <div class="chat__input-area">
-            <textarea class="chat__input" id="chat-input" placeholder="Describe your landing page..." rows="1"></textarea>
-            <button class="chat__send" id="chat-send" title="Send (Enter)">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 10L17 3L10 17L9 11L3 10Z" fill="currentColor"/></svg>
-            </button>
+            <div class="chat__input-wrapper">
+              <textarea class="chat__input" id="chat-input" placeholder="Describe your landing page..." rows="1"></textarea>
+              <div class="chat__input-actions">
+                <button class="chat__input-icon" id="btn-starter-templates" title="Templates">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                </button>
+                <button class="chat__send" id="chat-send" title="Send (Enter)">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M3 10L17 3L10 17L9 11L3 10Z" fill="currentColor"/></svg>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </aside>
