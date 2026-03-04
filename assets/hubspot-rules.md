@@ -465,7 +465,20 @@ If your theme uses different names, use alternate_names in theme fields.json:
 
 ---
 
-## 8. Common Error Messages → Causes
+## 8. Link & Button Hover Override
+
+HubSpot's `theme-overrides.css` applies default `a:hover` styles that override your button styling with blue color, underlines, and font changes.
+
+**Every `<a>` styled as a button MUST include `:hover`, `:focus`, and `:active` rules** that explicitly re-declare:
+- `color` (your intended color, not HubSpot's blue)
+- `text-decoration: none`
+- `font-family: inherit`
+
+Without these, HubSpot's defaults bleed through on hover/focus states even when base styles look correct.
+
+---
+
+## 9. Common Error Messages → Causes
 
 | Error | Likely Cause |
 |-------|-------------|
@@ -483,7 +496,7 @@ If your theme uses different names, use alternate_names in theme fields.json:
 
 ---
 
-## 9. HubL Syntax Quick Reference
+## 10. HubL Syntax Quick Reference
 
 ### Variables and Expressions
 ```
@@ -532,7 +545,7 @@ If your theme uses different names, use alternate_names in theme fields.json:
 
 ---
 
-## 10. Pre-Upload Checklist
+## 11. Pre-Upload Checklist
 
 Before deploying any HubSpot CMS code, verify:
 

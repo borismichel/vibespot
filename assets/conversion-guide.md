@@ -345,6 +345,34 @@ The base template loads CSS in this order (each can override the previous):
 }
 ```
 
+### Link & Button Hover Problem
+
+HubSpot's theme applies default `a:hover` styles (blue color, underline, font change) that override your button/link styling.
+
+**Solution**: For every button/link element, combine the base selector with `:hover`, `:focus`, and `:active` to lock down `color`, `text-decoration`, and `font-family`:
+
+```css
+/* Lock visual properties across ALL interaction states */
+.my-module__cta,
+.my-module__cta:hover,
+.my-module__cta:focus,
+.my-module__cta:active {
+  color: #ffffff;
+  text-decoration: none;
+  font-family: inherit;
+  background: var(--cta-bg);
+  border: none;
+}
+
+/* Then add intentional hover effects separately */
+.my-module__cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+```
+
+**CRITICAL**: Every `<a>` tag styled as a button MUST have explicit `:hover` and `:focus` rules that re-declare `color`, `text-decoration: none`, and `font-family`. Without this, HubSpot's defaults will bleed through.
+
 ### Body Background Problem
 
 The page wrapper structure is:

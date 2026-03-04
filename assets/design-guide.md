@@ -301,6 +301,7 @@ Every hero must have:
 - Primary: filled, bold, with icon →
 - Secondary: outlined or ghost style
 - Always include hover + active + focus states
+- CRITICAL: Re-declare color, text-decoration: none, and font-family on :hover/:focus/:active — HubSpot's theme overrides link hover styles
 - Padding: `px-6 py-3` minimum (generous click area)
 - Border radius: `rounded-lg` to `rounded-full`
 

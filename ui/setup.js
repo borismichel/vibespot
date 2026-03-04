@@ -21,11 +21,21 @@ const ENGINE_DISPLAY_NAMES = {
 
 async function initSetup() {
   try {
+    // Show loading spinner in rail while fetching
+    const railItems = document.getElementById("project-rail-items");
+    if (railItems) {
+      railItems.innerHTML = `
+        <div class="project-rail__loading">
+          <div class="setup__spinner"></div>
+          <span>Loading projects...</span>
+        </div>`;
+    }
+
     const res = await fetch("/api/setup");
     const info = await res.json();
 
-    // Populate sidebar with all projects (sessions + local themes)
-    populateSidebar(info);
+    // Populate the project rail with all projects
+    populateProjectRail(info);
 
     // Auto-select engine if available but not yet chosen
     if (info.availableEngines && info.availableEngines.length > 0 && !info.activeEngine) {
@@ -118,19 +128,14 @@ async function saveAlertApiKey(key) {
 }
 
 // ---------------------------------------------------------------------------
-// Sidebar — project list (like Lovable)
+// Project list helpers
 // ---------------------------------------------------------------------------
 
-function populateSidebar(info) {
-  const list = document.getElementById("sidebar-project-list");
-  const countEl = document.getElementById("sidebar-project-count");
-  list.innerHTML = "";
-
-  // Build a combined, deduplicated list of projects
+/** Dedup sessions + local themes into a single project list */
+function deduplicateProjects(info) {
   const projects = [];
   const seen = new Set();
 
-  // Add sessions first (most recent)
   for (const s of info.sessions || []) {
     if (!seen.has(s.themeName)) {
       seen.add(s.themeName);
@@ -139,51 +144,75 @@ function populateSidebar(info) {
         type: "session",
         sessionId: s.id,
         updatedAt: s.updatedAt,
+        moduleCount: s.moduleCount ?? null,
+        templateCount: s.templateCount ?? null,
       });
     }
   }
 
-  // Add local themes that aren't already sessions
-  for (const name of info.localThemes || []) {
+  for (const t of info.localThemes || []) {
+    const name = typeof t === "string" ? t : t.name;
     if (!seen.has(name)) {
       seen.add(name);
-      projects.push({ name, type: "local", sessionId: null, updatedAt: null });
+      projects.push({
+        name,
+        type: "local",
+        sessionId: null,
+        updatedAt: null,
+        moduleCount: typeof t === "object" ? t.moduleCount ?? null : null,
+        templateCount: null,
+      });
     }
   }
 
-  countEl.textContent = projects.length;
+  return projects;
+}
+
+// ---------------------------------------------------------------------------
+// Collapsible Project Rail (expanded on setup, collapsed on dashboard/chat)
+// ---------------------------------------------------------------------------
+
+const railTooltip = document.getElementById("project-rail-tooltip");
+
+function populateProjectRail(info) {
+  const rail = document.getElementById("project-rail-items");
+  const countEl = document.getElementById("rail-project-count");
+  if (!rail) return;
+  rail.innerHTML = "";
+
+  const projects = deduplicateProjects(info);
+  if (countEl) countEl.textContent = projects.length;
 
   if (projects.length === 0) {
-    list.innerHTML = `<div class="setup-sidebar__empty">No projects yet.<br>Create one to get started.</div>`;
+    rail.innerHTML = '<div class="project-rail__empty">No projects yet.<br>Create one to get started.</div>';
     return;
   }
 
   for (const p of projects) {
     const item = document.createElement("div");
-    item.className = "setup-sidebar__item";
+    item.className = "project-rail__item";
+    item.dataset.name = p.name;
+
     const initial = p.name.charAt(0).toUpperCase();
     const meta = p.updatedAt ? timeAgo(p.updatedAt) : "on disk";
 
-    const openBtn = document.createElement("button");
-    openBtn.className = "setup-sidebar__item-open";
-    openBtn.innerHTML = `
-      <div class="setup-sidebar__item-icon">${esc(initial)}</div>
-      <div class="setup-sidebar__item-info">
-        <span class="setup-sidebar__item-name">${esc(p.name)}</span>
-        <span class="setup-sidebar__item-meta">${meta}</span>
-      </div>
-    `;
-    openBtn.addEventListener("click", () => {
-      if (p.sessionId) {
-        resumeSession(p.sessionId);
-      } else {
-        openTheme(p.name);
-      }
-    });
-    item.appendChild(openBtn);
+    // Bubble (always visible — in collapsed mode this is the only thing shown)
+    const bubble = document.createElement("div");
+    bubble.className = "project-rail__item-bubble";
+    bubble.textContent = initial;
+    item.appendChild(bubble);
 
+    // Info (visible when expanded via CSS)
+    const infoEl = document.createElement("div");
+    infoEl.className = "project-rail__item-info";
+    infoEl.innerHTML = `
+      <span class="project-rail__item-name">${esc(p.name)}</span>
+      <span class="project-rail__item-meta">${meta}</span>`;
+    item.appendChild(infoEl);
+
+    // Delete button (visible when expanded + hover)
     const delBtn = document.createElement("button");
-    delBtn.className = "setup-sidebar__item-delete";
+    delBtn.className = "project-rail__item-delete";
     delBtn.innerHTML = "&times;";
     delBtn.title = "Delete project";
     delBtn.addEventListener("click", (e) => {
@@ -192,9 +221,56 @@ function populateSidebar(info) {
     });
     item.appendChild(delBtn);
 
-    list.appendChild(item);
+    // Tooltip (only when collapsed — skip when expanded since name is visible)
+    item.addEventListener("mouseenter", () => {
+      const railEl = document.getElementById("project-rail");
+      if (railEl && railEl.classList.contains("project-rail--expanded")) return;
+
+      let stats = "";
+      if (p.moduleCount != null) {
+        stats = p.moduleCount + " module" + (p.moduleCount !== 1 ? "s" : "");
+        if (p.templateCount > 1) stats += " \u00b7 " + p.templateCount + " templates";
+        stats += p.updatedAt ? " \u00b7 " + timeAgo(p.updatedAt) : " \u00b7 on disk";
+      } else {
+        stats = p.updatedAt ? timeAgo(p.updatedAt) : "on disk";
+      }
+
+      railTooltip.innerHTML =
+        '<div class="project-rail__tooltip-name">' + esc(p.name) + "</div>" +
+        '<div class="project-rail__tooltip-stats">' + stats + "</div>";
+
+      const rect = item.getBoundingClientRect();
+      railTooltip.style.top = rect.top + "px";
+      railTooltip.classList.add("project-rail__tooltip--visible");
+    });
+
+    item.addEventListener("mouseleave", () => {
+      railTooltip.classList.remove("project-rail__tooltip--visible");
+    });
+
+    // Click to open
+    item.addEventListener("click", () => {
+      if (p.sessionId) resumeSession(p.sessionId);
+      else openTheme(p.name);
+    });
+
+    rail.appendChild(item);
   }
+
+  updateRailActive();
 }
+
+function updateRailActive() {
+  const current = currentAppTheme || currentDashboardTheme || "";
+  document.querySelectorAll(".project-rail__item").forEach((btn) => {
+    btn.classList.toggle("project-rail__item--active", btn.dataset.name === current);
+  });
+}
+
+// "+" button → go to setup
+document.getElementById("project-rail-add")?.addEventListener("click", () => {
+  showSetup();
+});
 
 // ---------------------------------------------------------------------------
 // Delete project confirmation
@@ -568,6 +644,7 @@ function showApp(themeName) {
   if (typeof showDashboard === "function") {
     currentAppTheme = themeName;
     showDashboard(themeName);
+    updateRailActive();
   } else {
     // Fallback if dashboard.js not loaded
     showAppDirect(themeName);
@@ -581,6 +658,7 @@ function showApp(themeName) {
 function showAppDirect(themeName) {
   setupScreen.classList.add("hidden");
   document.getElementById("setup-topbar").classList.add("hidden");
+  document.getElementById("project-rail")?.classList.remove("project-rail--expanded");
   if (typeof hideDashboard === "function") hideDashboard();
   appScreen.classList.remove("hidden");
   document.getElementById("theme-name").textContent = themeName;
@@ -600,6 +678,7 @@ function showAppDirect(themeName) {
   if (typeof refreshPreview === "function") {
     refreshPreview();
   }
+  updateRailActive();
 }
 
 function showSetup() {
@@ -607,9 +686,11 @@ function showSetup() {
   if (typeof hideDashboard === "function") hideDashboard();
   setupScreen.classList.remove("hidden");
   document.getElementById("setup-topbar").classList.remove("hidden");
+  document.getElementById("project-rail")?.classList.add("project-rail--expanded");
   currentAppTheme = "";
 
   hideLoading();
+  updateRailActive();
 
   if (location.hash && location.hash !== "#/") {
     history.pushState(null, "", "#/");

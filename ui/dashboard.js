@@ -32,6 +32,7 @@ async function showDashboard(themeName) {
   // Hide other screens
   setupScreen.classList.add("hidden");
   document.getElementById("setup-topbar").classList.add("hidden");
+  document.getElementById("project-rail")?.classList.remove("project-rail--expanded");
   appScreen.classList.add("hidden");
   dashboardScreen.classList.remove("hidden");
 
@@ -209,6 +210,12 @@ function renderBrandAssets(assets) {
     bvIcon.textContent = "+";
     bvIcon.classList.remove("brand-asset-upload__icon--done");
   }
+
+  // Humanify toggle
+  const humanifyCheckbox = document.getElementById("humanify-checkbox");
+  if (humanifyCheckbox) {
+    humanifyCheckbox.checked = assets.humanify !== false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -381,3 +388,15 @@ document.getElementById("brand-upload-styleguide").querySelector("input").addEve
 document.getElementById("brand-upload-brandvoice").querySelector("input").addEventListener("change", (e) => {
   if (e.target.files[0]) handleBrandFileSelected("brandvoice", e.target.files[0]);
 });
+
+// Humanify toggle
+const humanifyCheckbox = document.getElementById("humanify-checkbox");
+if (humanifyCheckbox) {
+  humanifyCheckbox.addEventListener("change", async (e) => {
+    await fetch("/api/brand-assets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "humanify", content: e.target.checked ? "on" : "off" }),
+    });
+  });
+}

@@ -32,6 +32,14 @@ export function getHubspotRules(): string {
   }
 }
 
+export function getHumanifyGuide(): string {
+  try {
+    return readFile(resolveAsset("humanify-guide.md"));
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Extract page-type-specific section from page-types.md.
  * Returns only the relevant section for the given page type.

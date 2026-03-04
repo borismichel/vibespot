@@ -6,7 +6,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { spawn, execSync } from "node:child_process";
-import { getConversionGuide, getDesignGuide, getContentGuide, getHubspotRules, getPageTypeGuide } from "../ai/prompts.js";
+import { getConversionGuide, getDesignGuide, getContentGuide, getHubspotRules, getPageTypeGuide, getHumanifyGuide } from "../ai/prompts.js";
 import { loadConfig, getApiKeyForEngine, type AIEngineType } from "../utils/config.js";
 import {
   getSession,
@@ -23,7 +23,7 @@ import type { ModuleFiles } from "../ai/engine.js";
  * Get the active template's page type and brand assets from the session.
  * Used when building the system prompt.
  */
-function getPromptContext(): { pageType?: string; brandAssets?: { styleguide?: string; brandvoice?: string } } {
+function getPromptContext(): { pageType?: string; brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean } } {
   const session = getSession();
   if (!session) return {};
   const tpl = getActiveTemplate();
@@ -42,7 +42,7 @@ function buildVibeSystemPrompt(
   themeName: string,
   editMode: boolean = false,
   pageType?: string,
-  brandAssets?: { styleguide?: string; brandvoice?: string }
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean }
 ): string {
   const core = `You are vibeSpot, an AI that builds HubSpot CMS landing pages from natural language descriptions.
 
@@ -118,12 +118,19 @@ If the change affects shared CSS or JS, include those too.`;
 
   // Brand assets (only in full mode to keep edits lean)
   let brandPrompt = "";
-  if (!editMode && brandAssets) {
-    if (brandAssets.styleguide) {
+  if (!editMode) {
+    if (brandAssets?.styleguide) {
       brandPrompt += `\n\n## Brand Style Guide\n${brandAssets.styleguide}`;
     }
-    if (brandAssets.brandvoice) {
+    if (brandAssets?.brandvoice) {
       brandPrompt += `\n\n## Brand Voice\n${brandAssets.brandvoice}`;
+    }
+    // Humanify defaults to ON (even when brandAssets is undefined)
+    if (brandAssets?.humanify !== false) {
+      const humanifyGuide = getHumanifyGuide();
+      if (humanifyGuide) {
+        brandPrompt += `\n\n## Anti-AI Copy Rules (Humanify)\n${humanifyGuide}`;
+      }
     }
   }
 

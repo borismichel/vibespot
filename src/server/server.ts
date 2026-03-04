@@ -15,6 +15,7 @@ import {
   updateModules,
   reorderModules,
   removeModule,
+  detachModule,
   updateFieldValue,
   getOrderedModules,
   writeModulesToDisk,
@@ -360,8 +361,12 @@ function handleModulesRoute(
 
   if (method === "DELETE") {
     readBody(req, (body) => {
-      const { moduleName } = JSON.parse(body);
-      removeModule(moduleName);
+      const { moduleName, deleteEntirely } = JSON.parse(body);
+      if (deleteEntirely) {
+        removeModule(moduleName);
+      } else {
+        detachModule(moduleName);
+      }
       saveSession();
       jsonResponse(res, 200, { ok: true });
     });
@@ -502,15 +507,23 @@ function handleSetupInfoRoute(res: ServerResponse): void {
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, 10);
 
-  // Find local theme folders in workspace/
-  const localThemes: string[] = [];
+  // Find local theme folders in workspace/ (with module count)
+  const localThemes: Array<{ name: string; moduleCount: number }> = [];
   if (existsSync(WORKSPACE_DIR)) {
     try {
       for (const entry of readdirSync(WORKSPACE_DIR, { withFileTypes: true })) {
         if (entry.isDirectory()) {
           const themeJson = join(WORKSPACE_DIR, entry.name, "theme.json");
           if (existsSync(themeJson)) {
-            localThemes.push(entry.name);
+            let moduleCount = 0;
+            const modulesDir = join(WORKSPACE_DIR, entry.name, "modules");
+            if (existsSync(modulesDir)) {
+              try {
+                moduleCount = readdirSync(modulesDir, { withFileTypes: true })
+                  .filter((e) => e.isDirectory()).length;
+              } catch { /* ignore */ }
+            }
+            localThemes.push({ name: entry.name, moduleCount });
           }
         }
       }
@@ -1264,6 +1277,7 @@ function handleDashboardRoute(res: ServerResponse): void {
     brandAssets: {
       hasStyleguide: !!session.brandAssets?.styleguide,
       hasBrandvoice: !!session.brandAssets?.brandvoice,
+      humanify: session.brandAssets?.humanify !== false,
     },
   });
 }
@@ -1441,8 +1455,24 @@ function handleBrandAssetsRoute(method: string, req: IncomingMessage, res: Serve
     readBody(req, (body) => {
       try {
         const { type, content } = JSON.parse(body);
-        if (!type || !content) {
-          jsonResponse(res, 400, { error: "type and content are required" });
+        if (!type) {
+          jsonResponse(res, 400, { error: "type is required" });
+          return;
+        }
+
+        if (!session.brandAssets) session.brandAssets = {};
+
+        // Humanify toggle (boolean, no file)
+        if (type === "humanify") {
+          session.brandAssets.humanify = content === "on";
+          session.updatedAt = Date.now();
+          saveSession();
+          jsonResponse(res, 200, { ok: true });
+          return;
+        }
+
+        if (!content) {
+          jsonResponse(res, 400, { error: "content is required" });
           return;
         }
         if (type !== "styleguide" && type !== "brandvoice") {
@@ -1450,7 +1480,6 @@ function handleBrandAssetsRoute(method: string, req: IncomingMessage, res: Serve
           return;
         }
 
-        if (!session.brandAssets) session.brandAssets = {};
         session.brandAssets[type] = content;
         session.updatedAt = Date.now();
 

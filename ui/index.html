@@ -12,6 +12,29 @@
 <body>
 
   <!-- ============================================================ -->
+  <!-- PROJECT RAIL — persistent thin sidebar (Discord-style)       -->
+  <!-- ============================================================ -->
+  <aside class="project-rail project-rail--expanded" id="project-rail">
+    <div class="project-rail__header">
+      <span class="project-rail__title">Projects</span>
+      <span class="project-rail__count" id="rail-project-count">0</span>
+    </div>
+    <div class="project-rail__items" id="project-rail-items"></div>
+    <button class="project-rail__add" id="project-rail-add" title="New project">+</button>
+    <div class="project-rail__footer">
+      <button class="project-rail__settings-btn" id="btn-setup-settings">
+        <svg width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M7.5 1.5h3l.4 2.1a5.5 5.5 0 0 1 1.3.7l2-.8 1.5 2.6-1.6 1.3a5.5 5.5 0 0 1 0 1.5l1.6 1.3-1.5 2.6-2-.8a5.5 5.5 0 0 1-1.3.7l-.4 2.1h-3l-.4-2.1a5.5 5.5 0 0 1-1.3-.7l-2 .8-1.5-2.6 1.6-1.3a5.5 5.5 0 0 1 0-1.5L2.3 6.1l1.5-2.6 2 .8a5.5 5.5 0 0 1 1.3-.7L7.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span class="project-rail__settings-label">Settings</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Tooltip element (positioned via JS) -->
+  <div class="project-rail__tooltip" id="project-rail-tooltip"></div>
+
+  <div class="app-body" id="app-body">
+
+  <!-- ============================================================ -->
   <!-- SETUP SCREEN — shown until a session is created              -->
   <!-- ============================================================ -->
   <div class="setup-topbar" id="setup-topbar">
@@ -21,24 +44,6 @@
     </div>
   </div>
   <div class="setup" id="setup-screen">
-    <!-- Left sidebar: project list -->
-    <aside class="setup-sidebar" id="setup-sidebar">
-      <div class="setup-sidebar__header">
-        <span class="setup-sidebar__title">Projects</span>
-        <span class="setup-sidebar__count" id="sidebar-project-count">0</span>
-      </div>
-      <div class="setup-sidebar__list" id="sidebar-project-list">
-        <!-- Populated by setup.js -->
-      </div>
-      <div class="setup-sidebar__footer">
-        <button class="setup-sidebar__settings-btn" id="btn-setup-settings">
-          <svg width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M7.5 1.5h3l.4 2.1a5.5 5.5 0 0 1 1.3.7l2-.8 1.5 2.6-1.6 1.3a5.5 5.5 0 0 1 0 1.5l1.6 1.3-1.5 2.6-2-.8a5.5 5.5 0 0 1-1.3.7l-.4 2.1h-3l-.4-2.1a5.5 5.5 0 0 1-1.3-.7l-2 .8-1.5-2.6 1.6-1.3a5.5 5.5 0 0 1 0-1.5L2.3 6.1l1.5-2.6 2 .8a5.5 5.5 0 0 1 1.3-.7L7.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
-          Settings
-        </button>
-      </div>
-    </aside>
-
-    <!-- Right side: main content -->
     <div class="setup__main">
       <div class="setup__container">
         <div class="setup__symbol">&#10022;</div>
@@ -153,6 +158,14 @@
             <span class="dashboard__section-hint">Optional — injected into AI prompts</span>
           </div>
           <div class="dashboard__brand-assets" id="dashboard-brand-assets">
+            <div class="brand-asset-toggle" id="brand-toggle-humanify">
+              <label class="brand-asset-toggle__switch">
+                <input type="checkbox" id="humanify-checkbox" checked>
+                <span class="brand-asset-toggle__slider"></span>
+              </label>
+              <span class="brand-asset-toggle__label">Humanify</span>
+              <span class="brand-asset-toggle__tooltip" data-tooltip="Strips AI-sounding copy: removes em dashes, banned words like 'delve' and 'leverage', cliché openers, and forced enthusiasm. Makes your landing page read like a human wrote it.">?</span>
+            </div>
             <label class="brand-asset-upload" id="brand-upload-styleguide">
               <input type="file" accept=".md,.txt" hidden>
               <span class="brand-asset-upload__icon" id="brand-icon-styleguide">+</span>
@@ -277,14 +290,33 @@
 
     <div class="layout">
       <aside class="panel panel--left" id="panel-left">
-        <div class="module-list" id="module-list">
-          <div class="module-list__header">
+        <div class="module-bar" id="module-bar">
+          <button class="module-bar__btn" id="btn-modules">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             <span>Modules</span>
-            <span class="module-list__count" id="module-count">0</span>
-            <button class="module-list__add-btn" id="btn-add-module" title="Add module from library">+</button>
+            <span class="module-bar__count" id="module-count">0</span>
+          </button>
+        </div>
+
+        <div class="module-slideout" id="module-slideout">
+          <div class="module-slideout__view" id="module-list-view">
+            <div class="module-slideout__header">
+              <span class="module-slideout__title">Modules</span>
+              <span class="module-slideout__count" id="slideout-module-count">0</span>
+              <button class="module-slideout__add" id="btn-add-module" title="Add module from library">+</button>
+              <button class="module-slideout__close" id="module-slideout-close">&times;</button>
+            </div>
+            <div class="module-library-dropdown hidden" id="module-library-dropdown"></div>
+            <div class="module-slideout__items" id="module-items"></div>
           </div>
-          <div class="module-list__items" id="module-items"></div>
-          <div class="module-library-dropdown hidden" id="module-library-dropdown"></div>
+          <div class="module-slideout__view hidden" id="module-editor-view">
+            <div class="module-slideout__header">
+              <button class="module-slideout__back" id="field-editor-back">&larr;</button>
+              <span class="module-slideout__title" id="field-editor-title">Fields</span>
+              <button class="module-slideout__close" id="field-editor-close">&times;</button>
+            </div>
+            <div class="field-editor__content" id="field-editor-content"></div>
+          </div>
         </div>
 
         <div class="chat">
@@ -337,13 +369,6 @@
             <iframe id="preview-frame" class="browser-chrome__frame" sandbox="allow-scripts allow-same-origin"></iframe>
           </div>
         </div>
-        <aside class="field-editor" id="field-editor">
-          <div class="field-editor__header">
-            <h3 id="field-editor-title">Fields</h3>
-            <button class="field-editor__close" id="field-editor-close">&times;</button>
-          </div>
-          <div class="field-editor__content" id="field-editor-content"></div>
-        </aside>
         <aside class="history-panel hidden" id="history-panel">
           <div class="history-panel__header">
             <h3>Version History</h3>
@@ -391,6 +416,8 @@
       </div>
     </div>
   </div>
+
+  </div><!-- /app-body -->
 
   <script src="/dialog.js"></script>
   <script src="/setup.js"></script>

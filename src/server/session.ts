@@ -45,6 +45,7 @@ export interface VibeSession {
   brandAssets?: {
     styleguide?: string;
     brandvoice?: string;
+    humanify?: boolean;
   };
 
   // Legacy flat fields — kept for backward compat, redirected to active template
@@ -329,6 +330,19 @@ export function removeModule(moduleName: string): void {
 }
 
 /**
+ * Detach a module from the current template (remove from moduleOrder only).
+ * The module data stays in the session so it can be re-added later.
+ */
+export function detachModule(moduleName: string): void {
+  if (!activeSession) return;
+  activeSession.moduleOrder = activeSession.moduleOrder.filter(
+    (n) => n !== moduleName
+  );
+  activeSession.updatedAt = Date.now();
+  syncFlatFieldsToTemplate();
+}
+
+/**
  * Update a single field value in a module's fields.json.
  * Used by the field editor sidebar.
  */
@@ -490,7 +504,7 @@ export function loadSession(sessionId: string): VibeSession | null {
   }
 }
 
-export function listSessions(): Array<{ id: string; themeName: string; updatedAt: number }> {
+export function listSessions(): Array<{ id: string; themeName: string; updatedAt: number; moduleCount: number; templateCount: number }> {
   if (!existsSync(SESSIONS_DIR)) return [];
 
   return readdirSync(SESSIONS_DIR)
@@ -498,12 +512,19 @@ export function listSessions(): Array<{ id: string; themeName: string; updatedAt
     .map((f) => {
       try {
         const data = JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf-8"));
-        return { id: data.id, themeName: data.themeName, updatedAt: data.updatedAt };
+        const templates = data.templates || [];
+        return {
+          id: data.id,
+          themeName: data.themeName,
+          updatedAt: data.updatedAt,
+          moduleCount: templates.reduce((n: number, t: any) => n + (t.modules?.length || 0), 0),
+          templateCount: templates.length,
+        };
       } catch {
         return null;
       }
     })
-    .filter(Boolean) as Array<{ id: string; themeName: string; updatedAt: number }>;
+    .filter(Boolean) as Array<{ id: string; themeName: string; updatedAt: number; moduleCount: number; templateCount: number }>;
 }
 
 export function deleteSession(sessionId: string, deleteFiles = false): void {

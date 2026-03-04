@@ -2,21 +2,23 @@
  * Field editor sidebar — edit module field values with live preview.
  */
 
-const editorEl = document.getElementById("field-editor");
 const editorTitle = document.getElementById("field-editor-title");
 const editorContent = document.getElementById("field-editor-content");
-const editorClose = document.getElementById("field-editor-close");
 
 let currentEditModule = null;
 
 // ---------------------------------------------------------------------------
-// Open / close
+// Open / close (integrated with module slideout)
 // ---------------------------------------------------------------------------
 
 async function openFieldEditor(moduleName) {
   currentEditModule = moduleName;
   editorTitle.textContent = moduleName;
-  editorEl.classList.add("open");
+
+  // Switch slideout to editor view
+  if (typeof showEditorView === "function") {
+    showEditorView(moduleName);
+  }
 
   // Fetch module data
   try {
@@ -36,11 +38,11 @@ async function openFieldEditor(moduleName) {
 }
 
 function closeFieldEditor() {
-  editorEl.classList.remove("open");
   currentEditModule = null;
+  if (typeof showModuleListView === "function") {
+    showModuleListView();
+  }
 }
-
-editorClose.addEventListener("click", closeFieldEditor);
 
 // ---------------------------------------------------------------------------
 // Render field form

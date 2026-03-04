@@ -184,14 +184,14 @@ function appendUserMessage(text, timestamp) {
   const div = document.createElement("div");
   div.className = "chat-msg chat-msg--user";
   div.innerHTML = `
+    <div class="chat-msg__avatar chat-msg__avatar--user">Y</div>
     <div class="chat-msg__content">
       <div class="chat-msg__header">
         <span class="chat-msg__sender">You</span>
         <span class="chat-msg__time">${time}</span>
       </div>
       <div class="chat-msg__bubble">${escapeHtml(text)}</div>
-    </div>
-    <div class="chat-msg__avatar chat-msg__avatar--user">Y</div>`;
+    </div>`;
   messagesEl.appendChild(div);
   scrollToBottom();
 }
@@ -525,9 +525,11 @@ function timeAgoShort(timestamp) {
 
 function updateModuleList(moduleNames) {
   const itemsEl = document.getElementById("module-items");
-  const countEl = document.getElementById("module-count");
+  const barCountEl = document.getElementById("module-count");
+  const slideoutCountEl = document.getElementById("slideout-module-count");
 
-  countEl.textContent = moduleNames.length;
+  if (barCountEl) barCountEl.textContent = moduleNames.length;
+  if (slideoutCountEl) slideoutCountEl.textContent = moduleNames.length;
   itemsEl.innerHTML = "";
 
   for (const name of moduleNames) {
@@ -541,20 +543,12 @@ function updateModuleList(moduleNames) {
       <span class="module-item__delete" title="Delete module">&times;</span>
     `;
 
-    // Click to scroll to module in preview
-    item.querySelector(".module-item__name").addEventListener("click", () => {
-      scrollPreviewToModule(name);
-      highlightModuleItem(name);
-    });
-
-    // Click gear to open field editor
     item.querySelector(".module-item__edit").addEventListener("click", (e) => {
       e.stopPropagation();
       openFieldEditor(name);
       highlightModuleItem(name);
     });
 
-    // Click × to delete module
     item.querySelector(".module-item__delete").addEventListener("click", (e) => {
       e.stopPropagation();
       confirmDeleteModule(name);
@@ -563,7 +557,6 @@ function updateModuleList(moduleNames) {
     itemsEl.appendChild(item);
   }
 
-  // Set up drag-and-drop reordering
   setupDragReorder(itemsEl);
 }
 
@@ -571,6 +564,32 @@ function highlightModuleItem(name) {
   document.querySelectorAll(".module-item").forEach((el) => {
     el.classList.toggle("active", el.dataset.module === name);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Module slideout
+// ---------------------------------------------------------------------------
+
+function openModuleSlideout() {
+  const slideout = document.getElementById("module-slideout");
+  document.getElementById("module-list-view").classList.remove("hidden");
+  document.getElementById("module-editor-view").classList.add("hidden");
+  slideout.classList.add("open");
+}
+
+function closeModuleSlideout() {
+  document.getElementById("module-slideout").classList.remove("open");
+}
+
+function showEditorView(moduleName) {
+  document.getElementById("module-list-view").classList.add("hidden");
+  document.getElementById("module-editor-view").classList.remove("hidden");
+  document.getElementById("module-slideout").classList.add("open");
+}
+
+function showModuleListView() {
+  document.getElementById("module-editor-view").classList.add("hidden");
+  document.getElementById("module-list-view").classList.remove("hidden");
 }
 
 // ---------------------------------------------------------------------------
@@ -646,8 +665,23 @@ async function addModuleFromLibrary(moduleName) {
   }
 }
 
-// Add module button listener
+// Module bar button → toggle slideout
+document.getElementById("btn-modules")?.addEventListener("click", () => {
+  const slideout = document.getElementById("module-slideout");
+  if (slideout.classList.contains("open")) {
+    closeModuleSlideout();
+  } else {
+    openModuleSlideout();
+  }
+});
+
+// Add module button (inside slideout)
 document.getElementById("btn-add-module").addEventListener("click", toggleModuleLibraryDropdown);
+
+// Slideout close buttons
+document.getElementById("module-slideout-close")?.addEventListener("click", closeModuleSlideout);
+document.getElementById("field-editor-back")?.addEventListener("click", showModuleListView);
+document.getElementById("field-editor-close")?.addEventListener("click", closeModuleSlideout);
 
 // Close dropdown when clicking outside
 document.addEventListener("click", (e) => {
@@ -658,62 +692,172 @@ document.addEventListener("click", (e) => {
   }
 });
 
-async function confirmDeleteModule(moduleName) {
-  const ok = await vibeConfirm(`Delete "${escapeHtml(moduleName)}"?`, "This cannot be undone.", { confirmLabel: "Delete" });
-  if (!ok) return;
+function confirmDeleteModule(moduleName) {
+  return new Promise((resolve) => {
+    let deleteEntirely = false;
 
-  try {
-    await fetch("/api/modules", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ moduleName }),
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-overlay";
+    overlay.innerHTML = `
+      <div class="confirm-dialog">
+        <div class="confirm-dialog__title">Remove "${escapeHtml(moduleName)}"?</div>
+        <p class="confirm-dialog__detail">Module will be removed from this page but kept in your library.</p>
+        <label class="confirm-dialog__toggle">
+          <span class="confirm-dialog__toggle-switch">
+            <input type="checkbox" data-role="toggle" />
+            <span class="confirm-dialog__toggle-slider"></span>
+          </span>
+          <span class="confirm-dialog__toggle-label">Delete entirely</span>
+        </label>
+        <div class="confirm-dialog__toggle-warn">Cannot be undone!</div>
+        <div class="confirm-dialog__actions">
+          <button class="btn btn--secondary" data-action="cancel">Cancel</button>
+          <button class="btn btn--primary" data-action="confirm">Remove</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const toggle = overlay.querySelector('[data-role="toggle"]');
+    const confirmBtn = overlay.querySelector('[data-action="confirm"]');
+    const warnEl = overlay.querySelector(".confirm-dialog__toggle-warn");
+    warnEl.style.display = "none";
+
+    toggle.addEventListener("change", () => {
+      deleteEntirely = toggle.checked;
+      if (deleteEntirely) {
+        confirmBtn.textContent = "Delete";
+        confirmBtn.className = "btn btn--danger";
+        warnEl.style.display = "";
+      } else {
+        confirmBtn.textContent = "Remove";
+        confirmBtn.className = "btn btn--primary";
+        warnEl.style.display = "none";
+      }
     });
-    // Remove from list and refresh preview
-    const item = document.querySelector(`.module-item[data-module="${CSS.escape(moduleName)}"]`);
-    if (item) item.remove();
-    const countEl = document.getElementById("module-count");
-    countEl.textContent = document.querySelectorAll(".module-item").length;
-    refreshPreview();
-  } catch {
-    // silently fail
-  }
+
+    const close = (confirmed) => {
+      overlay.remove();
+      if (!confirmed) { resolve(); return; }
+
+      fetch("/api/modules", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ moduleName, deleteEntirely }),
+      }).then(() => {
+        const item = document.querySelector(`.module-item[data-module="${CSS.escape(moduleName)}"]`);
+        if (item) item.remove();
+        const countEl = document.getElementById("module-count");
+        const slideoutCountEl = document.getElementById("slideout-module-count");
+        const count = document.querySelectorAll(".module-item").length;
+        if (countEl) countEl.textContent = count;
+        if (slideoutCountEl) slideoutCountEl.textContent = count;
+        refreshPreview();
+        resolve();
+      }).catch(() => resolve());
+    };
+
+    overlay.querySelector('[data-action="cancel"]').addEventListener("click", () => close(false));
+    confirmBtn.addEventListener("click", () => close(true));
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(false); });
+  });
 }
 
 // ---------------------------------------------------------------------------
-// Drag-and-drop reordering
+// Drag-and-drop reordering (smooth sortable animation)
 // ---------------------------------------------------------------------------
 
 function setupDragReorder(container) {
-  let dragItem = null;
-  let dragY = 0;
+  container.querySelectorAll(".module-item").forEach((item) => {
+    item.addEventListener("mousedown", (e) => {
+      // Skip if clicking on edit/delete controls
+      if (e.target.closest(".module-item__edit") || e.target.closest(".module-item__delete")) return;
 
-  container.querySelectorAll(".module-item__drag").forEach((handle) => {
-    handle.addEventListener("mousedown", (e) => {
-      dragItem = handle.closest(".module-item");
-      dragY = e.clientY;
-      dragItem.style.opacity = "0.5";
+      e.preventDefault();
+      const dragItem = item;
+      const moduleName = dragItem.dataset.module;
+      const startY = e.clientY;
+      const DRAG_THRESHOLD = 5;
+      let isDragging = false;
+      let items, startIdx, itemRects, itemHeight, currentIdx;
 
-      const onMove = (e) => {
-        const dy = e.clientY - dragY;
-        if (Math.abs(dy) > 30) {
-          const items = [...container.querySelectorAll(".module-item")];
-          const idx = items.indexOf(dragItem);
-          if (dy > 0 && idx < items.length - 1) {
-            container.insertBefore(items[idx + 1], dragItem);
-          } else if (dy < 0 && idx > 0) {
-            container.insertBefore(dragItem, items[idx - 1]);
+      const startDrag = () => {
+        isDragging = true;
+        items = [...container.querySelectorAll(".module-item")];
+        startIdx = items.indexOf(dragItem);
+        itemRects = items.map((it) => it.getBoundingClientRect());
+        itemHeight = itemRects[startIdx]?.height || 36;
+        currentIdx = startIdx;
+
+        dragItem.classList.add("module-item--dragging");
+        items.forEach((it) => {
+          if (it !== dragItem) it.classList.add("module-item--placeholder");
+        });
+      };
+
+      const onMove = (ev) => {
+        const dy = ev.clientY - startY;
+
+        if (!isDragging) {
+          if (Math.abs(dy) >= DRAG_THRESHOLD) {
+            startDrag();
+          } else {
+            return;
           }
-          dragY = e.clientY;
+        }
+
+        dragItem.style.transform = `translateY(${dy}px)`;
+
+        const cursorY = ev.clientY;
+        let newIdx = startIdx;
+        for (let i = 0; i < itemRects.length; i++) {
+          const mid = itemRects[i].top + itemRects[i].height / 2;
+          if (cursorY > mid) newIdx = i;
+        }
+        newIdx = Math.max(0, Math.min(items.length - 1, newIdx));
+
+        if (newIdx !== currentIdx) {
+          currentIdx = newIdx;
+          items.forEach((it, i) => {
+            if (it === dragItem) return;
+            if (currentIdx > startIdx && i > startIdx && i <= currentIdx) {
+              it.style.transform = `translateY(${-itemHeight}px)`;
+            } else if (currentIdx < startIdx && i >= currentIdx && i < startIdx) {
+              it.style.transform = `translateY(${itemHeight}px)`;
+            } else {
+              it.style.transform = "";
+            }
+          });
         }
       };
 
       const onUp = () => {
-        if (dragItem) dragItem.style.opacity = "1";
-        dragItem = null;
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);
 
-        // Send new order to server
+        if (!isDragging) {
+          // Was a click — navigate to module
+          scrollPreviewToModule(moduleName);
+          highlightModuleItem(moduleName);
+          return;
+        }
+
+        dragItem.classList.remove("module-item--dragging");
+        dragItem.style.transform = "";
+        items.forEach((it) => {
+          it.classList.remove("module-item--placeholder");
+          it.style.transform = "";
+        });
+
+        if (currentIdx !== startIdx) {
+          if (currentIdx < startIdx) {
+            container.insertBefore(dragItem, items[currentIdx]);
+          } else {
+            const ref = items[currentIdx].nextSibling;
+            container.insertBefore(dragItem, ref);
+          }
+        }
+
         const newOrder = [...container.querySelectorAll(".module-item")].map(
           (el) => el.dataset.module
         );
