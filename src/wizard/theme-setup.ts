@@ -48,13 +48,13 @@ export async function setupTheme(): Promise<ThemeInfo> {
     const s = await ui.spinner();
     s.start("Fetching theme from HubSpot...");
 
-    const result = run(`hs fetch "${themeName}" "${themePath}"`);
+    const result = run(`hs cms fetch "${themeName}" "${themePath}"`);
     if (!result.success) {
       s.stop("Fetch failed");
       ui.logError(
         `Could not fetch theme "${themeName}". Check the name in HubSpot Design Manager.`
       );
-      ui.logError('Run `hs list /` to see available themes.');
+      ui.logError('Run `hs cms list /` to see available themes.');
       process.exit(1);
     }
 
@@ -75,7 +75,7 @@ export async function setupTheme(): Promise<ThemeInfo> {
     const cwdBefore = new Set(readdirSync(process.cwd()));
 
     // hs create always creates in process.cwd(), ignoring execSync cwd
-    const result = run(`hs create website-theme "${themeName}"`);
+    const result = run(`hs cms create website-theme "${themeName}"`);
 
     // Find the created directory — hs create may use exact name or a variant
     let createdAt = join(process.cwd(), themeName);
@@ -94,7 +94,7 @@ export async function setupTheme(): Promise<ThemeInfo> {
       ui.logError(
         `Could not create theme "${themeName}".` +
         (errMsg ? `\n${errMsg.slice(0, 300)}` : "") +
-        "\nTry running manually: hs create website-theme my-theme"
+        "\nTry running manually: hs cms create website-theme my-theme"
       );
       process.exit(1);
     }

@@ -222,7 +222,7 @@ This is where React props become HubSpot-editable fields. Every piece of text, i
 | `"name": "name"` | `missing field name` | `name` is reserved — use `item_name`, `link_label`, etc. |
 | `{% module %}` in module.html | `'module' is disabled in this context` | Cannot nest modules — use `{% form %}` for forms |
 | `{{ now() }}` | `Could not resolve function 'now'` | Use `{{ local_dt }}` for current date/time |
-| Partially uploaded module | Re-upload still fails | Run `hs remove <path>` first, then re-upload |
+| Partially uploaded module | Re-upload still fails | Run `hs cms remove <path>` first, then re-upload |
 | SVG in text field | SVG renders as escaped text | SVG markup in text fields is auto-escaped by HubL |
 
 ### Image Fields
@@ -618,7 +618,7 @@ For backgrounds with transparency (e.g., glassmorphism cards):
 
 **Cause**: Partially uploaded module with invalid `fields.json` is cached on HubSpot.
 
-**Fix**: `hs remove my-theme/modules/MyModule.module` then re-upload.
+**Fix**: `hs cms remove my-theme/modules/MyModule.module` then re-upload.
 
 ### 5. Repeater Group Content Missing
 

@@ -8,6 +8,7 @@ import {
   detectCodexCLI,
   detectHubSpotAuth,
   nodeVersionOk,
+  hsCliVersionOk,
 } from "../utils/detect.js";
 import { loadConfig } from "../utils/config.js";
 import * as ui from "../prompts/prompter.js";
@@ -48,6 +49,10 @@ export async function doctorCommand(): Promise<void> {
   if (!hs.found) {
     ui.logWarn("HubSpot CLI — not installed (only needed for deployment)");
     ui.log("  Install: npm install -g @hubspot/cli");
+  } else if (!hsCliVersionOk(hs.version)) {
+    ui.logWarn(`HubSpot CLI v${hs.version} — too old (need v8+)`);
+    ui.log("  Update: npm install -g @hubspot/cli@latest");
+    issues++;
   } else {
     ui.logSuccess(`HubSpot CLI v${hs.version}`);
 

@@ -5,7 +5,7 @@ import type { AIEngine, GeneratedAssets, ModuleFiles } from "./engine.js";
 import { getConversionGuide, getHubspotRules } from "./prompts.js";
 import { readFile, fileExists } from "../utils/fs.js";
 
-/** Boilerplate modules from `hs create website-theme` — used to distinguish AI-generated modules. */
+/** Boilerplate modules from `hs cms create website-theme` — used to distinguish AI-generated modules. */
 const BOILERPLATE_MODULES = new Set([
   "button.module",
   "card.module",
@@ -14,7 +14,7 @@ const BOILERPLATE_MODULES = new Set([
   "social-follow.module",
 ]);
 
-/** Boilerplate templates from `hs create website-theme`. */
+/** Boilerplate templates from `hs cms create website-theme`. */
 const BOILERPLATE_TEMPLATES = new Set([
   "about.html",
   "blog-index.html",

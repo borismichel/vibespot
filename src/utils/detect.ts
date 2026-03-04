@@ -277,6 +277,11 @@ export function nodeVersionOk(version: string): boolean {
   return major >= 18;
 }
 
+export function hsCliVersionOk(version: string): boolean {
+  const major = parseInt(version.split(".")[0], 10);
+  return !isNaN(major) && major >= 8;
+}
+
 // ---------------------------------------------------------------------------
 // Comprehensive environment status (used by GET /api/settings/status)
 // ---------------------------------------------------------------------------

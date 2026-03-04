@@ -559,7 +559,7 @@ function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse): void
       // hs create ALWAYS creates in process.cwd(), ignoring execSync's cwd option.
       // So we create it wherever it lands, then move it to the workspace.
       const cwdBefore = new Set(readdirSync(process.cwd()));
-      execSync(`hs create website-theme "${themeName}"`, {
+      execSync(`hs cms create website-theme "${themeName}"`, {
         encoding: "utf-8",
         stdio: "pipe",
       });
@@ -613,7 +613,7 @@ function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse): void 
       const themePath = join(WORKSPACE_DIR, name);
       ensureDir(WORKSPACE_DIR);
 
-      execSync(`hs fetch "${name}" "${themePath}"`, {
+      execSync(`hs cms fetch "${name}" "${themePath}"`, {
         encoding: "utf-8",
         stdio: "pipe",
       });
