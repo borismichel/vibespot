@@ -21,7 +21,7 @@ export class CodexCLIEngine implements AIEngine {
 
     // Use async spawn so the event loop stays free for spinner animation
     await new Promise<void>((resolve, reject) => {
-      const child = spawn("codex", ["--quiet", "--auto-edit", prompt], {
+      const child = spawn("codex", ["exec", "--full-auto", prompt], {
         cwd: themePath,
         stdio: ["pipe", "pipe", "pipe"],
         env: { ...process.env },

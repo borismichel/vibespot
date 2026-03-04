@@ -10,6 +10,15 @@ const appScreen = document.getElementById("app-screen");
 // Load setup info on page load
 // ---------------------------------------------------------------------------
 
+const ENGINE_DISPLAY_NAMES = {
+  "claude-code": "Claude Code",
+  "anthropic-api": "Anthropic API",
+  "openai-api": "OpenAI API",
+  "gemini-cli": "Gemini CLI",
+  "gemini-api": "Gemini API",
+  "codex-cli": "Codex CLI",
+};
+
 async function initSetup() {
   try {
     const res = await fetch("/api/setup");
@@ -18,20 +27,52 @@ async function initSetup() {
     // Populate sidebar with all projects (sessions + local themes)
     populateSidebar(info);
 
+    // Auto-select engine if available but not yet chosen
+    if (info.availableEngines && info.availableEngines.length > 0 && !info.activeEngine) {
+      const engine = info.availableEngines[0];
+      await fetch("/api/settings/engine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ engine }),
+      });
+      info.activeEngine = engine;
+      info.aiAvailable = true;
+      // Update statusbar
+      const statusEngine = document.getElementById("status-engine");
+      if (statusEngine) statusEngine.textContent = ENGINE_DISPLAY_NAMES[engine] || engine;
+    }
+
     // Show environment alerts
     const alerts = document.getElementById("setup-alerts");
-    alerts.innerHTML = ""; // Clear on re-init
+    alerts.innerHTML = "";
     if (!info.aiAvailable) {
-      alerts.innerHTML += `<div class="setup__alert setup__alert--warn">No AI engine configured. <a href="#" id="alert-setup-link">Set up an AI engine</a> to start building.</div>`;
+      alerts.innerHTML += `
+        <div class="setup__alert setup__alert--warn">
+          <div>No AI engine configured. Paste an API key to get started:</div>
+          <div class="setup__alert-key-row">
+            <input type="password" class="setup__alert-key-input" id="alert-api-key" placeholder="sk-ant-api03-..." />
+            <button class="btn btn--primary btn--sm" id="alert-api-save">Save</button>
+          </div>
+          <div class="setup__alert-alt">or <a href="#" id="alert-setup-link">open settings</a> for more options</div>
+        </div>`;
       setTimeout(() => {
         const link = document.getElementById("alert-setup-link");
         if (link) link.addEventListener("click", (e) => { e.preventDefault(); openSettings(); });
+        const saveBtn = document.getElementById("alert-api-save");
+        const keyInput = document.getElementById("alert-api-key");
+        if (saveBtn && keyInput) {
+          const doSave = () => saveAlertApiKey(keyInput.value.trim());
+          saveBtn.addEventListener("click", doSave);
+          keyInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doSave(); });
+        }
       }, 0);
     }
 
     // Check if we should show the walkthrough (fresh environment)
-    if (!info.aiAvailable && info.sessions.length === 0 && info.localThemes.length === 0) {
-      showWalkthrough(info);
+    // Add ?walkthrough to URL to force-show it for testing
+    if (new URLSearchParams(location.search).has("walkthrough") ||
+        (!info.aiAvailable && info.sessions.length === 0 && info.localThemes.length === 0)) {
+      showWalkthrough();
       return;
     }
 
@@ -42,6 +83,37 @@ async function initSetup() {
 
   } catch (err) {
     showError("Could not connect to server. Is vibeSpot running?");
+  }
+}
+
+async function saveAlertApiKey(key) {
+  if (!key) return;
+  // Detect provider from key prefix
+  let provider;
+  if (key.startsWith("sk-ant-")) provider = "anthropic";
+  else if (key.startsWith("sk-")) provider = "openai";
+  else if (key.startsWith("AIza")) provider = "gemini";
+  else provider = "anthropic"; // default guess
+
+  try {
+    const res = await fetch("/api/settings/apikey", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider, apiKey: key }),
+    });
+    const data = await res.json();
+    if (data.error) { await vibeAlert(data.error, "Error"); return; }
+
+    // Update statusbar if engine was auto-selected
+    if (data.autoSelectedEngine) {
+      const statusEngine = document.getElementById("status-engine");
+      if (statusEngine) statusEngine.textContent = ENGINE_DISPLAY_NAMES[data.autoSelectedEngine] || data.autoSelectedEngine;
+    }
+
+    // Re-init to refresh everything
+    initSetup();
+  } catch (err) {
+    await vibeAlert("Failed to save API key: " + err.message, "Error");
   }
 }
 
@@ -182,14 +254,14 @@ function confirmDeleteProject(project) {
 // Guided walkthrough (first-run experience)
 // ---------------------------------------------------------------------------
 
-async function showWalkthrough(setupInfo) {
+async function showWalkthrough() {
   const walkthrough = document.getElementById("walkthrough");
   const options = document.getElementById("setup-options");
 
   walkthrough.classList.remove("hidden");
   options.classList.add("hidden");
 
-  // Fetch full environment status
+  // Fetch full environment status for CLI tool details
   let envData;
   try {
     const res = await fetch("/api/settings/status");
@@ -202,103 +274,181 @@ async function showWalkthrough(setupInfo) {
   }
 
   const env = envData.environment;
-  let step = 1;
+  const progress = document.getElementById("walkthrough-progress");
+  const content = document.getElementById("walkthrough-content");
+  progress.innerHTML = "";
 
-  function renderProgress() {
-    const progress = document.getElementById("walkthrough-progress");
-    progress.innerHTML = "";
-    for (let i = 1; i <= 3; i++) {
-      const dot = document.createElement("div");
-      dot.className = `walkthrough__step-dot${i < step ? " done" : i === step ? " active" : ""}`;
-      dot.textContent = i < step ? "\u2713" : i;
-      progress.appendChild(dot);
-      if (i < 3) {
-        const line = document.createElement("div");
-        line.className = "walkthrough__step-line";
-        progress.appendChild(line);
-      }
-    }
-  }
+  content.innerHTML = `
+    <div class="walkthrough__step-title">Set up your AI engine</div>
+    <div class="walkthrough__step-desc">vibeSpot needs an AI engine to build HubSpot pages. The fastest way is to paste an API key.</div>
 
-  function renderStep() {
-    renderProgress();
-    const content = document.getElementById("walkthrough-content");
+    <div class="walkthrough__card walkthrough__card--highlight">
+      <div class="walkthrough__card-title">Paste an API key <span class="walkthrough__badge">Easiest</span></div>
+      <div class="walkthrough__key-row">
+        <label>Anthropic</label>
+        <input type="password" class="walkthrough__key-input" id="wt-key-anthropic" placeholder="sk-ant-api03-..." />
+        <button class="btn btn--primary btn--sm" data-provider="anthropic">Save</button>
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" class="walkthrough__key-link">Get key</a>
+      </div>
+      <div class="walkthrough__key-row">
+        <label>OpenAI</label>
+        <input type="password" class="walkthrough__key-input" id="wt-key-openai" placeholder="sk-..." />
+        <button class="btn btn--primary btn--sm" data-provider="openai">Save</button>
+        <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" class="walkthrough__key-link">Get key</a>
+      </div>
+      <div class="walkthrough__key-row">
+        <label>Google AI</label>
+        <input type="password" class="walkthrough__key-input" id="wt-key-gemini" placeholder="AIza..." />
+        <button class="btn btn--primary btn--sm" data-provider="gemini">Save</button>
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" class="walkthrough__key-link">Get key</a>
+      </div>
+    </div>
 
-    if (step === 1) {
-      // Environment check
-      content.innerHTML = `
-        <div class="walkthrough__step-title">Environment Check</div>
-        <div class="walkthrough__step-desc">Let's see what tools you have installed.</div>
-        <div class="walkthrough__tool-list">
-          ${toolItem("Node.js", env.tools.node.found, env.tools.node.found ? `v${env.tools.node.version}` : "Not found")}
-          ${toolItem("Git", env.tools.git.found, env.tools.git.found ? `v${env.tools.git.version}` : "Not found")}
-          ${toolItem("HubSpot CLI", env.tools.hubspot.found, env.tools.hubspot.found ? `v${env.tools.hubspot.version}` : "Not installed")}
-          ${toolItem("GitHub CLI", env.tools.github.found, env.tools.github.found ? `v${env.tools.github.version}` : "Not installed")}
-        </div>
-        <div class="walkthrough__actions">
-          <button class="btn btn--primary" id="wt-next-1">Continue</button>
-        </div>
-      `;
-      document.getElementById("wt-next-1").addEventListener("click", () => { step = 2; renderStep(); });
+    <div class="walkthrough__card">
+      <div class="walkthrough__card-title">Or use a CLI tool</div>
+      <div class="walkthrough__tool-list">
+        ${cliToolRow("Claude Code", "claude-code", env.tools.claudeCode)}
+        ${cliToolRow("Gemini CLI", "gemini-cli", env.tools.geminiCli)}
+        ${cliToolRow("Codex CLI", "codex-cli", env.tools.codexCli)}
+      </div>
+    </div>
 
-    } else if (step === 2) {
-      // AI engine setup
-      content.innerHTML = `
-        <div class="walkthrough__step-title">Set Up an AI Engine</div>
-        <div class="walkthrough__step-desc">vibeSpot needs an AI engine to generate HubSpot modules. Choose one:</div>
-        <div class="walkthrough__tool-list">
-          ${toolItem("Claude Code", env.tools.claudeCode.found, env.tools.claudeCode.found ? "Installed" : "Not installed")}
-          ${toolItem("Gemini CLI", env.tools.geminiCli.found, env.tools.geminiCli.found ? "Installed" : "Not installed")}
-          ${toolItem("Codex CLI", env.tools.codexCli.found, env.tools.codexCli.found ? "Installed" : "Not installed")}
-          ${toolItem("Anthropic API Key", env.apiKeys.anthropic.configured, env.apiKeys.anthropic.configured ? "Configured" : "Not set")}
-          ${toolItem("OpenAI API Key", env.apiKeys.openai.configured, env.apiKeys.openai.configured ? "Configured" : "Not set")}
-          ${toolItem("Gemini API Key", env.apiKeys.gemini.configured, env.apiKeys.gemini.configured ? "Configured" : "Not set")}
-        </div>
-        <div class="walkthrough__actions">
-          <button class="btn btn--primary" id="wt-open-settings">Open Settings to Configure</button>
-          <button class="btn btn--secondary" id="wt-next-2">Skip for now</button>
-        </div>
-      `;
-      document.getElementById("wt-open-settings").addEventListener("click", () => {
-        if (typeof openSettings === "function") openSettings();
-      });
-      document.getElementById("wt-next-2").addEventListener("click", () => { step = 3; renderStep(); });
+    <div class="walkthrough__actions">
+      <button class="btn btn--secondary" id="wt-skip">Skip for now</button>
+    </div>
+  `;
 
-    } else if (step === 3) {
-      // Ready
-      const hasAI = env.availableEngines.length > 0;
-      content.innerHTML = `
-        <div class="walkthrough__step-title">${hasAI ? "Ready to Build!" : "Almost There"}</div>
-        <div class="walkthrough__step-desc">
-          ${hasAI
-            ? "Your environment is configured. Create a new theme to get started."
-            : "No AI engine is configured yet. You can still create a theme, but you'll need to set up an AI engine before chatting."}
-        </div>
-        <div class="walkthrough__actions">
-          <button class="btn btn--primary" id="wt-finish">Start Building</button>
-          ${!hasAI ? `<button class="btn btn--secondary" id="wt-back-settings">Configure AI</button>` : ""}
-        </div>
-      `;
-      document.getElementById("wt-finish").addEventListener("click", () => {
+  // API key save handlers
+  content.querySelectorAll(".walkthrough__card--highlight button[data-provider]").forEach((btn) => {
+    const provider = btn.dataset.provider;
+    const input = document.getElementById("wt-key-" + provider);
+    const doSave = async () => {
+      const key = input.value.trim();
+      if (!key) return;
+      btn.disabled = true;
+      btn.textContent = "...";
+      try {
+        const res = await fetch("/api/settings/apikey", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider, apiKey: key }),
+        });
+        const data = await res.json();
+        if (data.error) { await vibeAlert(data.error, "Error"); btn.disabled = false; btn.textContent = "Save"; return; }
+        if (data.autoSelectedEngine) {
+          const statusEngine = document.getElementById("status-engine");
+          if (statusEngine) statusEngine.textContent = ENGINE_DISPLAY_NAMES[data.autoSelectedEngine] || data.autoSelectedEngine;
+        }
+        clearWalkthroughParam();
         walkthrough.classList.add("hidden");
         options.classList.remove("hidden");
-      });
-      const backBtn = document.getElementById("wt-back-settings");
-      if (backBtn) backBtn.addEventListener("click", () => {
-        if (typeof openSettings === "function") openSettings();
-      });
-    }
-  }
+        initSetup();
+      } catch (err) {
+        await vibeAlert("Failed to save: " + err.message, "Error");
+        btn.disabled = false;
+        btn.textContent = "Save";
+      }
+    };
+    btn.addEventListener("click", doSave);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") doSave(); });
+  });
 
-  renderStep();
+  // CLI tool action handlers
+  content.querySelectorAll("[data-cli-action]").forEach((btn) => {
+    btn.addEventListener("click", () => handleCliAction(btn.dataset.cliEngine, btn.dataset.cliAction, btn));
+  });
+
+  // Skip
+  document.getElementById("wt-skip").addEventListener("click", () => {
+    clearWalkthroughParam();
+    walkthrough.classList.add("hidden");
+    options.classList.remove("hidden");
+  });
 }
 
-function toolItem(name, ok, detail) {
+/** Strip ?walkthrough from URL so re-init doesn't re-show it */
+function clearWalkthroughParam() {
+  const url = new URL(location.href);
+  if (url.searchParams.has("walkthrough")) {
+    url.searchParams.delete("walkthrough");
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }
+}
+
+function cliToolRow(name, engineId, toolInfo) {
+  let statusHtml, actionHtml;
+  if (toolInfo.found && toolInfo.authenticated) {
+    statusHtml = `<span class="walkthrough__tool-status walkthrough__tool-status--ok">Ready</span>`;
+    actionHtml = `<button class="btn btn--sm btn--primary" data-cli-action="select" data-cli-engine="${engineId}">Use</button>`;
+  } else if (toolInfo.found && !toolInfo.authenticated) {
+    statusHtml = `<span class="walkthrough__tool-status walkthrough__tool-status--missing">Not signed in</span>`;
+    actionHtml = `<button class="btn btn--sm btn--secondary" data-cli-action="auth" data-cli-engine="${engineId}">Sign in</button>`;
+  } else {
+    statusHtml = `<span class="walkthrough__tool-status walkthrough__tool-status--missing">Not installed</span>`;
+    actionHtml = `<button class="btn btn--sm btn--secondary" data-cli-action="install" data-cli-engine="${engineId}">Install</button>`;
+  }
   return `<div class="walkthrough__tool-item">
-    <span class="settings__dot settings__dot--${ok ? "success" : "warn"}"></span>
+    <span class="settings__dot settings__dot--${toolInfo.found && toolInfo.authenticated ? "success" : toolInfo.found ? "warn" : "muted"}"></span>
     <span class="walkthrough__tool-name">${esc(name)}</span>
-    <span class="walkthrough__tool-status walkthrough__tool-status--${ok ? "ok" : "missing"}">${esc(detail)}</span>
+    ${statusHtml}
+    ${actionHtml}
   </div>`;
+}
+
+async function handleCliAction(engineId, action, btn) {
+  const toolMap = { "claude-code": "claude", "gemini-cli": "gemini", "codex-cli": "codex" };
+  const tool = toolMap[engineId];
+  if (!tool) return;
+
+  if (action === "select") {
+    // Already installed + authed, just select
+    await fetch("/api/settings/engine", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ engine: engineId }),
+    });
+    const statusEngine = document.getElementById("status-engine");
+    if (statusEngine) statusEngine.textContent = ENGINE_DISPLAY_NAMES[engineId] || engineId;
+    clearWalkthroughParam();
+    document.getElementById("walkthrough").classList.add("hidden");
+    document.getElementById("setup-options").classList.remove("hidden");
+    initSetup();
+    return;
+  }
+
+  const endpoint = action === "install" ? "/api/settings/install" : "/api/settings/cli-auth";
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.innerHTML = '<span class="upload-spinner"></span>';
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool }),
+    });
+    const data = await res.json();
+    if (data.jobId) {
+      // Poll until complete
+      await pollJob(data.jobId);
+    }
+    // Refresh walkthrough to show updated status
+    showWalkthrough();
+  } catch {
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+}
+
+async function pollJob(jobId) {
+  for (let i = 0; i < 60; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    try {
+      const res = await fetch("/api/settings/job/" + jobId);
+      const data = await res.json();
+      if (data.status === "completed" || data.status === "failed") return;
+    } catch { return; }
+  }
 }
 
 // ---------------------------------------------------------------------------

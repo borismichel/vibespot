@@ -7,7 +7,6 @@ import {
   detectGeminiCLI,
   detectCodexCLI,
   detectHubSpotAuth,
-  hasAnthropicKey,
   nodeVersionOk,
 } from "../utils/detect.js";
 import { loadConfig } from "../utils/config.js";
@@ -44,26 +43,24 @@ export async function doctorCommand(): Promise<void> {
     ui.logSuccess(`Git ${git.version}`);
   }
 
-  // HubSpot CLI
+  // HubSpot CLI (only needed for deployment)
   const hs = detectHubSpotCLI();
   if (!hs.found) {
-    ui.logError("HubSpot CLI — not installed");
+    ui.logWarn("HubSpot CLI — not installed (only needed for deployment)");
     ui.log("  Install: npm install -g @hubspot/cli");
-    issues++;
   } else {
     ui.logSuccess(`HubSpot CLI v${hs.version}`);
-  }
 
-  // HubSpot auth
-  const auth = detectHubSpotAuth();
-  if (!auth.authenticated) {
-    ui.logWarn("HubSpot — not authenticated");
-    ui.log("  Run: hs init");
-    issues++;
-  } else {
-    ui.logSuccess(
-      `HubSpot portal${auth.portalName ? `: ${auth.portalName}` : ""} (ID: ${auth.portalId})`
-    );
+    // HubSpot auth
+    const auth = detectHubSpotAuth();
+    if (!auth.authenticated) {
+      ui.logWarn("HubSpot — not authenticated");
+      ui.log("  Run: hs init");
+    } else {
+      ui.logSuccess(
+        `HubSpot portal${auth.portalName ? `: ${auth.portalName}` : ""} (ID: ${auth.portalId})`
+      );
+    }
   }
 
   // AI engines
@@ -88,15 +85,21 @@ export async function doctorCommand(): Promise<void> {
     ui.log(theme.muted("OpenAI Codex — not installed"));
   }
 
-  // API key
-  if (hasAnthropicKey()) {
-    ui.logSuccess("Anthropic API key set");
-  } else {
-    ui.log(theme.muted("Anthropic API key — not set"));
-  }
-
-  // Config
+  // API keys
   const config = loadConfig();
+
+  const anthropicKey = !!(config.anthropicApiKey || process.env.ANTHROPIC_API_KEY);
+  const openaiKey = !!(config.openaiApiKey || process.env.OPENAI_API_KEY);
+  const geminiKey = !!(config.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY);
+
+  if (anthropicKey) ui.logSuccess("Anthropic API key configured");
+  else ui.log(theme.muted("Anthropic API key — not set"));
+
+  if (openaiKey) ui.logSuccess("OpenAI API key configured");
+  else ui.log(theme.muted("OpenAI API key — not set"));
+
+  if (geminiKey) ui.logSuccess("Google AI API key configured");
+  else ui.log(theme.muted("Google AI API key — not set"));
   const engineLabels: Record<string, string> = {
     "claude-code": "Claude Code",
     "api": "Anthropic API",
@@ -114,12 +117,12 @@ export async function doctorCommand(): Promise<void> {
   }
 
   // No AI option available
-  if (!claude.found && !gemini.found && !codex.found && !hasAnthropicKey()) {
+  if (!claude.found && !gemini.found && !codex.found && !anthropicKey && !openaiKey && !geminiKey) {
     ui.logWarn("No AI engine available");
-    ui.log("  Option 1: Install Claude Code — https://claude.ai/code");
-    ui.log("  Option 2: Install Gemini CLI — https://github.com/google-gemini/gemini-cli");
-    ui.log("  Option 3: Install OpenAI Codex — https://github.com/openai/codex");
-    ui.log("  Option 4: Set ANTHROPIC_API_KEY environment variable");
+    ui.log("  Fastest: Set an API key (ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY)");
+    ui.log("  Or install: Claude Code — https://claude.ai/code");
+    ui.log("             Gemini CLI — https://github.com/google-gemini/gemini-cli");
+    ui.log("             Codex CLI — https://github.com/openai/codex");
     issues++;
   }
 

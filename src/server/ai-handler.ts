@@ -657,7 +657,7 @@ async function generateWithCLI(
     args = [];
   } else {
     bin = "codex";
-    args = ["--quiet", "--full-auto"];
+    args = ["exec", "--full-auto"];
   }
 
   // CLI may buffer output — send status updates so user knows what's happening

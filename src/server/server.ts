@@ -486,23 +486,15 @@ const WORKSPACE_DIR = join(homedir(), "vibespot-themes");
 
 function handleSetupInfoRoute(res: ServerResponse): void {
   const session = getSession();
-  const config = loadConfig();
 
-  // Check if hs CLI is installed
+  // Full environment detection — checks all 6 AI engines, not just Anthropic + Claude Code
+  const env = detectEnvironment();
+
+  // Lightweight hs check for "Fetch from HubSpot" visibility
   let hsInstalled = false;
   try {
     execSync("hs --version", { encoding: "utf-8", stdio: "pipe" });
     hsInstalled = true;
-  } catch { /* not installed */ }
-
-  // Check for API key
-  const hasApiKey = !!(config.anthropicApiKey || process.env.ANTHROPIC_API_KEY);
-
-  // Check for Claude Code
-  let hasClaudeCode = false;
-  try {
-    execSync("claude --version", { encoding: "utf-8", stdio: "pipe" });
-    hasClaudeCode = true;
   } catch { /* not installed */ }
 
   // List previous sessions
@@ -533,9 +525,9 @@ function handleSetupInfoRoute(res: ServerResponse): void {
       moduleCount: session.modules.length,
     } : null,
     hsInstalled,
-    hasApiKey,
-    hasClaudeCode,
-    aiAvailable: hasApiKey || hasClaudeCode,
+    aiAvailable: env.availableEngines.length > 0,
+    availableEngines: env.availableEngines,
+    activeEngine: env.activeEngine,
     sessions,
     localThemes,
   });
@@ -818,7 +810,24 @@ function handleSettingsApiKeyRoute(req: IncomingMessage, res: ServerResponse): v
       }
 
       saveConfig(configUpdate as any);
-      jsonResponse(res, 200, { ok: true, provider });
+
+      // Auto-select engine if none is currently configured
+      let autoSelectedEngine: string | null = null;
+      const currentConfig = loadConfig();
+      if (!currentConfig.aiEngine) {
+        const engineMap: Record<string, string> = {
+          anthropic: "anthropic-api",
+          openai: "openai-api",
+          gemini: "gemini-api",
+        };
+        const engine = engineMap[provider];
+        if (engine) {
+          saveConfig({ aiEngine: engine } as any);
+          autoSelectedEngine = engine;
+        }
+      }
+
+      jsonResponse(res, 200, { ok: true, provider, autoSelectedEngine });
     } catch (err) {
       jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
     }

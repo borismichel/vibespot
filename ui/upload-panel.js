@@ -19,24 +19,163 @@ async function startUpload() {
     uploadBtn.disabled = true;
   }
 
-  // Fetch portal info and ask for confirmation before uploading
+  function resetUploadBtn() {
+    if (uploadBtn) { uploadBtn.textContent = "Deploy"; uploadBtn.disabled = false; }
+  }
+
+  // Fetch portal info and check HubSpot CLI readiness
   try {
     const res = await fetch("/api/settings/status");
     const data = await res.json();
-    const hs = data.environment?.tools?.hubspot;
+    let hs = data.environment?.tools?.hubspot;
 
+    // HubSpot CLI not installed — guide the user through install
+    if (!hs || !hs.found) {
+      const installed = await showHubSpotSetupDialog("install");
+      if (!installed) { resetUploadBtn(); return; }
+      // Re-check after install
+      const recheck = await fetch("/api/settings/status").then((r) => r.json());
+      hs = recheck.environment?.tools?.hubspot;
+    }
+
+    // HubSpot CLI installed but not authenticated — guide through auth
+    if (hs && hs.found && !hs.authenticated) {
+      const authed = await showHubSpotSetupDialog("auth");
+      if (!authed) { resetUploadBtn(); return; }
+      // Re-check after auth
+      const recheck = await fetch("/api/settings/status").then((r) => r.json());
+      hs = recheck.environment?.tools?.hubspot;
+    }
+
+    // Confirm portal before deploying
     if (hs && hs.authenticated && hs.portalName) {
       const confirmed = await confirmUpload(hs.portalName, hs.portalId);
-      if (!confirmed) {
-        if (uploadBtn) { uploadBtn.textContent = "Deploy"; uploadBtn.disabled = false; }
-        return;
-      }
+      if (!confirmed) { resetUploadBtn(); return; }
     }
   } catch {
-    // If we can't detect the portal, proceed without confirmation
+    // If we can't detect, proceed and let the upload fail with a meaningful error
   }
 
   doUpload();
+}
+
+/**
+ * Show a dialog to guide the user through HubSpot CLI install or auth.
+ * @param {"install" | "auth"} mode
+ * @returns {Promise<boolean>} true if the step completed successfully
+ */
+function showHubSpotSetupDialog(mode) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-overlay";
+
+    if (mode === "install") {
+      overlay.innerHTML = `
+        <div class="confirm-dialog" style="width:420px">
+          <div class="confirm-dialog__title">Install HubSpot CLI</div>
+          <p class="confirm-dialog__detail">The HubSpot CLI is needed to deploy your theme. This will run <code>npm install -g @hubspot/cli</code>.</p>
+          <div class="confirm-dialog__actions">
+            <button class="btn btn--secondary" data-action="cancel">Cancel</button>
+            <button class="btn btn--primary" data-action="install">Install</button>
+          </div>
+          <div class="hs-setup__status hidden" id="hs-install-status">
+            <span class="upload-spinner"></span> Installing...
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const close = (val) => { overlay.remove(); resolve(val); };
+      overlay.querySelector('[data-action="cancel"]').addEventListener("click", () => close(false));
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) close(false); });
+
+      overlay.querySelector('[data-action="install"]').addEventListener("click", async () => {
+        const installBtn = overlay.querySelector('[data-action="install"]');
+        installBtn.disabled = true;
+        installBtn.textContent = "Installing...";
+        const statusEl = document.getElementById("hs-install-status");
+        if (statusEl) statusEl.classList.remove("hidden");
+
+        try {
+          const res = await fetch("/api/settings/install", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tool: "hubspot" }),
+          });
+          const data = await res.json();
+          if (data.jobId) {
+            // Poll until done
+            for (let i = 0; i < 60; i++) {
+              await new Promise((r) => setTimeout(r, 2000));
+              const jr = await fetch("/api/settings/job/" + data.jobId).then((r) => r.json());
+              if (jr.status === "completed") { close(true); return; }
+              if (jr.status === "failed") { close(false); return; }
+            }
+          }
+          close(false);
+        } catch {
+          close(false);
+        }
+      });
+
+    } else {
+      // Auth mode — PAK flow
+      overlay.innerHTML = `
+        <div class="confirm-dialog" style="width:460px">
+          <div class="confirm-dialog__title">Connect your HubSpot account</div>
+          <p class="confirm-dialog__detail">Create a Personal Access Key to connect vibeSpot to your HubSpot portal.</p>
+          <ol class="hs-setup__steps">
+            <li>Open <a href="https://app.hubspot.com/portal-recommend/l?slug=personal-access-key" target="_blank" rel="noopener">HubSpot Settings</a></li>
+            <li>Click "Create personal access key" or copy an existing one</li>
+            <li>Paste the key below</li>
+          </ol>
+          <input type="password" class="confirm-dialog__input" id="hs-pak-input" placeholder="pat-na1-..." />
+          <div class="confirm-dialog__actions">
+            <button class="btn btn--secondary" data-action="cancel">Cancel</button>
+            <button class="btn btn--primary" data-action="save">Connect</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const close = (val) => { overlay.remove(); resolve(val); };
+      overlay.querySelector('[data-action="cancel"]').addEventListener("click", () => close(false));
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) close(false); });
+
+      const pakInput = document.getElementById("hs-pak-input");
+      const saveBtn = overlay.querySelector('[data-action="save"]');
+
+      const doSave = async () => {
+        const key = pakInput.value.trim();
+        if (!key) return;
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Connecting...";
+        try {
+          const res = await fetch("/api/settings/hs-auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ personalAccessKey: key }),
+          });
+          const data = await res.json();
+          if (data.error) {
+            await vibeAlert(data.error, "Error");
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Connect";
+            return;
+          }
+          close(true);
+        } catch (err) {
+          await vibeAlert("Failed to connect: " + err.message, "Error");
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Connect";
+        }
+      };
+
+      saveBtn.addEventListener("click", doSave);
+      pakInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doSave(); });
+      setTimeout(() => pakInput.focus(), 50);
+    }
+  });
 }
 
 function doUpload() {

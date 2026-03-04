@@ -77,7 +77,7 @@ html, body {
    SETUP SCREEN
    ================================================================ */
 .setup {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   overflow: hidden;
 }
@@ -232,7 +232,7 @@ html, body {
 .setup__main {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 40px 20px;
   overflow-y: auto;
@@ -286,6 +286,32 @@ html, body {
   background: rgba(245,158,11,0.08);
   border: 1px solid rgba(245,158,11,0.2);
   color: var(--warning);
+}
+
+.setup__alert-key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.setup__alert-key-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  outline: none;
+}
+.setup__alert-key-input:focus {
+  border-color: var(--accent-glow);
+}
+.setup__alert-alt {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
 }
 
 .setup__options { text-align: left; }
@@ -940,6 +966,27 @@ html, body {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* HubSpot setup dialog (deferred install/auth) */
+.hs-setup__steps {
+  margin: 12px 0 16px;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+.hs-setup__steps a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.hs-setup__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-dim);
 }
 
 /* ================================================================
@@ -2089,6 +2136,70 @@ html, body {
 .walkthrough__tool-status { font-size: 12px; color: var(--text-muted); }
 .walkthrough__tool-status--ok { color: var(--success); }
 .walkthrough__tool-status--missing { color: var(--warning); }
+
+.walkthrough__card {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+.walkthrough__card--highlight {
+  border-color: var(--accent-glow);
+  background: var(--accent-tint);
+}
+.walkthrough__card-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.walkthrough__badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--accent);
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+.walkthrough__key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.walkthrough__key-row:last-child { margin-bottom: 0; }
+.walkthrough__key-row label {
+  width: 72px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.walkthrough__key-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.walkthrough__key-input:focus {
+  border-color: var(--accent-glow);
+}
+.walkthrough__key-link {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.walkthrough__key-link:hover { color: var(--accent); }
 
 .walkthrough__actions {
   display: flex;
