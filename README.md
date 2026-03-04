@@ -8,7 +8,7 @@ AI-powered HubSpot CMS landing page builder — vibe coding & React converter.
 
 > **Before you start:** vibeSpot's in-app setup will walk you through configuration, but for the smoothest experience, install your preferred AI engine and the HubSpot CLI **before** running vibeSpot. The onboarding flow is still being refined — having these tools ready avoids extra back-and-forth.
 >
-> **Requirements:** Node.js 18+, HubSpot CLI 8+ (`npm install -g @hubspot/cli@latest`). HubSpot CLI versions below 8 are **not supported** — deprecated commands like `hs create website-theme` were removed in v8.
+> **Requirements:** Node.js 18+, HubSpot CLI 8+ (`npm install -g @hubspot/cli@latest`). HubSpot CLI versions below 8 are **not supported** — deprecated commands like `hs create` were removed in v8.
 
 ## What It Does
 

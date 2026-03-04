@@ -115,7 +115,7 @@ export async function runUpload(themePath: string): Promise<boolean> {
     if (!anyFixed) {
       // Try removing stuck modules as last resort
       s.start("Cleaning up stuck modules...");
-      run(`hs cms remove "${themeName}/modules"`, {
+      run(`hs cms delete "${themeName}/modules"`, {
         cwd: join(themePath, ".."),
       });
       s.stop("Cleaned up modules, retrying...");

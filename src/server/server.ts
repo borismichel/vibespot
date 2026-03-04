@@ -559,7 +559,7 @@ function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse): void
       // hs create ALWAYS creates in process.cwd(), ignoring execSync's cwd option.
       // So we create it wherever it lands, then move it to the workspace.
       const cwdBefore = new Set(readdirSync(process.cwd()));
-      execSync(`hs cms create website-theme "${themeName}"`, {
+      execSync(`hs cms theme create "${themeName}"`, {
         encoding: "utf-8",
         stdio: "pipe",
       });
@@ -887,7 +887,7 @@ function handleSettingsHsAuthRoute(req: IncomingMessage, res: ServerResponse): v
       if (parsed.personalAccessKey) {
         // Non-interactive auth with provided key
         const jobId = startJob(
-          `echo "${parsed.personalAccessKey}" | hs auth personalaccesskey`,
+          `hs auth --pak="${parsed.personalAccessKey}"`,
           "Authenticating with HubSpot",
           { timeout: 30_000 }
         );

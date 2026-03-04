@@ -75,7 +75,7 @@ export async function setupTheme(): Promise<ThemeInfo> {
     const cwdBefore = new Set(readdirSync(process.cwd()));
 
     // hs create always creates in process.cwd(), ignoring execSync cwd
-    const result = run(`hs cms create website-theme "${themeName}"`);
+    const result = run(`hs cms theme create "${themeName}"`);
 
     // Find the created directory — hs create may use exact name or a variant
     let createdAt = join(process.cwd(), themeName);
@@ -94,7 +94,7 @@ export async function setupTheme(): Promise<ThemeInfo> {
       ui.logError(
         `Could not create theme "${themeName}".` +
         (errMsg ? `\n${errMsg.slice(0, 300)}` : "") +
-        "\nTry running manually: hs cms create website-theme my-theme"
+        "\nTry running manually: hs cms theme create my-theme"
       );
       process.exit(1);
     }
