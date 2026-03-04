@@ -115,4 +115,4 @@ Settings are saved in `~/.vibespot/config.json`:
 
 ## License
 
-MIT
+Personal use only — see [LICENSE](LICENSE) for details. Commercial licensing available on request.
