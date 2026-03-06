@@ -3,8 +3,8 @@
  * Tracks conversation history, generated modules, and theme state.
  */
 
-import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
-import { join, basename } from "node:path";
+import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, rmSync, renameSync } from "node:fs";
+import { join, basename, dirname } from "node:path";
 import { homedir } from "node:os";
 import type { ModuleFiles, GeneratedAssets } from "../ai/engine.js";
 import { ensureGitRepo } from "./project-git.js";
@@ -251,6 +251,18 @@ export function addTemplate(pageType: PageType, label: string): TemplateEntry {
   syncFlatFieldsFromTemplate(entry);
   activeSession.updatedAt = Date.now();
   return entry;
+}
+
+/**
+ * Rename a template's display label.
+ */
+export function renameTemplate(templateId: string, newLabel: string): boolean {
+  if (!activeSession) return false;
+  const tpl = activeSession.templates.find((t) => t.id === templateId);
+  if (!tpl) return false;
+  tpl.label = newLabel;
+  activeSession.updatedAt = Date.now();
+  return true;
 }
 
 /**
@@ -625,6 +637,86 @@ export function deleteSession(sessionId: string, deleteFiles = false): void {
   }
 }
 
+/**
+ * Rename a project: update themeName in all sessions, rename disk folder,
+ * rename CSS/JS files, and update the session index.
+ */
+export function renameSession(sessionId: string, newName: string): { ok: boolean; error?: string } {
+  // Load the session to get the current theme name
+  const filePath = join(SESSIONS_DIR, sessionId + ".json");
+  if (!existsSync(filePath)) return { ok: false, error: "Session not found" };
+
+  let session: VibeSession;
+  try {
+    session = JSON.parse(readFileSync(filePath, "utf-8"));
+  } catch {
+    return { ok: false, error: "Failed to read session" };
+  }
+
+  const oldName = session.themeName;
+  if (oldName === newName) return { ok: true };
+
+  const oldPath = session.themePath;
+  const newPath = join(dirname(oldPath), newName);
+
+  // Rename the folder on disk
+  if (existsSync(oldPath)) {
+    if (existsSync(newPath)) return { ok: false, error: "A project with that name already exists" };
+    try {
+      renameSync(oldPath, newPath);
+    } catch (err) {
+      return { ok: false, error: `Failed to rename folder: ${err instanceof Error ? err.message : String(err)}` };
+    }
+
+    // Rename CSS/JS files inside the new folder
+    const cssOld = join(newPath, "css", `${oldName}-theme.css`);
+    const cssNew = join(newPath, "css", `${newName}-theme.css`);
+    if (existsSync(cssOld)) try { renameSync(cssOld, cssNew); } catch { /* non-critical */ }
+
+    const jsOld = join(newPath, "js", `${oldName}-animations.js`);
+    const jsNew = join(newPath, "js", `${newName}-animations.js`);
+    if (existsSync(jsOld)) try { renameSync(jsOld, jsNew); } catch { /* non-critical */ }
+
+    // Update theme.json label/name
+    const themeJsonPath = join(newPath, "theme.json");
+    if (existsSync(themeJsonPath)) {
+      try {
+        const themeData = JSON.parse(readFileSync(themeJsonPath, "utf-8"));
+        themeData.label = newName;
+        themeData.name = newName;
+        writeFileSync(themeJsonPath, JSON.stringify(themeData, null, 2), "utf-8");
+      } catch { /* non-critical */ }
+    }
+  }
+
+  // Update all sessions that reference this theme
+  if (existsSync(SESSIONS_DIR)) {
+    for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith(".json") && f !== "_index.json")) {
+      try {
+        const data = JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf-8"));
+        if (data.themeName === oldName) {
+          data.themeName = newName;
+          data.themePath = newPath;
+          data.updatedAt = Date.now();
+          writeFileSync(join(SESSIONS_DIR, f), JSON.stringify(data, null, 2), "utf-8");
+        }
+      } catch { /* skip corrupt files */ }
+    }
+  }
+
+  // Update the in-memory active session
+  if (activeSession && activeSession.themeName === oldName) {
+    activeSession.themeName = newName;
+    activeSession.themePath = newPath;
+    activeSession.updatedAt = Date.now();
+  }
+
+  // Rebuild the index
+  rebuildIndex();
+
+  return { ok: true };
+}
+
 // ---------------------------------------------------------------------------
 // Write modules back to disk (for upload)
 // ---------------------------------------------------------------------------
@@ -776,6 +868,49 @@ export function reloadModulesFromDisk(): void {
   scanThemeFromDisk(activeSession.themePath);
   activeSession.updatedAt = Date.now();
   syncFlatFieldsToTemplate();
+}
+
+/**
+ * Reload only the active template's modules from disk.
+ * Used after a scoped rollback to avoid affecting other templates.
+ */
+export function reloadActiveTemplateFromDisk(): void {
+  if (!activeSession) return;
+  const tpl = getActiveTemplate();
+  if (!tpl) return;
+
+  const themePath = activeSession.themePath;
+  const modulesDir = join(themePath, "modules");
+
+  // Reload modules that belong to this template
+  tpl.modules = [];
+  for (const name of tpl.moduleOrder) {
+    const modDir = join(modulesDir, `${name}.module`);
+    if (!existsSync(modDir)) continue;
+    const mod: ModuleFiles = {
+      moduleName: name,
+      fieldsJson: safeRead(join(modDir, "fields.json")),
+      metaJson: safeRead(join(modDir, "meta.json")),
+      moduleHtml: safeRead(join(modDir, "module.html")),
+      moduleCss: safeRead(join(modDir, "module.css")),
+      moduleJs: safeRead(join(modDir, "module.js")) || undefined,
+    };
+    if (mod.fieldsJson && mod.moduleHtml) {
+      tpl.modules.push(mod);
+    }
+  }
+
+  // Reload template file
+  if (tpl.templateFile) {
+    const tplPath = join(themePath, tpl.templateFile);
+    if (existsSync(tplPath)) {
+      tpl.template = safeRead(tplPath);
+    }
+  }
+
+  // Sync flat fields from the updated template
+  syncFlatFieldsFromTemplate(tpl);
+  activeSession.updatedAt = Date.now();
 }
 
 // ---------------------------------------------------------------------------

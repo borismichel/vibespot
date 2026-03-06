@@ -197,42 +197,50 @@ export async function handleGenerateStream(
   const session = getSession();
   if (!session) throw new Error("No active session");
 
-  const config = loadConfig();
-  const engine = config.aiEngine || detectDefaultEngine();
+  const capturedSessionId = session.id;
+  generatingSessionId = capturedSessionId;
 
-  switch (engine) {
-    case "anthropic-api":
-    case "api": {
-      const apiKey = getApiKeyForEngine("anthropic-api", config);
-      if (!apiKey) throw new Error("Anthropic API key not configured. Open Settings to add one.");
-      await streamWithAnthropicAPI(userMessage, apiKey, session.themeName,
-        config.anthropicApiModel || "claude-sonnet-4-20250514", onChunk);
-      break;
+  try {
+    const config = loadConfig();
+    const engine = config.aiEngine || detectDefaultEngine();
+
+    switch (engine) {
+      case "anthropic-api":
+      case "api": {
+        const apiKey = getApiKeyForEngine("anthropic-api", config);
+        if (!apiKey) throw new Error("Anthropic API key not configured. Open Settings to add one.");
+        await streamWithAnthropicAPI(userMessage, apiKey, session.themeName,
+          config.anthropicApiModel || "claude-sonnet-4-6", onChunk, onStatus);
+        break;
+      }
+      case "openai-api": {
+        const apiKey = getApiKeyForEngine("openai-api", config);
+        if (!apiKey) throw new Error("OpenAI API key not configured. Open Settings to add one.");
+        await streamWithOpenAIAPI(userMessage, apiKey, session.themeName,
+          config.openaiApiModel || "gpt-4o", onChunk, onStatus);
+        break;
+      }
+      case "gemini-api": {
+        const apiKey = getApiKeyForEngine("gemini-api", config);
+        if (!apiKey) throw new Error("Gemini API key not configured. Open Settings to add one.");
+        await streamWithGeminiAPI(userMessage, apiKey, session.themeName, onChunk, onStatus);
+        break;
+      }
+      case "claude-code":
+        await generateWithClaudeCode(userMessage, session.themeName, onChunk, onStatus);
+        break;
+      case "gemini-cli":
+        await generateWithCLI("gemini", userMessage, session.themeName, onChunk, onStatus);
+        break;
+      case "codex-cli":
+        await generateWithCLI("codex", userMessage, session.themeName, onChunk, onStatus);
+        break;
+      default:
+        throw new Error(`Unknown AI engine: ${engine}. Open Settings to configure one.`);
     }
-    case "openai-api": {
-      const apiKey = getApiKeyForEngine("openai-api", config);
-      if (!apiKey) throw new Error("OpenAI API key not configured. Open Settings to add one.");
-      await streamWithOpenAIAPI(userMessage, apiKey, session.themeName,
-        config.openaiApiModel || "gpt-4o", onChunk);
-      break;
-    }
-    case "gemini-api": {
-      const apiKey = getApiKeyForEngine("gemini-api", config);
-      if (!apiKey) throw new Error("Gemini API key not configured. Open Settings to add one.");
-      await streamWithGeminiAPI(userMessage, apiKey, session.themeName, onChunk);
-      break;
-    }
-    case "claude-code":
-      await generateWithClaudeCode(userMessage, session.themeName, onChunk, onStatus);
-      break;
-    case "gemini-cli":
-      await generateWithCLI("gemini", userMessage, session.themeName, onChunk, onStatus);
-      break;
-    case "codex-cli":
-      await generateWithCLI("codex", userMessage, session.themeName, onChunk, onStatus);
-      break;
-    default:
-      throw new Error(`Unknown AI engine: ${engine}. Open Settings to configure one.`);
+  } finally {
+    generatingSessionId = null;
+    parseWarningCallback = null;
   }
 }
 
@@ -327,49 +335,102 @@ export function setParseWarningCallback(cb: ((warning: string) => void) | null):
 }
 
 function finishResponse(fullResponse: string): void {
+  if (generatingSessionId) {
+    const current = getSession();
+    if (!current || current.id !== generatingSessionId) {
+      console.warn("[ai-handler] Session changed during generation — discarding AI output");
+      return;
+    }
+  }
   addMessage("assistant", fullResponse);
   parseAndApplyModules(fullResponse);
   saveSession();
 }
 
 // ---------------------------------------------------------------------------
+// Generation lock — prevents session switching while AI is generating
+// ---------------------------------------------------------------------------
+
+let generatingSessionId: string | null = null;
+
+export function isGenerating(): boolean {
+  return generatingSessionId !== null;
+}
+
+// ---------------------------------------------------------------------------
 // Anthropic Streaming API
 // ---------------------------------------------------------------------------
+
+const RATE_LIMIT_DELAYS = [10, 20, 40, 60, 120]; // seconds
 
 async function streamWithAnthropicAPI(
   userMessage: string,
   apiKey: string,
   themeName: string,
   model: string,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  onStatus?: (status: string) => void
 ): Promise<void> {
   const client = new Anthropic({ apiKey });
   const conversionGuide = getConversionGuide();
   const session = getSession()!;
   const editMode = session.modules.length > 0;
   const messages = buildMessagesWithContext(userMessage);
+  const systemPrompt = buildVibeSystemPrompt(conversionGuide, themeName, editMode, getPromptContext().pageType, getPromptContext().brandAssets);
 
-  let fullResponse = "";
+  for (let attempt = 0; ; attempt++) {
+    try {
+      let fullResponse = "";
 
-  const stream = client.messages.stream({
-    model,
-    max_tokens: 16384,
-    system: buildVibeSystemPrompt(conversionGuide, themeName, editMode, getPromptContext().pageType, getPromptContext().brandAssets),
-    messages,
-  });
+      // Send periodic status updates (like CLI modes) so the user sees a spinner
+      let statusIndex = 0;
+      const sendStatus = onStatus || (() => {});
+      sendStatus(CLI_STATUS_MESSAGES[0]);
+      const heartbeat = setInterval(() => {
+        statusIndex++;
+        sendStatus(CLI_STATUS_MESSAGES[Math.min(statusIndex, CLI_STATUS_MESSAGES.length - 1)]);
+      }, 6000);
 
-  for await (const event of stream) {
-    if (
-      event.type === "content_block_delta" &&
-      event.delta.type === "text_delta"
-    ) {
-      const text = event.delta.text;
-      fullResponse += text;
-      onChunk(text);
+      try {
+        const stream = client.messages.stream({
+          model,
+          max_tokens: 48000,
+          system: systemPrompt,
+          messages,
+        });
+
+        for await (const event of stream) {
+          if (
+            event.type === "content_block_delta" &&
+            event.delta.type === "text_delta"
+          ) {
+            const text = event.delta.text;
+            fullResponse += text;
+            onChunk(text);
+          }
+        }
+      } finally {
+        clearInterval(heartbeat);
+      }
+
+      finishResponse(fullResponse);
+      return;
+    } catch (err: unknown) {
+      const status = (err as { status?: number }).status;
+      const errType = (err as { error?: { type?: string } }).error?.type;
+      const is429 = status === 429
+        || errType === "rate_limit_error"
+        || (err instanceof Error && err.message.includes("429"));
+
+      if (!is429 || attempt >= RATE_LIMIT_DELAYS.length) throw err;
+
+      const wait = RATE_LIMIT_DELAYS[attempt];
+      console.warn(`[ai-handler] Rate limited (429), attempt ${attempt + 1}/${RATE_LIMIT_DELAYS.length} — waiting ${wait}s`);
+      if (onStatus) onStatus(`Rate limited by Anthropic API — retrying in ${wait}s...`);
+      await new Promise((r) => setTimeout(r, wait * 1000));
+      if (onStatus) onStatus("Retrying...");
     }
   }
-
-  finishResponse(fullResponse);
 }
 
 // ---------------------------------------------------------------------------
@@ -381,7 +442,8 @@ async function streamWithOpenAIAPI(
   apiKey: string,
   themeName: string,
   model: string,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  onStatus?: (status: string) => void
 ): Promise<void> {
   const conversionGuide = getConversionGuide();
   const editMode = getSession()!.modules.length > 0;
@@ -395,7 +457,7 @@ async function streamWithOpenAIAPI(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 16384,
+      max_tokens: 48000,
       stream: true,
       messages: [
         { role: "system", content: buildVibeSystemPrompt(conversionGuide, themeName, editMode, getPromptContext().pageType, getPromptContext().brandAssets) },
@@ -409,33 +471,46 @@ async function streamWithOpenAIAPI(
     throw new Error(`OpenAI API error (${response.status}): ${err}`);
   }
 
+  // Send periodic status updates so the user sees a spinner
+  let statusIndex = 0;
+  const sendStatus = onStatus || (() => {});
+  sendStatus(CLI_STATUS_MESSAGES[0]);
+  const heartbeat = setInterval(() => {
+    statusIndex++;
+    sendStatus(CLI_STATUS_MESSAGES[Math.min(statusIndex, CLI_STATUS_MESSAGES.length - 1)]);
+  }, 6000);
+
   let fullResponse = "";
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const data = line.slice(6).trim();
-      if (data === "[DONE]") break;
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") break;
 
-      try {
-        const parsed = JSON.parse(data);
-        const delta = parsed.choices?.[0]?.delta?.content;
-        if (delta) {
-          fullResponse += delta;
-          onChunk(delta);
-        }
-      } catch { /* skip malformed SSE lines */ }
+        try {
+          const parsed = JSON.parse(data);
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (delta) {
+            fullResponse += delta;
+            onChunk(delta);
+          }
+        } catch { /* skip malformed SSE lines */ }
+      }
     }
+  } finally {
+    clearInterval(heartbeat);
   }
 
   finishResponse(fullResponse);
@@ -449,7 +524,8 @@ async function streamWithGeminiAPI(
   userMessage: string,
   apiKey: string,
   themeName: string,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  onStatus?: (status: string) => void
 ): Promise<void> {
   const conversionGuide = getConversionGuide();
   const session = getSession()!;
@@ -472,7 +548,7 @@ async function streamWithGeminiAPI(
     : userMessage;
   contents.push({ role: "user", parts: [{ text: userContent }] });
 
-  const model = "gemini-2.0-flash";
+  const model = "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
   const response = await fetch(url, {
@@ -481,7 +557,7 @@ async function streamWithGeminiAPI(
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: buildVibeSystemPrompt(conversionGuide, themeName, editMode, getPromptContext().pageType, getPromptContext().brandAssets) }] },
       contents,
-      generationConfig: { maxOutputTokens: 16384 },
+      generationConfig: { maxOutputTokens: 48000 },
     }),
   });
 
@@ -490,32 +566,45 @@ async function streamWithGeminiAPI(
     throw new Error(`Gemini API error (${response.status}): ${err}`);
   }
 
+  // Send periodic status updates so the user sees a spinner
+  let statusIndex = 0;
+  const sendStatus = onStatus || (() => {});
+  sendStatus(CLI_STATUS_MESSAGES[0]);
+  const heartbeat = setInterval(() => {
+    statusIndex++;
+    sendStatus(CLI_STATUS_MESSAGES[Math.min(statusIndex, CLI_STATUS_MESSAGES.length - 1)]);
+  }, 6000);
+
   let fullResponse = "";
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const data = line.slice(6).trim();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
 
-      try {
-        const parsed = JSON.parse(data);
-        const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          fullResponse += text;
-          onChunk(text);
-        }
-      } catch { /* skip malformed SSE lines */ }
+        try {
+          const parsed = JSON.parse(data);
+          const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            fullResponse += text;
+            onChunk(text);
+          }
+        } catch { /* skip malformed SSE lines */ }
+      }
     }
+  } finally {
+    clearInterval(heartbeat);
   }
 
   finishResponse(fullResponse);
@@ -735,19 +824,73 @@ function tryParseJSON(raw: string): unknown | null {
 }
 
 /**
+ * Attempt to salvage a truncated JSON response by finding complete module objects.
+ * Works by progressively trimming from the end until we find valid JSON.
+ */
+function tryRepairTruncatedJSON(raw: string): Record<string, unknown> | null {
+  // Strategy: find the last complete module object by looking for complete "moduleName" entries
+  // and closing the arrays/objects needed to make valid JSON
+  const modulesIdx = raw.indexOf('"modules"');
+  if (modulesIdx === -1) return null;
+
+  const arrayStart = raw.indexOf("[", modulesIdx);
+  if (arrayStart === -1) return null;
+
+  // Find complete module objects — each ends with a } that closes the module object
+  // We look for },{ or },] patterns to find module boundaries
+  let lastCompleteModule = -1;
+  let braceDepth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = arrayStart + 1; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escaped) { escaped = false; continue; }
+    if (ch === "\\") { escaped = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+
+    if (ch === "{") braceDepth++;
+    if (ch === "}") {
+      braceDepth--;
+      if (braceDepth === 0) {
+        // Found end of a top-level object inside the modules array
+        lastCompleteModule = i;
+      }
+    }
+  }
+
+  if (lastCompleteModule === -1) return null;
+
+  // Build repaired JSON: everything up to the last complete module, then close the structure
+  const upToLastModule = raw.slice(0, lastCompleteModule + 1);
+  const repaired = upToLastModule + "]}";
+
+  // Wrap in the outer object if needed
+  const jsonStr = repaired.trimStart().startsWith("{") ? repaired : "{" + repaired;
+  return tryParseJSON(jsonStr) as Record<string, unknown> | null;
+}
+
+/**
  * Parse vibespot-modules JSON blocks from an AI response and update the session.
  */
 function parseAndApplyModules(response: string): void {
   let modulesApplied = false;
 
   // Look for ```vibespot-modules ... ``` blocks
-  const blockPattern = /```vibespot-modules\s*\n([\s\S]*?)```/g;
+  const blockPattern = /```vibespot-modules\s*\n?([\s\S]*?)```/g;
   let match;
 
   while ((match = blockPattern.exec(response)) !== null) {
     try {
+      console.log("[parse] Found vibespot-modules block, length:", match[1].length);
+      console.log("[parse] Block start:", JSON.stringify(match[1].slice(0, 100)));
+      console.log("[parse] Block end:", JSON.stringify(match[1].slice(-100)));
       const data = tryParseJSON(match[1]);
-      if (!data || typeof data !== "object") throw new Error("Invalid JSON after repair");
+      if (!data || typeof data !== "object") {
+        console.warn("[parse] tryParseJSON returned:", data);
+        throw new Error("Invalid JSON after repair");
+      }
 
       const obj = data as Record<string, unknown>;
       if (obj.modules && Array.isArray(obj.modules)) {
@@ -779,8 +922,10 @@ function parseAndApplyModules(response: string): void {
 
   // Also try to find standalone JSON that looks like module data
   if (!modulesApplied) {
-    const jsonPattern = /```(?:json)?\s*\n(\{[\s\S]*?"modules"\s*:\s*\[[\s\S]*?\})\s*```/g;
+    const jsonPattern = /```(?:json)?\s*\n([\s\S]*?)```/g;
     while ((match = jsonPattern.exec(response)) !== null) {
+      // Only try blocks that look like they contain module data
+      if (!match[1].includes('"modules"')) continue;
       try {
         const data = tryParseJSON(match[1]);
         if (!data || typeof data !== "object") throw new Error("Invalid JSON after repair");
@@ -812,8 +957,55 @@ function parseAndApplyModules(response: string): void {
     }
   }
 
+  // Handle truncated responses (hit max_tokens — unclosed code fence)
+  if (!modulesApplied) {
+    const fenceCount = (response.match(/```/g) || []).length;
+    if (fenceCount % 2 !== 0 && response.includes('"modules"')) {
+      console.log("[parse] Detected truncated response (odd fence count), attempting salvage...");
+      // Extract content after the last opening fence
+      const lastFenceIdx = response.lastIndexOf("```");
+      let truncated = response.slice(lastFenceIdx + 3);
+      // Strip fence language label (e.g. "vibespot-modules\n" or "json\n")
+      truncated = truncated.replace(/^[\w-]*\s*\n?/, "");
+      // Try to close the truncated JSON by finding complete modules
+      const salvaged = tryRepairTruncatedJSON(truncated);
+      if (salvaged) {
+        const obj = salvaged as Record<string, unknown>;
+        if (obj.modules && Array.isArray(obj.modules) && obj.modules.length > 0) {
+          console.log("[parse] Salvaged", obj.modules.length, "modules from truncated response");
+          const modules: ModuleFiles[] = (obj.modules as Record<string, unknown>[]).map((m) => ({
+            moduleName: String(m.moduleName || ""),
+            fieldsJson: typeof m.fieldsJson === "string"
+              ? m.fieldsJson
+              : JSON.stringify(m.fieldsJson, null, 2),
+            metaJson: typeof m.metaJson === "string"
+              ? m.metaJson
+              : JSON.stringify(m.metaJson, null, 2),
+            moduleHtml: String(m.moduleHtml || ""),
+            moduleCss: String(m.moduleCss || ""),
+            moduleJs: m.moduleJs ? String(m.moduleJs) : undefined,
+          }));
+          updateModules({
+            modules,
+            sharedCss: obj.sharedCss !== undefined ? String(obj.sharedCss) : undefined,
+            sharedJs: obj.sharedJs !== undefined ? String(obj.sharedJs) : undefined,
+          });
+          modulesApplied = true;
+          if (parseWarningCallback) {
+            parseWarningCallback("Response was truncated — some modules may be incomplete. Try sending your request again for the full set.");
+          }
+        }
+      }
+    }
+  }
+
   // Warn user if the response looked like it should contain modules but parsing failed
   if (!modulesApplied) {
+    console.log("[parse] No modules applied. Response length:", response.length);
+    console.log("[parse] Contains 'vibespot-modules':", response.includes("vibespot-modules"));
+    console.log("[parse] Contains '\"modules\"':", response.includes('"modules"'));
+    console.log("[parse] Fence count:", (response.match(/```/g) || []).length);
+    console.log("[parse] Response preview:", response.slice(0, 500));
     const hasModuleRef = response.includes("vibespot-modules") || response.includes('"modules"');
     // Detect when the AI describes modules in prose (e.g. a summary table) without providing JSON
     const describesProse = /\bmodule|modul/i.test(response) &&

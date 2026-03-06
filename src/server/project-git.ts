@@ -114,6 +114,49 @@ export function commitThemeState(themePath: string, message: string): string | n
   return hashResult.success ? hashResult.stdout : null;
 }
 
+/**
+ * Stage only specific files and commit with a template-scoped message.
+ * Used for per-template version history so rollback doesn't affect other templates.
+ */
+export function commitTemplateState(
+  themePath: string,
+  templateId: string,
+  message: string,
+  filePaths: string[]
+): string | null {
+  if (!isGitAvailable()) return null;
+  if (!existsSync(join(themePath, ".git"))) return null;
+
+  // Stage only the specified paths
+  for (const fp of filePaths) {
+    const fullPath = join(themePath, fp);
+    if (existsSync(fullPath)) {
+      run(`git add "${fp}"`, { cwd: themePath });
+    }
+  }
+
+  // Check if there are staged changes
+  const diff = run("git diff --cached --quiet", { cwd: themePath });
+  if (diff.success) return null; // nothing staged
+
+  // Build prefixed message: [templateId] user message
+  const prefix = `[${templateId}] `;
+  const maxMsg = 72 - prefix.length;
+  const truncated = message.length > maxMsg
+    ? message.slice(0, maxMsg - 3) + "..."
+    : message;
+  const fullMessage = prefix + truncated;
+
+  const commitResult = run(`git commit -m "${fullMessage.replace(/"/g, '\\"')}"`, { cwd: themePath });
+  if (!commitResult.success) {
+    console.warn(`[project-git] template commit failed: ${commitResult.stderr}`);
+    return null;
+  }
+
+  const hashResult = run("git rev-parse --short HEAD", { cwd: themePath });
+  return hashResult.success ? hashResult.stdout : null;
+}
+
 // ---------------------------------------------------------------------------
 // History
 // ---------------------------------------------------------------------------
@@ -127,6 +170,40 @@ export function getHistory(themePath: string, limit: number = 50): GitCommitInfo
 
   const result = run(
     `git log --pretty=format:"%h|%H|%s|%at" -n ${limit}`,
+    { cwd: themePath }
+  );
+  if (!result.success || !result.stdout.trim()) return [];
+
+  const commits: GitCommitInfo[] = [];
+  for (const line of result.stdout.split("\n")) {
+    const parts = line.split("|");
+    if (parts.length < 4) continue;
+    const timestamp = parseInt(parts[3], 10) * 1000;
+    commits.push({
+      hash: parts[0],
+      fullHash: parts[1],
+      message: parts[2],
+      timestamp,
+      date: new Date(timestamp).toISOString(),
+    });
+  }
+  return commits;
+}
+
+/**
+ * Get commit history filtered to a specific template (by commit message prefix).
+ */
+export function getTemplateHistory(
+  themePath: string,
+  templateId: string,
+  limit: number = 50
+): GitCommitInfo[] {
+  if (!isGitAvailable()) return [];
+  if (!existsSync(join(themePath, ".git"))) return [];
+
+  const escapedId = templateId.replace(/[[\]\\]/g, "\\$&");
+  const result = run(
+    `git log --grep="\\[${escapedId}\\]" --pretty=format:"%h|%H|%s|%at" -n ${limit}`,
     { cwd: themePath }
   );
   if (!result.success || !result.stdout.trim()) return [];
@@ -181,6 +258,50 @@ export function rollbackToCommit(
 
   // Commit the rollback
   const rollbackMsg = `Rollback to: ${origMessage}`.slice(0, 72);
+  run(`git commit -m "${rollbackMsg.replace(/"/g, '\\"')}"`, { cwd: themePath });
+
+  return { success: true };
+}
+
+/**
+ * Restore only specific template files to a commit's state.
+ * Other templates' files are left untouched.
+ */
+export function rollbackTemplateToCommit(
+  themePath: string,
+  templateId: string,
+  commitHash: string,
+  filePaths: string[]
+): { success: boolean; error?: string } {
+  if (!isGitAvailable()) return { success: false, error: "Git not available" };
+  if (!existsSync(join(themePath, ".git"))) return { success: false, error: "Not a git repo" };
+
+  // Verify commit exists
+  const verify = run(`git cat-file -t ${commitHash}`, { cwd: themePath });
+  if (!verify.success || verify.stdout.trim() !== "commit") {
+    return { success: false, error: `Commit ${commitHash} not found` };
+  }
+
+  // Get original commit message
+  const msgResult = run(`git log --format="%s" -1 ${commitHash}`, { cwd: themePath });
+  const origMessage = msgResult.success ? msgResult.stdout : commitHash;
+
+  // Restore only the specified paths from that commit
+  let restored = 0;
+  for (const fp of filePaths) {
+    const checkout = run(`git checkout ${commitHash} -- "${fp}"`, { cwd: themePath });
+    if (checkout.success) restored++;
+    // Skip paths that didn't exist at that commit (git errors silently ignored)
+  }
+
+  if (restored === 0) {
+    return { success: false, error: "No files could be restored from that commit" };
+  }
+
+  // Stage and commit the scoped rollback
+  run("git add -A", { cwd: themePath });
+  const prefix = `[${templateId}] `;
+  const rollbackMsg = `${prefix}Rollback to: ${origMessage}`.slice(0, 72);
   run(`git commit -m "${rollbackMsg.replace(/"/g, '\\"')}"`, { cwd: themePath });
 
   return { success: true };

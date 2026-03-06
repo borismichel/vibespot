@@ -225,6 +225,15 @@ function populateProjectRail(info) {
       <span class="project-rail__item-meta">${meta}</span>`;
     item.appendChild(infoEl);
 
+    // Double-click on name to rename
+    const nameSpan = infoEl.querySelector(".project-rail__item-name");
+    if (nameSpan) {
+      nameSpan.addEventListener("dblclick", (e) => {
+        e.stopPropagation();
+        startInlineRename(nameSpan, p);
+      });
+    }
+
     // Delete button (visible when expanded + hover)
     const delBtn = document.createElement("button");
     delBtn.className = "project-rail__item-delete";
@@ -263,8 +272,12 @@ function populateProjectRail(info) {
       railTooltip.classList.remove("project-rail__tooltip--visible");
     });
 
-    // Click to open
+    // Click to open (blocked while AI is generating)
     item.addEventListener("click", () => {
+      if (typeof isStreaming !== "undefined" && isStreaming) {
+        showError("Cannot switch projects while AI is generating.");
+        return;
+      }
       if (p.sessionId) resumeSession(p.sessionId);
       else openTheme(p.name);
     });
@@ -286,6 +299,84 @@ function updateRailActive() {
 document.getElementById("project-rail-add")?.addEventListener("click", () => {
   showSetup();
 });
+
+// ---------------------------------------------------------------------------
+// Inline rename
+// ---------------------------------------------------------------------------
+
+function startInlineRename(nameSpan, project) {
+  if (nameSpan.contentEditable === "true") return; // already editing
+
+  const oldName = project.name;
+  nameSpan.contentEditable = "true";
+  nameSpan.classList.add("project-rail__item-name--editing");
+  nameSpan.focus();
+
+  // Select all text
+  const range = document.createRange();
+  range.selectNodeContents(nameSpan);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  function commit() {
+    nameSpan.contentEditable = "false";
+    nameSpan.classList.remove("project-rail__item-name--editing");
+
+    const newName = nameSpan.textContent.trim();
+    if (!newName || newName === oldName) {
+      nameSpan.textContent = oldName;
+      return;
+    }
+
+    fetch("/api/themes/rename", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: project.sessionId, newName }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok) {
+          // Update the in-memory project name + UI
+          project.name = data.newName;
+          nameSpan.textContent = data.newName;
+          const item = nameSpan.closest(".project-rail__item");
+          if (item) {
+            item.dataset.name = data.newName;
+            const bubble = item.querySelector(".project-rail__item-bubble");
+            if (bubble) bubble.textContent = data.newName.charAt(0).toUpperCase();
+          }
+          // Update topbar if this is the active project
+          if (currentAppTheme === oldName) {
+            currentAppTheme = data.newName;
+            const themeNameEl = document.getElementById("theme-name");
+            if (themeNameEl) themeNameEl.textContent = data.newName;
+            window.location.hash = "#/app/" + encodeURIComponent(data.newName);
+          }
+          updateRailActive();
+        } else {
+          nameSpan.textContent = oldName;
+          showError(data.error || "Rename failed");
+        }
+      })
+      .catch(() => {
+        nameSpan.textContent = oldName;
+        showError("Rename failed");
+      });
+  }
+
+  nameSpan.addEventListener("blur", commit, { once: true });
+  nameSpan.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      nameSpan.blur();
+    }
+    if (e.key === "Escape") {
+      nameSpan.textContent = oldName;
+      nameSpan.blur();
+    }
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Delete project confirmation
@@ -714,20 +805,19 @@ function showSetup() {
   initSetup();
 }
 
-// Logo click → go back to dashboard (from chat) or setup (from dashboard)
+// App back button → go back to dashboard from chat
+document.getElementById("app-back")?.addEventListener("click", () => {
+  if (currentAppTheme && typeof showDashboard === "function") {
+    appScreen.classList.add("hidden");
+    showDashboard(currentAppTheme);
+  }
+});
+
+// Logo click → go back to setup (from dashboard)
 document.querySelectorAll(".topbar__brand").forEach((el) => {
   el.style.cursor = "pointer";
   el.addEventListener("click", () => {
     const dashEl = document.getElementById("dashboard-screen");
-    // From chat → go to dashboard
-    if (!appScreen.classList.contains("hidden") && currentAppTheme) {
-      if (typeof showDashboard === "function") {
-        appScreen.classList.add("hidden");
-        showDashboard(currentAppTheme);
-        return;
-      }
-    }
-    // From dashboard → go to setup
     if (dashEl && !dashEl.classList.contains("hidden")) {
       showSetup();
       return;

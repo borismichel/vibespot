@@ -26,18 +26,21 @@ import {
   listSessions,
   deleteSession,
   reloadModulesFromDisk,
+  reloadActiveTemplateFromDisk,
   getActiveTemplate,
   setActiveTemplate,
   addTemplate,
   removeTemplate,
   getModuleLibrary,
   migrateSession,
+  renameSession,
+  renameTemplate,
   type PageType,
   type TemplateEntry,
 } from "./session.js";
-import { commitThemeState, getHistory, rollbackToCommit, isGitAvailable } from "./project-git.js";
+import { commitThemeState, commitTemplateState, getHistory, getTemplateHistory, rollbackToCommit, rollbackTemplateToCommit, isGitAvailable } from "./project-git.js";
 import { buildPreviewHtml, buildModulePreviewHtml } from "./preview.js";
-import { handleGenerate, handleGenerateStream, setParseWarningCallback } from "./ai-handler.js";
+import { handleGenerate, handleGenerateStream, setParseWarningCallback, isGenerating } from "./ai-handler.js";
 import { analyzeSource, type SourceAnalysis } from "../wizard/source.js";
 import { loadConfig, saveConfig, getApiKeyForEngine, type AIEngineType } from "../utils/config.js";
 import { detectEnvironment, detectHubSpotCLI, detectHubSpotAuth, detectDataCenter, detectGitHubCLI, detectGitHubAuth } from "../utils/detect.js";
@@ -267,8 +270,13 @@ function handleApiRoute(
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
+    case "/api/themes/rename":
+      if (method === "POST") handleRenameThemeRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
     case "/api/history":
-      if (method === "GET") handleHistoryRoute(res);
+      if (method === "GET") handleHistoryRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
@@ -292,6 +300,11 @@ function handleApiRoute(
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
+    case "/api/templates/rename":
+      if (method === "POST") handleTemplateRenameRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
     case "/api/module-library":
       if (method === "GET") handleModuleLibraryRoute(res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
@@ -299,6 +312,11 @@ function handleApiRoute(
 
     case "/api/brand-assets":
       handleBrandAssetsRoute(method, req, res);
+      break;
+
+    case "/api/download-zip":
+      if (method === "GET") handleDownloadZipRoute(res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
     default:
@@ -549,6 +567,7 @@ function handleSetupInfoRoute(res: ServerResponse): void {
 function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse): void {
   readBody(req, (body) => {
     try {
+      if (isGenerating()) { jsonResponse(res, 409, { error: "Cannot switch projects while AI is generating.", generating: true }); return; }
       const { name } = JSON.parse(body);
       if (!name || typeof name !== "string") {
         jsonResponse(res, 400, { error: "Theme name is required" });
@@ -617,6 +636,7 @@ function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse): void
 function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse): void {
   readBody(req, (body) => {
     try {
+      if (isGenerating()) { jsonResponse(res, 409, { error: "Cannot switch projects while AI is generating.", generating: true }); return; }
       const { name } = JSON.parse(body);
       if (!name || typeof name !== "string") {
         jsonResponse(res, 400, { error: "Theme name is required" });
@@ -652,6 +672,7 @@ function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse): void 
 function handleSetupOpenRoute(req: IncomingMessage, res: ServerResponse): void {
   readBody(req, (body) => {
     try {
+      if (isGenerating()) { jsonResponse(res, 409, { error: "Cannot switch projects while AI is generating.", generating: true }); return; }
       const { path: themePath } = JSON.parse(body);
       if (!themePath || typeof themePath !== "string") {
         jsonResponse(res, 400, { error: "Theme path is required" });
@@ -688,6 +709,7 @@ function handleSetupOpenRoute(req: IncomingMessage, res: ServerResponse): void {
 function handleSetupResumeRoute(req: IncomingMessage, res: ServerResponse): void {
   readBody(req, (body) => {
     try {
+      if (isGenerating()) { jsonResponse(res, 409, { error: "Cannot switch projects while AI is generating.", generating: true }); return; }
       const { sessionId } = JSON.parse(body);
       if (!sessionId || typeof sessionId !== "string") {
         jsonResponse(res, 400, { error: "Session ID is required" });
@@ -734,18 +756,138 @@ function handleSetupApiKeyRoute(req: IncomingMessage, res: ServerResponse): void
 // Settings routes — environment management, API keys, tool install, auth
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Live model catalog — fetched from provider APIs, cached 10 minutes
+// ---------------------------------------------------------------------------
+
+type ModelEntry = { id: string; label: string };
+const modelCache: { data: Record<string, ModelEntry[]>; ts: number } = { data: {}, ts: 0 };
+const MODEL_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+const STATIC_MODELS: Record<string, ModelEntry[]> = {
+  "claude-code": [
+    { id: "sonnet", label: "Claude Sonnet (default)" },
+    { id: "opus", label: "Claude Opus" },
+    { id: "haiku", label: "Claude Haiku" },
+  ],
+  "codex-cli": [
+    { id: "o4-mini", label: "o4 Mini (default)" },
+    { id: "o3", label: "o3" },
+    { id: "gpt-4o", label: "GPT-4o" },
+  ],
+};
+
+async function fetchAnthropicModels(apiKey: string): Promise<ModelEntry[]> {
+  const resp = await fetch("https://api.anthropic.com/v1/models", {
+    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+  });
+  if (!resp.ok) return [];
+  const data = await resp.json() as { data: { id: string; display_name: string }[] };
+  return data.data
+    .filter((m) => !m.id.startsWith("claude-3-") && !m.id.startsWith("claude-2"))
+    .map((m) => ({ id: m.id, label: m.display_name }));
+}
+
+async function fetchOpenAIModels(apiKey: string): Promise<ModelEntry[]> {
+  const resp = await fetch("https://api.openai.com/v1/models", {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!resp.ok) return [];
+  const data = await resp.json() as { data: { id: string }[] };
+  const keep = /^(gpt-4o|gpt-4o-mini|o[1-4](-mini)?|o[1-4]-pro)$/;
+  return data.data
+    .filter((m) => keep.test(m.id))
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((m) => ({ id: m.id, label: m.id }));
+}
+
+async function fetchGeminiModels(apiKey: string): Promise<ModelEntry[]> {
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+  );
+  if (!resp.ok) return [];
+  const data = await resp.json() as { models: { name: string; displayName: string }[] };
+  return data.models
+    .filter((m) => m.name.includes("gemini-2"))
+    .map((m) => ({ id: m.name.replace("models/", ""), label: m.displayName }));
+}
+
+async function getModelCatalog(): Promise<Record<string, ModelEntry[]>> {
+  if (Date.now() - modelCache.ts < MODEL_CACHE_TTL && Object.keys(modelCache.data).length > 0) {
+    return modelCache.data;
+  }
+
+  const config = loadConfig();
+  const catalog: Record<string, ModelEntry[]> = { ...STATIC_MODELS };
+
+  const jobs: Promise<void>[] = [];
+
+  const anthropicKey = getApiKeyForEngine("anthropic-api", config);
+  if (anthropicKey) {
+    jobs.push(
+      fetchAnthropicModels(anthropicKey)
+        .then((models) => { if (models.length) catalog["anthropic-api"] = models; })
+        .catch(() => {}),
+    );
+  }
+
+  const openaiKey = getApiKeyForEngine("openai-api", config);
+  if (openaiKey) {
+    jobs.push(
+      fetchOpenAIModels(openaiKey)
+        .then((models) => { if (models.length) catalog["openai-api"] = models; })
+        .catch(() => {}),
+    );
+  }
+
+  const geminiKey = getApiKeyForEngine("gemini-api", config);
+  if (geminiKey) {
+    jobs.push(
+      fetchGeminiModels(geminiKey)
+        .then((models) => {
+          if (models.length) {
+            catalog["gemini-api"] = models;
+            catalog["gemini-cli"] = models;
+          }
+        })
+        .catch(() => {}),
+    );
+  }
+
+  await Promise.all(jobs);
+
+  modelCache.data = catalog;
+  modelCache.ts = Date.now();
+  return catalog;
+}
+
 function handleSettingsStatusRoute(res: ServerResponse): void {
   const env = detectEnvironment();
   const config = loadConfig();
 
-  jsonResponse(res, 200, {
-    environment: env,
-    config: {
-      aiEngine: config.aiEngine || null,
-      claudeCodeModel: config.claudeCodeModel || null,
-      anthropicApiModel: config.anthropicApiModel || null,
-      openaiApiModel: config.openaiApiModel || null,
-    },
+  // Start model fetch in background; return status immediately with models when ready
+  getModelCatalog().then((models) => {
+    jsonResponse(res, 200, {
+      environment: env,
+      config: {
+        aiEngine: config.aiEngine || null,
+        claudeCodeModel: config.claudeCodeModel || null,
+        anthropicApiModel: config.anthropicApiModel || null,
+        openaiApiModel: config.openaiApiModel || null,
+      },
+      models,
+    });
+  }).catch(() => {
+    jsonResponse(res, 200, {
+      environment: env,
+      config: {
+        aiEngine: config.aiEngine || null,
+        claudeCodeModel: config.claudeCodeModel || null,
+        anthropicApiModel: config.anthropicApiModel || null,
+        openaiApiModel: config.openaiApiModel || null,
+      },
+      models: STATIC_MODELS,
+    });
   });
 }
 
@@ -1191,11 +1333,36 @@ function handleDeleteLocalThemeRoute(req: IncomingMessage, res: ServerResponse):
   });
 }
 
+function handleRenameThemeRoute(req: IncomingMessage, res: ServerResponse): void {
+  readBody(req, (body) => {
+    try {
+      const { sessionId, newName } = JSON.parse(body);
+      if (!sessionId || !newName || typeof newName !== "string") {
+        jsonResponse(res, 400, { error: "sessionId and newName are required" });
+        return;
+      }
+      const sanitized = newName.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "").replace(/-{2,}/g, "-");
+      if (!sanitized) {
+        jsonResponse(res, 400, { error: "Invalid name" });
+        return;
+      }
+      const result = renameSession(sessionId, sanitized);
+      if (result.ok) {
+        jsonResponse(res, 200, { ok: true, newName: sanitized });
+      } else {
+        jsonResponse(res, 400, { error: result.error });
+      }
+    } catch (err) {
+      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Version history routes
 // ---------------------------------------------------------------------------
 
-function handleHistoryRoute(res: ServerResponse): void {
+function handleHistoryRoute(req: IncomingMessage, res: ServerResponse): void {
   const session = getSession();
   if (!session) {
     jsonResponse(res, 404, { error: "No active session" });
@@ -1205,8 +1372,15 @@ function handleHistoryRoute(res: ServerResponse): void {
     jsonResponse(res, 200, { available: false, commits: [] });
     return;
   }
-  const commits = getHistory(session.themePath, 50);
-  jsonResponse(res, 200, { available: true, commits });
+
+  // Parse templateId from query string for per-template filtering
+  const url = new URL(req.url || "/", "http://localhost");
+  const templateId = url.searchParams.get("templateId");
+
+  const commits = templateId
+    ? getTemplateHistory(session.themePath, templateId, 50)
+    : getHistory(session.themePath, 50);
+  jsonResponse(res, 200, { available: true, commits, filtered: !!templateId });
 }
 
 function handleRollbackRoute(req: IncomingMessage, res: ServerResponse): void {
@@ -1218,7 +1392,7 @@ function handleRollbackRoute(req: IncomingMessage, res: ServerResponse): void {
         return;
       }
 
-      const { hash } = JSON.parse(body);
+      const { hash, templateId } = JSON.parse(body);
       if (!hash || typeof hash !== "string") {
         jsonResponse(res, 400, { error: "Commit hash is required" });
         return;
@@ -1227,16 +1401,33 @@ function handleRollbackRoute(req: IncomingMessage, res: ServerResponse): void {
       // Add a system message to chat (chat is immutable, always grows)
       addMessage("assistant", `Rolled back to version ${hash.slice(0, 7)}.`);
 
-      const result = rollbackToCommit(session.themePath, hash);
-      if (!result.success) {
-        jsonResponse(res, 500, { error: result.error || "Rollback failed" });
-        return;
+      if (templateId) {
+        // Scoped rollback: only restore this template's files
+        const tpl = session.templates.find((t) => t.id === templateId);
+        if (!tpl) {
+          jsonResponse(res, 404, { error: "Template not found" });
+          return;
+        }
+        const filePaths = tpl.moduleOrder.map((n) => `modules/${n}.module`);
+        if (tpl.templateFile) filePaths.push(tpl.templateFile);
+
+        const result = rollbackTemplateToCommit(session.themePath, templateId, hash, filePaths);
+        if (!result.success) {
+          jsonResponse(res, 500, { error: result.error || "Rollback failed" });
+          return;
+        }
+        reloadActiveTemplateFromDisk();
+      } else {
+        // Full theme rollback (legacy / "Show all" mode)
+        const result = rollbackToCommit(session.themePath, hash);
+        if (!result.success) {
+          jsonResponse(res, 500, { error: result.error || "Rollback failed" });
+          return;
+        }
+        reloadModulesFromDisk();
       }
 
-      // Reload modules from restored files
-      reloadModulesFromDisk();
       saveSession();
-
       jsonResponse(res, 200, {
         ok: true,
         modules: getOrderedModules().map((m) => m.moduleName),
@@ -1280,6 +1471,52 @@ function handleDashboardRoute(res: ServerResponse): void {
       humanify: session.brandAssets?.humanify !== false,
     },
   });
+}
+
+function handleDownloadZipRoute(res: ServerResponse): void {
+  const session = getSession();
+  if (!session) {
+    jsonResponse(res, 404, { error: "No active session" });
+    return;
+  }
+
+  const themePath = session.themePath;
+  if (!existsSync(themePath)) {
+    jsonResponse(res, 404, { error: "Theme directory not found" });
+    return;
+  }
+
+  const themeName = session.themeName || "theme";
+  const parentDir = join(themePath, "..");
+  const folderName = basename(themePath);
+
+  try {
+    // Create zip in a temp location using the system zip command
+    const zipFileName = `${themeName}.zip`;
+    const tmpZip = join(parentDir, zipFileName);
+
+    // Remove old zip if it exists
+    if (existsSync(tmpZip)) rmSync(tmpZip);
+
+    execSync(
+      `zip -r "${zipFileName}" "${folderName}" -x "${folderName}/.git/*" "${folderName}/.vibespot/*" "${folderName}/node_modules/*"`,
+      { cwd: parentDir, timeout: 30_000 }
+    );
+
+    const zipData = readFileSync(tmpZip);
+    // Clean up temp zip
+    rmSync(tmpZip);
+
+    res.writeHead(200, {
+      "Content-Type": "application/zip",
+      "Content-Disposition": `attachment; filename="${zipFileName}"`,
+      "Content-Length": zipData.length,
+    });
+    res.end(zipData);
+  } catch (err: any) {
+    console.warn("[download-zip] Failed:", err.message);
+    jsonResponse(res, 500, { error: "Failed to create zip archive" });
+  }
 }
 
 function handleTemplatesRoute(method: string, req: IncomingMessage, res: ServerResponse): void {
@@ -1379,6 +1616,27 @@ function handleTemplateActivateRoute(req: IncomingMessage, res: ServerResponse):
         modules: getOrderedModules().map((m) => m.moduleName),
         messageCount: session?.messages.length || 0,
       });
+    } catch (err) {
+      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
+function handleTemplateRenameRoute(req: IncomingMessage, res: ServerResponse): void {
+  readBody(req, (body) => {
+    try {
+      const { templateId, newLabel } = JSON.parse(body);
+      if (!templateId || !newLabel || typeof newLabel !== "string") {
+        jsonResponse(res, 400, { error: "templateId and newLabel are required" });
+        return;
+      }
+      const success = renameTemplate(templateId, newLabel.trim());
+      if (!success) {
+        jsonResponse(res, 404, { error: "Template not found" });
+        return;
+      }
+      saveSession();
+      jsonResponse(res, 200, { ok: true, newLabel: newLabel.trim() });
     } catch (err) {
       jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
     }
@@ -1570,7 +1828,17 @@ function handleWsConnection(ws: WebSocket): void {
           const currentSession = getSession();
           if (currentSession) {
             writeModulesToDisk();
-            const commitHash = commitThemeState(currentSession.themePath, userMessage);
+            const activeTpl = getActiveTemplate();
+            let commitHash: string | null = null;
+            if (activeTpl) {
+              const filePaths = activeTpl.moduleOrder.map((n: string) => `modules/${n}.module`);
+              if (activeTpl.templateFile) filePaths.push(activeTpl.templateFile);
+              if (activeTpl.sharedCss) filePaths.push(`css/${currentSession.themeName}-theme.css`);
+              if (activeTpl.sharedJs) filePaths.push(`js/${currentSession.themeName}-animations.js`);
+              commitHash = commitTemplateState(currentSession.themePath, activeTpl.id, userMessage, filePaths);
+            } else {
+              commitHash = commitThemeState(currentSession.themePath, userMessage);
+            }
             if (commitHash) {
               ws.send(JSON.stringify({ type: "version_created", hash: commitHash }));
             }
@@ -1742,6 +2010,7 @@ ${errorContext}`;
     const activeTpl = getActiveTemplate();
     ws.send(JSON.stringify({
       type: "init",
+      sessionId: session.id,
       themeName: session.themeName,
       modules: getOrderedModules().map((m) => m.moduleName),
       messageCount: session.messages.length,

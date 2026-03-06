@@ -25,6 +25,7 @@ const PAGE_TYPE_FULL_LABELS = {
 // ---------------------------------------------------------------------------
 
 let currentDashboardTheme = "";
+let currentDashboardSessionId = "";
 
 async function showDashboard(themeName) {
   currentDashboardTheme = themeName;
@@ -37,6 +38,15 @@ async function showDashboard(themeName) {
   dashboardScreen.classList.remove("hidden");
 
   document.getElementById("dashboard-theme-name").textContent = themeName;
+  document.getElementById("dashboard-theme-heading").textContent = themeName;
+  document.getElementById("dashboard-theme-path-text").textContent = "";
+
+  // Get sessionId for the active theme
+  try {
+    const themesRes = await fetch("/api/themes");
+    const themesData = await themesRes.json();
+    currentDashboardSessionId = themesData.activeTheme?.id || "";
+  } catch { currentDashboardSessionId = ""; }
 
   // Update URL
   const target = "#/dashboard/" + encodeURIComponent(themeName);
@@ -69,6 +79,9 @@ async function refreshDashboard() {
     renderTemplateList(data.templates || []);
     renderModuleLibrary(data.moduleLibrary || []);
     renderBrandAssets(data.brandAssets || {});
+    if (data.themePath) {
+      document.getElementById("dashboard-theme-path-text").textContent = data.themePath;
+    }
   } catch (err) {
     console.error("Failed to load dashboard:", err);
   }
@@ -108,6 +121,77 @@ function renderTemplateList(templates) {
   });
   list.querySelectorAll(".dashboard__template-delete").forEach((btn) => {
     btn.addEventListener("click", () => confirmDeleteTemplate(btn.dataset.id));
+  });
+
+  // Double-click on label to rename
+  list.querySelectorAll(".dashboard__template-label").forEach((labelEl) => {
+    const item = labelEl.closest(".dashboard__template-item");
+    const templateId = item?.querySelector(".dashboard__template-open")?.dataset.id;
+    if (!templateId) return;
+
+    labelEl.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      startTemplateRename(labelEl, templateId);
+    });
+  });
+}
+
+function startTemplateRename(labelEl, templateId) {
+  if (labelEl.contentEditable === "true") return;
+
+  const oldLabel = labelEl.textContent.trim();
+  labelEl.contentEditable = "true";
+  labelEl.classList.add("dashboard__template-label--editing");
+  labelEl.focus();
+
+  const range = document.createRange();
+  range.selectNodeContents(labelEl);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  function commit() {
+    labelEl.contentEditable = "false";
+    labelEl.classList.remove("dashboard__template-label--editing");
+
+    const newLabel = labelEl.textContent.trim();
+    if (!newLabel || newLabel === oldLabel) {
+      labelEl.textContent = oldLabel;
+      return;
+    }
+
+    fetch("/api/templates/rename", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ templateId, newLabel }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok) {
+          labelEl.textContent = data.newLabel;
+        } else {
+          labelEl.textContent = oldLabel;
+          if (typeof showError === "function") showError(data.error || "Rename failed");
+        }
+      })
+      .catch(() => {
+        labelEl.textContent = oldLabel;
+        if (typeof showError === "function") showError("Rename failed");
+      });
+  }
+
+  labelEl.addEventListener("blur", commit, { once: true });
+  labelEl.addEventListener("keydown", function handler(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      labelEl.removeEventListener("keydown", handler);
+      labelEl.blur();
+    }
+    if (e.key === "Escape") {
+      labelEl.textContent = oldLabel;
+      labelEl.removeEventListener("keydown", handler);
+      labelEl.blur();
+    }
   });
 }
 
@@ -387,6 +471,111 @@ document.getElementById("brand-upload-styleguide").querySelector("input").addEve
 });
 document.getElementById("brand-upload-brandvoice").querySelector("input").addEventListener("change", (e) => {
   if (e.target.files[0]) handleBrandFileSelected("brandvoice", e.target.files[0]);
+});
+
+// Dashboard theme heading — double-click to rename
+document.getElementById("dashboard-theme-heading")?.addEventListener("dblclick", () => {
+  const el = document.getElementById("dashboard-theme-heading");
+  if (!el || !currentDashboardSessionId) return;
+  if (el.contentEditable === "true") return;
+
+  const oldName = el.textContent.trim();
+  el.contentEditable = "true";
+  el.classList.add("dashboard__theme-heading--editing");
+  el.focus();
+
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  function commit() {
+    el.contentEditable = "false";
+    el.classList.remove("dashboard__theme-heading--editing");
+
+    const newName = el.textContent.trim();
+    if (!newName || newName === oldName) {
+      el.textContent = oldName;
+      return;
+    }
+
+    fetch("/api/themes/rename", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: currentDashboardSessionId, newName }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok) {
+          el.textContent = data.newName;
+          currentDashboardTheme = data.newName;
+          document.getElementById("dashboard-theme-name").textContent = data.newName;
+          window.location.hash = "#/dashboard/" + encodeURIComponent(data.newName);
+          // Update rail
+          const railItem = document.querySelector(`.project-rail__item[data-name="${oldName}"]`);
+          if (railItem) {
+            railItem.dataset.name = data.newName;
+            const nameSpan = railItem.querySelector(".project-rail__item-name");
+            if (nameSpan) nameSpan.textContent = data.newName;
+            const bubble = railItem.querySelector(".project-rail__item-bubble");
+            if (bubble) bubble.textContent = data.newName.charAt(0).toUpperCase();
+          }
+          if (typeof updateRailActive === "function") updateRailActive();
+        } else {
+          el.textContent = oldName;
+          if (typeof showError === "function") showError(data.error || "Rename failed");
+        }
+      })
+      .catch(() => {
+        el.textContent = oldName;
+        if (typeof showError === "function") showError("Rename failed");
+      });
+  }
+
+  el.addEventListener("blur", commit, { once: true });
+  el.addEventListener("keydown", function handler(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      el.removeEventListener("keydown", handler);
+      el.blur();
+    }
+    if (e.key === "Escape") {
+      el.textContent = oldName;
+      el.removeEventListener("keydown", handler);
+      el.blur();
+    }
+  });
+});
+
+// Download ZIP button
+document.getElementById("dashboard-download-zip").addEventListener("click", async () => {
+  const btn = document.getElementById("dashboard-download-zip");
+  const origHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.querySelector("span").textContent = "Downloading...";
+
+  try {
+    const res = await fetch("/api/download-zip");
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Download failed" }));
+      throw new Error(err.error || "Download failed");
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (currentDashboardTheme || "theme") + ".zip";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    if (typeof vibeAlert === "function") vibeAlert(err.message, "Error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origHTML;
+  }
 });
 
 // Humanify toggle

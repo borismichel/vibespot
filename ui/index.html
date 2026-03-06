@@ -41,7 +41,7 @@
   <!-- ============================================================ -->
   <div class="setup-topbar" id="setup-topbar">
     <div class="topbar__brand">
-      <div class="topbar__logo-icon">v</div>
+      <div class="topbar__logo-icon"><svg viewBox="0 0 512 512" width="18" height="18"><path d="M256 76 Q280 220 436 256 Q280 292 256 436 Q232 292 76 256 Q232 220 256 76 Z" fill="currentColor"/></svg></div>
       <span class="topbar__brand-name">vibeSpot</span>
     </div>
     <div style="margin-left:auto">
@@ -140,7 +140,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <div class="topbar__brand">
-          <div class="topbar__logo-icon">v</div>
+          <div class="topbar__logo-icon"><svg viewBox="0 0 512 512" width="18" height="18"><path d="M256 76 Q280 220 436 256 Q280 292 256 436 Q232 292 76 256 Q232 220 256 76 Z" fill="currentColor"/></svg></div>
           <span class="topbar__brand-name">vibeSpot</span>
         </div>
         <span class="topbar__project-pill" id="dashboard-theme-name"></span>
@@ -162,6 +162,17 @@
 
     <div class="dashboard__body">
       <div class="dashboard__container">
+
+        <h1 class="dashboard__theme-heading" id="dashboard-theme-heading"></h1>
+
+        <div class="dashboard__theme-path" id="dashboard-theme-path">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span class="dashboard__theme-path-text" id="dashboard-theme-path-text"></span>
+          <button class="dashboard__download-btn" id="dashboard-download-zip" title="Download theme as ZIP">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Download ZIP</span>
+          </button>
+        </div>
 
         <!-- Brand Assets -->
         <section class="dashboard__section">
@@ -267,10 +278,9 @@
   <div class="app hidden" id="app-screen">
     <header class="topbar">
       <div class="topbar__left">
-        <div class="topbar__brand">
-          <div class="topbar__logo-icon">v</div>
-          <span class="topbar__brand-name">vibeSpot</span>
-        </div>
+        <button class="topbar__back-btn" id="app-back" title="Back to theme overview">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
         <span class="topbar__project-pill" id="theme-name"></span>
       </div>
       <div class="topbar__center">
@@ -293,9 +303,6 @@
         </button>
         <button class="topbar__icon-btn" id="btn-history" title="Version History" style="display:none">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </button>
-        <button class="topbar__icon-btn" id="btn-settings" title="Settings">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M7.5 1.5h3l.4 2.1a5.5 5.5 0 0 1 1.3.7l2-.8 1.5 2.6-1.6 1.3a5.5 5.5 0 0 1 0 1.5l1.6 1.3-1.5 2.6-2-.8a5.5 5.5 0 0 1-1.3.7l-.4 2.1h-3l-.4-2.1a5.5 5.5 0 0 1-1.3-.7l-2 .8-1.5-2.6 1.6-1.3a5.5 5.5 0 0 1 0-1.5L2.3 6.1l1.5-2.6 2 .8a5.5 5.5 0 0 1 1.3-.7L7.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
         <button class="btn btn--primary" id="btn-upload" title="Deploy theme to HubSpot">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:-2px"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>

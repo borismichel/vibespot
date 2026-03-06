@@ -810,6 +810,11 @@ async function authCLI(cli, btn, apiKey) {
 // ---------------------------------------------------------------------------
 
 function getModelsForEngine(engine) {
+  // Use server-provided model catalog if available
+  if (settingsData && settingsData.models && settingsData.models[engine]) {
+    return settingsData.models[engine];
+  }
+  // Fallback to hardcoded defaults
   switch (engine) {
     case "claude-code":
       return [
@@ -819,10 +824,9 @@ function getModelsForEngine(engine) {
       ];
     case "anthropic-api":
       return [
-        { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4 (default)" },
-        { id: "claude-opus-4-20250514", label: "Claude Opus 4" },
+        { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+        { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
         { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
-        { id: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5" },
       ];
     case "openai-api":
       return [
@@ -834,9 +838,9 @@ function getModelsForEngine(engine) {
     case "gemini-cli":
     case "gemini-api":
       return [
-        { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash (default)" },
+        { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (default)" },
         { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-        { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+        { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
       ];
     case "codex-cli":
       return [
@@ -852,7 +856,7 @@ function getModelsForEngine(engine) {
 function getCurrentModel(engine, config) {
   switch (engine) {
     case "claude-code": return config.claudeCodeModel || "sonnet";
-    case "anthropic-api": return config.anthropicApiModel || "claude-sonnet-4-20250514";
+    case "anthropic-api": return config.anthropicApiModel || "claude-sonnet-4-6";
     case "openai-api": return config.openaiApiModel || "gpt-4o";
     default: return null;
   }
@@ -910,7 +914,6 @@ function escSettings(str) {
 // Event listeners
 // ---------------------------------------------------------------------------
 
-document.getElementById("btn-settings").addEventListener("click", openSettings);
 document.getElementById("settings-close").addEventListener("click", closeSettings);
 document.getElementById("settings-overlay").addEventListener("click", (e) => {
   if (e.target.id === "settings-overlay") closeSettings();

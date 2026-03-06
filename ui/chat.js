@@ -12,6 +12,9 @@ let streamingMsgEl = null;
 let streamBuffer = "";
 let streamStartTime = 0;
 let streamTimerInterval = null;
+let lastStreamStatus = "";
+let currentSessionId = "";
+let currentTemplateId = "";
 
 const messagesEl = document.getElementById("chat-messages");
 const inputEl = document.getElementById("chat-input");
@@ -64,6 +67,8 @@ function handleWsMessage(msg) {
 
   switch (msg.type) {
     case "init":
+      currentSessionId = msg.sessionId || "";
+      currentTemplateId = msg.templateId || "";
       document.getElementById("theme-name").textContent = msg.themeName || "—";
 
       // Clear previous project's chat and module list
@@ -104,7 +109,6 @@ function handleWsMessage(msg) {
       break;
 
     case "stream":
-      clearStreamStatus();
       handleStreamChunk(msg.content);
       break;
 
@@ -199,6 +203,7 @@ function appendUserMessage(text, timestamp) {
 function startStreaming() {
   isStreaming = true;
   streamBuffer = "";
+  lastStreamStatus = "";
   sendBtn.disabled = true;
   streamStartTime = Date.now();
 
@@ -231,13 +236,31 @@ function handleStreamChunk(text) {
   if (!streamingMsgEl) return;
   streamBuffer += text;
 
-  // Render markdown-lite (code blocks, inline code, paragraphs)
-  streamingMsgEl.innerHTML = renderMarkdown(streamBuffer);
+  // Hide incomplete code fences (AI is writing module code)
+  let display = streamBuffer;
+  const fenceCount = (display.match(/```/g) || []).length;
+  if (fenceCount % 2 !== 0) {
+    const lastFence = display.lastIndexOf("```");
+    display = display.substring(0, lastFence);
+  }
+
+  const rendered = renderMarkdown(display);
+  const visibleText = rendered.replace(/<[^>]*>/g, "").trim();
+
+  if (visibleText) {
+    // Preserve the stream-status spinner while updating text
+    const statusEl = streamingMsgEl.querySelector(".stream-status");
+    streamingMsgEl.innerHTML = rendered;
+    if (statusEl) streamingMsgEl.appendChild(statusEl);
+  }
+  // No visible text — leave the spinner (.stream-status) untouched in the DOM
   scrollToBottom();
 }
 
 function handleStreamStatus(status) {
   if (!streamingMsgEl) startStreaming();
+
+  lastStreamStatus = status;
 
   // Find or create the status element inside the streaming bubble
   let statusEl = streamingMsgEl.querySelector(".stream-status");
@@ -311,7 +334,9 @@ function finishStreaming() {
 
   // Final render of the full response
   if (streamingMsgEl && streamBuffer) {
-    streamingMsgEl.innerHTML = renderMarkdown(streamBuffer);
+    const rendered = renderMarkdown(streamBuffer);
+    const visibleText = rendered.replace(/<[^>]*>/g, "").trim();
+    streamingMsgEl.innerHTML = visibleText ? rendered : "<em>Modules applied.</em>";
   }
 
   streamingMsgEl = null;
@@ -344,13 +369,10 @@ function appendAssistantError(message) {
 // ---------------------------------------------------------------------------
 
 function renderMarkdown(text) {
-  // Hide vibespot-modules JSON blocks (they're data, not display)
-  text = text.replace(/```vibespot-modules[\s\S]*?```/g, "");
-
-  // Code blocks: ```lang\n...\n```
-  text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-    return `<pre><code>${escapeHtml(code.trim())}</code></pre>`;
-  });
+  // Strip all code blocks — module code is applied via JSON, not displayed in chat
+  text = text.replace(/```[\s\S]*?```/g, "");
+  // Also strip unclosed code fences (truncated responses)
+  text = text.replace(/```[\s\S]*$/g, "");
 
   // Inline code: `...`
   text = text.replace(/`([^`]+)`/g, "<code>$1</code>");
@@ -434,28 +456,46 @@ function toggleHistoryPanel() {
   if (historyPanelOpen) refreshHistoryPanel();
 }
 
+let historyShowAll = false;
+
 async function refreshHistoryPanel() {
   const list = document.getElementById("history-list");
   if (!list) return;
   list.innerHTML = '<div class="history__loading">Loading...</div>';
 
   try {
-    const res = await fetch("/api/history");
+    const useFilter = currentTemplateId && !historyShowAll;
+    const url = useFilter
+      ? `/api/history?templateId=${encodeURIComponent(currentTemplateId)}`
+      : "/api/history";
+    const res = await fetch(url);
     const data = await res.json();
 
     if (!data.available) {
       list.innerHTML = '<div class="history__empty">Git not available</div>';
       return;
     }
+
+    // Show all / filter toggle
+    const toggleHtml = currentTemplateId
+      ? `<div class="history__toggle"><button class="history__toggle-btn" id="history-toggle-filter">${historyShowAll ? "This template" : "Show all"}</button></div>`
+      : "";
+
     if (data.commits.length === 0) {
-      list.innerHTML = '<div class="history__empty">No versions yet</div>';
+      list.innerHTML = toggleHtml + '<div class="history__empty">No versions yet</div>';
+      attachHistoryToggle();
       return;
     }
 
-    list.innerHTML = "";
+    list.innerHTML = toggleHtml;
     for (const commit of data.commits) {
       const isInitial = commit.message.startsWith("Initial ");
-      const isRollback = commit.message.startsWith("Rollback to:");
+      const isRollback = commit.message.includes("Rollback to:");
+
+      // Strip [templateId] prefix from display
+      let displayMsg = commit.message;
+      const prefixMatch = displayMsg.match(/^\[[^\]]+\]\s*/);
+      if (prefixMatch) displayMsg = displayMsg.slice(prefixMatch[0].length);
 
       const item = document.createElement("div");
       item.className = "history-item" + (isRollback ? " history-item--rollback" : "");
@@ -464,7 +504,7 @@ async function refreshHistoryPanel() {
           <span class="history-item__hash">${escapeHtml(commit.hash)}</span>
           <span class="history-item__date">${timeAgoShort(commit.timestamp)}</span>
         </div>
-        <div class="history-item__msg">${escapeHtml(commit.message)}</div>
+        <div class="history-item__msg">${escapeHtml(displayMsg)}</div>
         ${!isInitial ? `<button class="history-item__rollback" data-hash="${escapeHtml(commit.fullHash)}">Restore</button>` : ""}
       `;
       list.appendChild(item);
@@ -473,21 +513,38 @@ async function refreshHistoryPanel() {
     list.querySelectorAll(".history-item__rollback").forEach((btn) => {
       btn.addEventListener("click", () => doRollback(btn.dataset.hash));
     });
+    attachHistoryToggle();
   } catch {
     list.innerHTML = '<div class="history__empty">Error loading history</div>';
   }
 }
 
+function attachHistoryToggle() {
+  const btn = document.getElementById("history-toggle-filter");
+  if (btn) {
+    btn.addEventListener("click", () => {
+      historyShowAll = !historyShowAll;
+      refreshHistoryPanel();
+    });
+  }
+}
+
 async function doRollback(hash) {
-  const ok = await vibeConfirm("Restore this version?", "Your current files will be replaced, but chat history is preserved.", { confirmLabel: "Restore", confirmClass: "btn--primary" });
+  const scoped = currentTemplateId && !historyShowAll;
+  const msg = scoped
+    ? "This template's modules will be restored to the selected version. Other templates are not affected."
+    : "All theme files will be replaced, but chat history is preserved.";
+  const ok = await vibeConfirm("Restore this version?", msg, { confirmLabel: "Restore", confirmClass: "btn--primary" });
   if (!ok) return;
   setStatus("Rolling back...");
 
   try {
+    const payload = { hash };
+    if (scoped) payload.templateId = currentTemplateId;
     const res = await fetch("/api/rollback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hash }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
 
@@ -990,6 +1047,83 @@ async function fetchHsAccountStatus() {
     // Silently ignore
   }
 }
+
+// ---------------------------------------------------------------------------
+// Topbar theme-name rename (double-click)
+// ---------------------------------------------------------------------------
+
+document.getElementById("theme-name")?.addEventListener("dblclick", () => {
+  const el = document.getElementById("theme-name");
+  if (!el || !currentSessionId) return;
+  if (el.contentEditable === "true") return;
+
+  const oldName = el.textContent.trim();
+  el.contentEditable = "true";
+  el.classList.add("topbar__project-pill--editing");
+  el.focus();
+
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  function commit() {
+    el.contentEditable = "false";
+    el.classList.remove("topbar__project-pill--editing");
+
+    const newName = el.textContent.trim();
+    if (!newName || newName === oldName) {
+      el.textContent = oldName;
+      return;
+    }
+
+    fetch("/api/themes/rename", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: currentSessionId, newName }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok) {
+          el.textContent = data.newName;
+          if (typeof currentAppTheme !== "undefined") currentAppTheme = data.newName;
+          window.location.hash = "#/app/" + encodeURIComponent(data.newName);
+          // Update rail item
+          const railItem = document.querySelector(`.project-rail__item[data-name="${oldName}"]`);
+          if (railItem) {
+            railItem.dataset.name = data.newName;
+            const nameSpan = railItem.querySelector(".project-rail__item-name");
+            if (nameSpan) nameSpan.textContent = data.newName;
+            const bubble = railItem.querySelector(".project-rail__item-bubble");
+            if (bubble) bubble.textContent = data.newName.charAt(0).toUpperCase();
+          }
+          if (typeof updateRailActive === "function") updateRailActive();
+        } else {
+          el.textContent = oldName;
+          showError(data.error || "Rename failed");
+        }
+      })
+      .catch(() => {
+        el.textContent = oldName;
+        showError("Rename failed");
+      });
+  }
+
+  el.addEventListener("blur", commit, { once: true });
+  el.addEventListener("keydown", function handler(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      el.removeEventListener("keydown", handler);
+      el.blur();
+    }
+    if (e.key === "Escape") {
+      el.textContent = oldName;
+      el.removeEventListener("keydown", handler);
+      el.blur();
+    }
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Initialize
