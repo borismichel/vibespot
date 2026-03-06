@@ -64,6 +64,77 @@ export interface VibeSession {
 // ---------------------------------------------------------------------------
 
 const SESSIONS_DIR = join(homedir(), ".vibespot", "sessions");
+const INDEX_PATH = join(SESSIONS_DIR, "_index.json");
+
+interface SessionIndexEntry {
+  id: string;
+  themeName: string;
+  updatedAt: number;
+  moduleCount: number;
+  templateCount: number;
+}
+
+function readIndex(): SessionIndexEntry[] {
+  try {
+    if (!existsSync(INDEX_PATH)) return rebuildIndex();
+    return JSON.parse(readFileSync(INDEX_PATH, "utf-8"));
+  } catch {
+    return rebuildIndex();
+  }
+}
+
+function writeIndex(entries: SessionIndexEntry[]): void {
+  try {
+    mkdirSync(SESSIONS_DIR, { recursive: true });
+    writeFileSync(INDEX_PATH, JSON.stringify(entries), "utf-8");
+  } catch { /* non-critical */ }
+}
+
+function rebuildIndex(): SessionIndexEntry[] {
+  if (!existsSync(SESSIONS_DIR)) return [];
+  const entries: SessionIndexEntry[] = [];
+  for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith(".json") && f !== "_index.json")) {
+    try {
+      const data = JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf-8"));
+      const templates = data.templates || [];
+      entries.push({
+        id: data.id,
+        themeName: data.themeName,
+        updatedAt: data.updatedAt,
+        moduleCount: templates.reduce((n: number, t: any) => n + (t.modules?.length || 0), 0),
+        templateCount: templates.length,
+      });
+    } catch { /* skip corrupt files */ }
+  }
+  writeIndex(entries);
+  return entries;
+}
+
+function upsertIndex(session: VibeSession): void {
+  const entries = readIndex();
+  const templates = session.templates || [];
+  const entry: SessionIndexEntry = {
+    id: session.id,
+    themeName: session.themeName,
+    updatedAt: session.updatedAt,
+    moduleCount: templates.reduce((n, t) => n + (t.modules?.length || 0), 0),
+    templateCount: templates.length,
+  };
+  const idx = entries.findIndex((e) => e.id === session.id);
+  if (idx >= 0) entries[idx] = entry;
+  else entries.push(entry);
+  writeIndex(entries);
+}
+
+function removeFromIndex(sessionId: string): void {
+  const entries = readIndex().filter((e) => e.id !== sessionId);
+  writeIndex(entries);
+}
+
+function removeFromIndexByTheme(themeName: string): void {
+  const entries = readIndex().filter((e) => e.themeName !== themeName);
+  writeIndex(entries);
+}
 
 let activeSession: VibeSession | null = null;
 
@@ -481,6 +552,7 @@ export function saveSession(): void {
   mkdirSync(SESSIONS_DIR, { recursive: true });
   const filePath = join(SESSIONS_DIR, `${activeSession.id}.json`);
   writeFileSync(filePath, JSON.stringify(activeSession, null, 2), "utf-8");
+  upsertIndex(activeSession);
 }
 
 export function loadSession(sessionId: string): VibeSession | null {
@@ -506,25 +578,7 @@ export function loadSession(sessionId: string): VibeSession | null {
 
 export function listSessions(): Array<{ id: string; themeName: string; updatedAt: number; moduleCount: number; templateCount: number }> {
   if (!existsSync(SESSIONS_DIR)) return [];
-
-  return readdirSync(SESSIONS_DIR)
-    .filter((f) => f.endsWith(".json"))
-    .map((f) => {
-      try {
-        const data = JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf-8"));
-        const templates = data.templates || [];
-        return {
-          id: data.id,
-          themeName: data.themeName,
-          updatedAt: data.updatedAt,
-          moduleCount: templates.reduce((n: number, t: any) => n + (t.modules?.length || 0), 0),
-          templateCount: templates.length,
-        };
-      } catch {
-        return null;
-      }
-    })
-    .filter(Boolean) as Array<{ id: string; themeName: string; updatedAt: number; moduleCount: number; templateCount: number }>;
+  return readIndex();
 }
 
 export function deleteSession(sessionId: string, deleteFiles = false): void {
@@ -553,7 +607,7 @@ export function deleteSession(sessionId: string, deleteFiles = false): void {
 
   // Also delete all other sessions for the same theme (prevents ghost entries)
   if (themeName && existsSync(SESSIONS_DIR)) {
-    for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith(".json"))) {
+    for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith(".json") && f !== "_index.json")) {
       try {
         const data = JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf-8"));
         if (data.themeName === themeName) {
@@ -561,6 +615,9 @@ export function deleteSession(sessionId: string, deleteFiles = false): void {
         }
       } catch { /* ignore */ }
     }
+    removeFromIndexByTheme(themeName);
+  } else {
+    removeFromIndex(sessionId);
   }
 
   if (activeSession?.id === sessionId) {

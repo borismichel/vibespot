@@ -1,43 +1,34 @@
 import { readFile, resolveAsset } from "../utils/fs.js";
 
+// In-memory cache for guide files (~90KB total, read once)
+const guideCache = new Map<string, string>();
+
+function cachedAsset(name: string): string {
+  let val = guideCache.get(name);
+  if (val !== undefined) return val;
+  try { val = readFile(resolveAsset(name)); } catch { val = ""; }
+  guideCache.set(name, val);
+  return val;
+}
+
 export function getConversionGuide(): string {
-  try {
-    return readFile(resolveAsset("conversion-guide.md"));
-  } catch {
-    return "Conversion guide not found. Using built-in rules.";
-  }
+  return cachedAsset("conversion-guide.md") || "Conversion guide not found. Using built-in rules.";
 }
 
 export function getDesignGuide(): string {
-  try {
-    return readFile(resolveAsset("design-guide.md"));
-  } catch {
-    return "";
-  }
+  return cachedAsset("design-guide.md");
 }
 
 export function getContentGuide(): string {
-  try {
-    return readFile(resolveAsset("content-guide.md"));
-  } catch {
-    return "";
-  }
+  return cachedAsset("content-guide.md");
 }
 
 export function getHubspotRules(): string {
-  try {
-    return readFile(resolveAsset("hubspot-rules.md"));
-  } catch {
-    return "";
-  }
+  return cachedAsset("hubspot-rules.md");
 }
 
 export function getHumanifyGuide(): string {
-  try {
-    return readFile(resolveAsset("humanify-guide.md"));
-  } catch {
-    return "";
-  }
+  return cachedAsset("humanify-guide.md");
 }
 
 /**
@@ -45,33 +36,30 @@ export function getHumanifyGuide(): string {
  * Returns only the relevant section for the given page type.
  */
 export function getPageTypeGuide(pageType: string): string {
-  try {
-    const fullGuide = readFile(resolveAsset("page-types.md"));
+  const fullGuide = cachedAsset("page-types.md");
+  if (!fullGuide) return "";
 
-    // Map page type to section header
-    const sectionHeaders: Record<string, string> = {
-      landing_page: "## Landing Page",
-      blog_post: "## Blog Post",
-      website_page: "## Website Page",
-      module_only: "## Module Only",
-    };
+  // Map page type to section header
+  const sectionHeaders: Record<string, string> = {
+    landing_page: "## Landing Page",
+    blog_post: "## Blog Post",
+    website_page: "## Website Page",
+    module_only: "## Module Only",
+  };
 
-    const header = sectionHeaders[pageType];
-    if (!header) return "";
+  const header = sectionHeaders[pageType];
+  if (!header) return "";
 
-    const startIdx = fullGuide.indexOf(header);
-    if (startIdx < 0) return "";
+  const startIdx = fullGuide.indexOf(header);
+  if (startIdx < 0) return "";
 
-    // Find the next section (## at start of line) after this one
-    const afterHeader = fullGuide.indexOf("\n## ", startIdx + header.length);
-    const section = afterHeader >= 0
-      ? fullGuide.slice(startIdx, afterHeader).trim()
-      : fullGuide.slice(startIdx).trim();
+  // Find the next section (## at start of line) after this one
+  const afterHeader = fullGuide.indexOf("\n## ", startIdx + header.length);
+  const section = afterHeader >= 0
+    ? fullGuide.slice(startIdx, afterHeader).trim()
+    : fullGuide.slice(startIdx).trim();
 
-    return section;
-  } catch {
-    return "";
-  }
+  return section;
 }
 
 export function buildSystemPrompt(conversionGuide: string): string {

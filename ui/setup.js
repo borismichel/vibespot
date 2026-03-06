@@ -1,3 +1,18 @@
+/* Theme init — runs synchronously before DOM to prevent flash */
+(function initTheme() {
+  const stored = localStorage.getItem("vibespot-theme");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const theme = stored || (prefersDark ? "dark" : "light");
+  document.documentElement.setAttribute("data-theme", theme);
+})();
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  const next = current === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("vibespot-theme", next);
+}
+
 /**
  * Setup screen — onboarding flow in the browser.
  * Handles theme creation, fetching, opening, and session resume.
