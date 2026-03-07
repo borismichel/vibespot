@@ -354,11 +354,23 @@ function setUploadState(state, data) {
   }
 }
 
+let _logBuffer = "";
+let _logFlushScheduled = false;
+
 function appendUploadLog(text) {
-  const log = document.getElementById("upload-log");
-  if (!log) return;
-  log.textContent += text;
-  log.scrollTop = log.scrollHeight;
+  _logBuffer += text;
+  if (!_logFlushScheduled) {
+    _logFlushScheduled = true;
+    requestAnimationFrame(() => {
+      _logFlushScheduled = false;
+      const log = document.getElementById("upload-log");
+      if (log) {
+        log.textContent += _logBuffer;
+        log.scrollTop = log.scrollHeight;
+      }
+      _logBuffer = "";
+    });
+  }
 }
 
 function fixUploadWithAI() {

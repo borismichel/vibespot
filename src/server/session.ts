@@ -74,16 +74,21 @@ interface SessionIndexEntry {
   templateCount: number;
 }
 
+let _indexCache: SessionIndexEntry[] | null = null;
+
 function readIndex(): SessionIndexEntry[] {
+  if (_indexCache) return _indexCache;
   try {
     if (!existsSync(INDEX_PATH)) return rebuildIndex();
-    return JSON.parse(readFileSync(INDEX_PATH, "utf-8"));
+    _indexCache = JSON.parse(readFileSync(INDEX_PATH, "utf-8"));
+    return _indexCache!;
   } catch {
     return rebuildIndex();
   }
 }
 
 function writeIndex(entries: SessionIndexEntry[]): void {
+  _indexCache = entries;
   try {
     mkdirSync(SESSIONS_DIR, { recursive: true });
     writeFileSync(INDEX_PATH, JSON.stringify(entries), "utf-8");
@@ -106,6 +111,7 @@ function rebuildIndex(): SessionIndexEntry[] {
       });
     } catch { /* skip corrupt files */ }
   }
+  _indexCache = entries;
   writeIndex(entries);
   return entries;
 }
@@ -740,10 +746,15 @@ export function writeModulesToDisk(): void {
     allModules.set(mod.moduleName, mod);
   }
 
+  // Pre-create all module directories in one pass
+  const modulesBaseDir = join(themePath, "modules");
+  mkdirSync(modulesBaseDir, { recursive: true });
   for (const mod of allModules.values()) {
-    const modDir = join(themePath, "modules", `${mod.moduleName}.module`);
-    mkdirSync(modDir, { recursive: true });
+    mkdirSync(join(modulesBaseDir, `${mod.moduleName}.module`), { recursive: true });
+  }
 
+  for (const mod of allModules.values()) {
+    const modDir = join(modulesBaseDir, `${mod.moduleName}.module`);
     writeFileSync(join(modDir, "fields.json"), mod.fieldsJson, "utf-8");
     writeFileSync(join(modDir, "meta.json"), mod.metaJson, "utf-8");
     writeFileSync(join(modDir, "module.html"), mod.moduleHtml, "utf-8");

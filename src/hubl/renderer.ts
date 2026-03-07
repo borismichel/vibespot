@@ -158,35 +158,31 @@ document.querySelectorAll('img').forEach(function(img){
 // Internals
 // ---------------------------------------------------------------------------
 
+// Pre-compiled regex patterns for stripDirectives (avoid recompilation per render)
+const RE_REQUIRE_TAG = /\{%[-\s]*require_(css|js)\b.*?%\}/gs;
+const RE_END_REQUIRE_TAG = /\{%[-\s]*end_require_(css|js)\s*%\}/gs;
+const RE_REQUIRE_EXPR = /\{\{[-\s]*require_(css|js)\(.*?\)\s*\}\}/gs;
+const RE_GET_ASSET_URL = /\{\{[-\s]*get_asset_url\(.*?\)\s*\}\}/gs;
+const RE_DND_TAGS = /\{%[-\s]*(end_)?(dnd_area|dnd_section|dnd_column|dnd_row|dnd_module)\b.*?%\}/gs;
+const RE_MODULE_TAG = /\{%[-\s]*module\b.*?%\}/gs;
+const RE_TEMPLATE_TAGS = /\{%[-\s]*(extends|block|endblock|set)\b.*?%\}/gs;
+const RE_ANNOTATIONS = /\{#.*?#\}/gs;
+const RE_CONTENT_VARS = /\{\{[-\s]*content\.\w+.*?\}\}/gs;
+const RE_IF_PATTERN = /\{%[-\s]*if\s+(.*?)\s*-?%\}([\s\S]*?)\{%[-\s]*endif\s*-?%\}/g;
+
 /**
  * Strip HubSpot-specific directives that have no meaning in local preview.
  */
 function stripDirectives(tpl: string): string {
-  // Remove {% require_css %}, {% require_js %}, {% end_require_css %}, etc.
-  tpl = tpl.replace(/\{%[-\s]*require_(css|js)\b.*?%\}/gs, "");
-  tpl = tpl.replace(/\{%[-\s]*end_require_(css|js)\s*%\}/gs, "");
-
-  // Remove {{ require_css(...) }}, {{ require_js(...) }}
-  tpl = tpl.replace(/\{\{[-\s]*require_(css|js)\(.*?\)\s*\}\}/gs, "");
-
-  // Remove {{ get_asset_url(...) }}
-  tpl = tpl.replace(/\{\{[-\s]*get_asset_url\(.*?\)\s*\}\}/gs, "");
-
-  // Remove {% dnd_area %}, {% dnd_section %}, {% dnd_column %}, {% dnd_row %} and their end tags
-  tpl = tpl.replace(/\{%[-\s]*(end_)?(dnd_area|dnd_section|dnd_column|dnd_row|dnd_module)\b.*?%\}/gs, "");
-
-  // Remove {% module ... %} tags (standalone module includes)
-  tpl = tpl.replace(/\{%[-\s]*module\b.*?%\}/gs, "");
-
-  // Remove {% extends %}, {% block %}, {% endblock %}, {% set %} — template-level
-  tpl = tpl.replace(/\{%[-\s]*(extends|block|endblock|set)\b.*?%\}/gs, "");
-
-  // Remove template annotations {# ... #}
-  tpl = tpl.replace(/\{#.*?#\}/gs, "");
-
-  // Remove {{ content.* }} page-level variables
-  tpl = tpl.replace(/\{\{[-\s]*content\.\w+.*?\}\}/gs, "");
-
+  tpl = tpl.replace(RE_REQUIRE_TAG, "");
+  tpl = tpl.replace(RE_END_REQUIRE_TAG, "");
+  tpl = tpl.replace(RE_REQUIRE_EXPR, "");
+  tpl = tpl.replace(RE_GET_ASSET_URL, "");
+  tpl = tpl.replace(RE_DND_TAGS, "");
+  tpl = tpl.replace(RE_MODULE_TAG, "");
+  tpl = tpl.replace(RE_TEMPLATE_TAGS, "");
+  tpl = tpl.replace(RE_ANNOTATIONS, "");
+  tpl = tpl.replace(RE_CONTENT_VARS, "");
   return tpl;
 }
 
@@ -270,14 +266,12 @@ function findOutermostFor(tpl: string): { varName: string; iterExpr: string; bod
  */
 function processConditionals(tpl: string, context: RenderContext): string {
   // Process from innermost out
-  const ifPattern = /\{%[-\s]*if\s+(.*?)\s*-?%\}([\s\S]*?)\{%[-\s]*endif\s*-?%\}/g;
-
   let result = tpl;
   let safety = 0;
 
-  while (ifPattern.test(result) && safety < 50) {
+  while (RE_IF_PATTERN.test(result) && safety < 50) {
     safety++;
-    result = result.replace(ifPattern, (_match, condition: string, body: string) => {
+    result = result.replace(RE_IF_PATTERN, (_match, condition: string, body: string) => {
       // Split on {% else %} and {% elif %}
       const elseMatch = body.split(/\{%[-\s]*else\s*-?%\}/);
       const ifBody = elseMatch[0];

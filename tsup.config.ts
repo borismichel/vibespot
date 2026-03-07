@@ -10,4 +10,5 @@ export default defineConfig({
   sourcemap: true,
   dts: false,
   shims: true,
+  minify: true,
 });

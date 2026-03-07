@@ -15,6 +15,8 @@ let streamTimerInterval = null;
 let lastStreamStatus = "";
 let currentSessionId = "";
 let currentTemplateId = "";
+let renderScheduled = false;
+let scrollScheduled = false;
 
 const messagesEl = document.getElementById("chat-messages");
 const inputEl = document.getElementById("chat-input");
@@ -47,11 +49,15 @@ function connectWebSocket() {
   };
 
   ws.onclose = () => {
+    stopStreamTimer();
+    if (isStreaming) finishStreaming();
     setStatus("Disconnected — reconnecting...");
     setTimeout(connectWebSocket, 2000);
   };
 
   ws.onerror = () => {
+    stopStreamTimer();
+    if (isStreaming) finishStreaming();
     setStatus("Connection error");
   };
 }
@@ -236,6 +242,16 @@ function handleStreamChunk(text) {
   if (!streamingMsgEl) return;
   streamBuffer += text;
 
+  if (!renderScheduled) {
+    renderScheduled = true;
+    requestAnimationFrame(flushStreamRender);
+  }
+}
+
+function flushStreamRender() {
+  renderScheduled = false;
+  if (!streamingMsgEl) return;
+
   // Hide incomplete code fences (AI is writing module code)
   let display = streamBuffer;
   const fenceCount = (display.match(/```/g) || []).length;
@@ -410,7 +426,16 @@ function escapeHtml(str) {
 }
 
 function scrollToBottom() {
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  if (scrollScheduled) return;
+  scrollScheduled = true;
+  requestAnimationFrame(() => {
+    scrollScheduled = false;
+    // Only auto-scroll if user is near the bottom (within 150px)
+    const gap = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+    if (gap < 150) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  });
 }
 
 function setStatus(text) {
@@ -488,7 +513,11 @@ async function refreshHistoryPanel() {
     }
 
     list.innerHTML = toggleHtml;
-    for (const commit of data.commits) {
+    const HISTORY_LIMIT = 50;
+    const commits = data.commits.slice(0, HISTORY_LIMIT);
+    const frag = document.createDocumentFragment();
+
+    for (const commit of commits) {
       const isInitial = commit.message.startsWith("Initial ");
       const isRollback = commit.message.includes("Rollback to:");
 
@@ -507,7 +536,15 @@ async function refreshHistoryPanel() {
         <div class="history-item__msg">${escapeHtml(displayMsg)}</div>
         ${!isInitial ? `<button class="history-item__rollback" data-hash="${escapeHtml(commit.fullHash)}">Restore</button>` : ""}
       `;
-      list.appendChild(item);
+      frag.appendChild(item);
+    }
+    list.appendChild(frag);
+
+    if (data.commits.length > HISTORY_LIMIT) {
+      const more = document.createElement("div");
+      more.className = "history__show-more";
+      more.textContent = `Showing ${HISTORY_LIMIT} of ${data.commits.length} versions`;
+      list.appendChild(more);
     }
 
     list.querySelectorAll(".history-item__rollback").forEach((btn) => {

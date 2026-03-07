@@ -38,6 +38,7 @@ async function openFieldEditor(moduleName) {
 }
 
 function closeFieldEditor() {
+  if (updateTimer) { clearTimeout(updateTimer); updateTimer = null; }
   currentEditModule = null;
   if (typeof showModuleListView === "function") {
     showModuleListView();

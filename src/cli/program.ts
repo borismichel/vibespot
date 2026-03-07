@@ -14,7 +14,7 @@ export function buildProgram(): Command {
     .description(
       "AI-powered HubSpot CMS landing page builder"
     )
-    .version("0.3.0")
+    .version("0.7.1")
     .action(vibeCommand);
 
   program

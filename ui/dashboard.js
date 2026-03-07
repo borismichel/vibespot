@@ -115,25 +115,20 @@ function renderTemplateList(templates) {
     list.appendChild(item);
   }
 
-  // Attach click handlers
-  list.querySelectorAll(".dashboard__template-open").forEach((btn) => {
-    btn.addEventListener("click", () => openTemplate(btn.dataset.id));
-  });
-  list.querySelectorAll(".dashboard__template-delete").forEach((btn) => {
-    btn.addEventListener("click", () => confirmDeleteTemplate(btn.dataset.id));
-  });
-
-  // Double-click on label to rename
-  list.querySelectorAll(".dashboard__template-label").forEach((labelEl) => {
+  // Event delegation — single listener handles all template actions
+  list.onclick = (e) => {
+    const openBtn = e.target.closest(".dashboard__template-open");
+    if (openBtn) return openTemplate(openBtn.dataset.id);
+    const delBtn = e.target.closest(".dashboard__template-delete");
+    if (delBtn) return confirmDeleteTemplate(delBtn.dataset.id);
+  };
+  list.ondblclick = (e) => {
+    const labelEl = e.target.closest(".dashboard__template-label");
+    if (!labelEl) return;
     const item = labelEl.closest(".dashboard__template-item");
     const templateId = item?.querySelector(".dashboard__template-open")?.dataset.id;
-    if (!templateId) return;
-
-    labelEl.addEventListener("dblclick", (e) => {
-      e.stopPropagation();
-      startTemplateRename(labelEl, templateId);
-    });
-  });
+    if (templateId) startTemplateRename(labelEl, templateId);
+  };
 }
 
 function startTemplateRename(labelEl, templateId) {

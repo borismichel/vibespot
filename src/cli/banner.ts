@@ -1,6 +1,6 @@
 import { theme } from "./theme.js";
 
-const VERSION = "0.3.0";
+const VERSION = "0.7.1";
 
 export function printBanner() {
   const v = theme.vibes;

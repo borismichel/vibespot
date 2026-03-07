@@ -6,10 +6,9 @@
 // HTML-escape helper (standalone so dialog.js has no load-order dependency)
 if (typeof esc === "undefined") {
   // eslint-disable-next-line no-var
+  var _escMap = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
   var esc = function (str) {
-    const el = document.createElement("span");
-    el.textContent = String(str);
-    return el.innerHTML;
+    return String(str).replace(/[&<>"']/g, function (c) { return _escMap[c]; });
   };
 }
 
