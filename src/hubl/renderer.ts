@@ -302,7 +302,7 @@ function processConditionals(tpl: string, context: RenderContext): string {
       return elseBody;
     });
 
-    ifPattern.lastIndex = 0;
+    RE_IF_PATTERN.lastIndex = 0;
   }
 
   return result;
