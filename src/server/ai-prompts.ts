@@ -8,6 +8,17 @@ import {
   getActiveTemplate,
   getModuleLibrary,
 } from "./session.js";
+import type { UploadedFileContext } from "./routes/upload-files.js";
+
+// Multimodal content block types (compatible with Anthropic/OpenAI APIs)
+export type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
+
+export type MultimodalMessage = {
+  role: "user" | "assistant";
+  content: string | ContentBlock[];
+};
 
 /**
  * Get the active template's page type and brand assets from the session.
@@ -82,12 +93,17 @@ NEVER respond with only a text summary. The vibespot-modules JSON block is manda
 - Image fields: type "image", default { "src": "https://placehold.co/800x600/1a1a2e/ffffff?text=Replace+in+HubSpot", "alt": "Placeholder image", "width": 800, "height": 600 }
 
 ## Images & Media
-- All images are managed through HubSpot's file manager — users will replace placeholders after publishing
+- Users can upload images that get placed in the theme's assets/ folder automatically
+- When the user uploads an image and wants it on the page, reference it with: {{ get_asset_url("${themeName}/assets/filename.ext") }}
+- IMPORTANT: get_asset_url() paths must include the theme name prefix "${themeName}/" because HubSpot resolves from the Design Manager root
+- For background images with uploaded assets: style="background-image: url('{{ get_asset_url(\\"${themeName}/assets/filename.ext\\") }}')"
+- For images without an uploaded asset, use image fields (type "image") with placehold.co defaults
 - ALWAYS use image fields (type "image") so users can swap images in the page editor
 - Use placehold.co URLs as defaults so the preview looks complete (e.g. https://placehold.co/800x600/1a1a2e/ffffff?text=Hero+Image)
 - In module.html, render images with: <img src="{{ module.field_name.src }}" alt="{{ module.field_name.alt }}" width="{{ module.field_name.width }}" height="{{ module.field_name.height }}">
 - For background images in CSS, use inline styles: style="background-image: url('{{ module.field_name.src }}')"
 - Size placeholders appropriately for their context (hero: 1920x800, cards: 600x400, icons: 200x200, avatars: 150x150)
+- If the user's intent is ambiguous (design reference vs page asset), ask them to clarify
 
 ## Navigation & Anchor Links
 - Each module is automatically wrapped with an id derived from its moduleName (lowercase, hyphens for spaces)
@@ -204,20 +220,69 @@ export function buildStateContext(): string {
 
 /**
  * Build the messages array with state context appended to the latest user message.
+ * When fileContexts are provided, the last message uses multimodal content blocks.
  */
-export function buildMessagesWithContext(userMessage: string): Array<{ role: "user" | "assistant"; content: string }> {
+export function buildMessagesWithContext(
+  userMessage: string,
+  fileContexts?: UploadedFileContext[]
+): MultimodalMessage[] {
   const session = getSession()!;
-  const messages: Array<{ role: "user" | "assistant"; content: string }> =
+  const messages: MultimodalMessage[] =
     session.messages.slice(-20).map((m) => ({
       role: m.role,
       content: m.content,
     }));
 
   const stateContext = buildStateContext();
-  const userContent = stateContext
-    ? `${userMessage}\n\n---\n${stateContext}`
-    : userMessage;
 
-  messages.push({ role: "user", content: userContent });
+  // Build asset manifest if there are any uploaded assets in the session
+  let assetManifest = "";
+  if (session.assets?.length) {
+    const imageAssets = session.assets.filter((a) => a.type === "image" && a.usage === "asset");
+    if (imageAssets.length > 0) {
+      assetManifest = `\n\n## Available Theme Assets\nThese images are in the theme's assets/ folder. Reference them with get_asset_url("${session.themeName}/assets/filename"):\n${imageAssets.map((a) => `- ${a.filename} (${a.originalName}) → get_asset_url("${session.themeName}/assets/${a.filename}")`).join("\n")}`;
+    }
+  }
+
+  let textContent = userMessage;
+  if (stateContext) textContent += `\n\n---\n${stateContext}`;
+  if (assetManifest) textContent += assetManifest;
+
+  // Add document text from attachments
+  const hasFiles = fileContexts && fileContexts.length > 0;
+  if (hasFiles) {
+    for (const fc of fileContexts) {
+      if (fc.type === "document" && fc.extractedText) {
+        textContent += `\n\n---\n[Attached document: ${fc.originalName}]\n${fc.extractedText}`;
+      }
+      if (fc.type === "image" && fc.usage === "asset" && fc.assetPath) {
+        textContent += `\n\n[Uploaded image: ${fc.originalName} → available as get_asset_url("${fc.assetPath}")]`;
+      }
+    }
+  }
+
+  // Build multimodal content if there are image attachments
+  const imageFiles = hasFiles ? fileContexts.filter((fc) => fc.type === "image" && fc.base64) : [];
+
+  if (imageFiles.length > 0) {
+    const contentBlocks: ContentBlock[] = [];
+    // Add image blocks first so the AI "sees" them
+    for (const img of imageFiles) {
+      contentBlocks.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: img.mimeType,
+          data: img.base64!,
+        },
+      });
+    }
+    // Add the text content
+    contentBlocks.push({ type: "text", text: textContent });
+    messages.push({ role: "user", content: contentBlocks });
+  } else {
+    messages.push({ role: "user", content: textContent });
+  }
+
   return messages;
 }

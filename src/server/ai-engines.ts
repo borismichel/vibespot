@@ -7,8 +7,9 @@ import { spawn } from "node:child_process";
 import { getConversionGuide } from "../ai/prompts.js";
 import { loadConfig } from "../utils/config.js";
 import { getSession } from "./session.js";
-import { buildVibeSystemPrompt, buildStateContext, buildMessagesWithContext, getPromptContext } from "./ai-prompts.js";
+import { buildVibeSystemPrompt, buildStateContext, buildMessagesWithContext, getPromptContext, type MultimodalMessage } from "./ai-prompts.js";
 import { log } from "./log.js";
+import type { UploadedFileContext } from "./routes/upload-files.js";
 
 // ---------------------------------------------------------------------------
 // Lazy-loaded Anthropic SDK
@@ -21,6 +22,24 @@ async function getAnthropicSDK(): Promise<typeof import("@anthropic-ai/sdk").def
     _AnthropicCtor = mod.default;
   }
   return _AnthropicCtor;
+}
+
+// ---------------------------------------------------------------------------
+// File context helper (for CLI engines that don't support vision)
+// ---------------------------------------------------------------------------
+
+function buildFileContextText(fileContexts?: UploadedFileContext[]): string {
+  if (!fileContexts?.length) return "";
+  const parts: string[] = [];
+  for (const fc of fileContexts) {
+    if (fc.type === "image" && fc.usage === "asset" && fc.assetPath) {
+      parts.push(`\n[Uploaded image: ${fc.originalName} → use get_asset_url("${fc.assetPath}")]`);
+    }
+    if (fc.type === "document" && fc.extractedText) {
+      parts.push(`\n\n---\n[Attached document: ${fc.originalName}]\n${fc.extractedText}`);
+    }
+  }
+  return parts.join("");
 }
 
 // ---------------------------------------------------------------------------
@@ -53,14 +72,15 @@ export async function streamWithAnthropicAPI(
   model: string,
   onChunk: (chunk: string) => void,
   onStatus?: (status: string) => void,
-  onFinish?: (fullResponse: string) => void
+  onFinish?: (fullResponse: string) => void,
+  fileContexts?: UploadedFileContext[]
 ): Promise<void> {
   const AnthropicSDK = await getAnthropicSDK();
   const client = new AnthropicSDK({ apiKey });
   const conversionGuide = getConversionGuide();
   const session = getSession()!;
   const editMode = session.modules.length > 0;
-  const messages = buildMessagesWithContext(userMessage);
+  const messages = buildMessagesWithContext(userMessage, fileContexts);
   const ctx = getPromptContext();
   const systemPrompt = buildVibeSystemPrompt(conversionGuide, themeName, editMode, ctx.pageType, ctx.brandAssets);
 
@@ -129,12 +149,29 @@ export async function streamWithOpenAIAPI(
   model: string,
   onChunk: (chunk: string) => void,
   onStatus?: (status: string) => void,
-  onFinish?: (fullResponse: string) => void
+  onFinish?: (fullResponse: string) => void,
+  fileContexts?: UploadedFileContext[]
 ): Promise<void> {
   const conversionGuide = getConversionGuide();
   const editMode = getSession()!.modules.length > 0;
-  const messages = buildMessagesWithContext(userMessage);
+  const messages = buildMessagesWithContext(userMessage, fileContexts);
   const ctx = getPromptContext();
+
+  // Convert multimodal messages to OpenAI format
+  const openaiMessages = messages.map((m) => {
+    if (typeof m.content === "string") return m;
+    // Convert Anthropic-style content blocks to OpenAI format
+    return {
+      role: m.role,
+      content: m.content.map((block) => {
+        if (block.type === "text") return { type: "text" as const, text: block.text };
+        return {
+          type: "image_url" as const,
+          image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` },
+        };
+      }),
+    };
+  });
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -148,7 +185,7 @@ export async function streamWithOpenAIAPI(
       stream: true,
       messages: [
         { role: "system", content: buildVibeSystemPrompt(conversionGuide, themeName, editMode, ctx.pageType, ctx.brandAssets) },
-        ...messages,
+        ...openaiMessages,
       ],
     }),
   });
@@ -212,7 +249,8 @@ export async function streamWithGeminiAPI(
   themeName: string,
   onChunk: (chunk: string) => void,
   onStatus?: (status: string) => void,
-  onFinish?: (fullResponse: string) => void
+  onFinish?: (fullResponse: string) => void,
+  fileContexts?: UploadedFileContext[]
 ): Promise<void> {
   const conversionGuide = getConversionGuide();
   const session = getSession()!;
@@ -220,7 +258,7 @@ export async function streamWithGeminiAPI(
   const stateContext = buildStateContext();
   const ctx = getPromptContext();
 
-  const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+  const contents: Array<{ role: string; parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> }> = [];
 
   for (const m of session.messages.slice(-20)) {
     contents.push({
@@ -229,10 +267,35 @@ export async function streamWithGeminiAPI(
     });
   }
 
-  const userContent = stateContext
+  let userContent = stateContext
     ? `${userMessage}\n\n---\n${stateContext}`
     : userMessage;
-  contents.push({ role: "user", parts: [{ text: userContent }] });
+
+  // Add document text from file contexts
+  if (fileContexts?.length) {
+    for (const fc of fileContexts) {
+      if (fc.type === "document" && fc.extractedText) {
+        userContent += `\n\n---\n[Attached document: ${fc.originalName}]\n${fc.extractedText}`;
+      }
+      if (fc.type === "image" && fc.usage === "asset" && fc.assetPath) {
+        userContent += `\n\n[Uploaded image: ${fc.originalName} → available as get_asset_url("${fc.assetPath}")]`;
+      }
+    }
+  }
+
+  const userParts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
+
+  // Add image parts for Gemini vision
+  if (fileContexts?.length) {
+    for (const fc of fileContexts) {
+      if (fc.type === "image" && fc.base64) {
+        userParts.push({ inlineData: { mimeType: fc.mimeType, data: fc.base64 } });
+      }
+    }
+  }
+
+  userParts.push({ text: userContent });
+  contents.push({ role: "user", parts: userParts });
 
   const model = "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
@@ -361,7 +424,8 @@ export async function generateWithClaudeCode(
   themeName: string,
   onChunk: (chunk: string) => void,
   onStatus?: (status: string) => void,
-  onFinish?: (fullResponse: string) => void
+  onFinish?: (fullResponse: string) => void,
+  fileContexts?: UploadedFileContext[]
 ): Promise<void> {
   const conversionGuide = getConversionGuide();
   const config = loadConfig();
@@ -371,6 +435,7 @@ export async function generateWithClaudeCode(
   let prompt = buildVibeSystemPrompt(conversionGuide, themeName, editMode, ctx.pageType, ctx.brandAssets);
   prompt += "\n\n## User Request\n" + userMessage;
   prompt += buildStateContext();
+  prompt += buildFileContextText(fileContexts);
 
   const args = ["--print"];
   if (config.claudeCodeModel) args.push("--model", config.claudeCodeModel);
@@ -405,7 +470,8 @@ export async function generateWithCLI(
   themeName: string,
   onChunk: (chunk: string) => void,
   onStatus?: (status: string) => void,
-  onFinish?: (fullResponse: string) => void
+  onFinish?: (fullResponse: string) => void,
+  fileContexts?: UploadedFileContext[]
 ): Promise<void> {
   const conversionGuide = getConversionGuide();
   const editMode = getSession()!.modules.length > 0;
@@ -414,6 +480,7 @@ export async function generateWithCLI(
   let prompt = buildVibeSystemPrompt(conversionGuide, themeName, editMode, ctx.pageType, ctx.brandAssets);
   prompt += "\n\n## User Request\n" + userMessage;
   prompt += buildStateContext();
+  prompt += buildFileContextText(fileContexts);
 
   let bin: string;
   let args: string[];

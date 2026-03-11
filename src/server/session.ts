@@ -34,6 +34,18 @@ export interface TemplateEntry {
   messages: ChatMessage[];       // per-template chat history
 }
 
+export interface SessionAsset {
+  id: string;
+  filename: string;
+  originalName: string;
+  type: "image" | "document";
+  usage: "asset" | "context";
+  mimeType: string;
+  size: number;
+  addedAt: string;
+  extractedText?: string;
+}
+
 export interface VibeSession {
   id: string;
   themePath: string;
@@ -47,6 +59,7 @@ export interface VibeSession {
     brandvoice?: string;
     humanify?: boolean;
   };
+  assets?: SessionAsset[];
 
   // Legacy flat fields — kept for backward compat, redirected to active template
   messages: ChatMessage[];
@@ -362,6 +375,14 @@ export function addMessage(role: "user" | "assistant", content: string): void {
   activeSession.updatedAt = Date.now();
   syncFlatFieldsToTemplate();
   saveChatToTheme();
+}
+
+export function addSessionAsset(asset: SessionAsset): void {
+  if (!activeSession) return;
+  if (!activeSession.assets) activeSession.assets = [];
+  activeSession.assets.push(asset);
+  activeSession.updatedAt = Date.now();
+  saveSession();
 }
 
 /**

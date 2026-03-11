@@ -72,6 +72,7 @@ import {
   handleHistoryRoute,
   handleRollbackRoute,
 } from "./routes/modules.js";
+import { handleFileUploadRoute } from "./routes/upload-files.js";
 
 // ---------------------------------------------------------------------------
 // MIME types for static serving
@@ -84,6 +85,10 @@ const MIME_TYPES: Record<string, string> = {
   ".json": "application/json",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
   ".ico": "image/x-icon",
   ".woff2": "font/woff2",
 };
@@ -161,6 +166,12 @@ function handleRequest(req: IncomingMessage, res: ServerResponse, uiDir: string)
     return;
   }
 
+  // Theme assets — serve uploaded images for preview
+  if (url.pathname.startsWith("/theme-assets/")) {
+    serveThemeAsset(url.pathname.slice("/theme-assets/".length), res);
+    return;
+  }
+
   // Static files from ui/ directory
   serveStatic(url.pathname, uiDir, req, res);
 }
@@ -201,6 +212,11 @@ function handleApiRoute(
 
     case "/api/upload":
       handleUploadRoute(res);
+      break;
+
+    case "/api/upload-files":
+      if (method === "POST") handleFileUploadRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
     case "/api/field":
@@ -386,6 +402,7 @@ function handleWsConnection(ws: WebSocket): void {
         });
 
         // Stream AI response back via WebSocket
+        const fileIds = Array.isArray(msg.fileIds) ? msg.fileIds as string[] : undefined;
         try {
           await handleGenerateStream(
             userMessage,
@@ -394,7 +411,8 @@ function handleWsConnection(ws: WebSocket): void {
             },
             (status) => {
               ws.send(JSON.stringify({ type: "stream_status", content: status }));
-            }
+            },
+            fileIds
           );
 
           // Write modules to disk and commit for version history
@@ -603,6 +621,33 @@ ${errorContext}`;
   } else {
     ws.send(JSON.stringify({ type: "needs_setup" }));
   }
+}
+
+// ---------------------------------------------------------------------------
+// Theme asset serving (uploaded images for preview)
+// ---------------------------------------------------------------------------
+
+function serveThemeAsset(filename: string, res: ServerResponse): void {
+  const session = getSession();
+  if (!session) {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("No session");
+    return;
+  }
+  const filePath = join(session.themePath, "assets", filename);
+  if (!existsSync(filePath)) {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("Asset not found");
+    return;
+  }
+  const ext = extname(filePath);
+  const contentType = MIME_TYPES[ext] || "application/octet-stream";
+  const buffer = readFileSync(filePath);
+  res.writeHead(200, {
+    "Content-Type": contentType,
+    "Cache-Control": "no-cache",
+  });
+  res.end(buffer);
 }
 
 // ---------------------------------------------------------------------------

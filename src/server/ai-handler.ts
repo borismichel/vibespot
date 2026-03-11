@@ -16,6 +16,7 @@ import {
   generateWithClaudeCode,
   generateWithCLI,
 } from "./ai-engines.js";
+import { getFileContexts } from "./routes/upload-files.js";
 
 // ---------------------------------------------------------------------------
 // Parse warning callback — set by the WebSocket handler
@@ -66,13 +67,17 @@ function finishResponse(fullResponse: string): void {
 export async function handleGenerateStream(
   userMessage: string,
   onChunk: (chunk: string) => void,
-  onStatus?: (status: string) => void
+  onStatus?: (status: string) => void,
+  fileIds?: string[]
 ): Promise<void> {
   const session = getSession();
   if (!session) throw new Error("No active session");
 
   const capturedSessionId = session.id;
   generatingSessionId = capturedSessionId;
+
+  // Load file contexts for any attached files
+  const fileContexts = fileIds?.length ? getFileContexts(fileIds) : undefined;
 
   try {
     const config = loadConfig();
@@ -84,30 +89,30 @@ export async function handleGenerateStream(
         const apiKey = getApiKeyForEngine("anthropic-api", config);
         if (!apiKey) throw new Error("Anthropic API key not configured. Open Settings to add one.");
         await streamWithAnthropicAPI(userMessage, apiKey, session.themeName,
-          config.anthropicApiModel || "claude-sonnet-4-6", onChunk, onStatus, finishResponse);
+          config.anthropicApiModel || "claude-sonnet-4-6", onChunk, onStatus, finishResponse, fileContexts);
         break;
       }
       case "openai-api": {
         const apiKey = getApiKeyForEngine("openai-api", config);
         if (!apiKey) throw new Error("OpenAI API key not configured. Open Settings to add one.");
         await streamWithOpenAIAPI(userMessage, apiKey, session.themeName,
-          config.openaiApiModel || "gpt-4o", onChunk, onStatus, finishResponse);
+          config.openaiApiModel || "gpt-4o", onChunk, onStatus, finishResponse, fileContexts);
         break;
       }
       case "gemini-api": {
         const apiKey = getApiKeyForEngine("gemini-api", config);
         if (!apiKey) throw new Error("Gemini API key not configured. Open Settings to add one.");
-        await streamWithGeminiAPI(userMessage, apiKey, session.themeName, onChunk, onStatus, finishResponse);
+        await streamWithGeminiAPI(userMessage, apiKey, session.themeName, onChunk, onStatus, finishResponse, fileContexts);
         break;
       }
       case "claude-code":
-        await generateWithClaudeCode(userMessage, session.themeName, onChunk, onStatus, finishResponse);
+        await generateWithClaudeCode(userMessage, session.themeName, onChunk, onStatus, finishResponse, fileContexts);
         break;
       case "gemini-cli":
-        await generateWithCLI("gemini", userMessage, session.themeName, onChunk, onStatus, finishResponse);
+        await generateWithCLI("gemini", userMessage, session.themeName, onChunk, onStatus, finishResponse, fileContexts);
         break;
       case "codex-cli":
-        await generateWithCLI("codex", userMessage, session.themeName, onChunk, onStatus, finishResponse);
+        await generateWithCLI("codex", userMessage, session.themeName, onChunk, onStatus, finishResponse, fileContexts);
         break;
       default:
         throw new Error(`Unknown AI engine: ${engine}. Open Settings to configure one.`);

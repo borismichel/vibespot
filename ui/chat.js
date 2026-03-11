@@ -154,24 +154,190 @@ function handleWsMessage(msg) {
 }
 
 // ---------------------------------------------------------------------------
+// File attachments
+// ---------------------------------------------------------------------------
+
+const pendingFiles = [];
+const fileChipsEl = document.getElementById("file-chips");
+const fileInputEl = document.getElementById("file-input");
+const attachBtn = document.getElementById("btn-attach-file");
+const dropOverlay = document.getElementById("drop-overlay");
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/svg+xml", "image/webp", "image/gif"]);
+const DOC_TYPES = new Set([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/markdown", "text/plain",
+]);
+const SUPPORTED_TYPES = new Set([...IMAGE_TYPES, ...DOC_TYPES]);
+
+function addPendingFile(file) {
+  if (!SUPPORTED_TYPES.has(file.type)) {
+    showToast(`Unsupported file type: ${file.name}`);
+    return;
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    showToast(`File too large (>10MB): ${file.name}`);
+    return;
+  }
+  pendingFiles.push(file);
+  renderFileChips();
+}
+
+function removePendingFile(index) {
+  pendingFiles.splice(index, 1);
+  renderFileChips();
+}
+
+function renderFileChips() {
+  fileChipsEl.innerHTML = "";
+  if (pendingFiles.length === 0) {
+    fileChipsEl.classList.remove("visible");
+    return;
+  }
+  fileChipsEl.classList.add("visible");
+  pendingFiles.forEach((file, i) => {
+    const isImage = IMAGE_TYPES.has(file.type);
+    const chip = document.createElement("div");
+    chip.className = `file-chip file-chip--${isImage ? "image" : "doc"}`;
+    const sizeKB = Math.round(file.size / 1024);
+    const sizeStr = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB} KB`;
+    chip.innerHTML = `
+      <span class="file-chip__icon">${isImage ? "\u{1F5BC}" : "\u{1F4C4}"}</span>
+      <span class="file-chip__name">${escapeHtml(file.name)}</span>
+      <span class="file-chip__size">${sizeStr}</span>
+      <button class="file-chip__remove" title="Remove">&times;</button>
+    `;
+    chip.querySelector(".file-chip__remove").addEventListener("click", () => removePendingFile(i));
+    fileChipsEl.appendChild(chip);
+  });
+}
+
+function showToast(message) {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.classList.add("visible"), 10);
+  setTimeout(() => {
+    toast.classList.remove("visible");
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+async function uploadFiles(files) {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append("files", file);
+  }
+  const resp = await fetch("/api/upload-files", { method: "POST", body: formData });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ error: "Upload failed" }));
+    throw new Error(err.error || "Upload failed");
+  }
+  return resp.json();
+}
+
+function renderFileChipsInMessage(files) {
+  if (!files || files.length === 0) return "";
+  return `<div class="chat-msg__files">${files
+    .map((f) => {
+      const isImage = f.type === "image";
+      return `<span class="file-chip file-chip--${isImage ? "image" : "doc"} file-chip--sent">
+        <span class="file-chip__icon">${isImage ? "\u{1F5BC}" : "\u{1F4C4}"}</span>
+        <span class="file-chip__name">${escapeHtml(f.originalName || f.name)}</span>
+      </span>`;
+    })
+    .join("")}</div>`;
+}
+
+// Drag-and-drop
+let dragCounter = 0;
+
+inputEl.closest(".chat__input-area").addEventListener("dragenter", (e) => {
+  e.preventDefault();
+  dragCounter++;
+  dropOverlay.classList.remove("hidden");
+});
+
+inputEl.closest(".chat__input-area").addEventListener("dragleave", (e) => {
+  e.preventDefault();
+  dragCounter--;
+  if (dragCounter <= 0) {
+    dragCounter = 0;
+    dropOverlay.classList.add("hidden");
+  }
+});
+
+inputEl.closest(".chat__input-area").addEventListener("dragover", (e) => {
+  e.preventDefault();
+});
+
+inputEl.closest(".chat__input-area").addEventListener("drop", (e) => {
+  e.preventDefault();
+  dragCounter = 0;
+  dropOverlay.classList.add("hidden");
+  if (e.dataTransfer?.files) {
+    for (const file of e.dataTransfer.files) {
+      addPendingFile(file);
+    }
+  }
+});
+
+// Paperclip button
+attachBtn.addEventListener("click", () => fileInputEl.click());
+fileInputEl.addEventListener("change", () => {
+  for (const file of fileInputEl.files) {
+    addPendingFile(file);
+  }
+  fileInputEl.value = "";
+});
+
+// ---------------------------------------------------------------------------
 // Sending messages
 // ---------------------------------------------------------------------------
 
-function sendMessage(text) {
-  if (!text.trim() || isStreaming || !ws || ws.readyState !== WebSocket.OPEN) return;
+async function sendMessage(text) {
+  const hasFiles = pendingFiles.length > 0;
+  if ((!text.trim() && !hasFiles) || isStreaming || !ws || ws.readyState !== WebSocket.OPEN) return;
 
   // Remove welcome screen
   const welcome = messagesEl.querySelector(".chat__welcome");
   if (welcome) welcome.remove();
 
-  // Show user message
-  appendUserMessage(text);
+  // Upload files first if any
+  let uploadedFiles = [];
+  const filesToUpload = [...pendingFiles];
+  if (hasFiles) {
+    pendingFiles.length = 0;
+    renderFileChips();
+    setStatus("Uploading files...");
+    try {
+      const result = await uploadFiles(filesToUpload);
+      uploadedFiles = result.files || [];
+      if (result.errors?.length) {
+        result.errors.forEach((e) => showToast(e));
+      }
+    } catch (err) {
+      showToast(err.message);
+      setStatus("Upload failed");
+      return;
+    }
+  }
+
+  // Show user message with file chips
+  appendUserMessage(text, null, uploadedFiles);
 
   // Start streaming indicator
   startStreaming();
 
-  // Send via WebSocket
-  ws.send(JSON.stringify({ type: "chat", message: text }));
+  // Send via WebSocket with file IDs
+  const payload = { type: "chat", message: text || "(files attached)" };
+  if (uploadedFiles.length > 0) {
+    payload.fileIds = uploadedFiles.map((f) => f.id);
+  }
+  ws.send(JSON.stringify(payload));
 
   // Clear input
   inputEl.value = "";
@@ -189,10 +355,11 @@ function formatMessageTime(ts) {
   return `${d.getHours()}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
-function appendUserMessage(text, timestamp) {
+function appendUserMessage(text, timestamp, files) {
   const time = formatMessageTime(timestamp || Date.now());
   const div = document.createElement("div");
   div.className = "chat-msg chat-msg--user";
+  const fileChipsHtml = renderFileChipsInMessage(files);
   div.innerHTML = `
     <div class="chat-msg__avatar chat-msg__avatar--user">Y</div>
     <div class="chat-msg__content">
@@ -200,6 +367,7 @@ function appendUserMessage(text, timestamp) {
         <span class="chat-msg__sender">You</span>
         <span class="chat-msg__time">${time}</span>
       </div>
+      ${fileChipsHtml}
       <div class="chat-msg__bubble">${escapeHtml(text)}</div>
     </div>`;
   messagesEl.appendChild(div);

@@ -8,7 +8,8 @@
  *   {% for item in module.list %}...{% endfor %} — loops
  *   {{ item.field }}               — loop variable access
  *
- * Everything else (require_css, get_asset_url, dnd_area, etc.) is stripped.
+ * get_asset_url("assets/...") is resolved to /theme-assets/ for local preview.
+ * Everything else (require_css, dnd_area, etc.) is stripped.
  */
 
 // ---------------------------------------------------------------------------
@@ -162,7 +163,8 @@ document.querySelectorAll('img').forEach(function(img){
 const RE_REQUIRE_TAG = /\{%[-\s]*require_(css|js)\b.*?%\}/gs;
 const RE_END_REQUIRE_TAG = /\{%[-\s]*end_require_(css|js)\s*%\}/gs;
 const RE_REQUIRE_EXPR = /\{\{[-\s]*require_(css|js)\(.*?\)\s*\}\}/gs;
-const RE_GET_ASSET_URL = /\{\{[-\s]*get_asset_url\(.*?\)\s*\}\}/gs;
+const RE_GET_ASSET_URL = /\{\{[-\s]*get_asset_url\(["'](?:[^"'\/]+\/)?assets\/(.*?)["']\)\s*\}\}/gs;
+const RE_GET_ASSET_URL_STRIP = /\{\{[-\s]*get_asset_url\(.*?\)\s*\}\}/gs;
 const RE_DND_TAGS = /\{%[-\s]*(end_)?(dnd_area|dnd_section|dnd_column|dnd_row|dnd_module)\b.*?%\}/gs;
 const RE_MODULE_TAG = /\{%[-\s]*module\b.*?%\}/gs;
 const RE_TEMPLATE_TAGS = /\{%[-\s]*(extends|block|endblock|set)\b.*?%\}/gs;
@@ -177,7 +179,12 @@ function stripDirectives(tpl: string): string {
   tpl = tpl.replace(RE_REQUIRE_TAG, "");
   tpl = tpl.replace(RE_END_REQUIRE_TAG, "");
   tpl = tpl.replace(RE_REQUIRE_EXPR, "");
-  tpl = tpl.replace(RE_GET_ASSET_URL, "");
+  // Resolve get_asset_url("assets/filename") → /theme-assets/filename for preview
+  RE_GET_ASSET_URL.lastIndex = 0;
+  tpl = tpl.replace(RE_GET_ASSET_URL, (_match, filename) => `/theme-assets/${filename}`);
+  // Strip any remaining get_asset_url() calls with non-standard paths
+  RE_GET_ASSET_URL_STRIP.lastIndex = 0;
+  tpl = tpl.replace(RE_GET_ASSET_URL_STRIP, "");
   tpl = tpl.replace(RE_DND_TAGS, "");
   tpl = tpl.replace(RE_MODULE_TAG, "");
   tpl = tpl.replace(RE_TEMPLATE_TAGS, "");
