@@ -691,26 +691,35 @@ async function fetchTheme() {
   }
 }
 
+let _openThemePromise = null;
 async function openTheme(pathOrName) {
+  // Deduplicate concurrent calls for the same theme
+  if (_openThemePromise) return _openThemePromise;
   showLoading("Opening theme...");
 
-  try {
-    const res = await fetch("/api/setup/open", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: pathOrName }),
-    });
-    const data = await res.json();
+  _openThemePromise = (async () => {
+    try {
+      const res = await fetch("/api/setup/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: pathOrName }),
+      });
+      const data = await res.json();
 
-    if (data.error) {
-      showError(data.error);
-      return;
+      if (data.error) {
+        showError(data.error);
+        return;
+      }
+
+      showApp(data.themeName);
+    } catch (err) {
+      showError("Failed to open theme: " + err.message);
+    } finally {
+      _openThemePromise = null;
     }
+  })();
 
-    showApp(data.themeName);
-  } catch (err) {
-    showError("Failed to open theme: " + err.message);
-  }
+  return _openThemePromise;
 }
 
 async function resumeSession(sessionId) {
@@ -1190,14 +1199,18 @@ function handleRoute() {
   }
 }
 
-window.addEventListener("popstate", handleRoute);
-
 // ---------------------------------------------------------------------------
 // Initialize — check URL hash first, fall back to setup screen
 // ---------------------------------------------------------------------------
 
-if (location.hash && (location.hash.startsWith("#/app/") || location.hash.startsWith("#/dashboard/"))) {
-  handleRoute();
-} else {
-  initSetup();
-}
+let _initialized = false;
+window.addEventListener("popstate", () => { if (_initialized) handleRoute(); });
+
+// Always initialize setup (loads project rail, engine status, etc.)
+// then handle the hash route if present.
+initSetup().then(() => {
+  _initialized = true;
+  if (location.hash && (location.hash.startsWith("#/app/") || location.hash.startsWith("#/dashboard/"))) {
+    handleRoute();
+  }
+});

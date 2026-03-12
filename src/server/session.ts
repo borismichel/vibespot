@@ -544,6 +544,35 @@ export function scanThemeFromDisk(themePath: string): void {
     }
   }
 
+  // Try to extract module order from template files (preserves display order)
+  const templatesDir = join(themePath, "templates");
+  if (existsSync(templatesDir) && activeSession.moduleOrder.length > 0) {
+    try {
+      const tplFiles = readdirSync(templatesDir).filter(
+        (f) => f.startsWith("lp-") && f.endsWith(".html")
+      );
+      if (tplFiles.length > 0) {
+        const tplContent = safeRead(join(templatesDir, tplFiles[0]));
+        const moduleRe = /dnd_module\s+path=["']\.\.\/modules\/(.+?)\.module["']/g;
+        const templateOrder: string[] = [];
+        let match: RegExpExecArray | null;
+        while ((match = moduleRe.exec(tplContent)) !== null) {
+          templateOrder.push(match[1]);
+        }
+        // Only use template order if it covers all loaded modules
+        if (templateOrder.length > 0) {
+          const loadedNames = new Set(activeSession.moduleOrder);
+          const validOrder = templateOrder.filter((n) => loadedNames.has(n));
+          // Append any modules not referenced in the template
+          for (const n of activeSession.moduleOrder) {
+            if (!validOrder.includes(n)) validOrder.push(n);
+          }
+          activeSession.moduleOrder = validOrder;
+        }
+      }
+    } catch { /* non-critical — fall back to filesystem order */ }
+  }
+
   // Load shared CSS/JS
   const cssDir = join(themePath, "css");
   const jsDir = join(themePath, "js");
@@ -807,39 +836,54 @@ export function writeModulesToDisk(): void {
   }
 
   // Write page templates for all templates in the session
-  if (activeSession.templates.length > 0) {
-    const templatesDir = join(themePath, "templates");
-    mkdirSync(templatesDir, { recursive: true });
+  const templatesDir = join(themePath, "templates");
+  mkdirSync(templatesDir, { recursive: true });
 
+  // Remove scaffold home.html once real templates exist — it's an empty shell
+  // that shows up as a usable template in HubSpot but has no modules.
+  const scaffoldHome = join(templatesDir, "home.html");
+  const hasRealTemplates = activeSession.templates.length > 0 || activeSession.modules.length > 0;
+  if (hasRealTemplates && existsSync(scaffoldHome)) {
+    rmSync(scaffoldHome, { force: true });
+  }
+
+  // Track which template files we're writing so we can clean up stale ones
+  const activeTemplateFiles = new Set<string>();
+
+  if (activeSession.templates.length > 0) {
     for (const tpl of activeSession.templates) {
       if (tpl.pageType === "module_only") continue; // No template for module-only
       if (tpl.modules.length === 0) continue;
 
       const templateContent = tpl.template || generateTemplateForEntry(tpl);
       const annotated = ensureTemplateAnnotations(templateContent, tpl.label, tpl.pageType);
-      writeFileSync(
-        join(templatesDir, `${tpl.id}.html`),
-        annotated,
-        "utf-8"
-      );
+      const filename = `${tpl.id}.html`;
+      writeFileSync(join(templatesDir, filename), annotated, "utf-8");
+      activeTemplateFiles.add(filename);
 
       // For blog posts, also generate a listing template
       if (tpl.pageType === "blog_post") {
         writeBlogListingTemplate(templatesDir, tpl);
+        activeTemplateFiles.add(`${tpl.id}-listing.html`);
       }
     }
   } else if (activeSession.modules.length > 0) {
     // Legacy fallback: single template from flat fields
     const template = activeSession.template || generateTemplateFromModules();
-    const templatesDir = join(themePath, "templates");
-    mkdirSync(templatesDir, { recursive: true });
     const annotated = ensureTemplateAnnotations(template, `${activeSession.themeName} Landing Page`);
-    writeFileSync(
-      join(templatesDir, `lp-${activeSession.themeName}.html`),
-      annotated,
-      "utf-8"
-    );
+    const filename = `lp-${activeSession.themeName}.html`;
+    writeFileSync(join(templatesDir, filename), annotated, "utf-8");
+    activeTemplateFiles.add(filename);
   }
+
+  // Clean up stale lp-*.html template files that are no longer in the session
+  try {
+    for (const file of readdirSync(templatesDir)) {
+      if (file.startsWith("lp-") && file.endsWith(".html") && !activeTemplateFiles.has(file)) {
+        rmSync(join(templatesDir, file), { force: true });
+      }
+    }
+  } catch { /* non-critical */ }
 
   // Patch base.html to load template_js (animations won't work without this)
   patchBaseTemplate();

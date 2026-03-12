@@ -84,6 +84,17 @@ export async function streamWithAnthropicAPI(
   const ctx = getPromptContext();
   const systemPrompt = buildVibeSystemPrompt(conversionGuide, themeName, editMode, ctx.pageType, ctx.brandAssets);
 
+  log.info("anthropic", "API call", {
+    model,
+    systemPromptLength: systemPrompt.length,
+    messageCount: messages.length,
+    messageRoles: messages.map((m) => m.role),
+    lastMessageLength: typeof messages[messages.length - 1]?.content === "string"
+      ? (messages[messages.length - 1].content as string).length
+      : "multimodal",
+    conversionGuideLength: conversionGuide.length,
+  });
+
   for (let attempt = 0; ; attempt++) {
     try {
       let fullResponse = "";
@@ -101,7 +112,7 @@ export async function streamWithAnthropicAPI(
           model,
           max_tokens: 48000,
           system: systemPrompt,
-          messages,
+          messages: messages as unknown as import("@anthropic-ai/sdk").MessageParam[],
         });
 
         for await (const event of stream) {

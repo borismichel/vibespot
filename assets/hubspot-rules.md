@@ -291,6 +291,24 @@ Every opening tag MUST have a matching closing tag:
 Common mistake: forgetting {% end_dnd_column %} or mismatching nesting.
 ```
 
+### Anchor Links in Modules
+```
+HubSpot's dnd_section/dnd_module system wraps modules in auto-generated
+container divs (hs_cos_wrapper_*). Any id attribute on external wrappers
+will be buried or overridden.
+
+To make anchor links work reliably:
+- Put the id directly on the module's ROOT element in module.html
+- Do NOT rely on external wrappers or template-level ids
+
+  ✅ <section id="pricing" class="my-pricing">...</section>
+  ❌ Relying on a wrapper: <div id="pricing"><section>...</section></div>
+
+The id should match the moduleName lowercased with spaces → hyphens:
+  "Pricing Cards" → id="pricing-cards"
+  "Hero" → id="hero"
+```
+
 ### Module References in HubL
 ```
 CURRENT (v2): {{ module.field_name }}

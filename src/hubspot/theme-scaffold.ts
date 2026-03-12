@@ -38,11 +38,12 @@ export function createThemeScaffold(themePath: string, themeName: string): void 
   // fields.json — empty theme-level fields
   writeFileSync(join(themePath, "fields.json"), "[]\n");
 
-  // Landing page template — minimal DnD template for vibespot modules
+  // Placeholder landing page template — gets replaced once AI generates real modules.
+  // Marked isAvailableForNewContent: false so it won't appear in HubSpot as a usable template.
   const landingTemplate = `<!--
   templateType: page
-  isAvailableForNewContent: true
-  label: ${themeName} Landing Page
+  isAvailableForNewContent: false
+  label: ${themeName} (placeholder)
   screenshotPath: ../images/template-previews/home.png
 -->
 {% extends "./layouts/base.html" %}
@@ -68,10 +69,16 @@ export function createThemeScaffold(themePath: string, themeName: string): void 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% if template_css %}
+    {{ require_css(get_asset_url(template_css)) }}
+  {% endif %}
   {{ standard_header_includes }}
 </head>
 <body>
   {% block body %}{% endblock body %}
+  {% if template_js %}
+    {{ require_js(get_asset_url(template_js)) }}
+  {% endif %}
   {{ standard_footer_includes }}
 </body>
 </html>

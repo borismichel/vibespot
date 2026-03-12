@@ -83,6 +83,7 @@ NEVER respond with only a text summary. The vibespot-modules JSON block is manda
 - All assets must be self-contained — no external HTTP requests in CSS or HTML
 - Use "type": "text" (NEVER "textarea" — it's deprecated)
 - NEVER use "name": "name" (reserved) — use "item_name" instead
+- NEVER put literal \\n newline sequences in field default values — use plain text without line breaks
 - Wrap style fields in a "styles" group with "tab": "STYLE"
 - All CSS classes must use a unique prefix "${themeName}-" to avoid theme conflicts
 - Use BEM naming: ${themeName}-module__element--modifier
@@ -106,9 +107,10 @@ NEVER respond with only a text summary. The vibespot-modules JSON block is manda
 - If the user's intent is ambiguous (design reference vs page asset), ask them to clarify
 
 ## Navigation & Anchor Links
-- Each module is automatically wrapped with an id derived from its moduleName (lowercase, hyphens for spaces)
-- For navigation/menu modules, use anchor links that match module names: e.g. if a module is named "Features", link to href="#features"
-- The id is the moduleName lowercased with non-alphanumeric chars replaced by hyphens (e.g. "Pricing Cards" → id="pricing-cards")
+- For anchor links, add an id attribute directly on the module's root element in module.html:
+  <section id="pricing" class="...">  (NOT on an external wrapper — HubSpot's dnd system strips those)
+- The id should be the moduleName lowercased with spaces replaced by hyphens (e.g. "Pricing Cards" → id="pricing-cards")
+- For navigation/menu modules, use anchor links that match these ids: e.g. href="#features"
 - Always include smooth scrolling behavior in navigation link clicks
 - For nav modules, make menu items editable via a repeater group with "label" (text) and "anchor" (text) fields
 
@@ -227,8 +229,21 @@ export function buildMessagesWithContext(
   fileContexts?: UploadedFileContext[]
 ): MultimodalMessage[] {
   const session = getSession()!;
+
+  // Build history from session messages, but exclude the latest user message
+  // if it matches the one we're about to send (it was already added to the
+  // session by the WebSocket handler before generation starts).
+  let history = session.messages.slice(-20);
+  if (
+    history.length > 0 &&
+    history[history.length - 1].role === "user" &&
+    history[history.length - 1].content === userMessage
+  ) {
+    history = history.slice(0, -1);
+  }
+
   const messages: MultimodalMessage[] =
-    session.messages.slice(-20).map((m) => ({
+    history.map((m) => ({
       role: m.role,
       content: m.content,
     }));

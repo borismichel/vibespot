@@ -5,6 +5,7 @@ import { convertCommand } from "../commands/convert.js";
 import { uploadCommand } from "../commands/upload.js";
 import { doctorCommand } from "../commands/doctor.js";
 import { vibeCommand } from "../commands/vibe.js";
+import { getVersion } from "../utils/fs.js";
 
 export function buildProgram(): Command {
   const program = new Command();
@@ -14,7 +15,7 @@ export function buildProgram(): Command {
     .description(
       "AI-powered HubSpot CMS landing page builder"
     )
-    .version("0.7.1")
+    .version(getVersion())
     .action(vibeCommand);
 
   program

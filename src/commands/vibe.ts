@@ -55,6 +55,9 @@ export async function vibeCommand(): Promise<void> {
         close();
         console.log(dim("  Goodbye!\n"));
         resolve();
+        // Force exit after a short grace period — open connections
+        // (WebSocket, keep-alive HTTP) can keep the process alive indefinitely.
+        setTimeout(() => process.exit(0), 500);
       });
     });
   } catch (err) {

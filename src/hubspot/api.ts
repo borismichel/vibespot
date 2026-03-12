@@ -228,7 +228,7 @@ export async function uploadFile(
   const blob = new Blob([fileContent]);
   formData.append("file", blob, fileName);
 
-  const url = `${BASE_URL}/cms/v3/source-code/draft/content/${encodePath(remotePath)}`;
+  const url = `${BASE_URL}/cms/v3/source-code/published/content/${encodePath(remotePath)}`;
 
   const resp = await fetchWithRetry(url, {
     method: "PUT",
@@ -248,7 +248,7 @@ export async function uploadFile(
  * Delete a file or directory from the HubSpot CMS Design Manager.
  */
 export async function deleteFile(pak: string, remotePath: string): Promise<void> {
-  const url = `${BASE_URL}/cms/v3/source-code/draft/content/${encodePath(remotePath)}`;
+  const url = `${BASE_URL}/cms/v3/source-code/published/content/${encodePath(remotePath)}`;
 
   const resp = await fetchWithRetry(url, {
     method: "DELETE",
@@ -265,7 +265,7 @@ export async function deleteFile(pak: string, remotePath: string): Promise<void>
  * Download a file from the HubSpot CMS Design Manager.
  */
 export async function downloadFile(pak: string, remotePath: string): Promise<Buffer> {
-  const url = `${BASE_URL}/cms/v3/source-code/draft/content/${encodePath(remotePath)}`;
+  const url = `${BASE_URL}/cms/v3/source-code/published/content/${encodePath(remotePath)}`;
 
   const resp = await fetchWithRetry(url, {
     method: "GET",
@@ -286,7 +286,7 @@ export async function downloadFile(pak: string, remotePath: string): Promise<Buf
  * Returns null if the path doesn't exist (404).
  */
 export async function getMetadata(pak: string, remotePath: string): Promise<FileMetadata | null> {
-  const url = `${BASE_URL}/cms/v3/source-code/draft/metadata/${encodePath(remotePath)}`;
+  const url = `${BASE_URL}/cms/v3/source-code/published/metadata/${encodePath(remotePath)}`;
 
   const resp = await fetchWithRetry(url, {
     method: "GET",
@@ -323,8 +323,8 @@ export async function listRootFolders(pak: string): Promise<FileMetadata[]> {
 
   // Try different URL patterns for root metadata
   const urlVariants = [
-    `${BASE_URL}/cms/v3/source-code/draft/metadata`,       // no trailing slash
-    `${BASE_URL}/cms/v3/source-code/draft/metadata/`,      // trailing slash
+    `${BASE_URL}/cms/v3/source-code/published/metadata`,       // no trailing slash
+    `${BASE_URL}/cms/v3/source-code/published/metadata/`,      // trailing slash
     `${BASE_URL}/designmanager/v1/portals/content/listing`, // Design Manager API
   ];
 

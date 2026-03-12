@@ -335,7 +335,10 @@ function resolveExpressions(tpl: string, context: RenderContext): string {
 
     if (value === null || value === undefined) return "";
     if (typeof value === "object") return JSON.stringify(value);
-    return String(value);
+    // Strip literal \n sequences that AI sometimes puts in field defaults
+    let str = String(value);
+    str = str.replace(/\\n/g, " ").replace(/\n/g, " ");
+    return str;
   });
 }
 

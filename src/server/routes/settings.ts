@@ -12,6 +12,7 @@ import { listSessions } from "../session.js";
 import { getLocalThemes } from "./setup.js";
 import { detectEnvironment, detectHubSpotCLI, detectHubSpotAuth, detectGitHubCLI, detectGitHubAuth } from "../../utils/detect.js";
 import { validatePak } from "../../hubspot/api.js";
+import { getVersion } from "../../utils/fs.js";
 import { startJob, getJob } from "../process-manager.js";
 
 // ---------------------------------------------------------------------------
@@ -141,8 +142,11 @@ export function handleSettingsStatusRoute(res: ServerResponse): void {
   const sessionCount = listSessions().length;
   const localThemeCount = getLocalThemes().length;
 
+  const version = getVersion();
+
   getModelCatalog().then((models) => {
     jsonResponse(res, 200, {
+      version,
       environment: env,
       config: configPayload,
       models,
@@ -151,6 +155,7 @@ export function handleSettingsStatusRoute(res: ServerResponse): void {
     });
   }).catch(() => {
     jsonResponse(res, 200, {
+      version,
       environment: env,
       config: configPayload,
       models: STATIC_MODELS,

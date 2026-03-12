@@ -1,6 +1,5 @@
 import { theme } from "./theme.js";
-
-const VERSION = "0.7.1";
+import { getVersion } from "../utils/fs.js";
 
 export function printBanner() {
   const v = theme.vibes;
@@ -21,6 +20,6 @@ export function printBanner() {
     console.log(`  ${line}`);
   }
   console.log();
-  console.log(`  ${m("AI-powered HubSpot Landing Pages")}    ${theme.dim(`v${VERSION}`)}`);
+  console.log(`  ${m("AI-powered HubSpot Landing Pages")}    ${theme.dim(`v${getVersion()}`)}`);
   console.log();
 }

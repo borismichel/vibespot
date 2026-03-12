@@ -33,3 +33,27 @@ export function resolveAsset(name: string): string {
 
   throw new Error(`Asset not found: ${name}`);
 }
+
+/** Read version from package.json (cached after first call). */
+let _version = "";
+export function getVersion(): string {
+  if (_version) return _version;
+  const candidates = [
+    join(import.meta.dirname, "../../package.json"),
+    join(import.meta.dirname, "../package.json"),
+    join(process.cwd(), "package.json"),
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) {
+      try {
+        const pkg = JSON.parse(readFileSync(p, "utf-8"));
+        if (pkg.name === "vibespot" && pkg.version) {
+          _version = pkg.version;
+          return _version;
+        }
+      } catch { /* try next */ }
+    }
+  }
+  _version = "dev";
+  return _version;
+}
