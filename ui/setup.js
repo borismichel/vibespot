@@ -293,9 +293,10 @@ function updateRailActive() {
   });
 }
 
-// "+" button → go to setup
+// "+" button → open New Theme panel (show setup first if needed)
 document.getElementById("project-rail-add")?.addEventListener("click", () => {
-  showSetup();
+  if (setupScreen.classList.contains("hidden")) showSetup();
+  togglePanel("new");
 });
 
 // ---------------------------------------------------------------------------
