@@ -6,9 +6,10 @@ AI-powered HubSpot CMS landing page builder — vibe coding & React converter.
   ≋ vibeSpot — Build HubSpot Landing Pages with AI
 ```
 
-> **Before you start:** vibeSpot's in-app setup will walk you through configuration, but for the smoothest experience, install your preferred AI engine and the HubSpot CLI **before** running vibeSpot. The onboarding flow is still being refined — having these tools ready avoids extra back-and-forth.
->
-> **Requirements:** Node.js 18+, HubSpot CLI 8+ (`npm install -g @hubspot/cli@latest`). HubSpot CLI versions below 8 are **not supported** — deprecated commands like `hs create` were removed in v8.
+**Website:** [vibespot.letsplaywith.tech](https://vibespot.letsplaywith.tech)
+**LinkedIn:** [myvibespot](https://www.linkedin.com/company/myvibespot/)
+
+> **Requirements:** Node.js 18+. That's it — vibeSpot connects to HubSpot directly via API. No HubSpot CLI needed.
 
 ## What It Does
 
@@ -30,8 +31,12 @@ Opens a browser with:
 - **Starter templates** — SaaS, Portfolio, Restaurant, Event
 - **GitHub import** — convert existing React projects
 - **Field editor** — tweak text, colors, images directly
-- **Upload to HubSpot** — celebration popup with direct link to create pages
-- **Version history** — automatic git commits after each AI generation
+- **File uploads** — attach images and documents via drag-and-drop or paperclip button
+- **Upload to HubSpot** — per-file progress, auto-fix, celebration popup with direct portal link
+- **Version history** — per-template git commits with rollback
+- **Light/dark mode** — toggle or auto-detect system preference
+- **Tabbed settings** — AI engines, HubSpot accounts, GitHub, vibeSpot config
+- **ZIP download** — export your theme as a ZIP file
 
 ### Classic Wizard Mode
 
@@ -72,17 +77,22 @@ npx vibespot
 
 The browser opens automatically. Enter your API key in the setup screen, create or open a theme, and start chatting.
 
+### 4. Connect HubSpot
+
+Open **Settings → HubSpot** and add your account with a Personal Access Key (PAK). vibeSpot connects directly via the HubSpot API — no CLI installation needed. You can also switch to legacy CLI mode if you prefer.
+
 ## After Building Your Page
 
 Once your modules are ready:
 
 1. Click **Upload to HubSpot** in the toolbar
-2. The celebration popup shows a direct link to your HubSpot portal (EU and NA regions auto-detected)
-3. In HubSpot: **Content** → **Landing Pages** → **Create**
-4. Choose your uploaded theme
-5. Drag your modules onto the page
-6. Edit text, images, and colors in the page editor
-7. Preview and publish!
+2. Watch per-file upload progress with auto-fix for common errors
+3. The celebration popup shows a direct link to your HubSpot portal (EU and NA regions auto-detected)
+4. In HubSpot: **Content** → **Landing Pages** → **Create**
+5. Choose your uploaded theme
+6. Drag your modules onto the page
+7. Edit text, images, and colors in the page editor
+8. Preview and publish!
 
 ## Commands
 
@@ -99,13 +109,26 @@ Most users only need `npx vibespot` — the web UI handles everything.
 
 ## Configuration
 
-Settings are saved in `~/.vibespot/config.json`:
+Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, GitHub, vibeSpot) and saved in `~/.vibespot/config.json`:
+
 - `aiEngine` — Your preferred AI engine (`anthropic-api`, `openai-api`, `gemini-api`, `claude-code`, `gemini-cli`, `codex-cli`)
-- `anthropicApiKey` — Your Anthropic API key
-- `openaiApiKey` — Your OpenAI API key
-- `geminiApiKey` — Your Gemini API key
-- `lastThemePath` — Last used theme directory
-- `lastSourcePath` — Last used source directory
+- `anthropicApiKey`, `openaiApiKey`, `geminiApiKey` — API keys (stored locally, never sent except to the provider)
+- `hubspotAccounts` — Connected HubSpot accounts (PAK-based auth)
+- `hubspotUploadMode` — `api` (default, direct API) or `cli` (legacy, requires HubSpot CLI)
+- `enabledCLITools` — Which CLI tools to detect on settings load
+
+## What's New (v0.9)
+
+- **HubSpot API mode** — upload, download, and manage themes without the HubSpot CLI
+- **File uploads** — attach images and documents to chat (drag-and-drop or paperclip)
+- **Tabbed settings** — organized into AI, HubSpot, GitHub, and vibeSpot tabs with descriptions
+- **Per-template version history** — scoped git commits, filtered history, safe rollback
+- **Light/dark mode** — system preference detection, persisted toggle
+- **Performance** — 137KB bundle, ETag caching, lazy SDK loading, session index cache
+- **ZIP download** — export themes from the dashboard
+- **Inline rename** — double-click to rename projects and templates
+
+See [CHANGELOG.md](CHANGELOG.md) for the full history.
 
 ## Troubleshooting
 
@@ -113,9 +136,15 @@ Settings are saved in `~/.vibespot/config.json`:
 
 **"vibeSpot has not been built yet"** — Use `npx vibespot` instead, or run `npm run build` first.
 
-**HubSpot upload keeps failing** — Run `vibespot doctor` to check your setup. Make sure `hs accounts list` shows your portal.
+**HubSpot upload failing** — Open Settings → HubSpot and verify your account is connected. Run `vibespot doctor` for diagnostics.
 
 **Preview shows default template instead of modules** — Delete the boilerplate modules (button, card, menu, pricing-card, social-follow) using the × button on each module in the sidebar.
+
+## Links
+
+- **Website:** [vibespot.letsplaywith.tech](https://vibespot.letsplaywith.tech)
+- **LinkedIn:** [myvibespot](https://www.linkedin.com/company/myvibespot/)
+- **npm:** [vibespot](https://www.npmjs.com/package/vibespot)
 
 ## License
 
