@@ -23,34 +23,45 @@ async function startUpload() {
     if (uploadBtn) { uploadBtn.textContent = "Deploy"; uploadBtn.disabled = false; }
   }
 
-  // Fetch portal info and check HubSpot CLI readiness
+  // Fetch portal info and check readiness
   try {
     const res = await fetch("/api/settings/status");
     const data = await res.json();
+    const uploadMode = data.config?.hubspotUploadMode || "api";
     let hs = data.environment?.tools?.hubspot;
 
-    // HubSpot CLI not installed — guide the user through install
-    if (!hs || !hs.found) {
-      const installed = await showHubSpotSetupDialog("install");
-      if (!installed) { resetUploadBtn(); return; }
-      // Re-check after install
-      const recheck = await fetch("/api/settings/status").then((r) => r.json());
-      hs = recheck.environment?.tools?.hubspot;
-    }
-
-    // HubSpot CLI installed but not authenticated — guide through auth
-    if (hs && hs.found && !hs.authenticated) {
-      const authed = await showHubSpotSetupDialog("auth");
-      if (!authed) { resetUploadBtn(); return; }
-      // Re-check after auth
-      const recheck = await fetch("/api/settings/status").then((r) => r.json());
-      hs = recheck.environment?.tools?.hubspot;
-    }
-
-    // Confirm portal before deploying
-    if (hs && hs.authenticated && hs.portalName) {
-      const confirmed = await confirmUpload(hs.portalName, hs.portalId);
-      if (!confirmed) { resetUploadBtn(); return; }
+    if (uploadMode === "api") {
+      // API mode — just need a PAK configured
+      const accounts = data.config?.hubspotAccounts || [];
+      if (accounts.length === 0) {
+        const authed = await showHubSpotSetupDialog("auth");
+        if (!authed) { resetUploadBtn(); return; }
+        const recheck = await fetch("/api/settings/status").then((r) => r.json());
+        hs = recheck.environment?.tools?.hubspot;
+      }
+      // Confirm portal
+      if (hs && hs.authenticated && hs.portalName) {
+        const confirmed = await confirmUpload(hs.portalName, hs.portalId);
+        if (!confirmed) { resetUploadBtn(); return; }
+      }
+    } else {
+      // CLI mode — need CLI installed and authed
+      if (!hs || !hs.found) {
+        const installed = await showHubSpotSetupDialog("install");
+        if (!installed) { resetUploadBtn(); return; }
+        const recheck = await fetch("/api/settings/status").then((r) => r.json());
+        hs = recheck.environment?.tools?.hubspot;
+      }
+      if (hs && hs.found && !hs.authenticated) {
+        const authed = await showHubSpotSetupDialog("auth");
+        if (!authed) { resetUploadBtn(); return; }
+        const recheck = await fetch("/api/settings/status").then((r) => r.json());
+        hs = recheck.environment?.tools?.hubspot;
+      }
+      if (hs && hs.authenticated && hs.portalName) {
+        const confirmed = await confirmUpload(hs.portalName, hs.portalId);
+        if (!confirmed) { resetUploadBtn(); return; }
+      }
     }
   } catch {
     // If we can't detect, proceed and let the upload fail with a meaningful error
@@ -125,8 +136,8 @@ function showHubSpotSetupDialog(mode) {
           <div class="confirm-dialog__title">Connect your HubSpot account</div>
           <p class="confirm-dialog__detail">Create a Personal Access Key to connect vibeSpot to your HubSpot portal.</p>
           <ol class="hs-setup__steps">
-            <li>Open <a href="https://app.hubspot.com/portal-recommend/l?slug=personal-access-key" target="_blank" rel="noopener">HubSpot Settings</a></li>
-            <li>Click "Create personal access key" or copy an existing one</li>
+            <li>Open <a href="https://app.hubspot.com/l/personal-access-key" target="_blank" rel="noopener">HubSpot Personal Access Key</a></li>
+            <li>Create a key with the <strong>Content</strong> scope enabled</li>
             <li>Paste the key below</li>
           </ol>
           <input type="password" class="confirm-dialog__input" id="hs-pak-input" placeholder="pat-na1-..." />
@@ -206,7 +217,9 @@ function confirmUpload(portalName, portalId) {
         <div class="confirm-dialog__title">Deploy to HubSpot?</div>
         <p class="confirm-dialog__detail">
           Uploading to <strong>${esc(portalName)}</strong>${portalId ? ` (${esc(portalId)})` : ""}
+          <button class="btn-link" id="confirm-upload-change">Change</button>
         </p>
+        <div id="confirm-upload-switch" class="hidden" style="margin:12px 0"></div>
         <div class="confirm-dialog__actions">
           <button class="btn btn--secondary" id="confirm-upload-cancel">Cancel</button>
           <button class="btn btn--primary" id="confirm-upload-go">Deploy</button>
@@ -215,16 +228,57 @@ function confirmUpload(portalName, portalId) {
     `;
     document.body.appendChild(overlay);
 
-    document.getElementById("confirm-upload-cancel").addEventListener("click", () => {
-      overlay.remove();
-      resolve(false);
-    });
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) { overlay.remove(); resolve(false); }
-    });
-    document.getElementById("confirm-upload-go").addEventListener("click", () => {
-      overlay.remove();
-      resolve(true);
+    const close = (val) => { overlay.remove(); resolve(val); };
+
+    document.getElementById("confirm-upload-cancel").addEventListener("click", () => close(false));
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(false); });
+    document.getElementById("confirm-upload-go").addEventListener("click", () => close(true));
+
+    document.getElementById("confirm-upload-change").addEventListener("click", async () => {
+      const switchArea = document.getElementById("confirm-upload-switch");
+      if (!switchArea.classList.contains("hidden")) { switchArea.classList.add("hidden"); return; }
+      switchArea.classList.remove("hidden");
+      switchArea.innerHTML = '<span class="upload-spinner"></span> Loading accounts...';
+
+      try {
+        const res = await fetch("/api/settings/status");
+        const data = await res.json();
+        const accounts = data.config?.hubspotAccounts || [];
+        const activeId = data.config?.activeHubSpotAccount;
+
+        let html = '<div style="display:flex;flex-direction:column;gap:6px">';
+        for (const acct of accounts) {
+          const isActive = acct.portalId === activeId;
+          html += `<button class="btn btn--${isActive ? "primary" : "secondary"} confirm-acct-btn" data-portal="${esc(acct.portalId)}" style="text-align:left;padding:6px 12px;font-size:13px">${esc(acct.portalName || acct.portalId)} (${esc(acct.portalId)})${isActive ? " ✓" : ""}</button>`;
+        }
+        html += `<button class="btn btn--secondary confirm-acct-btn" data-portal="__new" style="text-align:left;padding:6px 12px;font-size:13px">+ Add another account</button>`;
+        html += '</div>';
+        switchArea.innerHTML = html;
+
+        switchArea.querySelectorAll(".confirm-acct-btn").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const pid = btn.dataset.portal;
+            if (pid === "__new") {
+              close(false);
+              const added = await showHubSpotSetupDialog("auth");
+              if (added) startUpload();
+              return;
+            }
+            if (pid === activeId) { switchArea.classList.add("hidden"); return; }
+            // Switch active account
+            await fetch("/api/settings/hs-switch", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ portalId: pid }),
+            });
+            // Restart the deploy flow with the new account
+            close(false);
+            startUpload();
+          });
+        });
+      } catch {
+        switchArea.innerHTML = '<span style="color:var(--error)">Failed to load accounts</span>';
+      }
     });
   });
 }
@@ -419,6 +473,16 @@ function handleUploadWsMessage(msg) {
     case "upload_started":
       uploadAttempt++;
       setUploadState("uploading");
+      break;
+
+    case "upload_progress":
+      if (msg.completed !== undefined && msg.total) {
+        const pct = Math.round((msg.completed / msg.total) * 100);
+        const statusEl = document.getElementById("upload-status-text");
+        if (statusEl) {
+          statusEl.textContent = `Uploading to HubSpot... ${msg.completed}/${msg.total} files (${pct}%)`;
+        }
+      }
       break;
 
     case "upload_output":

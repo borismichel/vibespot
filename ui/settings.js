@@ -1,5 +1,5 @@
 /**
- * Settings panel — environment detection, AI engine selection, API keys, tool install, auth flows.
+ * Settings panel — tabbed layout with AI, HubSpot, GitHub, vibeSpot tabs.
  */
 
 // ---------------------------------------------------------------------------
@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 let settingsData = null;
+let activeTab = "ai";
 const activePolls = {};
 
 const ENGINE_LABELS = {
@@ -23,7 +24,6 @@ const ENGINE_LABELS = {
 // ---------------------------------------------------------------------------
 
 function openSettings() {
-  // Close menu if open
   if (typeof closeMenu === "function") closeMenu();
   document.getElementById("settings-overlay").classList.remove("hidden");
   refreshSettings();
@@ -34,6 +34,22 @@ function closeSettings() {
   Object.keys(activePolls).forEach((id) => {
     clearInterval(activePolls[id]);
     delete activePolls[id];
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tab switching
+// ---------------------------------------------------------------------------
+
+function initTabs() {
+  const tabs = document.querySelectorAll("#settings-tabs .settings__tab");
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      tabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      activeTab = tab.dataset.tab;
+      if (settingsData) renderSettings(settingsData);
+    });
   });
 }
 
@@ -56,16 +72,29 @@ async function refreshSettings() {
 
 function renderSettings(data) {
   const body = document.getElementById("settings-body");
+  body.innerHTML = "";
+
+  switch (activeTab) {
+    case "ai": renderAITab(body, data); break;
+    case "hubspot": renderHubSpotTab(body, data); break;
+    case "github": renderGitHubTab(body, data); break;
+    case "vibespot": renderVibeSpotTab(body, data); break;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AI Tab
+// ---------------------------------------------------------------------------
+
+function renderAITab(body, data) {
   const env = data.environment;
   const config = data.config;
 
-  body.innerHTML = "";
+  // Engine selector
+  const section = el("section", "settings__section");
+  section.appendChild(sectionTitle("Engine"));
+  section.appendChild(desc("Choose which AI engine generates your HubSpot modules. API engines need an API key. CLI engines need the tool installed on your system."));
 
-  // --- AI Engines section ---
-  const aiSection = el("section", "settings__section");
-  aiSection.appendChild(sectionTitle("AI Engine"));
-
-  // Engine selector pills
   const selectEl = el("div", "settings__engine-select");
   const allEngines = [
     { id: "claude-code", label: "Claude Code" },
@@ -82,15 +111,12 @@ function renderSettings(data) {
     btn.textContent = eng.label;
     btn.disabled = !available;
     if (config.aiEngine === eng.id) btn.classList.add("active");
-    if (!config.aiEngine && available && env.availableEngines[0] === eng.id) {
-      // Highlight first available if none selected
-    }
     btn.addEventListener("click", () => setEngine(eng.id));
     selectEl.appendChild(btn);
   }
-  aiSection.appendChild(selectEl);
+  section.appendChild(selectEl);
 
-  // Model selector (for the active engine)
+  // Model selector
   const activeEngine = config.aiEngine || (env.availableEngines.length > 0 ? env.availableEngines[0] : null);
   if (activeEngine) {
     const modelRow = el("div", "settings__model-row");
@@ -110,7 +136,6 @@ function renderSettings(data) {
       modelSelect.appendChild(opt);
     }
 
-    // Custom model option
     const customOpt = document.createElement("option");
     customOpt.value = "__custom__";
     customOpt.textContent = "Custom...";
@@ -130,24 +155,16 @@ function renderSettings(data) {
     });
 
     modelRow.appendChild(modelSelect);
-    aiSection.appendChild(modelRow);
+    section.appendChild(modelRow);
   }
 
-  // CLI tools subsection
-  aiSection.appendChild(subsectionTitle("CLI Tools"));
-  const cliTools = [
-    { key: "claudeCode", name: "Claude Code", installId: "claude", url: "https://claude.ai/code" },
-    { key: "geminiCli", name: "Gemini CLI", installId: "gemini", url: "https://github.com/google-gemini/gemini-cli" },
-    { key: "codexCli", name: "Codex CLI", installId: "codex", url: "https://github.com/openai/codex" },
-  ];
+  body.appendChild(section);
 
-  for (const tool of cliTools) {
-    const info = env.tools[tool.key];
-    aiSection.appendChild(createToolCard(tool.name, info, tool.installId, tool.url));
-  }
+  // API Keys section
+  const keysSection = el("section", "settings__section");
+  keysSection.appendChild(sectionTitle("API Keys"));
+  keysSection.appendChild(desc("API keys are stored locally in ~/.vibespot/config.json and never sent anywhere except the provider\u2019s API."));
 
-  // API keys subsection
-  aiSection.appendChild(subsectionTitle("API Keys"));
   const providers = [
     { key: "anthropic", name: "Anthropic", placeholder: "sk-ant-api03-..." },
     { key: "openai", name: "OpenAI", placeholder: "sk-..." },
@@ -156,253 +173,321 @@ function renderSettings(data) {
 
   for (const prov of providers) {
     const keyInfo = env.apiKeys[prov.key];
-    aiSection.appendChild(createApiKeyCard(prov.key, prov.name, prov.placeholder, keyInfo));
+    keysSection.appendChild(createApiKeyCard(prov.key, prov.name, prov.placeholder, keyInfo));
   }
+  body.appendChild(keysSection);
 
-  body.appendChild(aiSection);
+  // CLI Tools section with toggles
+  const cliSection = el("section", "settings__section");
+  cliSection.appendChild(sectionTitle("CLI Tools"));
+  cliSection.appendChild(desc("Enable CLI tools you have installed. Install status is only checked when you toggle a tool on, so disabled tools add zero overhead."));
 
-  // --- HubSpot section ---
-  const hsSection = el("section", "settings__section");
-  hsSection.appendChild(sectionTitle("HubSpot"));
-  hsSection.appendChild(createHubSpotCard(env.tools.hubspot));
-  body.appendChild(hsSection);
+  const cliTools = [
+    { key: "claudeCode", id: "claude-code", name: "Claude Code", installId: "claude", url: "https://claude.ai/code" },
+    { key: "geminiCli", id: "gemini-cli", name: "Gemini CLI", installId: "gemini", url: "https://github.com/google-gemini/gemini-cli" },
+    { key: "codexCli", id: "codex-cli", name: "Codex CLI", installId: "codex", url: "https://github.com/openai/codex" },
+  ];
 
-  // --- GitHub section ---
-  const ghSection = el("section", "settings__section");
-  ghSection.appendChild(sectionTitle("GitHub"));
-  ghSection.appendChild(createGitHubCard(env.tools.github));
-  body.appendChild(ghSection);
-}
+  const enabledTools = config.enabledCLITools || [];
 
-// ---------------------------------------------------------------------------
-// Tool card
-// ---------------------------------------------------------------------------
+  for (const tool of cliTools) {
+    const enabled = enabledTools.includes(tool.id);
+    const info = env.tools[tool.key];
+    const row = el("div", "settings__card");
 
-function createToolCard(name, info, installId, url) {
-  const card = el("div", "settings__card");
+    const toggleRow = el("div", "settings__toggle-row");
+    const labelWrap = el("div", "");
+    const label = el("div", "settings__toggle-label");
+    label.textContent = tool.name;
+    labelWrap.appendChild(label);
 
-  const row = el("div", "settings__card-row");
-
-  if (info.found) {
-    row.appendChild(dot(info.authenticated ? "success" : "warn"));
-  } else {
-    row.appendChild(dot("muted"));
-  }
-
-  const label = el("span", "settings__card-label");
-  label.textContent = name;
-  row.appendChild(label);
-
-  if (info.found) {
-    const meta = el("span", "settings__card-meta");
-    meta.textContent = `v${info.version}`;
-    row.appendChild(meta);
-  } else {
-    const installBtn = el("button", "settings__btn");
-    installBtn.textContent = "Install";
-    installBtn.addEventListener("click", () => installTool(installId, installBtn));
-    row.appendChild(installBtn);
-
-    if (url) {
-      const link = el("a", "settings__btn");
-      link.textContent = "Docs";
-      link.href = url;
-      link.target = "_blank";
-      link.style.textDecoration = "none";
-      row.appendChild(link);
+    if (enabled && info.found) {
+      const sub = el("div", "settings__toggle-label-sub");
+      sub.textContent = `v${info.version}` + (info.authenticated ? " \u2014 authenticated" : " \u2014 not authenticated");
+      sub.style.color = info.authenticated ? "var(--success)" : "var(--warning)";
+      labelWrap.appendChild(sub);
+    } else if (enabled && !info.found) {
+      const sub = el("div", "settings__toggle-label-sub");
+      sub.textContent = "Not installed";
+      sub.style.color = "var(--text-muted)";
+      labelWrap.appendChild(sub);
     }
-  }
 
-  card.appendChild(row);
+    toggleRow.appendChild(labelWrap);
 
-  // Auth action row for installed but not authenticated CLI tools
-  if (info.found && !info.authenticated) {
-    const authRow = el("div", "settings__card-row settings__card-row--sub");
-
-    {
-      // Claude Code / Gemini CLI — browser-based sign in
-      const authLabel = el("span", "settings__card-meta");
-      authLabel.textContent = info.authDetail || "Not authenticated";
-      authLabel.style.color = "var(--warning, #f59e0b)";
-      authRow.appendChild(authLabel);
-
-      const authBtn = el("button", "settings__btn settings__btn--primary");
-      authBtn.textContent = "Sign in";
-      authBtn.addEventListener("click", () => authCLI(installId, authBtn));
-      authRow.appendChild(authBtn);
-
-      card.appendChild(authRow);
-    }
-  } else if (info.found && info.authenticated) {
-    const authRow = el("div", "settings__card-row settings__card-row--sub");
-    const authLabel = el("span", "settings__card-meta");
-    authLabel.textContent = "Authenticated";
-    authLabel.style.color = "var(--success, #22c55e)";
-    authRow.appendChild(authLabel);
-    card.appendChild(authRow);
-  }
-
-  return card;
-}
-
-// ---------------------------------------------------------------------------
-// API key card
-// ---------------------------------------------------------------------------
-
-function createApiKeyCard(provider, name, placeholder, keyInfo) {
-  const card = el("div", "settings__apikey-row");
-
-  const label = el("span", "settings__apikey-label");
-  label.textContent = name;
-  card.appendChild(label);
-
-  if (keyInfo.configured) {
-    // Show masked key + edit/clear buttons
-    const value = el("span", "settings__apikey-value");
-    value.textContent = keyInfo.masked;
-    card.appendChild(value);
-
-    const actions = el("div", "settings__apikey-actions");
-
-    const editBtn = el("button", "settings__btn");
-    editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", () => {
-      // Replace card content with input
-      showApiKeyInput(card, provider, name, placeholder);
-    });
-    actions.appendChild(editBtn);
-
-    const clearBtn = el("button", "settings__btn");
-    clearBtn.textContent = "Clear";
-    clearBtn.addEventListener("click", async () => {
-      await fetch("/api/settings/apikey", {
+    const toggle = el("button", "settings__toggle" + (enabled ? " active" : ""));
+    toggle.addEventListener("click", async () => {
+      const newVal = !enabled;
+      await fetch("/api/settings/cli-toggle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, apiKey: null }),
+        body: JSON.stringify({ toolId: tool.id, enabled: newVal }),
       });
       refreshSettings();
     });
-    actions.appendChild(clearBtn);
+    toggleRow.appendChild(toggle);
 
-    card.appendChild(actions);
-  } else {
-    showApiKeyInput(card, provider, name, placeholder);
+    row.appendChild(toggleRow);
+
+    // If enabled but not installed, show install button
+    if (enabled && !info.found) {
+      const installRow = el("div", "settings__card-row");
+      const installBtn = el("button", "settings__btn settings__btn--primary");
+      installBtn.textContent = "Install";
+      installBtn.addEventListener("click", () => installTool(tool.installId, installBtn));
+      installRow.appendChild(installBtn);
+      if (tool.url) {
+        const link = el("a", "settings__btn");
+        link.textContent = "Docs";
+        link.href = tool.url;
+        link.target = "_blank";
+        link.style.textDecoration = "none";
+        installRow.appendChild(link);
+      }
+      row.appendChild(installRow);
+    }
+
+    // If enabled, installed, but not authenticated — show sign in
+    if (enabled && info.found && !info.authenticated) {
+      const authRow = el("div", "settings__card-row");
+      const authBtn = el("button", "settings__btn settings__btn--primary");
+      authBtn.textContent = "Sign in";
+      authBtn.addEventListener("click", () => authCLI(tool.installId, authBtn));
+      authRow.appendChild(authBtn);
+      row.appendChild(authRow);
+    }
+
+    cliSection.appendChild(row);
   }
-
-  return card;
-}
-
-function showApiKeyInput(container, provider, name, placeholder) {
-  // Clear existing content except label
-  const label = container.querySelector(".settings__apikey-label");
-  container.innerHTML = "";
-  if (label) container.appendChild(label);
-  else {
-    const lbl = el("span", "settings__apikey-label");
-    lbl.textContent = name;
-    container.appendChild(lbl);
-  }
-
-  const input = el("input", "settings__apikey-input");
-  input.type = "password";
-  input.placeholder = placeholder;
-  container.appendChild(input);
-
-  const saveBtn = el("button", "settings__btn settings__btn--primary");
-  saveBtn.textContent = "Save";
-  saveBtn.addEventListener("click", () => saveApiKey(provider, input.value, saveBtn));
-  container.appendChild(saveBtn);
-
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); saveBtn.click(); }
-  });
-
-  input.focus();
+  body.appendChild(cliSection);
 }
 
 // ---------------------------------------------------------------------------
-// HubSpot card
+// HubSpot Tab
 // ---------------------------------------------------------------------------
 
-function createHubSpotCard(hs) {
-  const card = el("div", "settings__card");
+function renderHubSpotTab(body, data) {
+  const env = data.environment;
+  const config = data.config;
+  const hs = env.tools.hubspot;
 
-  // CLI status
-  const cliRow = el("div", "settings__card-row");
-  cliRow.appendChild(dot(hs.found ? "success" : "warn"));
-  const cliLabel = el("span", "settings__card-label");
-  cliLabel.textContent = "HubSpot CLI";
-  cliRow.appendChild(cliLabel);
+  // Upload mode toggle
+  const modeSection = el("section", "settings__section");
+  modeSection.appendChild(sectionTitle("Upload Mode"));
 
-  if (hs.found) {
-    const meta = el("span", "settings__card-meta");
-    meta.textContent = `v${hs.version}`;
-    cliRow.appendChild(meta);
+  const currentMode = config.hubspotUploadMode || "api";
+  const pills = el("div", "settings__mode-pills");
+
+  const apiPill = el("button", "settings__mode-pill" + (currentMode === "api" ? " active" : ""));
+  apiPill.textContent = "API (recommended)";
+  apiPill.addEventListener("click", () => setHsMode("api"));
+  pills.appendChild(apiPill);
+
+  const cliPill = el("button", "settings__mode-pill" + (currentMode === "cli" ? " active" : ""));
+  cliPill.textContent = "CLI (legacy)";
+  cliPill.addEventListener("click", () => setHsMode("cli"));
+  pills.appendChild(cliPill);
+
+  modeSection.appendChild(pills);
+
+  if (currentMode === "api") {
+    modeSection.appendChild(desc("Uploads directly to HubSpot via API. No CLI installation needed. Supports parallel file uploads for faster deployments."));
   } else {
-    const installBtn = el("button", "settings__btn");
-    installBtn.textContent = "Install";
-    installBtn.addEventListener("click", () => installTool("hubspot", installBtn));
-    cliRow.appendChild(installBtn);
+    modeSection.appendChild(desc("Uses the HubSpot CLI (hs command). Requires @hubspot/cli installed globally. Slower sequential uploads."));
   }
-  card.appendChild(cliRow);
 
-  // Accounts list (if CLI is installed)
-  if (hs.found) {
-    const accounts = hs.accounts || [];
+  body.appendChild(modeSection);
 
+  // Accounts section
+  const acctSection = el("section", "settings__section");
+  acctSection.appendChild(sectionTitle("Accounts"));
+
+  if (currentMode === "api") {
+    acctSection.appendChild(desc("Connect HubSpot accounts with a Personal Access Key. Keys are stored locally and used to authenticate API requests."));
+
+    const accounts = config.hubspotAccounts || [];
     if (accounts.length > 0) {
-      // Show each account with switch/remove actions
-      accounts.forEach((acct) => {
+      for (const acct of accounts) {
+        const isActive = acct.portalId === config.activeHubSpotAccount;
+        const card = el("div", "settings__card");
+        const row = el("div", "settings__card-row");
+        row.appendChild(dot(isActive ? "success" : "muted"));
+        const label = el("span", "settings__card-label");
+        label.textContent = `${acct.portalName} (${acct.portalId})`;
+        if (isActive) label.textContent += " \u2014 active";
+        row.appendChild(label);
+
+        const actions = el("span", "settings__card-actions");
+        if (!isActive) {
+          const useBtn = el("button", "settings__btn settings__btn--small");
+          useBtn.textContent = "Use";
+          useBtn.addEventListener("click", () => switchHsAccount(acct.portalId, useBtn));
+          actions.appendChild(useBtn);
+        }
+        const removeBtn = el("button", "settings__btn settings__btn--small settings__btn--danger");
+        removeBtn.textContent = "Remove";
+        removeBtn.addEventListener("click", () => removeHsAccount(acct.portalId, removeBtn));
+        actions.appendChild(removeBtn);
+        row.appendChild(actions);
+        card.appendChild(row);
+        acctSection.appendChild(card);
+      }
+    } else {
+      const empty = el("div", "settings__card");
+      const emptyRow = el("div", "settings__card-row");
+      emptyRow.appendChild(dot("muted"));
+      const emptyLabel = el("span", "settings__card-label");
+      emptyLabel.textContent = "No accounts connected";
+      emptyRow.appendChild(emptyLabel);
+      empty.appendChild(emptyRow);
+      acctSection.appendChild(empty);
+    }
+
+    // Add account button + PAK input
+    const addCard = el("div", "settings__card");
+    const addRow = el("div", "settings__card-row");
+    const addBtn = el("button", "settings__btn settings__btn--primary");
+    addBtn.textContent = "Add Account";
+    addBtn.addEventListener("click", () => showPakInput(addCard, addBtn));
+    addRow.appendChild(addBtn);
+    addCard.appendChild(addRow);
+    acctSection.appendChild(addCard);
+  } else {
+    // CLI mode — show CLI status and accounts from hs accounts list
+    acctSection.appendChild(desc("HubSpot CLI accounts are managed by the hs command. Use \u201chs auth\u201d to add accounts."));
+
+    const cliCard = el("div", "settings__card");
+    const cliRow = el("div", "settings__card-row");
+    cliRow.appendChild(dot(hs.found ? "success" : "warn"));
+    const cliLabel = el("span", "settings__card-label");
+    cliLabel.textContent = "HubSpot CLI";
+    cliRow.appendChild(cliLabel);
+
+    if (hs.found) {
+      const meta = el("span", "settings__card-meta");
+      meta.textContent = `v${hs.version}`;
+      cliRow.appendChild(meta);
+    } else {
+      const installBtn = el("button", "settings__btn");
+      installBtn.textContent = "Install";
+      installBtn.addEventListener("click", () => installTool("hubspot", installBtn));
+      cliRow.appendChild(installBtn);
+    }
+    cliCard.appendChild(cliRow);
+    acctSection.appendChild(cliCard);
+
+    if (hs.found) {
+      const accounts = hs.accounts || [];
+      for (const acct of accounts) {
+        const card = el("div", "settings__card");
         const row = el("div", "settings__card-row");
         row.appendChild(dot(acct.isDefault ? "success" : "muted"));
         const label = el("span", "settings__card-label");
         label.textContent = `${acct.name} (${acct.portalId})`;
-        if (acct.isDefault) label.textContent += " — active";
+        if (acct.isDefault) label.textContent += " \u2014 active";
         row.appendChild(label);
 
         const actions = el("span", "settings__card-actions");
-
         if (!acct.isDefault) {
           const useBtn = el("button", "settings__btn settings__btn--small");
           useBtn.textContent = "Use";
           useBtn.addEventListener("click", () => switchHsAccount(acct.portalId, useBtn));
           actions.appendChild(useBtn);
         }
-
         const removeBtn = el("button", "settings__btn settings__btn--small settings__btn--danger");
         removeBtn.textContent = "Remove";
         removeBtn.addEventListener("click", () => removeHsAccount(acct.portalId, removeBtn));
         actions.appendChild(removeBtn);
-
         row.appendChild(actions);
         card.appendChild(row);
-      });
-    } else if (!hs.authenticated) {
-      const authRow = el("div", "settings__card-row");
-      authRow.appendChild(dot("warn"));
-      const authLabel = el("span", "settings__card-label");
-      authLabel.textContent = "Not authenticated";
-      authRow.appendChild(authLabel);
-      card.appendChild(authRow);
-    }
+        acctSection.appendChild(card);
+      }
 
-    // "Add account" button (always available when CLI is installed)
-    const addRow = el("div", "settings__card-row");
-    const addBtn = el("button", "settings__btn settings__btn--primary");
-    addBtn.textContent = "Add Account";
-    addBtn.addEventListener("click", () => startHsAuth(addBtn, card));
-    addRow.appendChild(addBtn);
-    card.appendChild(addRow);
+      const addRow2 = el("div", "settings__card");
+      const addBtnRow = el("div", "settings__card-row");
+      const addBtn2 = el("button", "settings__btn settings__btn--primary");
+      addBtn2.textContent = "Add Account";
+      addBtn2.addEventListener("click", () => startHsAuth(addBtn2, addRow2));
+      addBtnRow.appendChild(addBtn2);
+      addRow2.appendChild(addBtnRow);
+      acctSection.appendChild(addRow2);
+    }
   }
 
-  return card;
+  body.appendChild(acctSection);
+}
+
+function showPakInput(container, addBtn) {
+  // Hide the add button, show PAK input
+  addBtn.style.display = "none";
+
+  const instructions = el("div", "settings__instructions");
+  instructions.innerHTML = `
+    <strong>Connect your HubSpot account:</strong>
+    <ol>
+      <li>Open <a href="https://app.hubspot.com/l/personal-access-key" target="_blank" rel="noopener">HubSpot Personal Access Key</a></li>
+      <li>Create a key with the <strong>Content</strong> scope enabled</li>
+      <li>Copy the key and paste it below</li>
+    </ol>
+    <div class="settings__pak-row">
+      <input type="password" class="settings__apikey-input" placeholder="Personal access key (pat-na1-...)" />
+      <button class="settings__btn settings__btn--primary">Connect</button>
+    </div>
+  `;
+  container.appendChild(instructions);
+
+  const input = instructions.querySelector("input");
+  const saveBtn = instructions.querySelector("button");
+  input.focus();
+
+  const doSave = async () => {
+    const key = input.value.trim();
+    if (!key) return;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="settings__spinner"></span> Validating...';
+
+    try {
+      const res = await fetch("/api/settings/hs-auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personalAccessKey: key }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        refreshSettings();
+      } else if (data.jobId) {
+        pollJob(data.jobId, () => refreshSettings(), () => {
+          saveBtn.textContent = "Failed";
+          saveBtn.disabled = false;
+        });
+      } else {
+        saveBtn.textContent = data.error || "Failed";
+        saveBtn.disabled = false;
+        setTimeout(() => { saveBtn.textContent = "Connect"; }, 2000);
+      }
+    } catch {
+      saveBtn.textContent = "Failed";
+      setTimeout(() => { saveBtn.textContent = "Connect"; saveBtn.disabled = false; }, 2000);
+    }
+  };
+
+  saveBtn.addEventListener("click", doSave);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); doSave(); }
+  });
 }
 
 // ---------------------------------------------------------------------------
-// GitHub card
+// GitHub Tab
 // ---------------------------------------------------------------------------
 
-function createGitHubCard(gh) {
+function renderGitHubTab(body, data) {
+  const gh = data.environment.tools.github;
+
+  const section = el("section", "settings__section");
+  section.appendChild(sectionTitle("GitHub CLI"));
+  section.appendChild(desc("GitHub CLI enables pushing your theme to a repository. Optional \u2014 not needed for HubSpot deployment."));
+
   const card = el("div", "settings__card");
 
   // CLI status
@@ -435,9 +520,7 @@ function createGitHubCard(gh) {
     authRow.appendChild(authLabel);
 
     const actions = el("span", "settings__card-actions");
-
     if (gh.authenticated) {
-      // Switch account = logout + login
       const switchBtn = el("button", "settings__btn settings__btn--small");
       switchBtn.textContent = "Switch";
       switchBtn.addEventListener("click", () => switchGhAccount(switchBtn));
@@ -458,7 +541,69 @@ function createGitHubCard(gh) {
     card.appendChild(authRow);
   }
 
-  return card;
+  section.appendChild(card);
+  body.appendChild(section);
+}
+
+// ---------------------------------------------------------------------------
+// vibeSpot Tab
+// ---------------------------------------------------------------------------
+
+function renderVibeSpotTab(body, data) {
+  const section = el("section", "settings__section");
+  section.appendChild(sectionTitle("About"));
+  section.appendChild(desc("General vibeSpot configuration and information."));
+
+  const card = el("div", "settings__card");
+
+  // Version
+  const versionRow = el("div", "settings__card-row");
+  const versionLabel = el("span", "settings__card-label");
+  versionLabel.textContent = "Version";
+  versionRow.appendChild(versionLabel);
+  const versionVal = el("span", "settings__card-meta");
+  versionVal.textContent = data.version || "dev";
+  versionRow.appendChild(versionVal);
+  card.appendChild(versionRow);
+
+  // Workspace
+  const wsRow = el("div", "settings__card-row");
+  const wsLabel = el("span", "settings__card-label");
+  wsLabel.textContent = "Workspace";
+  wsRow.appendChild(wsLabel);
+  const wsVal = el("span", "settings__card-meta");
+  wsVal.textContent = "~/vibespot-themes";
+  wsVal.style.fontFamily = "var(--font-mono, monospace)";
+  wsVal.style.fontSize = "11px";
+  wsRow.appendChild(wsVal);
+  card.appendChild(wsRow);
+
+  // Session count
+  if (data.sessionCount !== undefined) {
+    const sessRow = el("div", "settings__card-row");
+    const sessLabel = el("span", "settings__card-label");
+    sessLabel.textContent = "Saved sessions";
+    sessRow.appendChild(sessLabel);
+    const sessVal = el("span", "settings__card-meta");
+    sessVal.textContent = String(data.sessionCount);
+    sessRow.appendChild(sessVal);
+    card.appendChild(sessRow);
+  }
+
+  // Local themes count
+  if (data.localThemeCount !== undefined) {
+    const themeRow = el("div", "settings__card-row");
+    const themeLabel = el("span", "settings__card-label");
+    themeLabel.textContent = "Local themes";
+    themeRow.appendChild(themeLabel);
+    const themeVal = el("span", "settings__card-meta");
+    themeVal.textContent = String(data.localThemeCount);
+    themeRow.appendChild(themeVal);
+    card.appendChild(themeRow);
+  }
+
+  section.appendChild(card);
+  body.appendChild(section);
 }
 
 // ---------------------------------------------------------------------------
@@ -472,12 +617,20 @@ async function setEngine(engineId) {
     body: JSON.stringify({ engine: engineId }),
   });
 
-  // Update statusbar engine label
   const statusEngine = document.getElementById("status-engine");
   if (statusEngine) {
     statusEngine.textContent = ENGINE_LABELS[engineId] || engineId;
   }
 
+  refreshSettings();
+}
+
+async function setHsMode(mode) {
+  await fetch("/api/settings/hs-mode", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode }),
+  });
   refreshSettings();
 }
 
@@ -518,9 +671,7 @@ async function installTool(toolId, btn) {
     const data = await res.json();
 
     if (data.jobId) {
-      pollJob(data.jobId, () => {
-        refreshSettings();
-      }, (err) => {
+      pollJob(data.jobId, () => refreshSettings(), () => {
         btn.textContent = "Failed";
         btn.disabled = false;
       });
@@ -611,7 +762,6 @@ async function switchGhAccount(btn) {
   btn.innerHTML = '<span class="settings__spinner"></span>';
 
   try {
-    // Logout first, then trigger login
     const res = await fetch("/api/settings/gh-logout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -620,7 +770,6 @@ async function switchGhAccount(btn) {
     const data = await res.json();
     if (data.jobId) {
       pollJob(data.jobId, () => {
-        // After logout completes, start login flow
         startGhAuth(btn);
       }, () => {
         btn.textContent = "Failed";
@@ -646,7 +795,6 @@ async function startHsAuth(btn, card) {
     const data = await res.json();
 
     if (data.needsKey) {
-      // Show instructions to get a personal access key
       btn.textContent = "Connect";
       btn.disabled = false;
 
@@ -764,18 +912,15 @@ function pollJob(jobId, onComplete, onError) {
 // CLI auth
 // ---------------------------------------------------------------------------
 
-async function authCLI(cli, btn, apiKey) {
+async function authCLI(cli, btn) {
   btn.disabled = true;
   btn.innerHTML = '<span class="settings__spinner"></span>';
 
   try {
-    const payload = { cli };
-    if (apiKey) payload.apiKey = apiKey;
-
     const res = await fetch("/api/settings/cli-auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ cli }),
     });
     const data = await res.json();
 
@@ -786,17 +931,15 @@ async function authCLI(cli, btn, apiKey) {
     }
 
     if (data.hint) {
-      // Show hint to user (e.g., check browser)
       btn.innerHTML = '<span class="settings__spinner"></span> Check browser...';
     }
 
     if (data.jobId) {
       pollJob(data.jobId, () => refreshSettings(), () => {
-        btn.textContent = "Failed — try again";
+        btn.textContent = "Failed \u2014 try again";
         btn.disabled = false;
       });
     } else {
-      // Immediate success (e.g., Codex API key saved)
       refreshSettings();
     }
   } catch {
@@ -806,15 +949,85 @@ async function authCLI(cli, btn, apiKey) {
 }
 
 // ---------------------------------------------------------------------------
+// API key card
+// ---------------------------------------------------------------------------
+
+function createApiKeyCard(provider, name, placeholder, keyInfo) {
+  const card = el("div", "settings__apikey-row");
+
+  const label = el("span", "settings__apikey-label");
+  label.textContent = name;
+  card.appendChild(label);
+
+  if (keyInfo.configured) {
+    const value = el("span", "settings__apikey-value");
+    value.textContent = keyInfo.masked;
+    card.appendChild(value);
+
+    const actions = el("div", "settings__apikey-actions");
+
+    const editBtn = el("button", "settings__btn");
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", () => {
+      showApiKeyInput(card, provider, name, placeholder);
+    });
+    actions.appendChild(editBtn);
+
+    const clearBtn = el("button", "settings__btn");
+    clearBtn.textContent = "Clear";
+    clearBtn.addEventListener("click", async () => {
+      await fetch("/api/settings/apikey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, apiKey: null }),
+      });
+      refreshSettings();
+    });
+    actions.appendChild(clearBtn);
+
+    card.appendChild(actions);
+  } else {
+    showApiKeyInput(card, provider, name, placeholder);
+  }
+
+  return card;
+}
+
+function showApiKeyInput(container, provider, name, placeholder) {
+  const label = container.querySelector(".settings__apikey-label");
+  container.innerHTML = "";
+  if (label) container.appendChild(label);
+  else {
+    const lbl = el("span", "settings__apikey-label");
+    lbl.textContent = name;
+    container.appendChild(lbl);
+  }
+
+  const input = el("input", "settings__apikey-input");
+  input.type = "password";
+  input.placeholder = placeholder;
+  container.appendChild(input);
+
+  const saveBtn = el("button", "settings__btn settings__btn--primary");
+  saveBtn.textContent = "Save";
+  saveBtn.addEventListener("click", () => saveApiKey(provider, input.value, saveBtn));
+  container.appendChild(saveBtn);
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); saveBtn.click(); }
+  });
+
+  input.focus();
+}
+
+// ---------------------------------------------------------------------------
 // Model selection helpers
 // ---------------------------------------------------------------------------
 
 function getModelsForEngine(engine) {
-  // Use server-provided model catalog if available
   if (settingsData && settingsData.models && settingsData.models[engine]) {
     return settingsData.models[engine];
   }
-  // Fallback to hardcoded defaults
   switch (engine) {
     case "claude-code":
       return [
@@ -869,7 +1082,6 @@ async function setEngineModel(engine, model) {
     body: JSON.stringify({ engine, model }),
   });
 
-  // Update statusbar
   const statusEngine = document.getElementById("status-engine");
   if (statusEngine) {
     const label = ENGINE_LABELS[engine] || engine;
@@ -890,8 +1102,7 @@ function el(tag, className) {
 }
 
 function dot(variant) {
-  const d = el("span", `settings__dot settings__dot--${variant}`);
-  return d;
+  return el("span", `settings__dot settings__dot--${variant}`);
 }
 
 function sectionTitle(text) {
@@ -904,6 +1115,12 @@ function subsectionTitle(text) {
   const h = el("h4", "settings__subsection-title");
   h.textContent = text;
   return h;
+}
+
+function desc(text) {
+  const p = el("p", "settings__description");
+  p.textContent = text;
+  return p;
 }
 
 function escSettings(str) {
@@ -919,12 +1136,13 @@ document.getElementById("settings-overlay").addEventListener("click", (e) => {
   if (e.target.id === "settings-overlay") closeSettings();
 });
 
-// Setup screen settings button
 document.getElementById("btn-setup-settings").addEventListener("click", openSettings);
 
-// Escape key
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !document.getElementById("settings-overlay").classList.contains("hidden")) {
     closeSettings();
   }
 });
+
+// Initialize tabs
+initTabs();

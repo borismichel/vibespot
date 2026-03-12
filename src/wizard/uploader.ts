@@ -4,9 +4,12 @@ import * as ui from "../prompts/prompter.js";
 import { theme } from "../cli/theme.js";
 import {
   parseUploadErrors,
+  parseApiErrors,
   autoFixError,
   type UploadError,
 } from "../server/auto-fix.js";
+import { loadConfig, getHubSpotPak } from "../utils/config.js";
+import { uploadTheme, deleteFile } from "../hubspot/uploader.js";
 
 /** Count "Uploaded file" lines in hs cms upload output */
 function countUploadedFiles(output: string): number {
@@ -17,6 +20,9 @@ export async function runUpload(themePath: string): Promise<boolean> {
   await ui.intro("Uploading to HubSpot");
 
   const themeName = basename(themePath) || themePath;
+  const config = loadConfig();
+  const pak = getHubSpotPak();
+  const useApi = config.hubspotUploadMode !== "cli" && !!pak;
   const s = await ui.spinner();
 
   const MAX_RETRIES = 3;
@@ -28,24 +34,40 @@ export async function runUpload(themePath: string): Promise<boolean> {
         : `Retrying upload (attempt ${attempt}/${MAX_RETRIES})...`
     );
 
-    const result = run(`hs cms upload "${themePath}" "${themeName}"`, {
-      cwd: join(themePath, ".."),
-    });
+    let errors: UploadError[] = [];
+    let uploadedCount = 0;
+    let success = false;
 
-    // Combine stdout + stderr — hs cms upload logs success lines and errors to both
-    const fullOutput = [result.stdout, result.stderr].filter(Boolean).join("\n");
-    const uploadedCount = countUploadedFiles(fullOutput);
+    if (useApi) {
+      // API mode — parallel upload
+      const result = await uploadTheme(pak!, themePath, themeName, {
+        onFileComplete: () => { uploadedCount++; },
+      });
+      success = result.success;
+      if (!success) {
+        errors = parseApiErrors(result.errors);
+      } else {
+        uploadedCount = result.uploaded;
+      }
+    } else {
+      // CLI mode
+      const result = run(`hs cms upload "${themePath}" "${themeName}"`, {
+        cwd: join(themePath, ".."),
+      });
+      const fullOutput = [result.stdout, result.stderr].filter(Boolean).join("\n");
+      uploadedCount = countUploadedFiles(fullOutput);
+      success = result.success;
+      if (!success) {
+        errors = parseUploadErrors(fullOutput);
+      }
+    }
 
-    if (result.success) {
+    if (success) {
       s.stop(`All files uploaded! (${uploadedCount} files)`);
       await ui.outro("Upload complete!");
       return true;
     }
 
-    // Parse errors from combined output
-    const errors = parseUploadErrors(fullOutput);
-
-    // If files were uploaded despite errors, tell the user
     if (uploadedCount > 0) {
       s.stop(`${uploadedCount} files uploaded, but some errors occurred`);
     } else {
@@ -53,8 +75,7 @@ export async function runUpload(themePath: string): Promise<boolean> {
     }
 
     if (errors.length === 0) {
-      // Unknown error — show raw output
-      ui.logError(`Upload error:\n${fullOutput.slice(0, 500)}`);
+      ui.logError("Upload failed with unknown error.");
 
       if (uploadedCount > 0) {
         ui.logWarn(
@@ -69,9 +90,7 @@ export async function runUpload(themePath: string): Promise<boolean> {
       }
 
       if (attempt < MAX_RETRIES) {
-        const retry = await ui.confirm({
-          message: "Try uploading again?",
-        });
+        const retry = await ui.confirm({ message: "Try uploading again?" });
         if (!retry) break;
         continue;
       }
@@ -94,12 +113,8 @@ export async function runUpload(themePath: string): Promise<boolean> {
       }
     }
 
-    if (anyFixed && attempt < MAX_RETRIES) {
-      // Retry after fixes
-      continue;
-    }
+    if (anyFixed && attempt < MAX_RETRIES) continue;
 
-    // If files were uploaded, offer to continue despite errors
     if (uploadedCount > 0) {
       ui.logWarn(
         `${uploadedCount} files uploaded successfully despite errors.\n` +
@@ -113,17 +128,16 @@ export async function runUpload(themePath: string): Promise<boolean> {
     }
 
     if (!anyFixed) {
-      // Try removing stuck modules as last resort
       s.start("Cleaning up stuck modules...");
-      run(`hs cms delete "${themeName}/modules"`, {
-        cwd: join(themePath, ".."),
-      });
+      if (useApi) {
+        try { await deleteFile(pak!, `${themeName}/modules`); } catch { /* ignore */ }
+      } else {
+        run(`hs cms delete "${themeName}/modules"`, { cwd: join(themePath, "..") });
+      }
       s.stop("Cleaned up modules, retrying...");
     }
   }
 
-  ui.logError(
-    "Upload failed after multiple attempts. Try running `hs cms upload` manually to see detailed errors."
-  );
+  ui.logError("Upload failed after multiple attempts.");
   return false;
 }

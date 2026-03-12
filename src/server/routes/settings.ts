@@ -7,8 +7,11 @@ import { existsSync, readFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { jsonResponse, readBody } from "../route-helpers.js";
-import { loadConfig, saveConfig, getApiKeyForEngine, type AIEngineType } from "../../utils/config.js";
+import { loadConfig, saveConfig, getApiKeyForEngine, addHubSpotAccount, removeHubSpotAccount, setActiveHubSpotAccount, setCliToolEnabled, type AIEngineType, type HubSpotAccountConfig } from "../../utils/config.js";
+import { listSessions } from "../session.js";
+import { getLocalThemes } from "./setup.js";
 import { detectEnvironment, detectHubSpotCLI, detectHubSpotAuth, detectGitHubCLI, detectGitHubAuth } from "../../utils/detect.js";
+import { validatePak } from "../../hubspot/api.js";
 import { startJob, getJob } from "../process-manager.js";
 
 // ---------------------------------------------------------------------------
@@ -120,27 +123,39 @@ export function handleSettingsStatusRoute(res: ServerResponse): void {
   const env = detectEnvironment();
   const config = loadConfig();
 
+  const configPayload = {
+    aiEngine: config.aiEngine || null,
+    claudeCodeModel: config.claudeCodeModel || null,
+    anthropicApiModel: config.anthropicApiModel || null,
+    openaiApiModel: config.openaiApiModel || null,
+    hubspotUploadMode: config.hubspotUploadMode || "api",
+    hubspotAccounts: (config.hubspotAccounts || []).map((a: HubSpotAccountConfig) => ({
+      portalId: a.portalId,
+      portalName: a.portalName,
+      dataCenter: a.dataCenter,
+    })),
+    activeHubSpotAccount: config.activeHubSpotAccount || null,
+    enabledCLITools: config.enabledCLITools || [],
+  };
+
+  const sessionCount = listSessions().length;
+  const localThemeCount = getLocalThemes().length;
+
   getModelCatalog().then((models) => {
     jsonResponse(res, 200, {
       environment: env,
-      config: {
-        aiEngine: config.aiEngine || null,
-        claudeCodeModel: config.claudeCodeModel || null,
-        anthropicApiModel: config.anthropicApiModel || null,
-        openaiApiModel: config.openaiApiModel || null,
-      },
+      config: configPayload,
       models,
+      sessionCount,
+      localThemeCount,
     });
   }).catch(() => {
     jsonResponse(res, 200, {
       environment: env,
-      config: {
-        aiEngine: config.aiEngine || null,
-        claudeCodeModel: config.claudeCodeModel || null,
-        anthropicApiModel: config.anthropicApiModel || null,
-        openaiApiModel: config.openaiApiModel || null,
-      },
+      config: configPayload,
       models: STATIC_MODELS,
+      sessionCount,
+      localThemeCount,
     });
   });
 }
@@ -271,32 +286,70 @@ export function handleSettingsHsAuthRoute(req: IncomingMessage, res: ServerRespo
   readBody(req, (body) => {
     try {
       const parsed = JSON.parse(body || "{}");
-
-      const hs = detectHubSpotCLI();
-      if (!hs.found) {
-        jsonResponse(res, 400, { error: "HubSpot CLI not installed", needsInstall: true });
-        return;
-      }
-
-      const auth = detectHubSpotAuth();
-      if (auth.authenticated && !parsed.force) {
-        jsonResponse(res, 200, {
-          ok: true,
-          alreadyAuthenticated: true,
-          portalName: auth.portalName,
-          portalId: auth.portalId,
-        });
-        return;
-      }
+      const config = loadConfig();
+      const uploadMode = config.hubspotUploadMode || "api";
 
       if (parsed.personalAccessKey) {
-        const jobId = startJob(
-          `hs auth --pak="${parsed.personalAccessKey}"`,
-          "Authenticating with HubSpot",
-          { timeout: 30_000 }
-        );
-        jsonResponse(res, 200, { ok: true, jobId });
-        return;
+        if (uploadMode === "api") {
+          // API mode: validate PAK directly via HTTP, store in config
+          validatePak(parsed.personalAccessKey).then((info) => {
+            addHubSpotAccount(parsed.personalAccessKey, info.portalId, info.portalName, info.dataCenter);
+            jsonResponse(res, 200, {
+              ok: true,
+              portalName: info.portalName,
+              portalId: info.portalId,
+              dataCenter: info.dataCenter,
+            });
+          }).catch((err) => {
+            jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+          });
+          return;
+        } else {
+          // CLI mode: use hs auth command
+          const hs = detectHubSpotCLI();
+          if (!hs.found) {
+            jsonResponse(res, 400, { error: "HubSpot CLI not installed", needsInstall: true });
+            return;
+          }
+          const jobId = startJob(
+            `hs auth --pak="${parsed.personalAccessKey}"`,
+            "Authenticating with HubSpot",
+            { timeout: 30_000 }
+          );
+          jsonResponse(res, 200, { ok: true, jobId });
+          return;
+        }
+      }
+
+      // No key provided — check existing auth
+      if (uploadMode === "api") {
+        const accounts = config.hubspotAccounts || [];
+        if (accounts.length > 0 && !parsed.force) {
+          const active = accounts.find((a) => a.portalId === config.activeHubSpotAccount) || accounts[0];
+          jsonResponse(res, 200, {
+            ok: true,
+            alreadyAuthenticated: true,
+            portalName: active.portalName,
+            portalId: active.portalId,
+          });
+          return;
+        }
+      } else {
+        const hs = detectHubSpotCLI();
+        if (!hs.found) {
+          jsonResponse(res, 400, { error: "HubSpot CLI not installed", needsInstall: true });
+          return;
+        }
+        const auth = detectHubSpotAuth();
+        if (auth.authenticated && !parsed.force) {
+          jsonResponse(res, 200, {
+            ok: true,
+            alreadyAuthenticated: true,
+            portalName: auth.portalName,
+            portalId: auth.portalId,
+          });
+          return;
+        }
       }
 
       jsonResponse(res, 200, {
@@ -363,31 +416,38 @@ export function handleSettingsHsSwitchRoute(req: IncomingMessage, res: ServerRes
   readBody(req, (body) => {
     try {
       const { portalId, action } = JSON.parse(body);
+      const config = loadConfig();
+      const uploadMode = config.hubspotUploadMode || "api";
 
-      const hs = detectHubSpotCLI();
-      if (!hs.found) {
-        jsonResponse(res, 400, { error: "HubSpot CLI not installed" });
-        return;
-      }
-
-      if (action === "remove" && portalId) {
-        const jobId = startJob(
-          `hs accounts remove ${portalId}`,
-          `Removing HubSpot account ${portalId}`,
-          { timeout: 15_000 }
-        );
-        jsonResponse(res, 200, { ok: true, jobId });
-        return;
-      }
-
-      if (portalId) {
-        const jobId = startJob(
-          `hs accounts use ${portalId}`,
-          `Switching to HubSpot account ${portalId}`,
-          { timeout: 15_000 }
-        );
-        jsonResponse(res, 200, { ok: true, jobId });
-        return;
+      if (uploadMode === "api") {
+        // API mode: synchronous config updates (no subprocess)
+        if (action === "remove" && portalId) {
+          removeHubSpotAccount(portalId);
+          jsonResponse(res, 200, { ok: true });
+          return;
+        }
+        if (portalId) {
+          setActiveHubSpotAccount(portalId);
+          jsonResponse(res, 200, { ok: true });
+          return;
+        }
+      } else {
+        // CLI mode: use hs accounts commands
+        const hs = detectHubSpotCLI();
+        if (!hs.found) {
+          jsonResponse(res, 400, { error: "HubSpot CLI not installed" });
+          return;
+        }
+        if (action === "remove" && portalId) {
+          const jobId = startJob(`hs accounts remove ${portalId}`, `Removing HubSpot account ${portalId}`, { timeout: 15_000 });
+          jsonResponse(res, 200, { ok: true, jobId });
+          return;
+        }
+        if (portalId) {
+          const jobId = startJob(`hs accounts use ${portalId}`, `Switching to HubSpot account ${portalId}`, { timeout: 15_000 });
+          jsonResponse(res, 200, { ok: true, jobId });
+          return;
+        }
       }
 
       jsonResponse(res, 400, { error: "portalId required" });
@@ -468,6 +528,50 @@ export function handleSettingsCLIAuthRoute(req: IncomingMessage, res: ServerResp
     }
   });
 }
+
+// ---------------------------------------------------------------------------
+// HubSpot upload mode toggle
+// ---------------------------------------------------------------------------
+
+export function handleSettingsHsModeRoute(req: IncomingMessage, res: ServerResponse): void {
+  readBody(req, (body) => {
+    try {
+      const { mode } = JSON.parse(body);
+      if (mode !== "api" && mode !== "cli") {
+        jsonResponse(res, 400, { error: `Invalid mode: ${mode}. Must be "api" or "cli".` });
+        return;
+      }
+      saveConfig({ hubspotUploadMode: mode } as any);
+      jsonResponse(res, 200, { ok: true, mode });
+    } catch (err) {
+      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// CLI tool toggle
+// ---------------------------------------------------------------------------
+
+export function handleSettingsCliToggleRoute(req: IncomingMessage, res: ServerResponse): void {
+  readBody(req, (body) => {
+    try {
+      const { toolId, enabled } = JSON.parse(body);
+      if (!toolId || typeof enabled !== "boolean") {
+        jsonResponse(res, 400, { error: "toolId (string) and enabled (boolean) required" });
+        return;
+      }
+      setCliToolEnabled(toolId, enabled);
+      jsonResponse(res, 200, { ok: true, toolId, enabled });
+    } catch (err) {
+      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Job polling
+// ---------------------------------------------------------------------------
 
 export function handleSettingsJobRoute(path: string, res: ServerResponse): void {
   const jobId = path.replace("/api/settings/job/", "");

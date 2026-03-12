@@ -3,11 +3,15 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { existsSync, readdirSync, rmSync, renameSync } from "node:fs";
+import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import { execSync } from "node:child_process";
 import { jsonResponse, readBody } from "../route-helpers.js";
+import { loadConfig, getHubSpotPak } from "../../utils/config.js";
+import { createThemeScaffold } from "../../hubspot/theme-scaffold.js";
+import { fetchTheme } from "../../hubspot/fetcher.js";
+import { getMetadata, listRootFolders } from "../../hubspot/api.js";
 import {
   getSession,
   createSession,
@@ -108,29 +112,8 @@ export function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse
         rmSync(themePath, { recursive: true, force: true });
       }
 
-      const cwdBefore = new Set(readdirSync(process.cwd()));
-      execSync(`hs cms theme create "${themeName}"`, {
-        encoding: "utf-8",
-        stdio: "pipe",
-      });
-
-      let createdAt = join(process.cwd(), themeName);
-      if (!existsSync(createdAt)) {
-        const cwdAfter = readdirSync(process.cwd());
-        const newDir = cwdAfter.find((e) => !cwdBefore.has(e) && existsSync(join(process.cwd(), e)));
-        if (newDir) createdAt = join(process.cwd(), newDir);
-      }
-
-      if (createdAt !== themePath && existsSync(createdAt)) {
-        renameSync(createdAt, themePath);
-      }
-
-      const tplDir = join(themePath, "templates");
-      if (existsSync(tplDir)) {
-        for (const f of readdirSync(tplDir)) {
-          if (f.endsWith(".html")) rmSync(join(tplDir, f));
-        }
-      }
+      // Create theme scaffold locally (no CLI dependency)
+      createThemeScaffold(themePath, themeName);
 
       createSession(themePath, themeName);
       saveSession();
@@ -150,30 +133,63 @@ export function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse)
   readBody(req, (body) => {
     try {
       if (isGenerating()) { jsonResponse(res, 409, { error: "Cannot switch projects while AI is generating.", generating: true }); return; }
-      const { name } = JSON.parse(body);
-      if (!name || typeof name !== "string") {
+      const { name: rawName } = JSON.parse(body);
+      if (!rawName || typeof rawName !== "string") {
         jsonResponse(res, 400, { error: "Theme name is required" });
         return;
       }
 
+      // Strip leading/trailing slashes (HubSpot DM "Copy path" gives "/theme-name")
+      const name = rawName.replace(/^\/+|\/+$/g, "");
+      if (!name) {
+        jsonResponse(res, 400, { error: "Theme name is required" });
+        return;
+      }
+
+      const pak = getHubSpotPak();
+      const config = loadConfig();
+
       const themePath = join(WORKSPACE_DIR, name);
       ensureDir(WORKSPACE_DIR);
 
-      execSync(`hs cms fetch "${name}" "${themePath}"`, {
-        encoding: "utf-8",
-        stdio: "pipe",
-      });
+      if (config.hubspotUploadMode === "cli" || !pak) {
+        // CLI fallback
+        execSync(`hs cms fetch "${name}" "${themePath}"`, {
+          encoding: "utf-8",
+          stdio: "pipe",
+        });
 
-      createSession(themePath, name);
-      scanThemeFromDisk(themePath);
-      saveSession();
+        createSession(themePath, name);
+        scanThemeFromDisk(themePath);
+        saveSession();
 
-      jsonResponse(res, 200, {
-        ok: true,
-        themeName: name,
-        themePath,
-        moduleCount: getSession()?.modules.length || 0,
-      });
+        jsonResponse(res, 200, {
+          ok: true,
+          themeName: name,
+          themePath,
+          moduleCount: getSession()?.modules.length || 0,
+        });
+      } else {
+        // API mode (default)
+        fetchTheme(pak, name, themePath)
+          .then(() => {
+            createSession(themePath, name);
+            scanThemeFromDisk(themePath);
+            saveSession();
+
+            jsonResponse(res, 200, {
+              ok: true,
+              themeName: name,
+              themePath,
+              moduleCount: getSession()?.modules.length || 0,
+            });
+          })
+          .catch((err) => {
+            jsonResponse(res, 500, {
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+      }
     } catch (err) {
       jsonResponse(res, 500, {
         error: err instanceof Error ? err.message : String(err),
@@ -261,5 +277,57 @@ export function handleSetupApiKeyRoute(req: IncomingMessage, res: ServerResponse
     } catch (err) {
       jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
     }
+  });
+}
+
+/**
+ * List themes available on HubSpot Design Manager.
+ * Returns folders at the root level that look like themes (contain theme.json).
+ */
+export function handleSetupRemoteThemesRoute(res: ServerResponse): void {
+  const pak = getHubSpotPak();
+  if (!pak) {
+    jsonResponse(res, 200, { themes: [], error: "No HubSpot account connected" });
+    return;
+  }
+
+  (async () => {
+    const folders = await listRootFolders(pak);
+
+    if (folders.length === 0) {
+      jsonResponse(res, 200, { themes: [] });
+      return;
+    }
+
+    const themes: Array<{ name: string; path: string }> = [];
+
+    // Check which folders have a theme.json (in parallel)
+    const checks = folders.map(async (folder) => {
+      const folderPath = folder.path || folder.name;
+      try {
+        const tjMeta = await getMetadata(pak, `${folderPath}/theme.json`);
+        if (tjMeta && !tjMeta.folder) {
+          themes.push({ name: folder.name, path: folderPath });
+        }
+      } catch { /* not a theme */ }
+    });
+
+    await Promise.all(checks);
+    themes.sort((a, b) => a.name.localeCompare(b.name));
+
+    const localThemes = getLocalThemes();
+    const localNames = new Set(localThemes.map((t) => t.name));
+
+    jsonResponse(res, 200, {
+      themes: themes.map((t) => ({
+        ...t,
+        existsLocally: localNames.has(t.name),
+      })),
+    });
+  })().catch((err) => {
+    jsonResponse(res, 200, {
+      themes: [],
+      error: err instanceof Error ? err.message : String(err),
+    });
   });
 }

@@ -10,7 +10,8 @@ import {
   nodeVersionOk,
 } from "../utils/detect.js";
 import { run, runPassthrough } from "../utils/shell.js";
-import { saveConfig, loadConfig, type AIEngineType } from "../utils/config.js";
+import { saveConfig, loadConfig, getHubSpotPak, getActiveHubSpotAccount, addHubSpotAccount, type AIEngineType } from "../utils/config.js";
+import { validatePak } from "../hubspot/api.js";
 import * as ui from "../prompts/prompter.js";
 import { theme } from "../cli/theme.js";
 
@@ -46,76 +47,101 @@ export async function runPreflight(): Promise<PreflightResult> {
   }
   ui.logSuccess(`Git ${git.version}`);
 
-  // HubSpot CLI
-  let hs = detectHubSpotCLI();
-  if (!hs.found) {
-    ui.logWarn("HubSpot CLI not found");
-    await ui.note(
-      "The HubSpot CLI is required to upload your theme.\nI'll install it for you now.",
-      "Missing dependency"
-    );
+  // HubSpot connection
+  const config = loadConfig();
+  const useApi = config.hubspotUploadMode !== "cli";
+  let portalId = "";
+  let portalName = "";
 
-    const install = await ui.confirm({
-      message: "Install HubSpot CLI globally?",
-    });
+  if (useApi) {
+    // API mode — check for PAK in config
+    let pak = getHubSpotPak();
+    const acct = getActiveHubSpotAccount();
 
-    if (!install) {
-      ui.logError(
-        "HubSpot CLI is required. Install manually: npm install -g @hubspot/cli"
+    if (!pak) {
+      ui.logWarn("No HubSpot account connected");
+      await ui.note(
+        "You need a Personal Access Key to deploy themes.\n" +
+        "Create one at: https://app.hubspot.com/l/personal-access-key\n" +
+        "Make sure the Content scope is enabled.",
+        "HubSpot connection required"
       );
-      process.exit(1);
+
+      const key = await ui.text({
+        message: "Paste your Personal Access Key:",
+        placeholder: "pat-na1-...",
+        validate: (v) => v.trim() ? undefined : "Key is required",
+      });
+
+      const s = await ui.spinner();
+      s.start("Validating key...");
+      try {
+        const info = await validatePak(key);
+        addHubSpotAccount(key, info.portalId, info.portalName, info.dataCenter);
+        pak = key;
+        portalId = info.portalId;
+        portalName = info.portalName;
+        s.stop(`Connected to ${info.portalName} (${info.portalId})`);
+      } catch (err) {
+        s.stop("Validation failed");
+        ui.logError(`Invalid key: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+      }
+    } else {
+      portalId = acct?.portalId || "";
+      portalName = acct?.portalName || "";
+      ui.logSuccess(
+        `HubSpot${portalName ? `: ${portalName}` : ""}${portalId ? ` (${portalId})` : ""} — API mode`
+      );
     }
-
-    const s = await ui.spinner();
-    s.start("Installing HubSpot CLI...");
-
-    const result = run("npm install -g @hubspot/cli");
-    if (!result.success) {
-      s.stop("Failed to install HubSpot CLI");
-      ui.logError("Try running manually: npm install -g @hubspot/cli");
-      process.exit(1);
-    }
-
-    hs = detectHubSpotCLI();
-    s.stop(`HubSpot CLI v${hs.version} installed`);
   } else {
-    ui.logSuccess(`HubSpot CLI v${hs.version}`);
-  }
-
-  // HubSpot authentication
-  let auth = detectHubSpotAuth();
-  if (!auth.authenticated) {
-    ui.logWarn("HubSpot not authenticated");
-    await ui.note(
-      "You need to connect the CLI to your HubSpot account.\nThis will open a browser window — log in and authorize.",
-      "Authentication required"
-    );
-
-    const doAuth = await ui.confirm({ message: "Run `hs init` now?" });
-
-    if (!doAuth) {
-      ui.logError("HubSpot authentication is required. Run `hs init` manually.");
-      process.exit(1);
+    // CLI mode — require hs CLI
+    let hs = detectHubSpotCLI();
+    if (!hs.found) {
+      ui.logWarn("HubSpot CLI not found");
+      const install = await ui.confirm({ message: "Install HubSpot CLI globally?" });
+      if (!install) {
+        ui.logError("HubSpot CLI is required in CLI mode. Install: npm install -g @hubspot/cli");
+        process.exit(1);
+      }
+      const s = await ui.spinner();
+      s.start("Installing HubSpot CLI...");
+      const result = run("npm install -g @hubspot/cli");
+      if (!result.success) {
+        s.stop("Failed");
+        ui.logError("Try: npm install -g @hubspot/cli");
+        process.exit(1);
+      }
+      hs = detectHubSpotCLI();
+      s.stop(`HubSpot CLI v${hs.version} installed`);
+    } else {
+      ui.logSuccess(`HubSpot CLI v${hs.version}`);
     }
 
-    const s = await ui.spinner();
-    s.start("Waiting for HubSpot authentication...");
-
-    const authOk = runPassthrough("hs init");
-    if (!authOk) {
-      s.stop("Authentication failed");
-      ui.logError("HubSpot authentication failed. Try running `hs init` manually.");
-      process.exit(1);
+    let auth = detectHubSpotAuth();
+    if (!auth.authenticated) {
+      ui.logWarn("HubSpot not authenticated");
+      const doAuth = await ui.confirm({ message: "Run `hs init` now?" });
+      if (!doAuth) {
+        ui.logError("Run `hs init` manually.");
+        process.exit(1);
+      }
+      const s = await ui.spinner();
+      s.start("Waiting for HubSpot authentication...");
+      const authOk = runPassthrough("hs init");
+      if (!authOk) {
+        s.stop("Authentication failed");
+        process.exit(1);
+      }
+      auth = detectHubSpotAuth();
+      s.stop(`Connected to portal${auth.portalName ? `: ${auth.portalName}` : ""} (ID: ${auth.portalId})`);
+    } else {
+      ui.logSuccess(
+        `HubSpot portal${auth.portalName ? `: ${auth.portalName}` : ""} (ID: ${auth.portalId})`
+      );
     }
-
-    auth = detectHubSpotAuth();
-    s.stop(
-      `Connected to portal${auth.portalName ? `: ${auth.portalName}` : ""} (ID: ${auth.portalId})`
-    );
-  } else {
-    ui.logSuccess(
-      `HubSpot portal${auth.portalName ? `: ${auth.portalName}` : ""} (ID: ${auth.portalId})`
-    );
+    portalId = auth.portalId;
+    portalName = auth.portalName;
   }
 
   // AI Engine selection
@@ -123,7 +149,6 @@ export async function runPreflight(): Promise<PreflightResult> {
   const gemini = detectGeminiCLI();
   const codex = detectCodexCLI();
   const hasKey = hasAnthropicKey();
-  const config = loadConfig();
 
   const engineLabels: Record<AIEngineType, string> = {
     "claude-code": "Claude Code",
@@ -269,7 +294,7 @@ export async function runPreflight(): Promise<PreflightResult> {
   return {
     aiEngine,
     model,
-    portalId: auth.portalId,
-    portalName: auth.portalName,
+    portalId,
+    portalName,
   };
 }

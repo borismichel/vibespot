@@ -101,10 +101,8 @@ async function initSetup() {
       return;
     }
 
-    // Show fetch section if hs is installed
-    if (info.hsInstalled) {
-      document.getElementById("section-fetch").classList.remove("hidden");
-    }
+    // Reset panel state
+    remoteThemesLoaded = false;
 
   } catch (err) {
     showError("Could not connect to server. Is vibeSpot running?");
@@ -854,34 +852,225 @@ function hideError() {
 }
 
 // ---------------------------------------------------------------------------
+// Action button panel toggling
+// ---------------------------------------------------------------------------
+
+let activePanel = null;
+let remoteThemesLoaded = false;
+
+function togglePanel(action) {
+  const panels = document.querySelectorAll(".setup__panel");
+  const buttons = document.querySelectorAll(".setup__action-btn");
+
+  // Close if same panel clicked
+  if (activePanel === action) {
+    panels.forEach((p) => p.classList.add("hidden"));
+    buttons.forEach((b) => b.classList.remove("active"));
+    activePanel = null;
+    return;
+  }
+
+  // Hide all, show target
+  panels.forEach((p) => p.classList.add("hidden"));
+  buttons.forEach((b) => b.classList.remove("active"));
+
+  const panelMap = { new: "panel-new", continue: "panel-continue", download: "panel-download", convert: "panel-convert" };
+  const panel = document.getElementById(panelMap[action]);
+  if (panel) {
+    panel.classList.remove("hidden");
+    activePanel = action;
+  }
+
+  // Mark button active
+  const btn = document.querySelector(`.setup__action-btn[data-action="${action}"]`);
+  if (btn) btn.classList.add("active");
+
+  // Focus input if applicable
+  if (action === "new") setTimeout(() => document.getElementById("new-theme-name")?.focus(), 50);
+  if (action === "convert") setTimeout(() => document.getElementById("import-url")?.focus(), 50);
+
+  // Load remote themes on first open
+  if (action === "download" && !remoteThemesLoaded) loadDownloadPanel();
+
+  // Populate continue panel
+  if (action === "continue") populateContinuePanel();
+}
+
+function populateContinuePanel() {
+  const container = document.getElementById("continue-projects");
+  const empty = document.getElementById("continue-empty");
+  if (!container) return;
+
+  // Gather projects from the rail
+  const railItems = document.querySelectorAll(".project-rail__item");
+  if (railItems.length === 0) {
+    container.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
+
+  empty.classList.add("hidden");
+  container.innerHTML = "";
+
+  railItems.forEach((item) => {
+    const name = item.dataset.name || item.querySelector(".project-rail__name")?.textContent || "";
+    const sessionId = item.dataset.sessionId || "";
+    const meta = item.querySelector(".project-rail__meta")?.textContent || "";
+
+    const pill = document.createElement("button");
+    pill.className = "setup__pill";
+    pill.innerHTML = `<span>${esc(name)}</span>${meta ? `<span class="setup__pill__meta">${esc(meta)}</span>` : ""}`;
+    pill.addEventListener("click", () => {
+      if (sessionId) {
+        resumeSession(sessionId);
+      } else {
+        openTheme(name);
+      }
+    });
+    container.appendChild(pill);
+  });
+}
+
+async function loadDownloadPanel() {
+  const accountEl = document.getElementById("dl-account");
+  const accountName = document.getElementById("dl-account-name");
+  const switchArea = document.getElementById("dl-account-switch");
+  const inputRow = document.getElementById("dl-input-row");
+  const hint = document.getElementById("dl-hint");
+  const noAccount = document.getElementById("dl-no-account");
+
+  accountEl.classList.add("hidden");
+  switchArea.classList.add("hidden");
+  inputRow.classList.add("hidden");
+  hint.classList.add("hidden");
+  noAccount.classList.add("hidden");
+
+  // Fetch active account info to show portal name
+  try {
+    const statusRes = await fetch("/api/settings/status");
+    const statusData = await statusRes.json();
+    const accounts = statusData.config?.hubspotAccounts || [];
+    const activeId = statusData.config?.activeHubSpotAccount;
+    const active = accounts.find((a) => a.portalId === activeId) || accounts[0];
+
+    if (active) {
+      accountName.textContent = `${active.portalName || active.portalId} (${active.portalId})`;
+      accountEl.classList.remove("hidden");
+      inputRow.classList.remove("hidden");
+      hint.classList.remove("hidden");
+
+      // Wire up change button
+      initDlAccountSwitch(accounts, activeId);
+      remoteThemesLoaded = true;
+    } else {
+      noAccount.classList.remove("hidden");
+    }
+  } catch {
+    noAccount.classList.remove("hidden");
+  }
+}
+
+function initDlAccountSwitch(accounts, activeId) {
+  const changeBtn = document.getElementById("dl-account-change");
+  const switchArea = document.getElementById("dl-account-switch");
+
+  // Remove old listener by replacing the element
+  const newBtn = changeBtn.cloneNode(true);
+  changeBtn.parentNode.replaceChild(newBtn, changeBtn);
+
+  newBtn.addEventListener("click", () => {
+    if (!switchArea.classList.contains("hidden")) { switchArea.classList.add("hidden"); return; }
+    switchArea.classList.remove("hidden");
+
+    let html = '<div style="display:flex;flex-direction:column;gap:6px">';
+    for (const acct of accounts) {
+      const isActive = acct.portalId === activeId;
+      html += `<button class="btn btn--${isActive ? "primary" : "secondary"} dl-acct-btn" data-portal="${esc(acct.portalId)}" style="text-align:left;padding:6px 12px;font-size:13px">${esc(acct.portalName || acct.portalId)} (${esc(acct.portalId)})${isActive ? " ✓" : ""}</button>`;
+    }
+    html += `<button class="btn btn--secondary dl-acct-btn" data-portal="__new" style="text-align:left;padding:6px 12px;font-size:13px">+ Add another account</button>`;
+    html += '</div>';
+    switchArea.innerHTML = html;
+
+    switchArea.querySelectorAll(".dl-acct-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const pid = btn.dataset.portal;
+        if (pid === "__new") {
+          switchArea.classList.add("hidden");
+          if (typeof openSettings === "function") openSettings();
+          return;
+        }
+        if (pid === activeId) { switchArea.classList.add("hidden"); return; }
+        await fetch("/api/settings/hs-switch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ portalId: pid }),
+        });
+        switchArea.classList.add("hidden");
+        // Reload themes for the new account
+        remoteThemesLoaded = false;
+        loadDownloadPanel();
+      });
+    });
+  });
+}
+
+async function downloadThemeByName() {
+  const input = document.getElementById("dl-theme-name");
+  const name = input.value.trim();
+  if (!name) { showError("Enter a theme name."); return; }
+
+  showLoading(`Downloading ${name} from HubSpot...`);
+
+  try {
+    const res = await fetch("/api/setup/fetch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+
+    if (data.error) { showError(data.error); return; }
+    showApp(data.themeName);
+  } catch (err) {
+    showError("Failed to download theme: " + err.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Event listeners
 // ---------------------------------------------------------------------------
 
+// Action buttons
+document.querySelectorAll(".setup__action-btn").forEach((btn) => {
+  btn.addEventListener("click", () => togglePanel(btn.dataset.action));
+});
+
+// New theme
 document.getElementById("btn-create-theme").addEventListener("click", createTheme);
 document.getElementById("new-theme-name").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); createTheme(); }
 });
 
-document.getElementById("btn-fetch-theme").addEventListener("click", fetchTheme);
-document.getElementById("fetch-theme-name").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") { e.preventDefault(); fetchTheme(); }
+// Download from HubSpot
+document.getElementById("btn-fetch-theme").addEventListener("click", downloadThemeByName);
+document.getElementById("dl-theme-name").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); downloadThemeByName(); }
 });
 
-document.getElementById("btn-open-theme").addEventListener("click", () => {
-  openTheme(document.getElementById("open-theme-path").value.trim());
-});
-document.getElementById("open-theme-path").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") { e.preventDefault(); document.getElementById("btn-open-theme").click(); }
-});
+// Settings link in download panel
+const dlSettingsLink = document.getElementById("dl-open-settings");
+if (dlSettingsLink) {
+  dlSettingsLink.addEventListener("click", (e) => { e.preventDefault(); openSettings(); });
+}
 
-// Import from GitHub (on setup screen)
+// Import from GitHub / Lovable
 document.getElementById("import-btn").addEventListener("click", async () => {
   const urlInput = document.getElementById("import-url");
   const url = urlInput.value.trim();
   if (!url) return;
 
   // Extract repo name to use as theme name
-  const repoMatch = url.match(/github\.com\/[\w.-]+\/([\w.-]+)/);
+  const repoMatch = url.match(/(?:github\.com|lovable\.dev)\/[\w.-]+\/([\w.-]+)/);
   const themeName = repoMatch ? repoMatch[1].replace(/\.git$/, "") : "imported-project";
 
   showLoading(`Importing ${themeName}...`);
@@ -893,7 +1082,7 @@ document.getElementById("import-btn").addEventListener("click", async () => {
     const setupRes = await fetch("/api/setup/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ themeName }),
+      body: JSON.stringify({ name: themeName }),
     });
     const setupData = await setupRes.json();
     if (setupData.error) {
@@ -931,8 +1120,6 @@ document.getElementById("import-btn").addEventListener("click", async () => {
 document.getElementById("import-url").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); document.getElementById("import-btn").click(); }
 });
-
-// API key is now handled in the settings panel (settings.js)
 
 // ---------------------------------------------------------------------------
 // Helpers

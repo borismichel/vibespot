@@ -70,53 +70,63 @@
         <!-- Settings link (hidden — now in sidebar footer) -->
         <div class="setup__settings-link hidden" id="setup-settings-link"></div>
 
-        <!-- Main options -->
+        <!-- Main action buttons -->
         <div class="setup__options" id="setup-options">
-          <!-- Previous sessions (hidden — now shown in sidebar) -->
-          <div class="setup__section hidden" id="section-recent">
-            <div class="setup__cards" id="recent-sessions"></div>
+          <div class="setup__actions">
+            <button class="setup__action-btn" data-action="new">
+              <span class="setup__action-icon">&#43;</span>
+              <span>New Theme</span>
+            </button>
+            <button class="setup__action-btn" data-action="continue">
+              <span class="setup__action-icon">&#9654;</span>
+              <span>Continue</span>
+            </button>
+            <button class="setup__action-btn" data-action="download">
+              <span class="setup__action-icon">&#8595;</span>
+              <span>From HubSpot</span>
+            </button>
+            <button class="setup__action-btn" data-action="convert">
+              <span class="setup__action-icon">&#8634;</span>
+              <span>Convert React</span>
+              <span class="setup__action-badge">Experimental</span>
+            </button>
           </div>
 
-          <!-- Local themes (hidden — now shown in sidebar) -->
-          <div class="setup__section hidden" id="section-local">
-            <div class="setup__cards" id="local-themes"></div>
-          </div>
-
-          <!-- Create new -->
-          <div class="setup__section">
-            <p class="setup__label">Start a new project</p>
+          <!-- Expandable panels (one visible at a time) -->
+          <div class="setup__panel hidden" id="panel-new">
             <div class="setup__row">
               <input type="text" class="setup__input setup__input--wide" id="new-theme-name" placeholder="my-landing-page" />
               <button class="btn btn--primary" id="btn-create-theme">Create</button>
             </div>
           </div>
 
-          <!-- Fetch from HubSpot (only shown if hs is installed) -->
-          <div class="setup__section hidden" id="section-fetch">
-            <p class="setup__label">Download from HubSpot</p>
-            <div class="setup__row">
-              <input type="text" class="setup__input setup__input--wide" id="fetch-theme-name" placeholder="theme-name-in-hubspot" />
-              <button class="btn btn--secondary" id="btn-fetch-theme">Fetch</button>
+          <div class="setup__panel hidden" id="panel-continue">
+            <div class="setup__pills" id="continue-projects"></div>
+            <p class="setup__hint setup__hint--empty hidden" id="continue-empty">No themes yet — create one above!</p>
+          </div>
+
+          <div class="setup__panel hidden" id="panel-download">
+            <div class="setup__panel-account hidden" id="dl-account">
+              <span id="dl-account-name"></span>
+              <button class="btn-link" id="dl-account-change">Change</button>
+            </div>
+            <div id="dl-account-switch" class="hidden" style="margin:0 0 12px"></div>
+            <div class="setup__row hidden" id="dl-input-row">
+              <input type="text" class="setup__input setup__input--wide" id="dl-theme-name" placeholder="Enter theme folder name on HubSpot" />
+              <button class="btn btn--primary" id="btn-fetch-theme">Download</button>
+            </div>
+            <p class="setup__hint hidden" id="dl-hint">Enter the exact folder name of your theme in the HubSpot Design Manager</p>
+            <div class="hidden" id="dl-no-account">
+              <p class="setup__hint">Connect a HubSpot account in <a href="#" id="dl-open-settings">Settings</a> to download themes.</p>
             </div>
           </div>
 
-          <!-- Import from GitHub -->
-          <div class="setup__section">
-            <p class="setup__label">Import from GitHub</p>
+          <div class="setup__panel hidden" id="panel-convert">
             <div class="setup__row">
-              <input type="text" class="setup__input setup__input--wide" id="import-url" placeholder="https://github.com/user/my-landing-page" />
-              <button class="btn btn--secondary" id="import-btn">Import</button>
+              <input type="text" class="setup__input setup__input--wide" id="import-url" placeholder="https://github.com/user/repo or Lovable URL" />
+              <button class="btn btn--primary" id="import-btn">Import</button>
             </div>
-            <p class="setup__hint">Convert a React/Lovable project to HubSpot</p>
-          </div>
-
-          <!-- Open folder -->
-          <div class="setup__section">
-            <p class="setup__label">Open from disk</p>
-            <div class="setup__row">
-              <input type="text" class="setup__input setup__input--wide" id="open-theme-path" placeholder="/path/to/my-theme" />
-              <button class="btn btn--secondary" id="btn-open-theme">Open</button>
-            </div>
+            <p class="setup__hint">Convert a React or Lovable project to a HubSpot theme</p>
           </div>
         </div>
 
@@ -440,6 +450,12 @@
       <div class="settings__header">
         <h2 class="settings__title">Settings</h2>
         <button class="settings__close" id="settings-close">&times;</button>
+      </div>
+      <div class="settings__tabs" id="settings-tabs">
+        <button class="settings__tab active" data-tab="ai">AI</button>
+        <button class="settings__tab" data-tab="hubspot">HubSpot</button>
+        <button class="settings__tab" data-tab="github">GitHub</button>
+        <button class="settings__tab" data-tab="vibespot">vibeSpot</button>
       </div>
       <div class="settings__body" id="settings-body">
         <!-- Populated dynamically by settings.js -->

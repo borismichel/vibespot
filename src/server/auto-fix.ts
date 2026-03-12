@@ -13,6 +13,32 @@ export interface UploadError {
   fixable: boolean;
 }
 
+/** Parse API upload errors into the standard UploadError interface. */
+export function parseApiErrors(apiErrors: { file: string; status: number; message: string; category?: string; detail?: string }[]): UploadError[] {
+  const errors: UploadError[] = [];
+
+  for (const err of apiErrors) {
+    const msg = `${err.message}${err.detail ? ` — ${err.detail}` : ""}`;
+    let fixable = false;
+
+    // Detect fixable error patterns from API response messages
+    if (/textarea|unknown.*field.*type/i.test(msg)) fixable = true;
+    if (/reserved.*name|missing field name|field null/i.test(msg)) fixable = true;
+    if (/could not resolve.*now/i.test(msg)) fixable = true;
+    if (/hubdb|do not have access/i.test(msg)) fixable = true;
+    if (/invalid default value|link.*invalid|deserializ/i.test(msg)) fixable = true;
+    if (/color.*invalid/i.test(msg)) fixable = true;
+
+    errors.push({
+      file: err.file || "unknown",
+      message: msg,
+      fixable,
+    });
+  }
+
+  return errors;
+}
+
 export function parseUploadErrors(output: string): UploadError[] {
   const errors: UploadError[] = [];
 

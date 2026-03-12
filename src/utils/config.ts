@@ -12,6 +12,14 @@ export type AIEngineType =
   // Legacy value — migrated to "anthropic-api" on load
   | "api";
 
+export interface HubSpotAccountConfig {
+  portalId: string;
+  portalName: string;
+  personalAccessKey: string;
+  dataCenter: "na1" | "eu1";
+  addedAt: string;
+}
+
 export interface VibeSpotConfig {
   aiEngine?: AIEngineType;
   anthropicApiKey?: string;
@@ -22,6 +30,12 @@ export interface VibeSpotConfig {
   openaiApiModel?: string;
   lastThemePath?: string;
   lastSourcePath?: string;
+  // HubSpot account management
+  hubspotAccounts?: HubSpotAccountConfig[];
+  activeHubSpotAccount?: string; // portalId
+  hubspotUploadMode?: "api" | "cli"; // default "api"
+  // CLI tool toggles — only enabled tools get checked on settings load
+  enabledCLITools?: string[];
 }
 
 const CONFIG_DIR = join(homedir(), ".vibespot");
@@ -76,4 +90,90 @@ export function saveConfig(config: VibeSpotConfig): void {
 
 export function getConfigDir(): string {
   return CONFIG_DIR;
+}
+
+// ---------------------------------------------------------------------------
+// HubSpot account helpers
+// ---------------------------------------------------------------------------
+
+export function getActiveHubSpotAccount(): HubSpotAccountConfig | null {
+  const config = loadConfig();
+  if (!config.hubspotAccounts?.length) return null;
+  const activeId = config.activeHubSpotAccount;
+  if (activeId) {
+    const found = config.hubspotAccounts.find((a) => a.portalId === activeId);
+    if (found) return found;
+  }
+  // Fallback to first account
+  return config.hubspotAccounts[0] || null;
+}
+
+export function addHubSpotAccount(
+  pak: string,
+  portalId: string,
+  portalName: string,
+  dataCenter: "na1" | "eu1",
+): void {
+  const config = loadConfig();
+  const accounts = config.hubspotAccounts || [];
+
+  // Replace if same portalId exists
+  const idx = accounts.findIndex((a) => a.portalId === portalId);
+  const entry: HubSpotAccountConfig = {
+    portalId,
+    portalName,
+    personalAccessKey: pak,
+    dataCenter,
+    addedAt: new Date().toISOString(),
+  };
+
+  if (idx >= 0) {
+    accounts[idx] = entry;
+  } else {
+    accounts.push(entry);
+  }
+
+  saveConfig({
+    hubspotAccounts: accounts,
+    activeHubSpotAccount: portalId,
+  } as VibeSpotConfig);
+}
+
+export function removeHubSpotAccount(portalId: string): void {
+  const config = loadConfig();
+  const accounts = (config.hubspotAccounts || []).filter((a) => a.portalId !== portalId);
+  const update: Partial<VibeSpotConfig> = { hubspotAccounts: accounts };
+
+  // If we removed the active account, switch to the first remaining
+  if (config.activeHubSpotAccount === portalId) {
+    update.activeHubSpotAccount = accounts[0]?.portalId || undefined;
+  }
+
+  saveConfig(update as VibeSpotConfig);
+}
+
+export function setActiveHubSpotAccount(portalId: string): void {
+  saveConfig({ activeHubSpotAccount: portalId } as VibeSpotConfig);
+}
+
+export function getHubSpotPak(): string | null {
+  const acct = getActiveHubSpotAccount();
+  return acct?.personalAccessKey || null;
+}
+
+// ---------------------------------------------------------------------------
+// CLI tool toggle helpers
+// ---------------------------------------------------------------------------
+
+export function isCliToolEnabled(toolId: string): boolean {
+  const config = loadConfig();
+  return config.enabledCLITools?.includes(toolId) ?? false;
+}
+
+export function setCliToolEnabled(toolId: string, enabled: boolean): void {
+  const config = loadConfig();
+  const tools = new Set(config.enabledCLITools || []);
+  if (enabled) tools.add(toolId);
+  else tools.delete(toolId);
+  saveConfig({ enabledCLITools: [...tools] } as VibeSpotConfig);
 }

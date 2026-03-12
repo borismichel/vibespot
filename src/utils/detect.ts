@@ -2,7 +2,8 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { run } from "./shell.js";
-import { loadConfig, maskApiKey, type AIEngineType } from "./config.js";
+import { loadConfig, maskApiKey, isCliToolEnabled, getActiveHubSpotAccount, type AIEngineType, type HubSpotAccountConfig } from "./config.js";
+import { detectDataCenterFromPak } from "../hubspot/api.js";
 
 const whichCmd = process.platform === "win32" ? "where" : "which";
 
@@ -286,11 +287,50 @@ export function hsCliVersionOk(version: string): boolean {
 // Comprehensive environment status (used by GET /api/settings/status)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Config-based HubSpot auth (for API mode — no CLI subprocess)
+// ---------------------------------------------------------------------------
+
+export function detectHubSpotAuthFromConfig(): {
+  authenticated: boolean;
+  portalName: string;
+  portalId: string;
+  dataCenter: string;
+  accounts: HubSpotAccount[];
+  uploadMode: "api" | "cli";
+} {
+  const config = loadConfig();
+  const uploadMode = config.hubspotUploadMode || "api";
+  const configAccounts = config.hubspotAccounts || [];
+
+  const accounts: HubSpotAccount[] = configAccounts.map((a) => ({
+    name: a.portalName,
+    portalId: a.portalId,
+    authType: "personalaccesskey",
+    isDefault: a.portalId === (config.activeHubSpotAccount || configAccounts[0]?.portalId),
+  }));
+
+  const active = getActiveHubSpotAccount();
+
+  return {
+    authenticated: !!active,
+    portalName: active?.portalName || "",
+    portalId: active?.portalId || "",
+    dataCenter: active ? active.dataCenter : "na1",
+    accounts,
+    uploadMode,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Comprehensive environment status (used by GET /api/settings/status)
+// ---------------------------------------------------------------------------
+
 export interface EnvironmentStatus {
   tools: {
     node: ToolInfo;
     git: ToolInfo;
-    hubspot: ToolInfo & { authenticated: boolean; portalName: string; portalId: string; accounts: HubSpotAccount[] };
+    hubspot: ToolInfo & { authenticated: boolean; portalName: string; portalId: string; dataCenter: string; accounts: HubSpotAccount[]; uploadMode: "api" | "cli" };
     github: ToolInfo & { authenticated: boolean; username: string };
     claudeCode: CLIToolInfo;
     geminiCli: CLIToolInfo;
@@ -303,20 +343,47 @@ export interface EnvironmentStatus {
   };
   activeEngine: AIEngineType | null;
   availableEngines: AIEngineType[];
+  enabledCLITools: string[];
 }
+
+const DISABLED_CLI: CLIToolInfo = { name: "", found: false, version: "", path: "", authenticated: false, authDetail: "Disabled" };
 
 export function detectEnvironment(): EnvironmentStatus {
   const config = loadConfig();
 
   const node = detectNode();
   const git = detectGit();
-  const hs = detectHubSpotCLI();
-  const hsAuth = hs.found ? detectHubSpotAuth() : { authenticated: false, portalName: "", portalId: "", accounts: [] as HubSpotAccount[] };
+
+  // HubSpot: API mode uses config, CLI mode uses hs CLI
+  const hsUploadMode = config.hubspotUploadMode || "api";
+  let hsInfo: ToolInfo & { authenticated: boolean; portalName: string; portalId: string; dataCenter: string; accounts: HubSpotAccount[]; uploadMode: "api" | "cli" };
+
+  if (hsUploadMode === "cli") {
+    const hs = detectHubSpotCLI();
+    const hsAuth = hs.found ? detectHubSpotAuth() : { authenticated: false, portalName: "", portalId: "", accounts: [] as HubSpotAccount[] };
+    const dc = hsAuth.portalId ? detectDataCenter(hsAuth.portalId) : "na1";
+    hsInfo = { ...hs, ...hsAuth, dataCenter: dc, uploadMode: "cli" };
+  } else {
+    // API mode — read from vibespot config, no subprocess
+    const apiAuth = detectHubSpotAuthFromConfig();
+    hsInfo = {
+      name: "HubSpot API",
+      found: true, // always available (built-in)
+      version: "v3",
+      path: "",
+      ...apiAuth,
+    };
+  }
+
+  // GitHub CLI — always checked (lightweight)
   const gh = detectGitHubCLI();
   const ghAuth = gh.found ? detectGitHubAuth() : { authenticated: false, username: "" };
-  const claude = detectClaudeCode();
-  const gemini = detectGeminiCLI();
-  const codex = detectCodexCLI();
+
+  // AI CLI tools — only check if enabled in config (lazy loading)
+  const enabledTools = config.enabledCLITools || [];
+  const claude = isCliToolEnabled("claude-code") ? detectClaudeCode() : { ...DISABLED_CLI, name: "Claude Code" };
+  const gemini = isCliToolEnabled("gemini-cli") ? detectGeminiCLI() : { ...DISABLED_CLI, name: "Gemini CLI" };
+  const codex = isCliToolEnabled("codex-cli") ? detectCodexCLI() : { ...DISABLED_CLI, name: "OpenAI Codex CLI" };
 
   // Determine API key status
   function keyStatus(configKey: string | undefined, ...envVars: string[]): { configured: boolean; masked: string; source: "config" | "env" | null } {
@@ -331,7 +398,7 @@ export function detectEnvironment(): EnvironmentStatus {
   const openaiKey = keyStatus(config.openaiApiKey, "OPENAI_API_KEY");
   const geminiKey = keyStatus(config.geminiApiKey, "GEMINI_API_KEY", "GOOGLE_AI_API_KEY");
 
-  // Build available engines — CLI tools must be authenticated to be usable
+  // Build available engines — CLI tools must be enabled + authenticated
   const available: AIEngineType[] = [];
   if (claude.found && claude.authenticated) available.push("claude-code");
   if (anthropicKey.configured) available.push("anthropic-api");
@@ -344,7 +411,7 @@ export function detectEnvironment(): EnvironmentStatus {
     tools: {
       node,
       git,
-      hubspot: { ...hs, ...hsAuth },
+      hubspot: hsInfo,
       github: { ...gh, ...ghAuth },
       claudeCode: claude,
       geminiCli: gemini,
@@ -357,5 +424,6 @@ export function detectEnvironment(): EnvironmentStatus {
     },
     activeEngine: config.aiEngine || null,
     availableEngines: available,
+    enabledCLITools: enabledTools,
   };
 }

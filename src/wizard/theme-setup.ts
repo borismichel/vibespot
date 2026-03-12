@@ -1,9 +1,11 @@
 import { join } from "node:path";
-import { readdirSync, renameSync } from "node:fs";
-import { run, runPassthrough } from "../utils/shell.js";
+import { run } from "../utils/shell.js";
 import { fileExists, readFile, writeFile, ensureDir } from "../utils/fs.js";
 import * as ui from "../prompts/prompter.js";
 import { theme } from "../cli/theme.js";
+import { loadConfig, getHubSpotPak } from "../utils/config.js";
+import { createThemeScaffold } from "../hubspot/theme-scaffold.js";
+import { fetchTheme } from "../hubspot/fetcher.js";
 
 export interface ThemeInfo {
   themePath: string;
@@ -48,14 +50,30 @@ export async function setupTheme(): Promise<ThemeInfo> {
     const s = await ui.spinner();
     s.start("Fetching theme from HubSpot...");
 
-    const result = run(`hs cms fetch "${themeName}" "${themePath}"`);
-    if (!result.success) {
-      s.stop("Fetch failed");
-      ui.logError(
-        `Could not fetch theme "${themeName}". Check the name in HubSpot Design Manager.`
-      );
-      ui.logError('Run `hs cms list /` to see available themes.');
-      process.exit(1);
+    const config = loadConfig();
+    const pak = getHubSpotPak();
+
+    if (config.hubspotUploadMode === "cli" || !pak) {
+      // CLI fallback
+      const result = run(`hs cms fetch "${themeName}" "${themePath}"`);
+      if (!result.success) {
+        s.stop("Fetch failed");
+        ui.logError(
+          `Could not fetch theme "${themeName}". Check the name in HubSpot Design Manager.`
+        );
+        process.exit(1);
+      }
+    } else {
+      // API mode
+      try {
+        await fetchTheme(pak, themeName, themePath);
+      } catch (err) {
+        s.stop("Fetch failed");
+        ui.logError(
+          `Could not fetch theme "${themeName}": ${err instanceof Error ? err.message : String(err)}`
+        );
+        process.exit(1);
+      }
     }
 
     s.stop(`Theme fetched: ${theme.dim(themePath)}`);
@@ -69,55 +87,19 @@ export async function setupTheme(): Promise<ThemeInfo> {
     themePath = join(workspaceDir, themeName);
 
     const s = await ui.spinner();
-    s.start("Creating theme from boilerplate...");
+    s.start("Creating theme...");
 
-    // Snapshot cwd contents before hs create to detect what it creates
-    const cwdBefore = new Set(readdirSync(process.cwd()));
-
-    // hs create always creates in process.cwd(), ignoring execSync cwd
-    const result = run(`hs cms theme create "${themeName}"`);
-
-    // Find the created directory — hs create may use exact name or a variant
-    let createdAt = join(process.cwd(), themeName);
-    if (!fileExists(createdAt)) {
-      // Fallback: find any new directory that appeared in cwd
-      const cwdAfter = readdirSync(process.cwd());
-      const newDir = cwdAfter.find((e) => !cwdBefore.has(e) && fileExists(join(process.cwd(), e)));
-      if (newDir) {
-        createdAt = join(process.cwd(), newDir);
-      }
-    }
-
-    if (!result.success || !fileExists(createdAt)) {
+    try {
+      createThemeScaffold(themePath, themeName);
+    } catch (err) {
       s.stop("Creation failed");
-      const errMsg = result.stderr || result.stdout || "";
       ui.logError(
-        `Could not create theme "${themeName}".` +
-        (errMsg ? `\n${errMsg.slice(0, 300)}` : "") +
-        "\nTry running manually: hs cms theme create my-theme"
+        `Could not create theme "${themeName}": ${err instanceof Error ? err.message : String(err)}`
       );
       process.exit(1);
     }
 
-    // Move from cwd into workspace/
-    if (createdAt !== themePath) {
-      renameSync(createdAt, themePath);
-    }
-
     s.stop(`Theme created: ${theme.dim(themePath)}`);
-
-    // Rename theme label from "CMS theme boilerplate" to the user's chosen name
-    const themeJsonPath = join(themePath, "theme.json");
-    if (fileExists(themeJsonPath)) {
-      try {
-        const themeJson = JSON.parse(readFile(themeJsonPath));
-        themeJson.label = themeName;
-        writeFile(themeJsonPath, JSON.stringify(themeJson, null, 2) + "\n");
-        ui.logSuccess(`Theme label set to "${themeName}"`);
-      } catch {
-        ui.logWarn("Could not update theme.json label — you can rename it manually in HubSpot.");
-      }
-    }
   }
 
   // Validate and patch

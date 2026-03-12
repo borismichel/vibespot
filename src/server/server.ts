@@ -19,10 +19,11 @@ import {
 import { commitThemeState, commitTemplateState, isGitAvailable } from "./project-git.js";
 import { buildPreviewHtml, buildModulePreviewHtml } from "./preview.js";
 import { handleGenerateStream, setParseWarningCallback } from "./ai-handler.js";
-import { loadConfig } from "../utils/config.js";
-import { detectHubSpotAuth, detectDataCenter } from "../utils/detect.js";
-import { applyAutoFixes, parseUploadErrors } from "./auto-fix.js";
+import { loadConfig, getHubSpotPak, getActiveHubSpotAccount } from "../utils/config.js";
+import { detectHubSpotAuth, detectDataCenter, detectHubSpotAuthFromConfig } from "../utils/detect.js";
+import { applyAutoFixes, parseUploadErrors, parseApiErrors } from "./auto-fix.js";
 import { startStreamingJob, getJob, addJobListener, removeJobListener } from "./process-manager.js";
+import { uploadTheme, type UploadFileError } from "../hubspot/uploader.js";
 import { jsonResponse } from "./route-helpers.js";
 
 // Route modules
@@ -33,6 +34,7 @@ import {
   handleSetupOpenRoute,
   handleSetupResumeRoute,
   handleSetupApiKeyRoute,
+  handleSetupRemoteThemesRoute,
 } from "./routes/setup.js";
 import {
   handleSettingsStatusRoute,
@@ -44,6 +46,8 @@ import {
   handleSettingsHsSwitchRoute,
   handleSettingsGhLogoutRoute,
   handleSettingsCLIAuthRoute,
+  handleSettingsHsModeRoute,
+  handleSettingsCliToggleRoute,
   handleSettingsJobRoute,
 } from "./routes/settings.js";
 import {
@@ -251,6 +255,11 @@ function handleApiRoute(
       handleSetupApiKeyRoute(req, res);
       break;
 
+    case "/api/setup/remote-themes":
+      if (method === "GET") handleSetupRemoteThemesRoute(res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
     // Settings routes
     case "/api/settings/status":
       if (method === "GET") handleSettingsStatusRoute(res);
@@ -294,6 +303,16 @@ function handleApiRoute(
 
     case "/api/settings/cli-auth":
       if (method === "POST") handleSettingsCLIAuthRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/settings/hs-mode":
+      if (method === "POST") handleSettingsHsModeRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/settings/cli-toggle":
+      if (method === "POST") handleSettingsCliToggleRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
@@ -466,49 +485,98 @@ function handleWsConnection(ws: WebSocket): void {
             ws.send(JSON.stringify({ type: "upload_status", phase: "autofix", fixes }));
           }
 
-          // Start streaming upload job
-          const jobId = startStreamingJob(
-            `hs cms upload "${session.themePath}" "${session.themeName}"`,
-            "Uploading to HubSpot",
-            { cwd: join(session.themePath, ".."), timeout: 180_000 }
-          );
+          const config = loadConfig();
+          const uploadMode = config.hubspotUploadMode || "api";
 
-          ws.send(JSON.stringify({ type: "upload_started", jobId }));
+          if (uploadMode === "api") {
+            // --- API mode: direct HTTP uploads ---
+            const pak = getHubSpotPak();
+            if (!pak) {
+              ws.send(JSON.stringify({
+                type: "upload_failed",
+                output: "No HubSpot account configured. Open Settings → HubSpot to add one.",
+                errors: [{ file: "", message: "No HubSpot account configured", fixable: false }],
+              }));
+              break;
+            }
 
-          // Stream output chunks to the client
-          const chunkListener = (chunk: string) => {
-            ws.send(JSON.stringify({ type: "upload_output", chunk }));
-          };
-          addJobListener(jobId, chunkListener);
+            ws.send(JSON.stringify({ type: "upload_started", jobId: "api-upload" }));
 
-          // Poll for job completion
-          const pollInterval = setInterval(() => {
-            const job = getJob(jobId);
-            if (!job || job.status === "running") return;
+            const result = await uploadTheme(pak, session.themePath, session.themeName, {
+              onFileStart: (path) => {
+                ws.send(JSON.stringify({ type: "upload_output", chunk: `Uploading ${path}\n` }));
+              },
+              onFileComplete: (path) => {
+                ws.send(JSON.stringify({ type: "upload_output", chunk: `  ✓ ${path}\n` }));
+              },
+              onFileError: (path, err) => {
+                ws.send(JSON.stringify({ type: "upload_output", chunk: `  ✗ ${path}: ${err.message}\n` }));
+              },
+              onProgress: (completed, total) => {
+                ws.send(JSON.stringify({ type: "upload_progress", completed, total }));
+              },
+            });
 
-            clearInterval(pollInterval);
-            removeJobListener(jobId, chunkListener);
-
-            if (job.status === "completed") {
-              const auth = detectHubSpotAuth();
-              const dc = auth.portalId ? detectDataCenter(auth.portalId) : "na1";
+            if (result.success) {
+              const acct = getActiveHubSpotAccount();
               ws.send(JSON.stringify({
                 type: "upload_complete",
-                output: job.output,
-                portalId: auth.portalId || "",
-                dataCenter: dc,
+                output: `Uploaded ${result.uploaded} files`,
+                portalId: acct?.portalId || "",
+                dataCenter: acct?.dataCenter || "na1",
                 themeName: session.themeName,
               }));
             } else {
-              const errors = parseUploadErrors(job.output);
+              const errors = parseApiErrors(result.errors);
               ws.send(JSON.stringify({
                 type: "upload_failed",
-                output: job.output,
+                output: result.errors.map((e) => `${e.file}: ${e.message}`).join("\n"),
                 errors,
-                exitCode: job.exitCode,
               }));
             }
-          }, 500);
+          } else {
+            // --- CLI mode: legacy hs cms upload subprocess ---
+            const jobId = startStreamingJob(
+              `hs cms upload "${session.themePath}" "${session.themeName}"`,
+              "Uploading to HubSpot",
+              { cwd: join(session.themePath, ".."), timeout: 180_000 }
+            );
+
+            ws.send(JSON.stringify({ type: "upload_started", jobId }));
+
+            const chunkListener = (chunk: string) => {
+              ws.send(JSON.stringify({ type: "upload_output", chunk }));
+            };
+            addJobListener(jobId, chunkListener);
+
+            const pollInterval = setInterval(() => {
+              const job = getJob(jobId);
+              if (!job || job.status === "running") return;
+
+              clearInterval(pollInterval);
+              removeJobListener(jobId, chunkListener);
+
+              if (job.status === "completed") {
+                const auth = detectHubSpotAuth();
+                const dc = auth.portalId ? detectDataCenter(auth.portalId) : "na1";
+                ws.send(JSON.stringify({
+                  type: "upload_complete",
+                  output: job.output,
+                  portalId: auth.portalId || "",
+                  dataCenter: dc,
+                  themeName: session.themeName,
+                }));
+              } else {
+                const errors = parseUploadErrors(job.output);
+                ws.send(JSON.stringify({
+                  type: "upload_failed",
+                  output: job.output,
+                  errors,
+                  exitCode: job.exitCode,
+                }));
+              }
+            }, 500);
+          }
         } catch (err) {
           ws.send(JSON.stringify({
             type: "error",
