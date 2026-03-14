@@ -115,6 +115,101 @@ function vibePrompt(title, defaultValue, placeholder) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Feedback form → HubSpot Forms API
+// ---------------------------------------------------------------------------
+
+const _FEEDBACK_PORTAL = "144870572";
+const _FEEDBACK_FORM   = "4f18572f-a3ec-4193-bcfd-a373f54d86d2";
+let _feedbackCooldown = false;
+
+/**
+ * Show a feedback dialog that submits to a HubSpot form.
+ * @returns {Promise<void>}
+ */
+function vibeFeedback() {
+  if (_feedbackCooldown) {
+    return vibeAlert("Please wait a moment before submitting another report.", "Cooldown");
+  }
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-overlay";
+    overlay.innerHTML = `
+      <div class="confirm-dialog" style="max-width:440px">
+        <div class="confirm-dialog__title">Submit Feedback</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin:12px 0">
+          <label style="font-size:13px;color:var(--text-dim)">Type
+            <select data-role="type" style="display:block;width:100%;margin-top:4px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px">
+              <option value="Bug Report">Bug Report</option>
+              <option value="Feature Request">Feature Request</option>
+              <option value="Comment">Comment</option>
+            </select>
+          </label>
+          <label style="font-size:13px;color:var(--text-dim)">Email (optional)
+            <input type="email" data-role="email" placeholder="you@example.com" style="display:block;width:100%;margin-top:4px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;box-sizing:border-box" />
+          </label>
+          <label style="font-size:13px;color:var(--text-dim)">Message
+            <textarea data-role="message" rows="5" maxlength="2000" placeholder="Describe the issue or idea..." style="display:block;width:100%;margin-top:4px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+          </label>
+        </div>
+        <div class="confirm-dialog__actions">
+          <button class="btn btn--secondary" data-action="cancel">Cancel</button>
+          <button class="btn btn--primary" data-action="submit">Submit</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const typeEl = overlay.querySelector('[data-role="type"]');
+    const emailEl = overlay.querySelector('[data-role="email"]');
+    const msgEl = overlay.querySelector('[data-role="message"]');
+    const submitBtn = overlay.querySelector('[data-action="submit"]');
+
+    setTimeout(() => msgEl.focus(), 50);
+
+    const close = () => { overlay.remove(); resolve(); };
+
+    overlay.querySelector('[data-action="cancel"]').addEventListener("click", close);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+    submitBtn.addEventListener("click", async () => {
+      const message = msgEl.value.trim();
+      if (!message) { msgEl.style.borderColor = "var(--error)"; msgEl.focus(); return; }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Sending...";
+
+      try {
+        const res = await fetch(
+          `https://api.hsforms.com/submissions/v3/integration/submit/${_FEEDBACK_PORTAL}/${_FEEDBACK_FORM}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fields: [
+                { name: "report_type", value: typeEl.value },
+                { name: "email", value: emailEl.value },
+                { name: "message", value: message },
+              ],
+              context: { pageUri: window.location.href, pageName: "vibespot" },
+            }),
+          }
+        );
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        close();
+        _feedbackCooldown = true;
+        setTimeout(() => { _feedbackCooldown = false; }, 30000);
+        await vibeAlert("Thank you! Your feedback has been submitted.", "Feedback Sent");
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Submit";
+        await vibeAlert("Failed to submit: " + err.message, "Error");
+      }
+    });
+  });
+}
+
 /**
  * Show a large scrollable content viewer dialog with rendered markdown.
  * Uses the `marked` library (loaded via vendor/marked.umd.js).
