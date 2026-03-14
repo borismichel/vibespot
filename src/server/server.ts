@@ -62,9 +62,12 @@ import {
   handleTemplatesRoute,
   handleTemplateActivateRoute,
   handleTemplateRenameRoute,
+  handleTemplateCloneRoute,
   handleModuleLibraryRoute,
   handleAddModuleToTemplateRoute,
   handleBrandAssetsRoute,
+  handleDesignExtractRoute,
+  handleReferenceImportRoute,
 } from "./routes/templates.js";
 import {
   handleSessionRoute,
@@ -365,6 +368,11 @@ function handleApiRoute(
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
+    case "/api/templates/clone":
+      if (method === "POST") handleTemplateCloneRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
     case "/api/module-library":
       if (method === "GET") handleModuleLibraryRoute(res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
@@ -372,6 +380,16 @@ function handleApiRoute(
 
     case "/api/brand-assets":
       handleBrandAssetsRoute(method, req, res);
+      break;
+
+    case "/api/brand-assets/extract":
+      if (method === "POST") handleDesignExtractRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/brand-assets/import-reference":
+      if (method === "POST") handleReferenceImportRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
     case "/api/download-zip":

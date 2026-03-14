@@ -114,3 +114,44 @@ function vibePrompt(title, defaultValue, placeholder) {
     });
   });
 }
+
+/**
+ * Show a large scrollable content viewer dialog with rendered markdown.
+ * Uses the `marked` library (loaded via vendor/marked.umd.js).
+ * @param {string} content — markdown text to display
+ * @param {string} [title] — dialog title
+ * @returns {Promise<void>}
+ */
+function vibeViewContent(content, title) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-overlay";
+
+    const dialog = document.createElement("div");
+    dialog.className = "confirm-dialog confirm-dialog--wide";
+
+    if (title) {
+      dialog.innerHTML = '<div class="confirm-dialog__title">' + esc(title) + '</div>';
+    }
+
+    const body = document.createElement("div");
+    body.className = "confirm-dialog__content-view md-body";
+    body.innerHTML = typeof marked !== "undefined" ? marked.parse(content) : esc(content);
+    dialog.appendChild(body);
+
+    const actions = document.createElement("div");
+    actions.className = "confirm-dialog__actions";
+    actions.innerHTML = '<button class="btn btn--primary" data-action="ok">Close</button>';
+    dialog.appendChild(actions);
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    const close = () => { overlay.remove(); resolve(); };
+    overlay.querySelector('[data-action="ok"]').addEventListener("click", close);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+    document.addEventListener("keydown", function onKey(e) {
+      if (e.key === "Escape") { document.removeEventListener("keydown", onKey); close(); }
+    });
+  });
+}

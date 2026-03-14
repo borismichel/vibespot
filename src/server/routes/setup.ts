@@ -149,7 +149,11 @@ export function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse)
       const pak = getHubSpotPak();
       const config = loadConfig();
 
-      const themePath = join(WORKSPACE_DIR, name);
+      // Sanitize for local directory name (marketplace paths like @marketplace/Theme → _marketplace_Theme)
+      const safeDirName = name.includes("/") || name.includes("@")
+        ? name.replace(/[@/]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "")
+        : name;
+      const themePath = join(WORKSPACE_DIR, safeDirName);
       ensureDir(WORKSPACE_DIR);
 
       if (config.hubspotUploadMode === "cli" || !pak) {
@@ -159,27 +163,27 @@ export function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse)
           stdio: "pipe",
         });
 
-        createSession(themePath, name);
+        createSession(themePath, safeDirName);
         scanThemeFromDisk(themePath);
         saveSession();
 
         jsonResponse(res, 200, {
           ok: true,
-          themeName: name,
+          themeName: safeDirName,
           themePath,
           moduleCount: getSession()?.modules.length || 0,
         });
       } else {
-        // API mode (default)
+        // API mode (default) — use original name for API, safe name for local
         fetchTheme(pak, name, themePath)
           .then(() => {
-            createSession(themePath, name);
+            createSession(themePath, safeDirName);
             scanThemeFromDisk(themePath);
             saveSession();
 
             jsonResponse(res, 200, {
               ok: true,
-              themeName: name,
+              themeName: safeDirName,
               themePath,
               moduleCount: getSession()?.modules.length || 0,
             });

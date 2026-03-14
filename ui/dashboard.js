@@ -110,6 +110,7 @@ function renderTemplateList(templates) {
       <span class="dashboard__template-label">${esc(tpl.label)}</span>
       <span class="dashboard__template-meta">${tpl.moduleCount} module${tpl.moduleCount !== 1 ? "s" : ""}</span>
       <button class="btn btn--sm btn--primary dashboard__template-open" data-id="${esc(tpl.id)}">Open</button>
+      <button class="dashboard__template-clone" data-id="${esc(tpl.id)}" title="Clone template">&#x2398;</button>
       <button class="dashboard__template-delete" data-id="${esc(tpl.id)}" title="Delete template">&times;</button>
     `;
     list.appendChild(item);
@@ -119,6 +120,8 @@ function renderTemplateList(templates) {
   list.onclick = (e) => {
     const openBtn = e.target.closest(".dashboard__template-open");
     if (openBtn) return openTemplate(openBtn.dataset.id);
+    const cloneBtn = e.target.closest(".dashboard__template-clone");
+    if (cloneBtn) return cloneTemplateAction(cloneBtn.dataset.id);
     const delBtn = e.target.closest(".dashboard__template-delete");
     if (delBtn) return confirmDeleteTemplate(delBtn.dataset.id);
   };
@@ -290,10 +293,63 @@ function renderBrandAssets(assets) {
     bvIcon.classList.remove("brand-asset-upload__icon--done");
   }
 
+  // View buttons — show only when asset exists
+  let sgView = document.getElementById("btn-view-styleguide");
+  if (!sgView) {
+    sgView = document.createElement("button");
+    sgView.id = "btn-view-styleguide";
+    sgView.className = "btn btn--sm btn--ghost brand-asset-view";
+    sgView.textContent = "View";
+    sgView.title = "View styleguide";
+    sgView.addEventListener("click", viewStyleguide);
+    document.getElementById("brand-upload-styleguide")?.after(sgView);
+  }
+  sgView.style.display = assets.hasStyleguide ? "" : "none";
+
+  let bvView = document.getElementById("btn-view-brandvoice");
+  if (!bvView) {
+    bvView = document.createElement("button");
+    bvView.id = "btn-view-brandvoice";
+    bvView.className = "btn btn--sm btn--ghost brand-asset-view";
+    bvView.textContent = "View";
+    bvView.title = "View brand voice";
+    bvView.addEventListener("click", viewBrandvoice);
+    document.getElementById("brand-upload-brandvoice")?.after(bvView);
+  }
+  bvView.style.display = assets.hasBrandvoice ? "" : "none";
+
   // Humanify toggle
   const humanifyCheckbox = document.getElementById("humanify-checkbox");
   if (humanifyCheckbox) {
     humanifyCheckbox.checked = assets.humanify !== false;
+  }
+}
+
+async function viewStyleguide() {
+  try {
+    const res = await fetch("/api/brand-assets");
+    const data = await res.json();
+    if (data.styleguide) {
+      await vibeViewContent(data.styleguide, "Styleguide");
+    } else {
+      await vibeAlert("No styleguide found.", "Info");
+    }
+  } catch (err) {
+    await vibeAlert("Failed to load styleguide: " + err.message, "Error");
+  }
+}
+
+async function viewBrandvoice() {
+  try {
+    const res = await fetch("/api/brand-assets");
+    const data = await res.json();
+    if (data.brandvoice) {
+      await vibeViewContent(data.brandvoice, "Brand Voice");
+    } else {
+      await vibeAlert("No brand voice found.", "Info");
+    }
+  } catch (err) {
+    await vibeAlert("Failed to load brand voice: " + err.message, "Error");
   }
 }
 
@@ -365,6 +421,27 @@ async function confirmDeleteTemplate(templateId) {
     await refreshDashboard();
   } catch (err) {
     await vibeAlert("Failed to delete: " + err.message, "Error");
+  }
+}
+
+async function cloneTemplateAction(templateId) {
+  const label = prompt("Name for the cloned template:");
+  if (!label) return;
+
+  try {
+    const res = await fetch("/api/templates/clone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ templateId, label }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      await vibeAlert(data.error || "Clone failed", "Error");
+      return;
+    }
+    await refreshDashboard();
+  } catch (err) {
+    await vibeAlert("Failed to clone: " + err.message, "Error");
   }
 }
 
@@ -466,6 +543,81 @@ document.getElementById("brand-upload-styleguide").querySelector("input").addEve
 });
 document.getElementById("brand-upload-brandvoice").querySelector("input").addEventListener("change", (e) => {
   if (e.target.files[0]) handleBrandFileSelected("brandvoice", e.target.files[0]);
+});
+
+// Extract design from theme
+document.getElementById("btn-extract-design")?.addEventListener("click", async () => {
+  const btn = document.getElementById("btn-extract-design");
+  const origText = btn.textContent;
+  btn.textContent = "Extracting...";
+  btn.disabled = true;
+
+  try {
+    const res = await fetch("/api/brand-assets/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      await refreshDashboard();
+      const view = await vibeConfirm("Design system extracted and saved as styleguide.", "Would you like to view it?", { confirmLabel: "View Styleguide", confirmClass: "btn--primary" });
+      if (view && data.styleguide) {
+        await vibeViewContent(data.styleguide, "Styleguide");
+      }
+    } else {
+      await vibeAlert(data.error || "Extraction failed", "Error");
+    }
+  } catch (err) {
+    await vibeAlert("Extraction failed: " + err.message, "Error");
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+});
+
+// Import design reference from another theme
+document.getElementById("btn-import-reference")?.addEventListener("click", async () => {
+  const input = await vibePrompt(
+    "Import design from another theme",
+    "",
+    "HubSpot theme name or local path (e.g. ~/vibespot-themes/my-theme)"
+  );
+  if (!input) return;
+
+  // Detect source: if it looks like a path (contains / or ~), treat as local
+  const isLocal = input.includes("/") || input.startsWith("~");
+  const body = isLocal
+    ? { source: "local", localPath: input }
+    : { source: "hubspot", themeName: input };
+
+  const btn = document.getElementById("btn-import-reference");
+  const origText = btn.textContent;
+  btn.textContent = "Importing...";
+  btn.disabled = true;
+
+  try {
+    const res = await fetch("/api/brand-assets/import-reference", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      await refreshDashboard();
+      const view = await vibeConfirm("Design imported and saved as styleguide.", "Would you like to view it?", { confirmLabel: "View Styleguide", confirmClass: "btn--primary" });
+      if (view && data.styleguide) {
+        await vibeViewContent(data.styleguide, "Styleguide");
+      }
+    } else {
+      await vibeAlert(data.error || "Import failed", "Error");
+    }
+  } catch (err) {
+    await vibeAlert("Import failed: " + err.message, "Error");
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
 });
 
 // Dashboard theme heading — double-click to rename

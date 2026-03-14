@@ -115,33 +115,41 @@ NEVER respond with only a text summary. The vibespot-modules JSON block is manda
 - For nav modules, make menu items editable via a repeater group with "label" (text) and "anchor" (text) fields
 
 ## When modifying existing modules
-When the user asks to change something, include ONLY the modules that changed. Keep module names consistent.
-If the change affects shared CSS or JS, include those too.`;
+The current template's modules are listed in page order in the user message. This sequence forms the page narrative.
+
+- **Modify**: When the user references an existing module by name or describes changes to existing content, update that module's code. Keep the moduleName unchanged.
+- **Add**: When the user asks for a new section, create a new module and insert it at the narratively correct position. Consider the page flow: navigation → hero → content sections → social proof → CTA → footer.
+- **Rearrange**: When the user asks to reorder sections, include a "moduleOrder" array in the vibespot-modules JSON with the new sequence of module names.
+- **Remove**: When the user asks to remove a section, omit it from the output.
+- **Preserve**: Always include ALL modules you want to keep (modified + unchanged) in your output. Modules omitted from the output will be removed from the page.
+- **Design consistency**: Match the existing theme's design language — reuse the same CSS custom properties, class naming prefix, spacing scale, and typography.`;
 
   const pageTypeSection = pageType ? getPageTypeGuide(pageType) : "";
   const pageTypePrompt = pageTypeSection ? `\n\n## Page Type Context\n${pageTypeSection}` : "";
 
+  // Brand assets are included in both creation and edit modes for design consistency
   let brandPrompt = "";
-  if (!editMode) {
-    if (brandAssets?.styleguide) {
-      brandPrompt += `\n\n## Brand Style Guide\n${brandAssets.styleguide}`;
-    }
-    if (brandAssets?.brandvoice) {
-      brandPrompt += `\n\n## Brand Voice\n${brandAssets.brandvoice}`;
-    }
-    if (brandAssets?.humanify !== false) {
-      const humanifyGuide = getHumanifyGuide();
-      if (humanifyGuide) {
-        brandPrompt += `\n\n## Anti-AI Copy Rules (Humanify)\n${humanifyGuide}`;
-      }
+  if (brandAssets?.styleguide) {
+    brandPrompt += `\n\n## Brand Style Guide\n${brandAssets.styleguide}`;
+  }
+  if (brandAssets?.brandvoice) {
+    brandPrompt += `\n\n## Brand Voice\n${brandAssets.brandvoice}`;
+  }
+  if (brandAssets?.humanify !== false) {
+    const humanifyGuide = getHumanifyGuide();
+    if (humanifyGuide) {
+      brandPrompt += `\n\n## Anti-AI Copy Rules (Humanify)\n${humanifyGuide}`;
     }
   }
 
   if (editMode) {
-    return core + pageTypePrompt + `
+    return core + pageTypePrompt + brandPrompt + `
 
 ## HubSpot CMS Rules
-${getHubspotRules()}`;
+${getHubspotRules()}
+
+## Conversion Guide Reference
+${conversionGuide}`;
   }
 
   return core + pageTypePrompt + brandPrompt + `
@@ -187,10 +195,23 @@ ${conversionGuide}`;
 export function buildStateContext(): string {
   const session = getSession()!;
   const parts: string[] = [];
-  if (session.modules.length > 0) {
-    parts.push("\n\n## Current Module State\n");
-    for (const mod of session.modules) {
-      parts.push(`\n### ${mod.moduleName}.module\n`);
+  const modules = session.modules;
+  const total = modules.length;
+
+  if (total > 0) {
+    // Page narrative summary — helps AI understand the page structure
+    parts.push("\n\n## Page Narrative (module sequence)\n");
+    parts.push(`This template has ${total} module${total === 1 ? "" : "s"} in this order:\n`);
+    for (let i = 0; i < total; i++) {
+      parts.push(`${i + 1}. ${modules[i].moduleName}\n`);
+    }
+    parts.push(`\nWhen the user asks to modify this page, decide whether to MODIFY existing modules, ADD new ones at the right narrative position, REARRANGE the sequence, or REMOVE sections. Always include ALL modules you want to keep in your output.\n`);
+
+    // Detailed module state
+    parts.push("\n## Current Module State\n");
+    for (let i = 0; i < total; i++) {
+      const mod = modules[i];
+      parts.push(`\n### ${i + 1}/${total}: ${mod.moduleName}.module\n`);
       parts.push(`**fields.json:**\n\`\`\`json\n${mod.fieldsJson}\n\`\`\`\n`);
       parts.push(`**module.html:**\n\`\`\`html\n${mod.moduleHtml}\n\`\`\`\n`);
       parts.push(`**module.css:**\n\`\`\`css\n${mod.moduleCss}\n\`\`\`\n`);

@@ -8,6 +8,7 @@ import { join, basename } from "node:path";
 import { execSync } from "node:child_process";
 import { jsonResponse, readBody } from "../route-helpers.js";
 import { log } from "../log.js";
+import { getHubSpotPak } from "../../utils/config.js";
 import {
   getSession,
   saveSession,
@@ -16,6 +17,7 @@ import {
   setActiveTemplate,
   addTemplate,
   removeTemplate,
+  cloneTemplate,
   getModuleLibrary,
   renameTemplate,
   type PageType,
@@ -220,6 +222,35 @@ export function handleTemplateRenameRoute(req: IncomingMessage, res: ServerRespo
   });
 }
 
+export function handleTemplateCloneRoute(req: IncomingMessage, res: ServerResponse): void {
+  readBody(req, (body) => {
+    try {
+      const { templateId, label } = JSON.parse(body);
+      if (!templateId) {
+        jsonResponse(res, 400, { error: "templateId is required" });
+        return;
+      }
+      const entry = cloneTemplate(templateId, label);
+      if (!entry) {
+        jsonResponse(res, 404, { error: "Template not found" });
+        return;
+      }
+      saveSession();
+      jsonResponse(res, 200, {
+        ok: true,
+        template: {
+          id: entry.id,
+          label: entry.label,
+          pageType: entry.pageType,
+          moduleCount: entry.modules.length,
+        },
+      });
+    } catch (err) {
+      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
 export function handleModuleLibraryRoute(res: ServerResponse): void {
   const library = getModuleLibrary();
   jsonResponse(res, 200, {
@@ -355,4 +386,125 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
   }
 
   jsonResponse(res, 405, { error: "Method not allowed" });
+}
+
+// ---------------------------------------------------------------------------
+// Design extraction from theme
+// ---------------------------------------------------------------------------
+
+export function handleDesignExtractRoute(req: IncomingMessage, res: ServerResponse): void {
+  const session = getSession();
+  if (!session) {
+    jsonResponse(res, 404, { error: "No active session" });
+    return;
+  }
+
+  readBody(req, (body) => {
+    (async () => {
+      try {
+        const { sourcePath } = body ? JSON.parse(body) : {};
+        // Default to the current theme path, or a provided source path
+        const themePath = sourcePath || session.themePath;
+
+        const { extractDesignContext } = await import("../../ai/design-extractor.js");
+        const styleguide = await extractDesignContext(themePath);
+
+        // Save to the current working theme
+        if (!session.brandAssets) session.brandAssets = {};
+        session.brandAssets.styleguide = styleguide;
+        session.updatedAt = Date.now();
+
+        const assetDir = join(session.themePath, ".vibespot");
+        ensureDir(assetDir);
+        writeFile(join(assetDir, "styleguide.md"), styleguide);
+
+        saveSession();
+        jsonResponse(res, 200, { ok: true, styleguide });
+      } catch (err) {
+        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
+    })();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Reference theme import — download from HubSpot + extract design
+// ---------------------------------------------------------------------------
+
+export function handleReferenceImportRoute(req: IncomingMessage, res: ServerResponse): void {
+  const session = getSession();
+  if (!session) {
+    jsonResponse(res, 404, { error: "No active session" });
+    return;
+  }
+
+  readBody(req, (body) => {
+    (async () => {
+      try {
+        const { source, themeName, localPath } = JSON.parse(body);
+
+        let sourcePath: string;
+
+        if (source === "hubspot") {
+          // Download theme from HubSpot to temp location
+          if (!themeName) {
+            jsonResponse(res, 400, { error: "themeName is required for HubSpot import" });
+            return;
+          }
+          const pak = getHubSpotPak();
+          if (!pak) {
+            jsonResponse(res, 400, { error: "No HubSpot account connected" });
+            return;
+          }
+
+          // Strip leading/trailing slashes (HubSpot DM "Copy path" gives "/@marketplace/Theme")
+          const cleanName = themeName.replace(/^\/+|\/+$/g, "");
+          if (!cleanName) {
+            jsonResponse(res, 400, { error: "Invalid theme name" });
+            return;
+          }
+
+          // Sanitize for local directory name (replace @ and / with safe chars)
+          const safeDirName = cleanName.replace(/[@/]/g, "_").replace(/_+/g, "_");
+          const { homedir } = await import("node:os");
+          const refDir = join(homedir(), "vibespot-themes", ".references", safeDirName);
+          ensureDir(refDir);
+
+          const { fetchTheme } = await import("../../hubspot/fetcher.js");
+          await fetchTheme(pak, cleanName, refDir);
+          sourcePath = refDir;
+        } else if (source === "local") {
+          if (!localPath) {
+            jsonResponse(res, 400, { error: "localPath is required for local import" });
+            return;
+          }
+          if (!existsSync(localPath)) {
+            jsonResponse(res, 400, { error: `Path not found: ${localPath}` });
+            return;
+          }
+          sourcePath = localPath;
+        } else {
+          jsonResponse(res, 400, { error: "source must be 'hubspot' or 'local'" });
+          return;
+        }
+
+        // Extract design context and save to current theme
+        const { extractDesignContext } = await import("../../ai/design-extractor.js");
+        const styleguide = await extractDesignContext(sourcePath);
+
+        if (!session.brandAssets) session.brandAssets = {};
+        session.brandAssets.styleguide = styleguide;
+        session.updatedAt = Date.now();
+
+        const assetDir = join(session.themePath, ".vibespot");
+        ensureDir(assetDir);
+        writeFile(join(assetDir, "styleguide.md"), styleguide);
+
+        saveSession();
+        jsonResponse(res, 200, { ok: true, styleguide, source: sourcePath });
+      } catch (err) {
+        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
+    })();
+  });
 }

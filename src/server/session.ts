@@ -273,6 +273,45 @@ export function addTemplate(pageType: PageType, label: string): TemplateEntry {
 }
 
 /**
+ * Clone an existing template, deep-copying modules and state.
+ */
+export function cloneTemplate(templateId: string, newLabel?: string): TemplateEntry | null {
+  if (!activeSession) return null;
+  const source = activeSession.templates.find((t) => t.id === templateId);
+  if (!source) return null;
+
+  const label = newLabel || `${source.label} (Copy)`;
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  const prefix = source.pageType === "blog_post" ? "bp" :
+                 source.pageType === "website_page" ? "wp" :
+                 source.pageType === "module_only" ? "mo" : "lp";
+  const id = `${prefix}-${slug}`;
+
+  const entry: TemplateEntry = {
+    id,
+    label,
+    pageType: source.pageType,
+    templateFile: source.pageType === "module_only" ? "" : `templates/${id}.html`,
+    modules: source.modules.map((m) => ({ ...m })), // shallow copy each module
+    moduleOrder: [...source.moduleOrder],
+    sharedCss: source.sharedCss,
+    sharedJs: source.sharedJs,
+    template: source.template,
+    messages: [], // start fresh chat for clone
+  };
+
+  activeSession.templates.push(entry);
+  activeSession.activeTemplateId = id;
+  syncFlatFieldsFromTemplate(entry);
+  activeSession.updatedAt = Date.now();
+  return entry;
+}
+
+/**
  * Rename a template's display label.
  */
 export function renameTemplate(templateId: string, newLabel: string): boolean {
@@ -500,6 +539,109 @@ export function getOrderedModules(): ModuleFiles[] {
 }
 
 // ---------------------------------------------------------------------------
+// Template file parsing
+// ---------------------------------------------------------------------------
+
+interface ParsedTemplate {
+  id: string;
+  label: string;
+  pageType: PageType;
+  moduleNames: string[];
+  templateContent: string;
+  filename: string;
+}
+
+/**
+ * Parse a single HubL template file to extract metadata and module references.
+ */
+function parseTemplateFile(filePath: string, filename: string): ParsedTemplate | null {
+  const content = safeRead(filePath);
+  if (!content) return null;
+
+  // Skip scaffold placeholder and listing templates
+  if (filename === "home.html" || filename.endsWith("-listing.html")) return null;
+
+  // Infer ID from filename (strip .html)
+  const id = filename.replace(/\.html$/, "");
+
+  // Infer pageType from prefix
+  let pageType: PageType = "landing_page";
+  if (id.startsWith("bp-")) pageType = "blog_post";
+  else if (id.startsWith("wp-")) pageType = "website_page";
+  else if (id.startsWith("mo-")) pageType = "module_only";
+
+  // Extract label from HubL comment metadata
+  let label = id;
+  const labelMatch = content.match(/<!--[\s\S]*?label:\s*"?([^"\n]+)"?\s*[\s\S]*?-->/);
+  if (labelMatch) {
+    label = labelMatch[1].trim();
+  }
+
+  // Extract module references from dnd_module tags
+  const moduleRe = /dnd_module\s+path=["']\.\.\/modules\/(.+?)\.module["']/g;
+  const moduleNames: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = moduleRe.exec(content)) !== null) {
+    moduleNames.push(match[1]);
+  }
+
+  return { id, label, pageType, moduleNames, templateContent: content, filename };
+}
+
+/**
+ * Scan the templates directory and create TemplateEntry objects for each template file.
+ * Returns an empty array if no valid template files are found.
+ */
+function scanTemplateFiles(
+  templatesDir: string,
+  modulesByName: Map<string, ModuleFiles>,
+  sharedCss: string,
+  sharedJs: string,
+  chatMessages: ChatMessage[],
+): TemplateEntry[] {
+  if (!existsSync(templatesDir)) return [];
+
+  const entries: TemplateEntry[] = [];
+  const allFiles = readdirSync(templatesDir).filter(
+    (f) => f.endsWith(".html") && f !== "home.html"
+  );
+
+  // Filter out layout files (in subdirectories) — only direct children
+  for (const filename of allFiles) {
+    const filePath = join(templatesDir, filename);
+    const parsed = parseTemplateFile(filePath, filename);
+    if (!parsed) continue;
+    if (parsed.moduleNames.length === 0 && entries.length > 0) continue; // skip empty templates if we have others
+
+    // Build module list for this template
+    const templateModules: ModuleFiles[] = [];
+    const templateOrder: string[] = [];
+    for (const name of parsed.moduleNames) {
+      const mod = modulesByName.get(name);
+      if (mod) {
+        templateModules.push(mod);
+        templateOrder.push(name);
+      }
+    }
+
+    entries.push({
+      id: parsed.id,
+      label: parsed.label,
+      pageType: parsed.pageType,
+      templateFile: `templates/${parsed.filename}`,
+      modules: templateModules,
+      moduleOrder: templateOrder,
+      sharedCss,
+      sharedJs,
+      template: parsed.templateContent,
+      messages: entries.length === 0 ? [...chatMessages] : [], // chat history goes to first template
+    });
+  }
+
+  return entries;
+}
+
+// ---------------------------------------------------------------------------
 // Scan modules from disk (for loading existing themes)
 // ---------------------------------------------------------------------------
 
@@ -544,45 +686,19 @@ export function scanThemeFromDisk(themePath: string): void {
     }
   }
 
-  // Try to extract module order from template files (preserves display order)
-  const templatesDir = join(themePath, "templates");
-  if (existsSync(templatesDir) && activeSession.moduleOrder.length > 0) {
-    try {
-      const tplFiles = readdirSync(templatesDir).filter(
-        (f) => f.startsWith("lp-") && f.endsWith(".html")
-      );
-      if (tplFiles.length > 0) {
-        const tplContent = safeRead(join(templatesDir, tplFiles[0]));
-        const moduleRe = /dnd_module\s+path=["']\.\.\/modules\/(.+?)\.module["']/g;
-        const templateOrder: string[] = [];
-        let match: RegExpExecArray | null;
-        while ((match = moduleRe.exec(tplContent)) !== null) {
-          templateOrder.push(match[1]);
-        }
-        // Only use template order if it covers all loaded modules
-        if (templateOrder.length > 0) {
-          const loadedNames = new Set(activeSession.moduleOrder);
-          const validOrder = templateOrder.filter((n) => loadedNames.has(n));
-          // Append any modules not referenced in the template
-          for (const n of activeSession.moduleOrder) {
-            if (!validOrder.includes(n)) validOrder.push(n);
-          }
-          activeSession.moduleOrder = validOrder;
-        }
-      }
-    } catch { /* non-critical — fall back to filesystem order */ }
-  }
-
   // Load shared CSS/JS
   const cssDir = join(themePath, "css");
   const jsDir = join(themePath, "js");
+  let sharedCss = "";
+  let sharedJs = "";
 
   if (existsSync(cssDir)) {
     const cssFiles = readdirSync(cssDir).filter(
-      (f) => f.endsWith("-theme.css") || f.endsWith("-theme.css")
+      (f) => f.endsWith("-theme.css")
     );
     if (cssFiles.length > 0) {
-      activeSession.sharedCss = safeRead(join(cssDir, cssFiles[0]));
+      sharedCss = safeRead(join(cssDir, cssFiles[0]));
+      activeSession.sharedCss = sharedCss;
     }
   }
 
@@ -591,7 +707,8 @@ export function scanThemeFromDisk(themePath: string): void {
       (f) => f.endsWith("-animations.js")
     );
     if (jsFiles.length > 0) {
-      activeSession.sharedJs = safeRead(join(jsDir, jsFiles[0]));
+      sharedJs = safeRead(join(jsDir, jsFiles[0]));
+      activeSession.sharedJs = sharedJs;
     }
   }
 
@@ -604,10 +721,33 @@ export function scanThemeFromDisk(themePath: string): void {
     if (existsSync(bvPath)) activeSession.brandAssets.brandvoice = safeRead(bvPath);
   }
 
-  // Migrate flat fields to templates if this is a pre-existing theme
-  if (!activeSession.templates) activeSession.templates = [];
-  if (!activeSession.activeTemplateId) activeSession.activeTemplateId = "";
-  migrateSession(activeSession);
+  // Scan template files and create per-template TemplateEntry objects
+  const templatesDir = join(themePath, "templates");
+  const modulesByName = new Map(activeSession.modules.map((m) => [m.moduleName, m]));
+  const parsedTemplates = scanTemplateFiles(templatesDir, modulesByName, sharedCss, sharedJs, activeSession.messages);
+
+  if (parsedTemplates.length > 0) {
+    activeSession.templates = parsedTemplates;
+    activeSession.activeTemplateId = parsedTemplates[0].id;
+
+    // Reorder flat modules to match the first template's order
+    const firstOrder = parsedTemplates[0].moduleOrder;
+    if (firstOrder.length > 0) {
+      const loadedNames = new Set(activeSession.moduleOrder);
+      const validOrder = firstOrder.filter((n) => loadedNames.has(n));
+      for (const n of activeSession.moduleOrder) {
+        if (!validOrder.includes(n)) validOrder.push(n);
+      }
+      activeSession.moduleOrder = validOrder;
+    }
+
+    syncFlatFieldsFromTemplate(parsedTemplates[0]);
+  } else {
+    // No template files found — fall back to legacy single-template migration
+    if (!activeSession.templates) activeSession.templates = [];
+    if (!activeSession.activeTemplateId) activeSession.activeTemplateId = "";
+    migrateSession(activeSession);
+  }
 }
 
 // ---------------------------------------------------------------------------
