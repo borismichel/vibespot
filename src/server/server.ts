@@ -78,6 +78,7 @@ import {
   handleImportRoute,
   handleHistoryRoute,
   handleRollbackRoute,
+  handleCodeUpdateRoute,
 } from "./routes/modules.js";
 import { handleFileUploadRoute } from "./routes/upload-files.js";
 
@@ -215,6 +216,10 @@ function handleApiRoute(
 
     case "/api/modules/reorder":
       handleReorderRoute(req, res);
+      break;
+
+    case "/api/modules/code":
+      handleCodeUpdateRoute(req, res);
       break;
 
     case "/api/upload":

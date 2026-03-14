@@ -110,7 +110,7 @@ function renderTemplateList(templates) {
       <span class="dashboard__template-label">${esc(tpl.label)}</span>
       <span class="dashboard__template-meta">${tpl.moduleCount} module${tpl.moduleCount !== 1 ? "s" : ""}</span>
       <button class="btn btn--sm btn--primary dashboard__template-open" data-id="${esc(tpl.id)}">Open</button>
-      <button class="dashboard__template-clone" data-id="${esc(tpl.id)}" title="Clone template">&#x2398;</button>
+      <button class="dashboard__template-clone" data-id="${esc(tpl.id)}" title="Clone template">&#x29C9;</button>
       <button class="dashboard__template-delete" data-id="${esc(tpl.id)}" title="Delete template">&times;</button>
     `;
     list.appendChild(item);

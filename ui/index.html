@@ -402,6 +402,11 @@
       <div class="resize-handle" id="resize-handle"></div>
 
       <main class="panel panel--right" id="panel-right">
+        <div class="view-toggle" id="view-toggle">
+          <button class="view-toggle__btn active" data-view="preview">Preview</button>
+          <button class="view-toggle__btn" data-view="code">Code</button>
+        </div>
+
         <div class="preview" id="preview-container">
           <div class="browser-chrome" id="browser-chrome">
             <div class="browser-chrome__bar">
@@ -415,6 +420,24 @@
             <iframe id="preview-frame" class="browser-chrome__frame" sandbox="allow-scripts allow-same-origin"></iframe>
           </div>
         </div>
+
+        <div class="code-view hidden" id="code-view">
+          <div class="code-view__sidebar">
+            <div class="code-view__sidebar-header">Files</div>
+            <div class="code-view__file-list" id="code-file-list"></div>
+          </div>
+          <div class="code-view__editor">
+            <div class="code-view__editor-header">
+              <span class="code-view__filename" id="code-filename">Select a file</span>
+              <div class="code-view__editor-actions">
+                <span class="code-view__dirty-dot hidden" id="code-dirty-dot" title="Unsaved changes"></span>
+                <button class="btn btn--sm btn--accent" id="code-save-btn" disabled>Save</button>
+              </div>
+            </div>
+            <div class="code-view__editor-area" id="code-editor-area"></div>
+          </div>
+        </div>
+
         <aside class="history-panel hidden" id="history-panel">
           <div class="history-panel__header">
             <h3>Version History</h3>
@@ -472,6 +495,7 @@
   </div><!-- /app-body -->
 
   <script src="/vendor/marked.umd.js"></script>
+  <script src="/vendor/codemirror-bundle.global.js"></script>
   <script src="/dialog.js"></script>
   <script src="/setup.js"></script>
   <script src="/dashboard.js"></script>
@@ -480,5 +504,6 @@
   <script src="/chat.js"></script>
   <script src="/preview.js"></script>
   <script src="/field-editor.js"></script>
+  <script src="/code-editor.js"></script>
 </body>
 </html>

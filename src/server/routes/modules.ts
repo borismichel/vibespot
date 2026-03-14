@@ -86,6 +86,80 @@ export function handleModulesRoute(
   jsonResponse(res, 405, { error: "Method not allowed" });
 }
 
+export function handleCodeUpdateRoute(req: IncomingMessage, res: ServerResponse): void {
+  const session = getSession();
+  if (!session) {
+    jsonResponse(res, 404, { error: "No active session" });
+    return;
+  }
+
+  readBody(req, (body) => {
+    try {
+      const data = JSON.parse(body);
+
+      // Shared CSS/JS
+      if (data.shared) {
+        if (data.shared === "css") {
+          session.sharedCss = data.content;
+        } else if (data.shared === "js") {
+          session.sharedJs = data.content;
+        } else {
+          jsonResponse(res, 400, { error: "Invalid shared type" });
+          return;
+        }
+        // Also update the active template's shared fields
+        const tpl = getActiveTemplate();
+        if (tpl) {
+          if (data.shared === "css") tpl.sharedCss = data.content;
+          else tpl.sharedJs = data.content;
+        }
+        session.updatedAt = Date.now();
+        saveSession();
+        writeModulesToDisk();
+        jsonResponse(res, 200, { ok: true });
+        return;
+      }
+
+      // Module file
+      const { moduleName, fileType, content } = data;
+      if (!moduleName || !fileType) {
+        jsonResponse(res, 400, { error: "moduleName and fileType required" });
+        return;
+      }
+
+      const mod = session.modules.find((m) => m.moduleName === moduleName);
+      if (!mod) {
+        jsonResponse(res, 404, { error: `Module "${moduleName}" not found` });
+        return;
+      }
+
+      switch (fileType) {
+        case "html": mod.moduleHtml = content; break;
+        case "css": mod.moduleCss = content; break;
+        case "js": mod.moduleJs = content || undefined; break;
+        case "fields":
+          // Validate JSON before saving
+          try { JSON.parse(content); } catch {
+            jsonResponse(res, 400, { error: "Invalid JSON in fields.json" });
+            return;
+          }
+          mod.fieldsJson = content;
+          break;
+        default:
+          jsonResponse(res, 400, { error: `Invalid fileType: ${fileType}` });
+          return;
+      }
+
+      session.updatedAt = Date.now();
+      saveSession();
+      writeModulesToDisk();
+      jsonResponse(res, 200, { ok: true });
+    } catch (err) {
+      jsonResponse(res, 400, { error: String(err) });
+    }
+  });
+}
+
 export function handleReorderRoute(req: IncomingMessage, res: ServerResponse): void {
   readBody(req, (body) => {
     const { order } = JSON.parse(body);

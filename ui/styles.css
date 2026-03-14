@@ -686,9 +686,9 @@ body { display: flex; }
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 18px;
+  font-size: 24px;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 0 6px;
   opacity: 0;
   transition: opacity 0.15s, color 0.15s;
 }
@@ -705,9 +705,9 @@ body { display: flex; }
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 15px;
+  font-size: 20px;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 0 6px;
   opacity: 0;
   transition: opacity 0.15s, color 0.15s;
 }
@@ -1045,6 +1045,20 @@ body { display: flex; }
   background: rgba(99, 102, 241, 0.08);
 }
 
+.btn--accent {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+}
+.btn--accent:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.btn--accent:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .btn--danger {
   background: var(--error);
   color: var(--text-on-accent);
@@ -1333,6 +1347,7 @@ body { display: flex; }
 .panel--right {
   flex: 1;
   display: flex;
+  flex-direction: column;
   position: relative;
   background: var(--bg-deep);
 }
@@ -1346,6 +1361,151 @@ body { display: flex; }
 }
 .resize-handle:hover, .resize-handle.dragging {
   background: var(--accent);
+}
+
+/* ================================================================
+   VIEW TOGGLE (Preview / Code tabs)
+   ================================================================ */
+.view-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 6px 12px;
+  background: var(--bg-panel-solid);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.view-toggle__btn {
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-dim);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.view-toggle__btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.view-toggle__btn.active {
+  background: var(--bg-input);
+  color: var(--text);
+}
+
+/* ================================================================
+   CODE VIEW (file browser + editor)
+   ================================================================ */
+.code-view {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+.code-view__sidebar {
+  width: 200px;
+  min-width: 160px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-panel-solid);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.code-view__sidebar-header {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+}
+.code-view__file-group {
+  border-bottom: 1px solid var(--border);
+}
+.code-view__group-header {
+  padding: 8px 14px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.code-view__file-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px 5px 22px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+.code-view__file-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.code-view__file-item--active {
+  background: var(--bg-input);
+  color: var(--accent);
+}
+.code-view__file-item--active:hover {
+  color: var(--accent);
+}
+.code-view__file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Editor area */
+.code-view__editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.code-view__editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel-solid);
+  flex-shrink: 0;
+}
+.code-view__filename {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, 'SF Mono', SFMono-Regular, Consolas, monospace);
+}
+.code-view__editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.code-view__dirty-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.code-view__editor-area {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg-deep);
+}
+
+/* CodeMirror overrides */
+.code-view__editor-area .cm-editor {
+  height: 100%;
+}
+.code-view__editor-area .cm-editor .cm-scroller {
+  overflow: auto;
+  font-family: var(--font-mono, 'SF Mono', SFMono-Regular, Consolas, monospace);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.code-view__editor-area .cm-editor.cm-focused {
+  outline: none;
 }
 
 /* ================================================================
