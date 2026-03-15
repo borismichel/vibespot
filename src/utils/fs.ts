@@ -57,3 +57,23 @@ export function getVersion(): string {
   _version = "dev";
   return _version;
 }
+
+/** Read CHANGELOG.md content (cached after first call). */
+let _changelog = "";
+export function getChangelog(): string {
+  if (_changelog) return _changelog;
+  const candidates = [
+    join(import.meta.dirname, "../../CHANGELOG.md"),
+    join(import.meta.dirname, "../CHANGELOG.md"),
+    join(process.cwd(), "CHANGELOG.md"),
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) {
+      try {
+        _changelog = readFileSync(p, "utf-8");
+        return _changelog;
+      } catch { /* try next */ }
+    }
+  }
+  return "";
+}

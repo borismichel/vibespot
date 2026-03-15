@@ -25,6 +25,7 @@ import { applyAutoFixes, parseUploadErrors, parseApiErrors } from "./auto-fix.js
 import { startStreamingJob, startJobSafe, getJob, addJobListener, removeJobListener } from "./process-manager.js";
 import { uploadTheme, type UploadFileError } from "../hubspot/uploader.js";
 import { jsonResponse } from "./route-helpers.js";
+import { getChangelog } from "../utils/fs.js";
 
 // Route modules
 import {
@@ -331,6 +332,14 @@ function handleApiRoute(
     case "/api/settings/cli-toggle":
       if (method === "POST") handleSettingsCliToggleRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/changelog":
+      if (method === "GET") {
+        jsonResponse(res, 200, { changelog: getChangelog() });
+      } else {
+        jsonResponse(res, 405, { error: "Method not allowed" });
+      }
       break;
 
     case "/api/themes":

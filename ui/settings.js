@@ -564,6 +564,25 @@ function renderVibeSpotTab(body, data) {
   const versionVal = el("span", "settings__card-meta");
   versionVal.textContent = data.version || "dev";
   versionRow.appendChild(versionVal);
+
+  const changelogBtn = el("button", "settings__btn settings__btn--small");
+  changelogBtn.textContent = "Changelog";
+  changelogBtn.style.marginLeft = "8px";
+  changelogBtn.addEventListener("click", async () => {
+    try {
+      const resp = await fetch("/api/changelog");
+      const json = await resp.json();
+      if (json.changelog) {
+        vibeViewContent(json.changelog, "Changelog");
+      } else {
+        vibeAlert("Changelog not available.");
+      }
+    } catch {
+      vibeAlert("Failed to load changelog.");
+    }
+  });
+  versionRow.appendChild(changelogBtn);
+
   card.appendChild(versionRow);
 
   // Workspace
