@@ -26,6 +26,7 @@ npx vibespot
 Opens a browser with:
 - **Chat on the left** — describe your landing page in natural language
 - **Live preview on the right** — see your page render in real-time
+- **Agentic pipeline** — multi-stage AI generation with real-time progress
 - **Project sidebar** — create, open, resume, or delete projects
 - **Module management** — reorder via drag-and-drop, edit fields, delete modules
 - **Starter templates** — SaaS, Portfolio, Restaurant, Event
@@ -37,6 +38,17 @@ Opens a browser with:
 - **Light/dark mode** — toggle or auto-detect system preference
 - **Tabbed settings** — AI engines, HubSpot accounts, GitHub, vibeSpot config
 - **ZIP download** — export your theme as a ZIP file
+
+### Agentic Pipeline
+
+When you send a message, vibeSpot runs a 4-stage pipeline:
+
+1. **Intent Analyzer** — classifies your request and plans which modules to create, modify, or keep unchanged
+2. **Page Architect** — designs the visual system (CSS variables, shared styles) then plans module specs
+3. **Module Developer** — generates all modules in parallel (up to 20 concurrent)
+4. **Quality Check** — auto-fixes common issues (unbalanced HubL tags, reserved field names, deprecated types, CDN imports)
+
+Completed modules appear in the live preview immediately as each finishes, with themed skeleton placeholders for modules still generating.
 
 ### Classic Wizard Mode
 
@@ -115,15 +127,17 @@ Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, GitHub, vib
 - `anthropicApiKey`, `openaiApiKey`, `geminiApiKey` — API keys (stored locally, never sent except to the provider)
 - `hubspotAccounts` — Connected HubSpot accounts (PAK-based auth)
 - `hubspotUploadMode` — `api` (default, direct API) or `cli` (legacy, requires HubSpot CLI)
+- `agenticConcurrency` — Max parallel module generation calls (default: 20)
 - `enabledCLITools` — Which CLI tools to detect on settings load
 
-## What's New (v0.9)
+## What's New (v1.0)
 
+- **Agentic pipeline** (v1.0.0) — 4-stage AI generation: Intent Analyzer → Page Architect (Design System + Module Planner) → Module Developer (parallel) → Quality Check (auto-fix)
+- **Incremental preview** (v1.0.0) — completed modules appear immediately with themed placeholders for pending ones
+- **Quality Check agent** (v1.0.0) — auto-fixes unbalanced HubL tags, reserved fields, deprecated types, CDN imports
 - **Security hardening** (v0.9.5) — shell injection prevention, CORS restriction, XSS prevention, security headers, API key file permissions
 - **Code editor** (v0.9.3) — CodeMirror 6 with syntax highlighting, file browser, Preview/Code toggle, dark/light theme
-- **Feedback button** (v0.9.4) — submit bug reports and feature requests directly from the UI
 - **Design extraction** (v0.9.3) — AI-powered styleguide generation from existing themes
-- **Multi-template import** (v0.9.3) — scan and import all templates from a theme
 - **HubSpot API mode** (v0.9.0) — upload, download, and manage themes without the HubSpot CLI
 - **File uploads** (v0.8.0) — attach images and documents to chat (drag-and-drop or paperclip)
 - **Per-template version history** (v0.7.0) — scoped git commits, filtered history, safe rollback

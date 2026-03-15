@@ -4,6 +4,61 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.0.0 — 2026-03-15
+
+Agentic pipeline — multi-stage AI generation replacing single-call mode.
+
+### Agentic Pipeline
+- **4-stage pipeline** — Intent Analyzer → Page Architect → Module Developer → Quality Check
+- **Intent Analyzer** — classifies user requests (create, modify, add, remove, rearrange, style_change, question) and plans which modules to generate, modify, or keep
+- **Page Architect** — split into two sequential calls:
+  - **Design System Architect** — creates `:root` CSS variables, shared CSS, shared JS with complete design tokens (colors, typography, spacing, effects)
+  - **Module Planner** — plans module specs using the finalized design system
+- **Module Developer** — parallel per-module generation with concurrency up to 20
+- **Quality Check agent** — auto-fixes common issues after generation:
+  - Unbalanced HubL tags (orphan closing tags removed, missing closing tags appended)
+  - Reserved field names (`name` → `item_name`, `label` → `section_label`)
+  - Deprecated field types (`textarea` → `text`)
+  - CDN @import removal
+  - Invalid HubL functions (`now()` → `local_dt`)
+  - Missing meta.json required fields
+- **Question short-circuit** — questions answered directly without running the full pipeline
+
+### Incremental Preview
+- Completed modules appear in the live preview immediately as each finishes
+- Themed skeleton placeholders for pending modules (matches light/dark theme)
+- Design system pushed to preview early for themed placeholders
+- Module order set after Stage 2 for correct placeholder positioning
+
+### Pipeline UI
+- Real-time pipeline progress in chat: Analyzing → Designing → Developing → module cards → Quality Check
+- Per-module status cards (queued, generating, complete, failed)
+- Detailed quality check reporting with per-issue breakdown (✓ auto-fixed / ⚠ warning)
+- Pipeline completion stats (modules generated, duration)
+
+### Multi-Engine Support
+- **Engine adapter** — unified interface for API engines (Anthropic, OpenAI, Gemini) and CLI engines (Claude Code, Gemini CLI, Codex CLI)
+- Structured output (JSON schema) support for API engines
+- CLI engines use subprocess spawning with prompt piping
+- Engine/model/concurrency configurable in Settings → AI tab
+
+### Bug Fixes
+- **Duplicate modules** — AI-generated module names (Title Case) vs spec names (kebab-case) caused 20 modules instead of 10. Fixed: module names always use canonical spec names; `updateModules` uses case-insensitive matching.
+- **Design system CSS variables** — `:root` block was never generated, causing all `var()` references to resolve to nothing. Fixed by dedicated Design System Architect stage.
+- **White gaps between placeholders** — body background now matches theme during generation
+
+### Architecture
+- Session module refactored from monolithic `session.ts` (1394 lines) into focused submodules:
+  - `session/state.ts` — module mutations, field updates
+  - `session/store.ts` — session CRUD, persistence
+  - `session/disk.ts` — theme file I/O, git operations
+  - `session/templates.ts` — template management
+  - `session/types.ts` — shared interfaces
+- Structured logging system with log levels and categories
+- Agent prompts in dedicated `agent/prompts/` directory with JSON schemas
+
+---
+
 ## v0.9.5 — 2026-03-15
 
 Security hardening, architecture improvements, and UI polish.
