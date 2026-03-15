@@ -20,6 +20,11 @@ export interface GitCommitInfo {
 // Git availability (cached)
 // ---------------------------------------------------------------------------
 
+/** Validate a git hash to prevent shell injection — must be hex only. */
+function isValidHash(hash: string): boolean {
+  return /^[0-9a-f]{4,40}$/i.test(hash);
+}
+
 let gitAvailableCache: boolean | null = null;
 
 export function isGitAvailable(): boolean {
@@ -240,6 +245,8 @@ export function rollbackToCommit(
   if (!isGitAvailable()) return { success: false, error: "Git not available" };
   if (!existsSync(join(themePath, ".git"))) return { success: false, error: "Not a git repo" };
 
+  if (!isValidHash(commitHash)) return { success: false, error: "Invalid commit hash" };
+
   // Verify commit exists
   const verify = run(`git cat-file -t ${commitHash}`, { cwd: themePath });
   if (!verify.success || verify.stdout.trim() !== "commit") {
@@ -275,6 +282,8 @@ export function rollbackTemplateToCommit(
 ): { success: boolean; error?: string } {
   if (!isGitAvailable()) return { success: false, error: "Git not available" };
   if (!existsSync(join(themePath, ".git"))) return { success: false, error: "Not a git repo" };
+
+  if (!isValidHash(commitHash)) return { success: false, error: "Invalid commit hash" };
 
   // Verify commit exists
   const verify = run(`git cat-file -t ${commitHash}`, { cwd: themePath });

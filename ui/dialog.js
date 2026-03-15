@@ -231,7 +231,9 @@ function vibeViewContent(content, title, downloadFilename) {
 
     const body = document.createElement("div");
     body.className = "confirm-dialog__content-view md-body";
-    body.innerHTML = typeof marked !== "undefined" ? marked.parse(content) : esc(content);
+    // Sanitize: escape HTML in content before markdown parsing to prevent XSS
+    const safeContent = esc(content);
+    body.innerHTML = typeof marked !== "undefined" ? marked.parse(safeContent) : safeContent;
     // Inject color swatches next to hex codes
     body.innerHTML = body.innerHTML.replace(
       /(#[0-9A-Fa-f]{3,8})(?![0-9A-Fa-f])/g,

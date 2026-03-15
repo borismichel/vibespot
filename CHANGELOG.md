@@ -4,6 +4,79 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v0.9.5 — 2026-03-15
+
+Security hardening, architecture improvements, and UI polish.
+
+### Security
+- **Shell injection prevention** — replace `execSync` string interpolation with `execFileSync` + argument arrays across all server routes, CLI commands, and utilities. New `startJobSafe()` process manager API with stdin support.
+- **CORS restriction** — restrict `Access-Control-Allow-Origin` from `*` to localhost-only origins
+- **Security headers** — add `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy`
+- **XSS prevention** — escape HTML before markdown rendering in chat and dialog views
+- **API key file permissions** — config file set to `0600` on write (non-Windows)
+- **Input validation** — git commit hash validation, portalId numeric check, API key format validation for shell profile writes
+
+### Architecture
+- **Safe JSON.parse** — new `readJsonBody()` route helper with automatic 400 response on parse failure
+- **Process manager cleanup** — streaming job listeners cleared on completion/error/timeout; shared `_attachJobHandlers()` reduces duplication
+- **Cross-platform** — Windows-compatible `execFileSync` with `shell: true` for PATH resolution while keeping argument arrays for injection safety
+
+### UI
+- Brand asset view icon changed from play arrow to eye icon
+- Brand asset delete now correctly refreshes the dashboard
+
+---
+
+## v0.9.4 — 2026-03-14
+
+### Features
+- Color swatches next to hex codes in styleguide/brandvoice preview
+- Download button to save styleguide/brandvoice as markdown files
+- Feedback button on all screens — submits to HubSpot form (bug reports, feature requests, comments)
+- Brand asset inline controls (view/delete) replacing separate buttons
+
+### UI
+- Larger template card clone/delete controls
+- Darker dialog overlay for better contrast
+- Speech bubble feedback icon on dashboard and editor topbars
+
+---
+
+## v0.9.3 — 2026-03-13
+
+### Features
+- **Code editor** — CodeMirror 6 with file browser, Preview/Code toggle
+- Custom vibespot theme using CSS variables for dark/light support
+- Syntax highlighting, Cmd+S save, pretty-printed JSON
+- Preview refreshes automatically when returning from code view after saving
+- Orange save button for better visibility
+
+### Theme Import
+- Multi-template scanning — parse each template file, create TemplateEntry per file with correct module assignments
+- Template cloning — deep-copy templates as starting point for new pages
+- AI design extraction — analyze theme CSS/HTML/fields to auto-generate styleguide
+- Reference theme import from HubSpot or local theme
+- Narrative-aware editing — page structure context for AI modifications
+- Styleguide/brandvoice viewer with rendered markdown
+
+---
+
+## v0.9.2 — 2026-03-13
+
+### Bug Fixes
+- Fix HubSpot API: upload to `published` env instead of `draft` (blank pages)
+- Fix base layout: add `require_css`/`require_js` for template assets
+- Fix hash routing: always init setup before handling route, dedup `openTheme`
+- Fix module order: parse template file for display order instead of filesystem
+- Fix Ctrl+C: force exit after 500ms grace period
+- Fix anchor links: instruct AI to put `id` on module root element
+- Fix version display: read from `package.json` dynamically
+- Fix `\n` in preview: strip literal newlines from field defaults
+- Fix duplicate messages in API call history
+- Fix `+` button in project rail to open New Theme dialog
+
+---
+
 ## v0.9.0 — 2026-03-12
 
 HubSpot API migration — replace CLI dependency with direct API calls.

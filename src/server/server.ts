@@ -22,7 +22,7 @@ import { handleGenerateStream, setParseWarningCallback } from "./ai-handler.js";
 import { loadConfig, getHubSpotPak, getActiveHubSpotAccount } from "../utils/config.js";
 import { detectHubSpotAuth, detectDataCenter, detectHubSpotAuthFromConfig } from "../utils/detect.js";
 import { applyAutoFixes, parseUploadErrors, parseApiErrors } from "./auto-fix.js";
-import { startStreamingJob, getJob, addJobListener, removeJobListener } from "./process-manager.js";
+import { startStreamingJob, startJobSafe, getJob, addJobListener, removeJobListener } from "./process-manager.js";
 import { uploadTheme, type UploadFileError } from "../hubspot/uploader.js";
 import { jsonResponse } from "./route-helpers.js";
 
@@ -151,6 +151,12 @@ function handleRequest(req: IncomingMessage, res: ServerResponse, uiDir: string)
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
   const method = req.method || "GET";
 
+  // Security headers
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+
   // API routes
   if (url.pathname.startsWith("/api/")) {
     handleApiRoute(method, url.pathname, req, res);
@@ -194,8 +200,11 @@ function handleApiRoute(
   req: IncomingMessage,
   res: ServerResponse
 ): void {
-  // CORS headers for local dev
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // CORS — restrict to localhost origins only
+  const origin = req.headers.origin || "";
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 

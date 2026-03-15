@@ -205,16 +205,28 @@
               <span class="brand-asset-toggle__label">Humanify</span>
               <span class="brand-asset-toggle__tooltip" data-tooltip="Strips AI-sounding copy: removes em dashes, banned words like 'delve' and 'leverage', cliché openers, and forced enthusiasm. Makes your landing page read like a human wrote it.">?</span>
             </div>
-            <label class="brand-asset-upload" id="brand-upload-styleguide">
-              <input type="file" accept=".md,.txt" hidden>
-              <span class="brand-asset-upload__icon" id="brand-icon-styleguide">+</span>
-              <span class="brand-asset-upload__label">styleguide.md</span>
-            </label>
-            <label class="brand-asset-upload" id="brand-upload-brandvoice">
-              <input type="file" accept=".md,.txt" hidden>
-              <span class="brand-asset-upload__icon" id="brand-icon-brandvoice">+</span>
-              <span class="brand-asset-upload__label">brandvoice.md</span>
-            </label>
+            <div class="brand-asset-row">
+              <label class="brand-asset-upload" id="brand-upload-styleguide">
+                <input type="file" accept=".md,.txt" hidden>
+                <span class="brand-asset-upload__icon" id="brand-icon-styleguide">+</span>
+                <span class="brand-asset-upload__label">styleguide.md</span>
+              </label>
+              <span class="brand-asset-actions hidden" id="brand-actions-styleguide">
+                <button class="brand-asset-action" title="View" id="btn-view-styleguide"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                <button class="brand-asset-action brand-asset-action--delete" title="Remove" id="btn-delete-styleguide">&times;</button>
+              </span>
+            </div>
+            <div class="brand-asset-row">
+              <label class="brand-asset-upload" id="brand-upload-brandvoice">
+                <input type="file" accept=".md,.txt" hidden>
+                <span class="brand-asset-upload__icon" id="brand-icon-brandvoice">+</span>
+                <span class="brand-asset-upload__label">brandvoice.md</span>
+              </label>
+              <span class="brand-asset-actions hidden" id="brand-actions-brandvoice">
+                <button class="brand-asset-action" title="View" id="btn-view-brandvoice"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                <button class="brand-asset-action brand-asset-action--delete" title="Remove" id="btn-delete-brandvoice">&times;</button>
+              </span>
+            </div>
             <button class="btn btn--sm btn--outline" id="btn-extract-design" title="Auto-extract design system from this theme's CSS and modules">Extract from Theme</button>
             <button class="btn btn--sm btn--outline" id="btn-import-reference" title="Import design from another HubSpot theme or local folder">Import Reference</button>
           </div>

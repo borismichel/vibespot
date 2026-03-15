@@ -119,14 +119,15 @@ Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, GitHub, vib
 
 ## What's New (v0.9)
 
-- **HubSpot API mode** — upload, download, and manage themes without the HubSpot CLI
-- **File uploads** — attach images and documents to chat (drag-and-drop or paperclip)
-- **Tabbed settings** — organized into AI, HubSpot, GitHub, and vibeSpot tabs with descriptions
-- **Per-template version history** — scoped git commits, filtered history, safe rollback
-- **Light/dark mode** — system preference detection, persisted toggle
-- **Performance** — 137KB bundle, ETag caching, lazy SDK loading, session index cache
-- **ZIP download** — export themes from the dashboard
-- **Inline rename** — double-click to rename projects and templates
+- **Security hardening** (v0.9.5) — shell injection prevention, CORS restriction, XSS prevention, security headers, API key file permissions
+- **Code editor** (v0.9.3) — CodeMirror 6 with syntax highlighting, file browser, Preview/Code toggle, dark/light theme
+- **Feedback button** (v0.9.4) — submit bug reports and feature requests directly from the UI
+- **Design extraction** (v0.9.3) — AI-powered styleguide generation from existing themes
+- **Multi-template import** (v0.9.3) — scan and import all templates from a theme
+- **HubSpot API mode** (v0.9.0) — upload, download, and manage themes without the HubSpot CLI
+- **File uploads** (v0.8.0) — attach images and documents to chat (drag-and-drop or paperclip)
+- **Per-template version history** (v0.7.0) — scoped git commits, filtered history, safe rollback
+- **Light/dark mode** (v0.6.0) — system preference detection, persisted toggle
 
 See [CHANGELOG.md](CHANGELOG.md) for the full history.
 

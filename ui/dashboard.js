@@ -293,30 +293,11 @@ function renderBrandAssets(assets) {
     bvIcon.classList.remove("brand-asset-upload__icon--done");
   }
 
-  // View buttons — show only when asset exists
-  let sgView = document.getElementById("btn-view-styleguide");
-  if (!sgView) {
-    sgView = document.createElement("button");
-    sgView.id = "btn-view-styleguide";
-    sgView.className = "btn btn--sm btn--ghost brand-asset-view";
-    sgView.textContent = "View";
-    sgView.title = "View styleguide";
-    sgView.addEventListener("click", viewStyleguide);
-    document.getElementById("brand-upload-styleguide")?.after(sgView);
-  }
-  sgView.style.display = assets.hasStyleguide ? "" : "none";
-
-  let bvView = document.getElementById("btn-view-brandvoice");
-  if (!bvView) {
-    bvView = document.createElement("button");
-    bvView.id = "btn-view-brandvoice";
-    bvView.className = "btn btn--sm btn--ghost brand-asset-view";
-    bvView.textContent = "View";
-    bvView.title = "View brand voice";
-    bvView.addEventListener("click", viewBrandvoice);
-    document.getElementById("brand-upload-brandvoice")?.after(bvView);
-  }
-  bvView.style.display = assets.hasBrandvoice ? "" : "none";
+  // Show/hide action buttons based on asset existence
+  const sgActions = document.getElementById("brand-actions-styleguide");
+  if (sgActions) sgActions.classList.toggle("hidden", !assets.hasStyleguide);
+  const bvActions = document.getElementById("brand-actions-brandvoice");
+  if (bvActions) bvActions.classList.toggle("hidden", !assets.hasBrandvoice);
 
   // Humanify toggle
   const humanifyCheckbox = document.getElementById("humanify-checkbox");
@@ -352,6 +333,29 @@ async function viewBrandvoice() {
     await vibeAlert("Failed to load brand voice: " + err.message, "Error");
   }
 }
+
+async function deleteBrandAsset(type) {
+  const label = type === "styleguide" ? "styleguide" : "brand voice";
+  const ok = await vibeConfirm(`Remove ${label}?`, "This will delete the file from disk.", { confirmLabel: "Remove", confirmClass: "btn--danger" });
+  if (!ok) return;
+  try {
+    const res = await fetch("/api/brand-assets", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type }),
+    });
+    const data = await res.json();
+    if (data.ok) showDashboard(currentDashboardTheme);
+    else await vibeAlert(data.error || "Failed to remove", "Error");
+  } catch (err) {
+    await vibeAlert("Failed to remove: " + err.message, "Error");
+  }
+}
+
+document.getElementById("btn-view-styleguide")?.addEventListener("click", viewStyleguide);
+document.getElementById("btn-view-brandvoice")?.addEventListener("click", viewBrandvoice);
+document.getElementById("btn-delete-styleguide")?.addEventListener("click", () => deleteBrandAsset("styleguide"));
+document.getElementById("btn-delete-brandvoice")?.addEventListener("click", () => deleteBrandAsset("brandvoice"));
 
 // ---------------------------------------------------------------------------
 // Actions

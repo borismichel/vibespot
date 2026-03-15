@@ -14,3 +14,21 @@ export function readBody(req: IncomingMessage, callback: (body: string) => void)
   req.on("data", (chunk) => chunks.push(chunk));
   req.on("end", () => callback(Buffer.concat(chunks).toString("utf-8")));
 }
+
+/**
+ * Read request body and parse as JSON with error handling.
+ * Returns 400 with an error message if parsing fails.
+ */
+export function readJsonBody<T = Record<string, unknown>>(
+  req: IncomingMessage,
+  res: ServerResponse,
+  callback: (data: T) => void
+): void {
+  readBody(req, (body) => {
+    try {
+      callback(JSON.parse(body || "{}") as T);
+    } catch {
+      jsonResponse(res, 400, { error: "Invalid JSON in request body" });
+    }
+  });
+}

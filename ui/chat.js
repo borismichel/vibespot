@@ -558,6 +558,9 @@ function renderMarkdown(text) {
   // Also strip unclosed code fences (truncated responses)
   text = text.replace(/```[\s\S]*$/g, "");
 
+  // Escape HTML to prevent XSS from AI/user content
+  text = escapeHtml(text);
+
   // Inline code: `...`
   text = text.replace(/`([^`]+)`/g, "<code>$1</code>");
 

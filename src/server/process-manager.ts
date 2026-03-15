@@ -18,6 +18,79 @@ export interface ProcessJob {
 
 const jobs = new Map<string, ProcessJob>();
 
+function _attachJobHandlers(child: ChildProcess, job: ProcessJob, timeout?: number): void {
+  child.stdout?.on("data", (d: Buffer) => {
+    job.output += d.toString();
+  });
+  child.stderr?.on("data", (d: Buffer) => {
+    job.output += d.toString();
+  });
+
+  child.on("close", (code) => {
+    job.status = code === 0 ? "completed" : "failed";
+    job.exitCode = code;
+    job.completedAt = Date.now();
+  });
+
+  child.on("error", (err) => {
+    job.status = "failed";
+    job.output += `\nProcess error: ${err.message}`;
+    job.completedAt = Date.now();
+  });
+
+  const t = timeout || 300_000;
+  setTimeout(() => {
+    if (job.status === "running") {
+      child.kill();
+      job.status = "failed";
+      job.output += "\nProcess timed out";
+      job.completedAt = Date.now();
+    }
+  }, t);
+}
+
+/**
+ * Start a job safely using an argument array (no shell interpolation).
+ * Preferred over the string overload to prevent command injection.
+ */
+export function startJobSafe(
+  cmd: string,
+  args: string[],
+  description: string,
+  opts?: { cwd?: string; env?: Record<string, string>; timeout?: number; stdin?: string }
+): string {
+  const id = `job-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+  const job: ProcessJob = {
+    id,
+    command: `${cmd} ${args.join(" ")}`,
+    description,
+    status: "running",
+    output: "",
+    exitCode: null,
+    startedAt: Date.now(),
+    completedAt: null,
+  };
+
+  jobs.set(id, job);
+
+  const child: ChildProcess = spawn(cmd, args, {
+    cwd: opts?.cwd,
+    stdio: [opts?.stdin ? "pipe" : "ignore", "pipe", "pipe"],
+    env: { ...process.env, ...opts?.env },
+    // Windows needs shell to resolve .cmd/.bat from PATH; args array prevents injection
+    shell: process.platform === "win32",
+  });
+
+  if (opts?.stdin && child.stdin) {
+    child.stdin.write(opts.stdin);
+    child.stdin.end();
+  }
+
+  _attachJobHandlers(child, job, opts?.timeout);
+  return id;
+}
+
 export function startJob(
   command: string,
   description: string,
@@ -46,36 +119,7 @@ export function startJob(
     shell: true,
   });
 
-  child.stdout?.on("data", (d: Buffer) => {
-    job.output += d.toString();
-  });
-  child.stderr?.on("data", (d: Buffer) => {
-    job.output += d.toString();
-  });
-
-  child.on("close", (code) => {
-    job.status = code === 0 ? "completed" : "failed";
-    job.exitCode = code;
-    job.completedAt = Date.now();
-  });
-
-  child.on("error", (err) => {
-    job.status = "failed";
-    job.output += `\nProcess error: ${err.message}`;
-    job.completedAt = Date.now();
-  });
-
-  // Timeout safety net
-  const timeout = opts?.timeout || 300_000;
-  setTimeout(() => {
-    if (job.status === "running") {
-      child.kill();
-      job.status = "failed";
-      job.output += "\nProcess timed out";
-      job.completedAt = Date.now();
-    }
-  }, timeout);
-
+  _attachJobHandlers(child, job, opts?.timeout);
   return id;
 }
 
@@ -153,12 +197,14 @@ export function startStreamingJob(
     job.status = code === 0 ? "completed" : "failed";
     job.exitCode = code;
     job.completedAt = Date.now();
+    job.listeners.clear();
   });
 
   child.on("error", (err) => {
     job.status = "failed";
     job.output += `\nProcess error: ${err.message}`;
     job.completedAt = Date.now();
+    job.listeners.clear();
   });
 
   // Timeout safety net
@@ -169,6 +215,7 @@ export function startStreamingJob(
       job.status = "failed";
       job.output += "\nProcess timed out";
       job.completedAt = Date.now();
+      job.listeners.clear();
     }
   }, timeout);
 

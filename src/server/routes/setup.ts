@@ -6,7 +6,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join, basename } from "node:path";
 import { homedir } from "node:os";
-import { execSync } from "node:child_process";
+import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
+
+// Windows needs shell to resolve .cmd/.bat from PATH; args array prevents injection
+const _shellOpt: ExecFileSyncOptions = process.platform === "win32" ? { shell: true } : {};
 import { jsonResponse, readBody } from "../route-helpers.js";
 import { loadConfig, getHubSpotPak } from "../../utils/config.js";
 import { createThemeScaffold } from "../../hubspot/theme-scaffold.js";
@@ -63,7 +66,7 @@ export function handleSetupInfoRoute(res: ServerResponse): void {
 
   let hsInstalled = false;
   try {
-    execSync("hs --version", { encoding: "utf-8", stdio: "pipe" });
+    execFileSync("hs", ["--version"], { encoding: "utf-8", stdio: "pipe", ..._shellOpt });
     hsInstalled = true;
   } catch { /* not installed */ }
 
@@ -158,9 +161,10 @@ export function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse)
 
       if (config.hubspotUploadMode === "cli" || !pak) {
         // CLI fallback
-        execSync(`hs cms fetch "${name}" "${themePath}"`, {
+        execFileSync("hs", ["cms", "fetch", name, themePath], {
           encoding: "utf-8",
           stdio: "pipe",
+          ..._shellOpt,
         });
 
         createSession(themePath, safeDirName);

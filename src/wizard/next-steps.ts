@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { basename } from "node:path";
 import * as ui from "../prompts/prompter.js";
@@ -47,11 +47,11 @@ export async function showNextSteps(opts: {
       // Cross-platform browser open
       const platform = process.platform;
       if (platform === "darwin") {
-        execSync(`open "${url}"`);
+        execFileSync("open", [url], { stdio: "ignore" });
       } else if (platform === "win32") {
-        execSync(`cmd /c start "${url}"`);
+        execFileSync("cmd", ["/c", "start", "", url], { stdio: "ignore" });
       } else {
-        execSync(`xdg-open "${url}"`);
+        execFileSync("xdg-open", [url], { stdio: "ignore" });
       }
       ui.logSuccess("Opening HubSpot Landing Pages...");
     } catch {

@@ -13,7 +13,7 @@ import { getLocalThemes } from "./setup.js";
 import { detectEnvironment, detectHubSpotCLI, detectHubSpotAuth, detectGitHubCLI, detectGitHubAuth } from "../../utils/detect.js";
 import { validatePak } from "../../hubspot/api.js";
 import { getVersion } from "../../utils/fs.js";
-import { startJob, getJob } from "../process-manager.js";
+import { startJob, startJobSafe, getJob } from "../process-manager.js";
 
 // ---------------------------------------------------------------------------
 // Live model catalog — fetched from provider APIs, cached 10 minutes
@@ -316,8 +316,8 @@ export function handleSettingsHsAuthRoute(req: IncomingMessage, res: ServerRespo
             jsonResponse(res, 400, { error: "HubSpot CLI not installed", needsInstall: true });
             return;
           }
-          const jobId = startJob(
-            `hs auth --pak="${parsed.personalAccessKey}"`,
+          const jobId = startJobSafe(
+            "hs", ["auth", `--pak=${parsed.personalAccessKey}`],
             "Authenticating with HubSpot",
             { timeout: 30_000 }
           );
@@ -396,10 +396,10 @@ export function handleSettingsGhAuthRoute(req: IncomingMessage, res: ServerRespo
       }
 
       if (parsed.token) {
-        const jobId = startJob(
-          `echo "${parsed.token}" | gh auth login --with-token`,
+        const jobId = startJobSafe(
+          "gh", ["auth", "login", "--with-token"],
           "Authenticating with GitHub",
-          { timeout: 30_000 }
+          { timeout: 30_000, stdin: parsed.token }
         );
         jsonResponse(res, 200, { ok: true, jobId });
         return;
@@ -443,13 +443,19 @@ export function handleSettingsHsSwitchRoute(req: IncomingMessage, res: ServerRes
           jsonResponse(res, 400, { error: "HubSpot CLI not installed" });
           return;
         }
-        if (action === "remove" && portalId) {
-          const jobId = startJob(`hs accounts remove ${portalId}`, `Removing HubSpot account ${portalId}`, { timeout: 15_000 });
+        // Validate portalId is numeric to prevent injection
+        const safePortalId = String(portalId).replace(/[^0-9]/g, "");
+        if (!safePortalId) {
+          jsonResponse(res, 400, { error: "Invalid portalId" });
+          return;
+        }
+        if (action === "remove") {
+          const jobId = startJobSafe("hs", ["accounts", "remove", safePortalId], `Removing HubSpot account ${safePortalId}`, { timeout: 15_000 });
           jsonResponse(res, 200, { ok: true, jobId });
           return;
         }
-        if (portalId) {
-          const jobId = startJob(`hs accounts use ${portalId}`, `Switching to HubSpot account ${portalId}`, { timeout: 15_000 });
+        if (safePortalId) {
+          const jobId = startJobSafe("hs", ["accounts", "use", safePortalId], `Switching to HubSpot account ${safePortalId}`, { timeout: 15_000 });
           jsonResponse(res, 200, { ok: true, jobId });
           return;
         }
@@ -501,18 +507,23 @@ export function handleSettingsCLIAuthRoute(req: IncomingMessage, res: ServerResp
             process.env.OPENAI_API_KEY = key;
             saveConfig({ openaiApiKey: key } as any);
             if (process.platform !== "win32") {
-              const profileLine = `export OPENAI_API_KEY="${key}"`;
-              const shellProfile = process.env.SHELL?.includes("zsh")
-                ? join(homedir(), ".zshrc")
-                : join(homedir(), ".bashrc");
-              try {
-                const existing = existsSync(shellProfile)
-                  ? readFileSync(shellProfile, "utf-8")
-                  : "";
-                if (!existing.includes("OPENAI_API_KEY")) {
-                  appendFileSync(shellProfile, `\n# Added by vibeSpot\n${profileLine}\n`);
-                }
-              } catch { /* ignore profile write errors */ }
+              // Sanitize key to prevent shell profile injection — only allow
+              // alphanumeric chars, dashes, underscores, and dots (valid API key chars)
+              const safeKey = /^[A-Za-z0-9_\-.:]+$/.test(key) ? key : "";
+              if (safeKey) {
+                const profileLine = `export OPENAI_API_KEY="${safeKey}"`;
+                const shellProfile = process.env.SHELL?.includes("zsh")
+                  ? join(homedir(), ".zshrc")
+                  : join(homedir(), ".bashrc");
+                try {
+                  const existing = existsSync(shellProfile)
+                    ? readFileSync(shellProfile, "utf-8")
+                    : "";
+                  if (!existing.includes("OPENAI_API_KEY")) {
+                    appendFileSync(shellProfile, `\n# Added by vibeSpot\n${profileLine}\n`);
+                  }
+                } catch { /* ignore profile write errors */ }
+              }
             }
             jsonResponse(res, 200, { ok: true, message: "API key saved" });
           } else {

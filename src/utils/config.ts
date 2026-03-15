@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { chmodSync } from "node:fs";
 import { readFile, writeFile, fileExists } from "./fs.js";
 
 export type AIEngineType =
@@ -86,6 +87,10 @@ export function saveConfig(config: VibeSpotConfig): void {
   const existing = loadConfig();
   const merged = { ...existing, ...config };
   writeFile(CONFIG_PATH, JSON.stringify(merged, null, 2));
+  // Restrict file permissions — config contains API keys
+  if (process.platform !== "win32") {
+    try { chmodSync(CONFIG_PATH, 0o600); } catch { /* ignore */ }
+  }
 }
 
 export function getConfigDir(): string {

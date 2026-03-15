@@ -840,21 +840,31 @@ body { display: flex; }
   color: var(--success);
 }
 
-.brand-asset-view {
-  font-size: 11px;
-  padding: 2px 6px;
-  margin-left: 4px;
+.brand-asset-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.brand-asset-actions {
+  display: flex;
+  gap: 2px;
+}
+.brand-asset-action {
   background: none;
   border: none;
-  color: var(--accent);
+  color: var(--text-muted);
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  opacity: 0.7;
-  transition: opacity 0.15s ease;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s, background 0.15s;
 }
-.brand-asset-view:hover {
-  opacity: 1;
+.brand-asset-action:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+.brand-asset-action--delete:hover {
+  color: var(--error);
 }
 
 .brand-asset-upload__label {

@@ -4,7 +4,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
-import { jsonResponse, readBody } from "../route-helpers.js";
+import { jsonResponse, readBody, readJsonBody } from "../route-helpers.js";
 import {
   getSession,
   getOrderedModules,
@@ -70,12 +70,11 @@ export function handleModulesRoute(
   }
 
   if (method === "DELETE") {
-    readBody(req, (body) => {
-      const { moduleName, deleteEntirely } = JSON.parse(body);
-      if (deleteEntirely) {
-        removeModule(moduleName);
+    readJsonBody(req, res, (data: { moduleName: string; deleteEntirely?: boolean }) => {
+      if (data.deleteEntirely) {
+        removeModule(data.moduleName);
       } else {
-        detachModule(moduleName);
+        detachModule(data.moduleName);
       }
       saveSession();
       jsonResponse(res, 200, { ok: true });
@@ -161,10 +160,9 @@ export function handleCodeUpdateRoute(req: IncomingMessage, res: ServerResponse)
 }
 
 export function handleReorderRoute(req: IncomingMessage, res: ServerResponse): void {
-  readBody(req, (body) => {
-    const { order } = JSON.parse(body);
-    if (Array.isArray(order)) {
-      reorderModules(order);
+  readJsonBody(req, res, (data: { order: unknown }) => {
+    if (Array.isArray(data.order)) {
+      reorderModules(data.order);
       saveSession();
       jsonResponse(res, 200, { ok: true });
     } else {

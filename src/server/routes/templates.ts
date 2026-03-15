@@ -5,7 +5,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join, basename } from "node:path";
-import { execSync } from "node:child_process";
+import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
+
+const _shellOpt: ExecFileSyncOptions = process.platform === "win32" ? { shell: true } : {};
 import { jsonResponse, readBody } from "../route-helpers.js";
 import { log } from "../log.js";
 import { getHubSpotPak } from "../../utils/config.js";
@@ -78,10 +80,10 @@ export function handleDownloadZipRoute(res: ServerResponse): void {
 
     if (existsSync(tmpZip)) rmSync(tmpZip);
 
-    execSync(
-      `zip -r "${zipFileName}" "${folderName}" -x "${folderName}/.git/*" "${folderName}/.vibespot/*" "${folderName}/node_modules/*"`,
-      { cwd: parentDir, timeout: 30_000 }
-    );
+    execFileSync("zip", [
+      "-r", zipFileName, folderName,
+      "-x", `${folderName}/.git/*`, `${folderName}/.vibespot/*`, `${folderName}/node_modules/*`,
+    ], { cwd: parentDir, timeout: 30_000, ..._shellOpt });
 
     const zipData = readFileSync(tmpZip);
     rmSync(tmpZip);
