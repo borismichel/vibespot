@@ -330,7 +330,7 @@ async function viewStyleguide() {
     const res = await fetch("/api/brand-assets");
     const data = await res.json();
     if (data.styleguide) {
-      await vibeViewContent(data.styleguide, "Styleguide");
+      await vibeViewContent(data.styleguide, "Styleguide", "styleguide.md");
     } else {
       await vibeAlert("No styleguide found.", "Info");
     }
@@ -344,7 +344,7 @@ async function viewBrandvoice() {
     const res = await fetch("/api/brand-assets");
     const data = await res.json();
     if (data.brandvoice) {
-      await vibeViewContent(data.brandvoice, "Brand Voice");
+      await vibeViewContent(data.brandvoice, "Brand Voice", "brandvoice.md");
     } else {
       await vibeAlert("No brand voice found.", "Info");
     }
@@ -563,7 +563,7 @@ document.getElementById("btn-extract-design")?.addEventListener("click", async (
       await refreshDashboard();
       const view = await vibeConfirm("Design system extracted and saved as styleguide.", "Would you like to view it?", { confirmLabel: "View Styleguide", confirmClass: "btn--primary" });
       if (view && data.styleguide) {
-        await vibeViewContent(data.styleguide, "Styleguide");
+        await vibeViewContent(data.styleguide, "Styleguide", "styleguide.md");
       }
     } else {
       await vibeAlert(data.error || "Extraction failed", "Error");
@@ -607,7 +607,7 @@ document.getElementById("btn-import-reference")?.addEventListener("click", async
       await refreshDashboard();
       const view = await vibeConfirm("Design imported and saved as styleguide.", "Would you like to view it?", { confirmLabel: "View Styleguide", confirmClass: "btn--primary" });
       if (view && data.styleguide) {
-        await vibeViewContent(data.styleguide, "Styleguide");
+        await vibeViewContent(data.styleguide, "Styleguide", "styleguide.md");
       }
     } else {
       await vibeAlert(data.error || "Import failed", "Error");

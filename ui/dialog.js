@@ -217,7 +217,7 @@ function vibeFeedback() {
  * @param {string} [title] — dialog title
  * @returns {Promise<void>}
  */
-function vibeViewContent(content, title) {
+function vibeViewContent(content, title, downloadFilename) {
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
     overlay.className = "confirm-overlay";
@@ -232,17 +232,36 @@ function vibeViewContent(content, title) {
     const body = document.createElement("div");
     body.className = "confirm-dialog__content-view md-body";
     body.innerHTML = typeof marked !== "undefined" ? marked.parse(content) : esc(content);
+    // Inject color swatches next to hex codes
+    body.innerHTML = body.innerHTML.replace(
+      /(#[0-9A-Fa-f]{3,8})(?![0-9A-Fa-f])/g,
+      '<span class="color-swatch-wrap">$1<span class="color-swatch" style="background:$1"></span></span>'
+    );
     dialog.appendChild(body);
 
     const actions = document.createElement("div");
     actions.className = "confirm-dialog__actions";
-    actions.innerHTML = '<button class="btn btn--primary" data-action="ok">Close</button>';
+    if (downloadFilename) {
+      actions.innerHTML = '<button class="btn btn--secondary" data-action="download">Download</button>';
+    }
+    actions.innerHTML += '<button class="btn btn--primary" data-action="ok">Close</button>';
     dialog.appendChild(actions);
 
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
 
     const close = () => { overlay.remove(); resolve(); };
+    if (downloadFilename) {
+      overlay.querySelector('[data-action="download"]').addEventListener("click", () => {
+        const blob = new Blob([content], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = downloadFilename;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
     overlay.querySelector('[data-action="ok"]').addEventListener("click", close);
     overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
     document.addEventListener("keydown", function onKey(e) {
