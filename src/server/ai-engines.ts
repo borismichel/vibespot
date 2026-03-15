@@ -373,7 +373,7 @@ export async function streamWithGeminiAPI(
 // CLI subprocess helper — sends prompt via stdin to avoid shell arg limits
 // ---------------------------------------------------------------------------
 
-function spawnCLI(
+export function spawnCLI(
   bin: string,
   args: string[],
   prompt: string,
@@ -386,11 +386,17 @@ function spawnCLI(
     const child = spawn(bin, args, {
       stdio: ["pipe", "pipe", "pipe"],
       env,
-      shell: true,
     });
 
     let stdout = "";
     let stderr = "";
+    let settled = false;
+
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
 
     child.stdout.on("data", (d: Buffer) => {
       const chunk = d.toString();
@@ -400,29 +406,44 @@ function spawnCLI(
     child.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
 
     child.on("error", (err) =>
-      reject(new Error(`${bin} failed to start: ${err.message}`))
+      settle(() => reject(new Error(`${bin} failed to start: ${err.message}`)))
     );
 
     child.on("close", (code) => {
-      if (code !== 0) {
-        reject(new Error(
-          `${bin} exited with code ${code}.\n` +
-          (stderr ? `Stderr: ${stderr.slice(0, 500)}\n` : "") +
-          (stdout ? `Output: ${stdout.slice(0, 500)}` : "No output")
-        ));
-      } else {
-        resolve(stdout);
-      }
+      settle(() => {
+        if (code !== 0) {
+          reject(new Error(
+            `${bin} exited with code ${code}.\n` +
+            (stderr ? `Stderr: ${stderr.slice(0, 500)}\n` : "") +
+            (stdout ? `Output: ${stdout.slice(0, 500)}` : "No output")
+          ));
+        } else {
+          resolve(stdout);
+        }
+      });
     });
 
+    // Write prompt to stdin with backpressure handling for large prompts
     child.stdin.on("error", () => {});
-    child.stdin.write(prompt);
-    child.stdin.end();
+    const ok = child.stdin.write(prompt);
+    if (!ok) {
+      // Buffer is full — wait for drain before ending
+      child.stdin.once("drain", () => child.stdin.end());
+    } else {
+      child.stdin.end();
+    }
 
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       child.kill();
-      reject(new Error(`${bin} timed out after 10 minutes`));
-    }, 600_000);
+      settle(() => reject(new Error(
+        `${bin} timed out after 5 minutes.\n` +
+        (stderr ? `Stderr: ${stderr.slice(0, 500)}\n` : "") +
+        `Partial output (${stdout.length} chars): ${stdout.slice(0, 500)}`
+      )));
+    }, 300_000);
+
+    // Clear timeout when process exits normally
+    child.on("close", () => clearTimeout(timer));
   });
 }
 
@@ -447,6 +468,7 @@ export async function generateWithClaudeCode(
   prompt += "\n\n## User Request\n" + userMessage;
   prompt += buildStateContext();
   prompt += buildFileContextText(fileContexts);
+  prompt += "\n\n---\nRemember: respond with a ```vibespot-modules JSON block containing ALL modules. No text-only responses.";
 
   const args = ["--print"];
   if (config.claudeCodeModel) args.push("--model", config.claudeCodeModel);
@@ -492,6 +514,7 @@ export async function generateWithCLI(
   prompt += "\n\n## User Request\n" + userMessage;
   prompt += buildStateContext();
   prompt += buildFileContextText(fileContexts);
+  prompt += "\n\n---\nRemember: respond with a ```vibespot-modules JSON block containing ALL modules. No text-only responses.";
 
   let bin: string;
   let args: string[];

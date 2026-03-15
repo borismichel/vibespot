@@ -101,7 +101,7 @@ function handleWsMessage(msg) {
           if (m.role === "user") {
             appendUserMessage(m.content, m.timestamp);
           } else if (m.role === "assistant") {
-            appendRestoredAssistantMessage(m.content, m.timestamp);
+            appendRestoredAssistantMessage(m.content, m.timestamp, m.pipeline);
           }
         }
         scrollToBottom();
@@ -143,14 +143,292 @@ function handleWsMessage(msg) {
       break;
 
     case "error":
+      stopPipelineTimer();
       finishStreaming();
+      pipelineBubbleEl = null;
+      pipelineStepsEl = null;
+      pipelineModulesEl = null;
       appendAssistantError(msg.message);
       setStatus("Error");
       break;
 
     case "pong":
       break;
+
+    // --- Agentic pipeline events ---
+    case "agent_step":
+      handleAgentStep(msg);
+      break;
+    case "agent_decision":
+      handleAgentDecision(msg);
+      break;
+    case "module_progress":
+      handleModuleProgress(msg);
+      break;
+    case "pipeline_complete":
+      handlePipelineComplete(msg);
+      break;
+    case "pipeline_partial":
+      handlePipelinePartial(msg);
+      break;
+    case "agentic_prompt":
+      handleAgenticPrompt();
+      break;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Agentic pipeline UI
+// ---------------------------------------------------------------------------
+
+const STEP_LABELS = {
+  analyzing: "Analyzing",
+  designing: "Designing",
+  developing: "Developing",
+  quality_check: "Quality Check",
+};
+const STEP_ORDER = ["analyzing", "designing", "developing", "quality_check"];
+
+let pipelineBubbleEl = null;
+let pipelineStepsEl = null;
+let pipelineModulesEl = null;
+
+function ensurePipelineBubble() {
+  if (pipelineBubbleEl) return;
+
+  if (!isStreaming) {
+    isStreaming = true;
+    sendBtn.disabled = true;
+    streamStartTime = Date.now();
+    if (typeof showGeneratingPreview === "function") showGeneratingPreview();
+  }
+
+  // If startStreaming() already created an empty bubble, repurpose it
+  if (streamingMsgEl) {
+    const existingDiv = streamingMsgEl.closest(".chat-msg");
+    if (existingDiv) {
+      streamingMsgEl.innerHTML = `
+        <div class="pipeline-steps"></div>
+        <div class="pipeline-modules"></div>
+        <div class="pipeline-timer"></div>`;
+      pipelineBubbleEl = existingDiv;
+      pipelineStepsEl = streamingMsgEl.querySelector(".pipeline-steps");
+      pipelineModulesEl = streamingMsgEl.querySelector(".pipeline-modules");
+      startPipelineTimer(streamingMsgEl.querySelector(".pipeline-timer"));
+      scrollToBottom();
+      return;
+    }
+  }
+
+  const time = formatMessageTime(Date.now());
+  const div = document.createElement("div");
+  div.className = "chat-msg chat-msg--assistant chat-msg--streaming";
+  div.innerHTML = `
+    <div class="chat-msg__avatar chat-msg__avatar--ai">AI</div>
+    <div class="chat-msg__content">
+      <div class="chat-msg__header">
+        <span class="chat-msg__sender">vibeSpot AI</span>
+        <span class="chat-msg__time">${time}</span>
+      </div>
+      <div class="chat-msg__bubble">
+        <div class="pipeline-steps"></div>
+        <div class="pipeline-modules"></div>
+        <div class="pipeline-timer"></div>
+      </div>
+    </div>`;
+  messagesEl.appendChild(div);
+
+  pipelineBubbleEl = div;
+  pipelineStepsEl = div.querySelector(".pipeline-steps");
+  pipelineModulesEl = div.querySelector(".pipeline-modules");
+  streamingMsgEl = div.querySelector(".chat-msg__bubble");
+  startPipelineTimer(div.querySelector(".pipeline-timer"));
+  scrollToBottom();
+}
+
+function handleAgentStep(msg) {
+  ensurePipelineBubble();
+
+  // Mark previous steps as done
+  const existing = pipelineStepsEl.querySelectorAll(".pipeline-step");
+  existing.forEach((el) => {
+    if (!el.classList.contains("pipeline-step--done")) {
+      el.classList.add("pipeline-step--done");
+      el.classList.remove("pipeline-step--active");
+    }
+  });
+
+  // Add new step
+  const step = document.createElement("div");
+  step.className = "pipeline-step pipeline-step--active";
+  step.dataset.step = msg.step;
+  step.innerHTML = `<span class="pipeline-step__icon">⟳</span> <span class="pipeline-step__label">${msg.label || STEP_LABELS[msg.step] || msg.step}</span>`;
+
+  // Insert quality_check AFTER module cards so the visual order is:
+  // developing → module cards → quality check
+  if (msg.step === "quality_check" && pipelineModulesEl) {
+    pipelineModulesEl.after(step);
+  } else {
+    pipelineStepsEl.appendChild(step);
+  }
+
+  // Clear module cards when entering developing
+  if (msg.step === "developing") {
+    pipelineModulesEl.innerHTML = "";
+  }
+
+  scrollToBottom();
+}
+
+function handleAgentDecision(msg) {
+  if (!pipelineBubbleEl) return;
+
+  // Find the step element — may be inside pipelineStepsEl or after pipelineModulesEl
+  const bubble = streamingMsgEl || pipelineBubbleEl;
+  const steps = bubble.querySelectorAll(".pipeline-step");
+  const lastStep = steps[steps.length - 1];
+  if (lastStep) {
+    const detail = document.createElement("div");
+    detail.className = "pipeline-step__decision";
+    detail.textContent = msg.decision;
+    lastStep.appendChild(detail);
+  }
+  scrollToBottom();
+}
+
+function handleModuleProgress(msg) {
+  ensurePipelineBubble();
+
+  let card = pipelineModulesEl.querySelector(`[data-module="${CSS.escape(msg.module)}"]`);
+  if (!card) {
+    card = document.createElement("div");
+    card.className = "pipeline-module-card";
+    card.dataset.module = msg.module;
+    card.innerHTML = `<span class="pipeline-module-card__name">${escapeHtml(msg.module)}</span> <span class="pipeline-module-card__status"></span>`;
+    pipelineModulesEl.appendChild(card);
+  }
+
+  const statusEl = card.querySelector(".pipeline-module-card__status");
+  card.className = "pipeline-module-card pipeline-module-card--" + msg.status;
+
+  const statusLabels = {
+    queued: "queued",
+    generating: "generating...",
+    validating: "validating...",
+    retrying: "retrying...",
+    complete: "✓",
+    failed: "✗",
+  };
+  statusEl.textContent = statusLabels[msg.status] || msg.status;
+  scrollToBottom();
+}
+
+function handlePipelineComplete(msg) {
+  if (!pipelineBubbleEl) return;
+
+  stopPipelineTimer();
+
+  // Remove the live timer element
+  const timerEl = pipelineBubbleEl.querySelector(".pipeline-timer");
+  if (timerEl) timerEl.remove();
+
+  // Mark all steps as done (search whole bubble since quality_check is outside pipelineStepsEl)
+  const bubble = streamingMsgEl || pipelineBubbleEl;
+  bubble.querySelectorAll(".pipeline-step").forEach((el) => {
+    el.classList.add("pipeline-step--done");
+    el.classList.remove("pipeline-step--active");
+  });
+
+  // Add completion stats after the last element in the bubble
+  const stats = document.createElement("div");
+  stats.className = "pipeline-stats";
+  const duration = formatDuration(msg.durationMs);
+  stats.textContent = `Generated ${msg.modulesGenerated} module${msg.modulesGenerated === 1 ? "" : "s"} in ${duration}`;
+  if (msg.modulesUnchanged > 0) {
+    stats.textContent += ` (${msg.modulesUnchanged} unchanged)`;
+  }
+  // Place stats after quality_check step (or after modules if no quality step)
+  const qualityStep = bubble.querySelector('[data-step="quality_check"]');
+  if (qualityStep) {
+    qualityStep.after(stats);
+  } else if (pipelineModulesEl) {
+    pipelineModulesEl.after(stats);
+  } else {
+    pipelineStepsEl.appendChild(stats);
+  }
+
+  clearStreamStatus();
+  finishStreaming();
+
+  // Reset pipeline state
+  pipelineBubbleEl = null;
+  pipelineStepsEl = null;
+  pipelineModulesEl = null;
+}
+
+function handlePipelinePartial(msg) {
+  if (!pipelineBubbleEl) return;
+
+  stopPipelineTimer();
+
+  const timerEl = pipelineBubbleEl.querySelector(".pipeline-timer");
+  if (timerEl) timerEl.remove();
+
+  const bubble = streamingMsgEl || pipelineBubbleEl;
+  bubble.querySelectorAll(".pipeline-step").forEach((el) => {
+    el.classList.add("pipeline-step--done");
+    el.classList.remove("pipeline-step--active");
+  });
+
+  const stats = document.createElement("div");
+  stats.className = "pipeline-stats pipeline-stats--partial";
+  const duration = formatDuration(msg.durationMs);
+  stats.textContent = `${msg.succeeded.length} modules succeeded, ${msg.failed.length} failed in ${duration}`;
+  const qualityStep = bubble.querySelector('[data-step="quality_check"]');
+  if (qualityStep) {
+    qualityStep.after(stats);
+  } else if (pipelineModulesEl) {
+    pipelineModulesEl.after(stats);
+  } else {
+    pipelineStepsEl.appendChild(stats);
+  }
+
+  clearStreamStatus();
+  finishStreaming();
+
+  pipelineBubbleEl = null;
+  pipelineStepsEl = null;
+  pipelineModulesEl = null;
+}
+
+async function handleAgenticPrompt() {
+  // First-run onboarding: show dialog explaining agentic mode
+  if (typeof vibeConfirm !== "function") return;
+
+  const agreed = await vibeConfirm(
+    "Agentic Pipeline Available",
+    "vibeSpot can decompose AI generation into specialized agents:\n\n" +
+    "• Intent Analyzer — classifies your request\n" +
+    "• Page Architect — designs the page structure\n" +
+    "• Module Developer — generates each module in parallel\n" +
+    "• Validator — checks and auto-fixes errors\n\n" +
+    "Tradeoffs:\n" +
+    "✓ Better quality — each agent is focused on one task\n" +
+    "✓ Structured output — eliminates JSON parsing failures\n" +
+    "✓ Only changed modules regenerated on edits\n" +
+    "✗ Uses more calls per request (API calls or CLI subprocess calls)\n\n" +
+    "You can change this anytime in Settings.",
+    "Use Agentic Pipeline",
+    "Keep Single-Call",
+  );
+
+  try {
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agenticMode: agreed }),
+    });
+  } catch { /* ignore */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -480,9 +758,32 @@ function stopStreamTimer() {
 function formatDuration(ms) {
   const totalSec = Math.floor(ms / 1000);
   if (totalSec < 60) return totalSec + "s";
-  const min = Math.floor(totalSec / 60);
+  const hours = Math.floor(totalSec / 3600);
+  const min = Math.floor((totalSec % 3600) / 60);
   const sec = totalSec % 60;
+  if (hours > 0) {
+    return hours + "h " + (min < 10 ? "0" : "") + min + "m " + (sec < 10 ? "0" : "") + sec + "s";
+  }
   return min + "m " + (sec < 10 ? "0" : "") + sec + "s";
+}
+
+let pipelineTimerInterval = null;
+
+function startPipelineTimer(timerEl) {
+  stopPipelineTimer();
+  if (!timerEl) return;
+  const update = () => {
+    timerEl.textContent = formatDuration(Date.now() - streamStartTime);
+  };
+  update();
+  pipelineTimerInterval = setInterval(update, 1000);
+}
+
+function stopPipelineTimer() {
+  if (pipelineTimerInterval) {
+    clearInterval(pipelineTimerInterval);
+    pipelineTimerInterval = null;
+  }
 }
 
 function clearStreamStatus() {
@@ -617,16 +918,52 @@ function setStatus(text) {
 // Restored / system messages
 // ---------------------------------------------------------------------------
 
-function appendRestoredAssistantMessage(text, timestamp) {
+function appendRestoredAssistantMessage(text, timestamp, pipeline) {
   const time = formatMessageTime(timestamp);
   const div = document.createElement("div");
   div.className = "chat-msg chat-msg--assistant";
-  div.innerHTML = `
-    <div class="chat-msg__avatar chat-msg__avatar--ai">AI</div>
-    <div class="chat-msg__content">
-      ${time ? `<div class="chat-msg__header"><span class="chat-msg__sender">vibeSpot AI</span><span class="chat-msg__time">${time}</span></div>` : ""}
-      <div class="chat-msg__bubble">${renderMarkdown(text)}</div>
-    </div>`;
+
+  if (pipeline && pipeline.steps && pipeline.steps.length > 0) {
+    // Render detailed pipeline structure
+    const stepsHtml = pipeline.steps.map((s) => {
+      const icon = "&#x2714;";
+      const decisionsHtml = (s.decisions || [])
+        .map((d) => `<div class="pipeline-step__decision">${escapeHtml(d)}</div>`)
+        .join("");
+      return `<div class="pipeline-step pipeline-step--done"><span class="pipeline-step__icon">${icon}</span> <span class="pipeline-step__label">${escapeHtml(s.label)}</span>${decisionsHtml}</div>`;
+    }).join("");
+
+    const modulesHtml = pipeline.modules && pipeline.modules.length > 0
+      ? pipeline.modules.map((m) => {
+          const statusClass = m.status === "failed" ? "pipeline-module-card--failed" : "pipeline-module-card--done";
+          const statusIcon = m.status === "failed" ? "&#x2718;" : "&#x2714;";
+          return `<div class="pipeline-module-card ${statusClass}">${statusIcon} ${escapeHtml(m.name)}</div>`;
+        }).join("")
+      : "";
+
+    const duration = formatDuration(pipeline.stats.durationMs);
+    let statsText = `Generated ${pipeline.stats.modulesGenerated} module${pipeline.stats.modulesGenerated === 1 ? "" : "s"} in ${duration}`;
+    if (pipeline.stats.modulesUnchanged > 0) {
+      statsText += ` (${pipeline.stats.modulesUnchanged} unchanged)`;
+    }
+    const statsClass = pipeline.stats.modulesFailed > 0 ? "pipeline-stats pipeline-stats--partial" : "pipeline-stats";
+
+    div.innerHTML = `
+      <div class="chat-msg__avatar chat-msg__avatar--ai">AI</div>
+      <div class="chat-msg__content">
+        ${time ? `<div class="chat-msg__header"><span class="chat-msg__sender">vibeSpot AI</span><span class="chat-msg__time">${time}</span></div>` : ""}
+        <div class="chat-msg__bubble">
+          <div class="pipeline-steps">${stepsHtml}${modulesHtml ? `<div class="pipeline-modules-restored">${modulesHtml}</div>` : ""}<div class="${statsClass}">${statsText}</div></div>
+        </div>
+      </div>`;
+  } else {
+    div.innerHTML = `
+      <div class="chat-msg__avatar chat-msg__avatar--ai">AI</div>
+      <div class="chat-msg__content">
+        ${time ? `<div class="chat-msg__header"><span class="chat-msg__sender">vibeSpot AI</span><span class="chat-msg__time">${time}</span></div>` : ""}
+        <div class="chat-msg__bubble">${renderMarkdown(text)}</div>
+      </div>`;
+  }
   messagesEl.appendChild(div);
 }
 

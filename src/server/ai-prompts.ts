@@ -142,6 +142,11 @@ The current template's modules are listed in page order in the user message. Thi
     }
   }
 
+  const formatReminder = `
+
+## REMINDER — Output Format (CRITICAL)
+Your response MUST contain a \`\`\`vibespot-modules code block with the full JSON. Without this block, no modules will be created. Do NOT respond with only text, tables, or descriptions. The JSON block is mandatory.`;
+
   if (editMode) {
     return core + pageTypePrompt + brandPrompt + `
 
@@ -149,7 +154,7 @@ The current template's modules are listed in page order in the user message. Thi
 ${getHubspotRules()}
 
 ## Conversion Guide Reference
-${conversionGuide}`;
+${conversionGuide}` + formatReminder;
   }
 
   return core + pageTypePrompt + brandPrompt + `
@@ -186,7 +191,7 @@ ${getContentGuide()}
 ${getHubspotRules()}
 
 ## Conversion Guide Reference
-${conversionGuide}`;
+${conversionGuide}` + formatReminder;
 }
 
 /**
@@ -283,6 +288,10 @@ export function buildMessagesWithContext(
   let textContent = userMessage;
   if (stateContext) textContent += `\n\n---\n${stateContext}`;
   if (assetManifest) textContent += assetManifest;
+
+  // Format reminder — placed at the end of user content so the model sees it
+  // right before it starts generating. This combats the "forgot the format" problem.
+  textContent += `\n\n---\nRemember: respond with a \`\`\`vibespot-modules JSON block containing ALL modules. No text-only responses.`;
 
   // Add document text from attachments
   const hasFiles = fileContexts && fileContexts.length > 0;

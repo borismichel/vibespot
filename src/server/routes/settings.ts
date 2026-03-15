@@ -137,6 +137,8 @@ export function handleSettingsStatusRoute(res: ServerResponse): void {
     })),
     activeHubSpotAccount: config.activeHubSpotAccount || null,
     enabledCLITools: config.enabledCLITools || [],
+    agenticMode: config.agenticMode,
+    agenticConcurrency: config.agenticConcurrency,
   };
 
   const sessionCount = listSessions().length;
@@ -579,6 +581,34 @@ export function handleSettingsCliToggleRoute(req: IncomingMessage, res: ServerRe
       }
       setCliToolEnabled(toolId, enabled);
       jsonResponse(res, 200, { ok: true, toolId, enabled });
+    } catch (err) {
+      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Generic settings save (used for agentic mode, etc.)
+// ---------------------------------------------------------------------------
+
+export function handleSettingsGenericRoute(req: IncomingMessage, res: ServerResponse): void {
+  readBody(req, (body) => {
+    try {
+      const data = JSON.parse(body);
+      const allowedKeys = ["agenticMode", "agenticConcurrency"];
+      const update: Record<string, unknown> = {};
+
+      for (const key of allowedKeys) {
+        if (key in data) update[key] = data[key];
+      }
+
+      if (Object.keys(update).length === 0) {
+        jsonResponse(res, 400, { error: "No valid settings fields provided" });
+        return;
+      }
+
+      saveConfig(update as import("../../utils/config.js").VibeSpotConfig);
+      jsonResponse(res, 200, { ok: true, updated: Object.keys(update) });
     } catch (err) {
       jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
     }

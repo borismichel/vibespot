@@ -37,6 +37,9 @@ export interface VibeSpotConfig {
   hubspotUploadMode?: "api" | "cli"; // default "api"
   // CLI tool toggles — only enabled tools get checked on settings load
   enabledCLITools?: string[];
+  // Agentic pipeline — multi-stage decomposed AI generation
+  agenticMode?: boolean;           // undefined = never prompted, true/false = user choice
+  agenticConcurrency?: number;     // max parallel module generation calls (default 3)
 }
 
 const CONFIG_DIR = join(homedir(), ".vibespot");

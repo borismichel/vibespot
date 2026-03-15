@@ -1,0 +1,613 @@
+/**
+ * Engine adapter for agentic pipeline — structured output via each provider's
+ * native mechanism (Anthropic tool_use, OpenAI json_schema, Gemini responseSchema)
+ * for API engines, or prompt-based JSON extraction for CLI engines.
+ *
+ * This is a lower-level API than the streaming functions in ai-engines.ts.
+ * It accepts custom system prompts and structured output schemas, returning
+ * parsed JSON or raw text.
+ */
+
+import type Anthropic from "@anthropic-ai/sdk";
+import { spawnCLI } from "../ai-engines.js";
+import { tryParseJSON, tryRepairTruncatedJSON } from "../ai-parser.js";
+import { loadConfig } from "../../utils/config.js";
+import { log } from "../log.js";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface MultimodalContent {
+  type: "text";
+  text: string;
+}
+
+export interface AgentMessage {
+  role: "user" | "assistant";
+  content: string | MultimodalContent[];
+}
+
+export interface StructuredOutputSpec {
+  /** JSON Schema for the expected output */
+  schema: Record<string, unknown>;
+  /** Name for the schema / tool (used by Anthropic tool_use, OpenAI json_schema) */
+  name: string;
+}
+
+export interface AgentCallOptions {
+  systemPrompt: string;
+  messages: AgentMessage[];
+  structuredOutput?: StructuredOutputSpec;
+  maxTokens?: number;
+  onChunk?: (chunk: string) => void;
+  onStatus?: (status: string) => void;
+}
+
+export type AgentCallResult =
+  | { type: "structured"; data: unknown }
+  | { type: "text"; text: string };
+
+export type AgentEngine =
+  | "anthropic-api"
+  | "openai-api"
+  | "gemini-api"
+  | "claude-code"
+  | "gemini-cli"
+  | "codex-cli";
+
+// ---------------------------------------------------------------------------
+// Rate limit retry delays (shared with ai-engines.ts pattern)
+// ---------------------------------------------------------------------------
+
+const RATE_LIMIT_DELAYS = [10, 20, 40, 60, 120]; // seconds
+
+async function withRateLimitRetry<T>(
+  fn: () => Promise<T>,
+  onStatus?: (status: string) => void,
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      const status = (err as { status?: number }).status;
+      const errType = (err as { error?: { type?: string } }).error?.type;
+      const is429 =
+        status === 429 ||
+        errType === "rate_limit_error" ||
+        (err instanceof Error && err.message.includes("429"));
+
+      if (!is429 || attempt >= RATE_LIMIT_DELAYS.length) throw err;
+
+      const wait = RATE_LIMIT_DELAYS[attempt];
+      log.warn(
+        "agent-adapter",
+        `Rate limited (429), attempt ${attempt + 1}/${RATE_LIMIT_DELAYS.length} — waiting ${wait}s`,
+      );
+      if (onStatus) onStatus(`Rate limited — retrying in ${wait}s...`);
+      await new Promise((r) => setTimeout(r, wait * 1000));
+      if (onStatus) onStatus("Retrying...");
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Post-processing: ensure fieldsJson / metaJson are strings, not objects
+// ---------------------------------------------------------------------------
+
+function stringifyJsonFields(data: unknown): unknown {
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const obj = data as Record<string, unknown>;
+    for (const key of ["fieldsJson", "metaJson"]) {
+      if (obj[key] && typeof obj[key] === "object") {
+        obj[key] = JSON.stringify(obj[key]);
+      }
+    }
+  }
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Anthropic Adapter — structured output via tool_use
+// ---------------------------------------------------------------------------
+
+let _AnthropicCtor: typeof import("@anthropic-ai/sdk").default | null = null;
+async function getAnthropicSDK(): Promise<
+  typeof import("@anthropic-ai/sdk").default
+> {
+  if (!_AnthropicCtor) {
+    const mod = await import("@anthropic-ai/sdk");
+    _AnthropicCtor = mod.default;
+  }
+  return _AnthropicCtor;
+}
+
+async function callAnthropic(
+  apiKey: string,
+  model: string,
+  opts: AgentCallOptions,
+): Promise<AgentCallResult> {
+  const AnthropicSDK = await getAnthropicSDK();
+  const client = new AnthropicSDK({ apiKey });
+
+  const messages =
+    opts.messages as unknown as import("@anthropic-ai/sdk").MessageParam[];
+
+  if (opts.structuredOutput) {
+    // Use tool_use to enforce structured output
+    const tool: Anthropic.Tool = {
+      name: opts.structuredOutput.name,
+      description: `Return the result as structured JSON matching the ${opts.structuredOutput.name} schema.`,
+      input_schema:
+        opts.structuredOutput.schema as Anthropic.Tool.InputSchema,
+    };
+
+    return withRateLimitRetry(async () => {
+      const response = await client.messages.create({
+        model,
+        max_tokens: opts.maxTokens || 16000,
+        system: opts.systemPrompt,
+        messages,
+        tools: [tool],
+        tool_choice: { type: "tool", name: opts.structuredOutput!.name },
+      });
+
+      // Extract tool_use input from the response
+      for (const block of response.content) {
+        if (block.type === "tool_use") {
+          return {
+            type: "structured" as const,
+            data: stringifyJsonFields(block.input),
+          };
+        }
+      }
+
+      // Fallback: no tool_use block found — return text
+      const textParts = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text);
+      return { type: "text" as const, text: textParts.join("") };
+    }, opts.onStatus);
+  }
+
+  // Non-structured: regular text generation
+  return withRateLimitRetry(async () => {
+    let fullText = "";
+    const stream = client.messages.stream({
+      model,
+      max_tokens: opts.maxTokens || 16000,
+      system: opts.systemPrompt,
+      messages,
+    });
+
+    for await (const event of stream) {
+      if (
+        event.type === "content_block_delta" &&
+        event.delta.type === "text_delta"
+      ) {
+        fullText += event.delta.text;
+        if (opts.onChunk) opts.onChunk(event.delta.text);
+      }
+    }
+
+    return { type: "text" as const, text: fullText };
+  }, opts.onStatus);
+}
+
+// ---------------------------------------------------------------------------
+// OpenAI Adapter — structured output via response_format json_schema
+// ---------------------------------------------------------------------------
+
+/**
+ * Recursively add `additionalProperties: false` to all object-type schemas
+ * (required by OpenAI's structured output).
+ */
+function addAdditionalPropertiesFalse(
+  schema: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...schema };
+  if (result.type === "object") {
+    result.additionalProperties = false;
+    if (
+      result.properties &&
+      typeof result.properties === "object"
+    ) {
+      const props: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(
+        result.properties as Record<string, unknown>,
+      )) {
+        props[k] =
+          v && typeof v === "object"
+            ? addAdditionalPropertiesFalse(v as Record<string, unknown>)
+            : v;
+      }
+      result.properties = props;
+    }
+  }
+  if (result.items && typeof result.items === "object") {
+    result.items = addAdditionalPropertiesFalse(
+      result.items as Record<string, unknown>,
+    );
+  }
+  return result;
+}
+
+async function callOpenAI(
+  apiKey: string,
+  model: string,
+  opts: AgentCallOptions,
+): Promise<AgentCallResult> {
+  const openaiMessages = [
+    { role: "system", content: opts.systemPrompt },
+    ...opts.messages.map((m) => ({
+      role: m.role,
+      content:
+        typeof m.content === "string"
+          ? m.content
+          : m.content.map((b) => ({ type: "text" as const, text: b.text })),
+    })),
+  ];
+
+  const body: Record<string, unknown> = {
+    model,
+    max_tokens: opts.maxTokens || 16000,
+    messages: openaiMessages,
+  };
+
+  if (opts.structuredOutput) {
+    body.response_format = {
+      type: "json_schema",
+      json_schema: {
+        name: opts.structuredOutput.name,
+        strict: true,
+        schema: addAdditionalPropertiesFalse(opts.structuredOutput.schema),
+      },
+    };
+  }
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    const status = response.status;
+    if (status === 429) {
+      const error = new Error(`OpenAI rate limit: ${err}`);
+      (error as unknown as { status: number }).status = 429;
+      throw error;
+    }
+    throw new Error(`OpenAI API error (${status}): ${err}`);
+  }
+
+  const json = await response.json();
+  const content = json.choices?.[0]?.message?.content || "";
+
+  if (opts.structuredOutput) {
+    try {
+      return {
+        type: "structured",
+        data: stringifyJsonFields(JSON.parse(content)),
+      };
+    } catch {
+      log.warn("agent-adapter", "OpenAI structured output parse failed, returning raw text");
+      return { type: "text", text: content };
+    }
+  }
+
+  return { type: "text", text: content };
+}
+
+// ---------------------------------------------------------------------------
+// Gemini Adapter — structured output via responseMimeType + responseSchema
+// ---------------------------------------------------------------------------
+
+async function callGemini(
+  apiKey: string,
+  _model: string,
+  opts: AgentCallOptions,
+): Promise<AgentCallResult> {
+  const model = _model || "gemini-2.5-flash";
+
+  // Gemini uses "user" / "model" roles
+  const contents = opts.messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts:
+      typeof m.content === "string"
+        ? [{ text: m.content }]
+        : m.content.map((b) => ({ text: b.text })),
+  }));
+
+  const body: Record<string, unknown> = {
+    systemInstruction: { parts: [{ text: opts.systemPrompt }] },
+    contents,
+    generationConfig: {
+      maxOutputTokens: opts.maxTokens || 16000,
+      ...(opts.structuredOutput
+        ? {
+            responseMimeType: "application/json",
+            responseSchema: opts.structuredOutput.schema,
+          }
+        : {}),
+    },
+  };
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    const status = response.status;
+    if (status === 429) {
+      const error = new Error(`Gemini rate limit: ${err}`);
+      (error as unknown as { status: number }).status = 429;
+      throw error;
+    }
+    throw new Error(`Gemini API error (${status}): ${err}`);
+  }
+
+  const json = await response.json();
+  const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+  if (opts.structuredOutput) {
+    try {
+      return {
+        type: "structured",
+        data: stringifyJsonFields(JSON.parse(text)),
+      };
+    } catch {
+      log.warn("agent-adapter", "Gemini structured output parse failed, returning raw text");
+      return { type: "text", text };
+    }
+  }
+
+  return { type: "text", text };
+}
+
+// ---------------------------------------------------------------------------
+// CLI Adapter — structured output via prompt instructions + post-parse
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve CLI binary and args for a given engine.
+ */
+function resolveCLIBinary(engine: AgentEngine): { bin: string; args: string[] } {
+  switch (engine) {
+    case "claude-code": {
+      const config = loadConfig();
+      const args = ["--print"];
+      if (config.claudeCodeModel) args.push("--model", config.claudeCodeModel);
+      return { bin: "claude", args };
+    }
+    case "gemini-cli":
+      return { bin: "gemini", args: [] };
+    case "codex-cli":
+      return { bin: "codex", args: ["exec", "--full-auto"] };
+    default:
+      throw new Error(`Not a CLI engine: ${engine}`);
+  }
+}
+
+/**
+ * Build a flat prompt string from AgentCallOptions for CLI engines.
+ * CLI engines receive a single string via stdin — no separate system/user messages.
+ */
+function buildCLIPrompt(opts: AgentCallOptions): string {
+  const parts: string[] = [opts.systemPrompt];
+
+  for (const msg of opts.messages) {
+    const role = msg.role === "user" ? "User" : "Assistant";
+    const text =
+      typeof msg.content === "string"
+        ? msg.content
+        : msg.content.map((b) => b.text).join("\n");
+    parts.push(`\n\n## ${role}\n${text}`);
+  }
+
+  if (opts.structuredOutput) {
+    const schemaDesc = describeSchema(opts.structuredOutput.schema);
+    parts.push(`\n\n## Output Format — CRITICAL
+Respond with a JSON code block. Wrap your JSON in \`\`\`json fences. No prose or explanation before or after the code block.
+
+The JSON must match this structure:
+${schemaDesc}`);
+  }
+
+  return parts.join("");
+}
+
+/**
+ * Generate a human-readable schema description from a JSON Schema object.
+ */
+function describeSchema(schema: Record<string, unknown>, indent = 0): string {
+  const pad = "  ".repeat(indent);
+  const props = schema.properties as Record<string, Record<string, unknown>> | undefined;
+  const required = (schema.required as string[]) || [];
+
+  if (!props) return `${pad}${JSON.stringify(schema)}`;
+
+  const lines: string[] = ["{"];
+  for (const [key, prop] of Object.entries(props)) {
+    const req = required.includes(key) ? " (required)" : "";
+    const type = prop.type || "any";
+    const desc = prop.description ? ` — ${prop.description}` : "";
+    const enumVals = prop.enum ? ` [${(prop.enum as string[]).join(", ")}]` : "";
+
+    if (type === "array" && prop.items) {
+      const itemType = (prop.items as Record<string, unknown>).type || "object";
+      lines.push(`${pad}  "${key}": ${type}<${itemType}>${req}${desc}${enumVals}`);
+    } else if (type === "object" && prop.properties) {
+      lines.push(`${pad}  "${key}": ${describeSchema(prop as Record<string, unknown>, indent + 1)}${req}${desc}`);
+    } else {
+      lines.push(`${pad}  "${key}": ${type}${req}${desc}${enumVals}`);
+    }
+  }
+  lines.push(`${pad}}`);
+  return lines.join("\n");
+}
+
+/**
+ * Extract JSON from CLI output that may contain prose, markdown fences, or raw JSON.
+ * Tries multiple strategies to find valid JSON anywhere in the output.
+ */
+function extractJSON(output: string): unknown | null {
+  const trimmed = output.trim();
+
+  // Strategy 1: Direct parse (output is raw JSON with no surrounding text)
+  const direct = tryParseJSON(trimmed);
+  if (direct && typeof direct === "object") return direct;
+
+  // Strategy 2: Extract from markdown fenced code blocks (```json ... ``` or ``` ... ```)
+  const fenceMatch = trimmed.match(/```(?:json|vibespot-modules)?\s*\n([\s\S]*?)```/i);
+  if (fenceMatch) {
+    const fenced = fenceMatch[1].trim();
+    const parsed = tryParseJSON(fenced);
+    if (parsed && typeof parsed === "object") return parsed;
+    const repaired = tryRepairTruncatedJSON(fenced);
+    if (repaired && typeof repaired === "object") return repaired;
+  }
+
+  // Strategy 3: Find the outermost { ... } in the output (greedy brace matching)
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const braceContent = trimmed.slice(firstBrace, lastBrace + 1);
+    const parsed = tryParseJSON(braceContent);
+    if (parsed && typeof parsed === "object") return parsed;
+    const repaired = tryRepairTruncatedJSON(braceContent);
+    if (repaired && typeof repaired === "object") return repaired;
+  }
+
+  // Strategy 4: Try repair on the full output (may be truncated JSON with leading text stripped)
+  const repaired = tryRepairTruncatedJSON(trimmed);
+  if (repaired && typeof repaired === "object") return repaired;
+
+  return null;
+}
+
+/**
+ * Call an AI agent via CLI subprocess with prompt-based JSON extraction.
+ */
+async function callAgentCLI(
+  engine: AgentEngine,
+  model: string,
+  opts: AgentCallOptions,
+): Promise<AgentCallResult> {
+  const { bin, args } = resolveCLIBinary(engine);
+  const prompt = buildCLIPrompt(opts);
+
+  const rawOutput = await spawnCLI(bin, args, prompt, opts.onChunk);
+
+  if (!opts.structuredOutput) {
+    return { type: "text", text: rawOutput };
+  }
+
+  // Extract JSON from CLI output using multiple strategies
+  const parsed = extractJSON(rawOutput);
+  if (parsed) {
+    return {
+      type: "structured",
+      data: stringifyJsonFields(parsed as Record<string, unknown>),
+    };
+  }
+
+  log.warn("agent-cli", `${engine}: failed to parse structured output, returning text`, {
+    outputPreview: rawOutput.slice(0, 500),
+    outputLength: rawOutput.length,
+  });
+  return { type: "text", text: rawOutput };
+}
+
+// ---------------------------------------------------------------------------
+// Unified entry points
+// ---------------------------------------------------------------------------
+
+const API_ENGINES = new Set(["anthropic-api", "openai-api", "gemini-api"]);
+
+/**
+ * Call an AI agent via API with optional structured output enforcement.
+ */
+export async function callAgentAPI(
+  engine: AgentEngine,
+  apiKey: string,
+  model: string,
+  opts: AgentCallOptions,
+): Promise<AgentCallResult> {
+  log.info("agent-adapter", `${engine} API call`, {
+    model,
+    structured: !!opts.structuredOutput,
+    schemaName: opts.structuredOutput?.name,
+    systemPromptLength: opts.systemPrompt.length,
+    messageCount: opts.messages.length,
+  });
+
+  switch (engine) {
+    case "anthropic-api":
+      return callAnthropic(apiKey, model, opts);
+    case "openai-api":
+      return callOpenAI(apiKey, model, opts);
+    case "gemini-api":
+      return callGemini(apiKey, model, opts);
+    default:
+      throw new Error(`Unsupported API engine: ${engine}`);
+  }
+}
+
+/**
+ * Unified agent call dispatcher — routes to API or CLI adapter based on engine type.
+ * Stages should call this instead of callAgentAPI directly.
+ */
+export async function callAgent(
+  engine: AgentEngine,
+  apiKey: string,
+  model: string,
+  opts: AgentCallOptions,
+): Promise<AgentCallResult> {
+  if (API_ENGINES.has(engine)) {
+    return callAgentAPI(engine, apiKey, model, opts);
+  }
+
+  log.info("agent-adapter", `${engine} CLI call`, {
+    structured: !!opts.structuredOutput,
+    schemaName: opts.structuredOutput?.name,
+    systemPromptLength: opts.systemPrompt.length,
+    messageCount: opts.messages.length,
+  });
+
+  return callAgentCLI(engine, model, opts);
+}
+
+/**
+ * Check if an engine type supports the agentic pipeline.
+ * All engine types now support agentic mode — CLI engines use
+ * prompt-based JSON extraction instead of native structured output.
+ */
+export function isAgenticCapable(
+  engine: string,
+): engine is AgentEngine {
+  return (
+    engine === "anthropic-api" ||
+    engine === "openai-api" ||
+    engine === "gemini-api" ||
+    engine === "claude-code" ||
+    engine === "gemini-cli" ||
+    engine === "codex-cli"
+  );
+}
+
+/**
+ * Check if an engine is a CLI engine (subprocess-based).
+ */
+export function isCLIEngine(engine: string): boolean {
+  return engine === "claude-code" || engine === "gemini-cli" || engine === "codex-cli";
+}

@@ -12,13 +12,15 @@ import {
   getSession,
   addMessage,
   getOrderedModules,
+  updateModules,
+  reorderModules,
   writeModulesToDisk,
   saveSession,
   getActiveTemplate,
 } from "./session.js";
 import { commitThemeState, commitTemplateState, isGitAvailable } from "./project-git.js";
 import { buildPreviewHtml, buildModulePreviewHtml } from "./preview.js";
-import { handleGenerateStream, setParseWarningCallback } from "./ai-handler.js";
+import { handleGenerateStream, handleAgenticGenerate, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback } from "./ai-handler.js";
 import { loadConfig, getHubSpotPak, getActiveHubSpotAccount } from "../utils/config.js";
 import { detectHubSpotAuth, detectDataCenter, detectHubSpotAuthFromConfig } from "../utils/detect.js";
 import { applyAutoFixes, parseUploadErrors, parseApiErrors } from "./auto-fix.js";
@@ -49,6 +51,7 @@ import {
   handleSettingsCLIAuthRoute,
   handleSettingsHsModeRoute,
   handleSettingsCliToggleRoute,
+  handleSettingsGenericRoute,
   handleSettingsJobRoute,
 } from "./routes/settings.js";
 import {
@@ -334,6 +337,11 @@ function handleApiRoute(
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
+    case "/api/settings":
+      if (method === "POST") handleSettingsGenericRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
     case "/api/changelog":
       if (method === "GET") {
         jsonResponse(res, 200, { changelog: getChangelog() });
@@ -456,24 +464,102 @@ function handleWsConnection(ws: WebSocket): void {
         addMessage("user", userMessage);
         saveSession();
 
-        // Set up parse warning callback for this generation
-        setParseWarningCallback((warning) => {
-          ws.send(JSON.stringify({ type: "parse_warning", message: warning }));
-        });
-
-        // Stream AI response back via WebSocket
         const fileIds = Array.isArray(msg.fileIds) ? msg.fileIds as string[] : undefined;
+
+        // Check if agentic mode should be used
+        const agenticCheck = shouldUseAgenticMode();
+
+        // Notify frontend if agentic mode needs first-run prompt
+        if (agenticCheck.needsPrompt) {
+          ws.send(JSON.stringify({ type: "agentic_prompt" }));
+          // Don't block — fall through to single-call mode for now.
+          // User can choose agentic mode from the prompt, which saves to config.
+        }
+
         try {
-          await handleGenerateStream(
-            userMessage,
-            (chunk) => {
-              ws.send(JSON.stringify({ type: "stream", content: chunk }));
-            },
-            (status) => {
-              ws.send(JSON.stringify({ type: "stream_status", content: status }));
-            },
-            fileIds
-          );
+          if (agenticCheck.useAgentic) {
+            // --- Agentic pipeline mode ---
+            // Collect pipeline events for metadata persistence
+            const pipelineSteps: { step: string; label: string; decisions?: string[] }[] = [];
+            const pipelineModules: { name: string; status: "complete" | "failed" }[] = [];
+
+            const result = await handleAgenticGenerate(
+              userMessage,
+              (event) => {
+                // Don't send moduleFiles over WebSocket (too large)
+                if (event.type === "module_progress" && event.moduleFiles) {
+                  const { moduleFiles, ...wsEvent } = event;
+                  ws.send(JSON.stringify(wsEvent));
+                } else {
+                  ws.send(JSON.stringify(event));
+                }
+
+                // Collect events for metadata + incremental preview
+                if (event.type === "agent_step") {
+                  pipelineSteps.push({ step: event.step, label: event.label });
+                } else if (event.type === "agent_decision") {
+                  const last = pipelineSteps[pipelineSteps.length - 1];
+                  if (last) {
+                    if (!last.decisions) last.decisions = [];
+                    last.decisions.push(event.decision);
+                  }
+                } else if (event.type === "design_system_ready") {
+                  // Design system created — push CSS to session for themed placeholders
+                  updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
+                } else if (event.type === "blueprint_ready") {
+                  // Module plan ready — set order for incremental preview placeholders
+                  updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
+                  reorderModules(event.moduleOrder);
+                  ws.send(JSON.stringify({
+                    type: "modules_updated",
+                    modules: getOrderedModules().map((m) => m.moduleName),
+                  }));
+                } else if (event.type === "module_progress" && event.status === "complete" && event.moduleFiles) {
+                  // Push completed module to session immediately for incremental preview
+                  updateModules({ modules: [{
+                    moduleName: event.module,
+                    fieldsJson: event.moduleFiles.fieldsJson,
+                    metaJson: event.moduleFiles.metaJson,
+                    moduleHtml: event.moduleFiles.moduleHtml,
+                    moduleCss: event.moduleFiles.moduleCss,
+                    moduleJs: event.moduleFiles.moduleJs,
+                  }] });
+                  ws.send(JSON.stringify({
+                    type: "modules_updated",
+                    modules: getOrderedModules().map((m) => m.moduleName),
+                  }));
+                  pipelineModules.push({ name: event.module, status: "complete" });
+                } else if (event.type === "module_progress" && event.status === "failed") {
+                  pipelineModules.push({ name: event.module, status: "failed" });
+                }
+              },
+              fileIds,
+            );
+
+            // Apply result to session with pipeline metadata
+            applyPipelineResult(result, {
+              steps: pipelineSteps,
+              modules: pipelineModules,
+              stats: result.stats,
+            });
+
+          } else {
+            // --- Single-call mode (existing behavior) ---
+            setParseWarningCallback((warning) => {
+              ws.send(JSON.stringify({ type: "parse_warning", message: warning }));
+            });
+
+            await handleGenerateStream(
+              userMessage,
+              (chunk) => {
+                ws.send(JSON.stringify({ type: "stream", content: chunk }));
+              },
+              (status) => {
+                ws.send(JSON.stringify({ type: "stream_status", content: status }));
+              },
+              fileIds
+            );
+          }
 
           // Write modules to disk and commit for version history
           const currentSession = getSession();

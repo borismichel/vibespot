@@ -160,6 +160,53 @@ function renderAITab(body, data) {
 
   body.appendChild(section);
 
+  // Agentic Pipeline section
+  const agenticSection = el("section", "settings__section");
+  agenticSection.appendChild(sectionTitle("Agentic Pipeline"));
+
+  const isCli = activeEngine && ["claude-code", "gemini-cli", "codex-cli"].includes(activeEngine);
+  const agenticMode = config.agenticMode;
+
+  if (isCli) {
+    agenticSection.appendChild(desc("Decompose AI generation into specialized agents with per-module parallel calls. Better quality and structured output enforcement. CLI engines use subprocess calls — may be slower than API engines."));
+  } else {
+    agenticSection.appendChild(desc("Decompose AI generation into specialized agents with per-module parallel calls. Better quality and structured output enforcement."));
+  }
+
+  const toggleRow = el("div", "settings__toggle-row");
+  const labelWrap = el("div", "");
+  const label = el("div", "settings__toggle-label");
+  label.textContent = "Enable Agentic Pipeline";
+  labelWrap.appendChild(label);
+
+  const sub = el("div", "settings__toggle-label-sub");
+  if (agenticMode === true) {
+    sub.textContent = "Active — multi-stage pipeline with parallel module generation";
+    sub.style.color = "var(--success)";
+  } else if (agenticMode === false) {
+    sub.textContent = "Disabled — using single-call mode";
+    sub.style.color = "var(--text-muted)";
+  } else {
+    sub.textContent = "Not configured — will be prompted on first generation";
+    sub.style.color = "var(--warning)";
+  }
+  labelWrap.appendChild(sub);
+  toggleRow.appendChild(labelWrap);
+
+  const toggle = el("button", "settings__toggle" + (agenticMode === true ? " active" : ""));
+  toggle.addEventListener("click", async () => {
+    const newVal = agenticMode !== true;
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agenticMode: newVal }),
+    });
+    refreshSettings();
+  });
+  toggleRow.appendChild(toggle);
+  agenticSection.appendChild(toggleRow);
+  body.appendChild(agenticSection);
+
   // API Keys section
   const keysSection = el("section", "settings__section");
   keysSection.appendChild(sectionTitle("API Keys"));
