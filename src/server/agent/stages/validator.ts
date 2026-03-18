@@ -33,7 +33,7 @@ export function validateModules(
   onEvent({
     type: "agent_step",
     step: "quality_check",
-    label: "Quality check — fixing common issues...",
+    label: "Quality check...",
   });
 
   return modules.map((mod) => {
