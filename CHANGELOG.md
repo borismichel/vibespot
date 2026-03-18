@@ -4,6 +4,25 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.0.1 — 2026-03-18
+
+Pipeline reliability, intent analyzer improvements, and UI polish.
+
+### Intent Analyzer
+- **Conversation history** — intent analyzer now receives the last 3 chat exchanges, enabling back-references ("same section"), follow-ups ("now make it bigger"), and corrections ("I meant the hero")
+- **Correction handling** — "I was referencing X" is now correctly classified as a modify intent targeting module X, no longer misclassified as a question
+- **Cross-module style references** — "match the rest of the page" / "consistent with other sections" correctly targets the specific module rather than triggering a design system rebuild
+
+### Pipeline Reliability
+- **moduleOrder reconciliation** — if the AI Module Planner omits a module from the page order (was causing modules to render after the footer), the pipeline now auto-inserts missing modules before the footer and warns in the chat
+- **Font limitation feedback** — when the user requests a web font (e.g., Montserrat), the design system stage now reports that HubSpot modules use system font stacks instead of silently dropping the request
+
+### UI
+- **Pipeline step collapsing** — duplicate step events for the same stage (e.g., two "designing" steps for design system + module planner) now properly update instead of creating orphan elements
+- **Lonely checkmark fix** — the stray `✓` between module cards and quality check is resolved via proper icon visibility handling and step element positioning
+
+---
+
 ## v1.0.0 — 2026-03-15
 
 Agentic pipeline — multi-stage AI generation replacing single-call mode.

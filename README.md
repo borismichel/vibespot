@@ -43,10 +43,10 @@ Opens a browser with:
 
 When you send a message, vibeSpot runs a 4-stage pipeline:
 
-1. **Intent Analyzer** — classifies your request and plans which modules to create, modify, or keep unchanged
-2. **Page Architect** — designs the visual system (CSS variables, shared styles) then plans module specs
+1. **Intent Analyzer** — classifies your request and plans which modules to create, modify, or keep unchanged. Uses conversation history to resolve back-references ("same section") and corrections ("I meant the hero").
+2. **Page Architect** — designs the visual system (CSS variables, shared styles) then plans module specs. Reports font limitations when web fonts are requested.
 3. **Module Developer** — generates all modules in parallel (up to 20 concurrent)
-4. **Quality Check** — auto-fixes common issues (unbalanced HubL tags, reserved field names, deprecated types, CDN imports)
+4. **Quality Check** — auto-fixes common issues (unbalanced HubL tags, reserved field names, deprecated types, CDN imports). Verifies all modules are in the page order.
 
 Completed modules appear in the live preview immediately as each finishes, with themed skeleton placeholders for modules still generating.
 

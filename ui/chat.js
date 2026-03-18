@@ -249,14 +249,23 @@ function ensurePipelineBubble() {
 function handleAgentStep(msg) {
   ensurePipelineBubble();
 
-  // Mark previous steps as done
-  const existing = pipelineStepsEl.querySelectorAll(".pipeline-step");
-  existing.forEach((el) => {
-    if (!el.classList.contains("pipeline-step--done")) {
-      el.classList.add("pipeline-step--done");
-      el.classList.remove("pipeline-step--active");
-    }
-  });
+  // If the same step fires again (e.g., "designing" fires twice for design system + module planner),
+  // update the existing step's label instead of creating a duplicate
+  const existingStep = pipelineStepsEl.querySelector(`[data-step="${CSS.escape(msg.step)}"]:not(.pipeline-step--done)`);
+  if (existingStep) {
+    // Mark the current one as done and create a fresh one below
+    existingStep.classList.add("pipeline-step--done");
+    existingStep.classList.remove("pipeline-step--active");
+  } else {
+    // Mark all other active steps as done
+    const existing = pipelineStepsEl.querySelectorAll(".pipeline-step");
+    existing.forEach((el) => {
+      if (!el.classList.contains("pipeline-step--done")) {
+        el.classList.add("pipeline-step--done");
+        el.classList.remove("pipeline-step--active");
+      }
+    });
+  }
 
   // Add new step
   const step = document.createElement("div");

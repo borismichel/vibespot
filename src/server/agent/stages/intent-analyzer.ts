@@ -37,9 +37,26 @@ export async function runIntentAnalyzer(
     libraryModules,
   );
 
+  // Build messages with recent conversation history for context resolution
+  // (e.g., "same section", "that module", corrections like "I meant the hero")
+  const messages: { role: "user" | "assistant"; content: string }[] = [];
+  const recentMessages = snapshot.messages.slice(-6); // Last 3 exchanges max
+  for (const msg of recentMessages) {
+    if (msg.role === "user" || msg.role === "assistant") {
+      // Truncate long assistant messages to just the first line (narrative summary)
+      const content =
+        msg.role === "assistant" && msg.content.length > 300
+          ? msg.content.slice(0, 300) + "..."
+          : msg.content;
+      messages.push({ role: msg.role, content });
+    }
+  }
+  // Always end with the current user message
+  messages.push({ role: "user", content: userMessage });
+
   const result = await callAgent(engine, apiKey, model, {
     systemPrompt,
-    messages: [{ role: "user", content: userMessage }],
+    messages,
     structuredOutput: {
       schema: INTENT_ANALYZER_SCHEMA as unknown as Record<string, unknown>,
       name: "pipeline_plan",

@@ -2105,6 +2105,12 @@ body { display: flex; }
   font-size: 13px;
   color: var(--text-muted);
   flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+/* Steps inside the steps container don't need extra margin (container has gap) */
+.pipeline-steps > .pipeline-step {
+  margin-top: 0;
 }
 
 .pipeline-step--active {
@@ -2123,12 +2129,17 @@ body { display: flex; }
 
 .pipeline-step--done .pipeline-step__icon {
   animation: none;
-  font-size: 0;
+  visibility: hidden;
+  width: 0;
+  display: inline-block;
+  position: relative;
 }
 
 .pipeline-step--done .pipeline-step__icon::after {
   content: "✓";
   font-size: 13px;
+  visibility: visible;
+  position: relative;
 }
 
 .pipeline-step__decision {

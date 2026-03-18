@@ -90,10 +90,31 @@ export async function runPageArchitect(
     }
   }
 
+  // Detect if the user requested web fonts that couldn't be used
+  const fontNotes: string[] = [];
+  const webFontPattern = /\b(Montserrat|Inter|Poppins|Raleway|Playfair|Lato|Roboto|Open\s?Sans|Nunito|Merriweather|Oswald|Source\s?Sans|Fira\s?Sans|Work\s?Sans|Manrope|Plus\s?Jakarta)\b/gi;
+  const requestedFonts = [...new Set((userMessage.match(webFontPattern) || []).map((f) => f.trim()))];
+  if (requestedFonts.length > 0) {
+    const usedFonts = requestedFonts.filter((f) =>
+      sharedCss.toLowerCase().includes(f.toLowerCase()),
+    );
+    const droppedFonts = requestedFonts.filter((f) => !usedFonts.includes(f));
+    if (droppedFonts.length > 0) {
+      fontNotes.push(
+        `Note: ${droppedFonts.join(", ")} not available — HubSpot modules use system font stacks (no external font imports allowed)`,
+      );
+    }
+  }
+
+  const decisionParts = [
+    `Design system: ${designSystem.aesthetic || "created"} | ${Object.keys(vars || {}).length} variables, ${sharedCss.length} chars CSS`,
+    ...fontNotes,
+  ];
+
   onEvent({
     type: "agent_decision",
     step: "designing",
-    decision: `Design system: ${designSystem.aesthetic || "created"} | ${Object.keys(vars || {}).length} variables, ${sharedCss.length} chars CSS`,
+    decision: decisionParts.join("\n"),
   });
 
   // Emit design system ready so the preview can start showing themed placeholders

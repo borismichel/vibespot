@@ -282,13 +282,28 @@ export async function runAgentPipeline(
     libraryModules,
   );
 
-  // Build module order
+  // Build module order (reconciles any missing modules automatically)
   const moduleOrder = buildModuleOrder(
     snapshot,
     plan,
     blueprint,
     finalModules,
   );
+
+  // Warn if moduleOrder was missing modules (reconciled in buildModuleOrder)
+  if (blueprint?.moduleOrder?.length) {
+    const blueprintSet = new Set(blueprint.moduleOrder);
+    const missing = finalModules
+      .filter((m) => !blueprintSet.has(m.moduleName))
+      .map((m) => m.moduleName);
+    if (missing.length > 0) {
+      onEvent({
+        type: "agent_decision",
+        step: "quality_check",
+        decision: `⚠ ${missing.length} module${missing.length === 1 ? "" : "s"} missing from page order — auto-inserted: ${missing.join(", ")}`,
+      });
+    }
+  }
 
   // -----------------------------------------------------------------------
   // Build assistant message
@@ -406,9 +421,31 @@ function buildModuleOrder(
   blueprint: PageBlueprint | null,
   finalModules: ModuleFiles[],
 ): string[] {
-  // If blueprint provides order, use it
+  // If blueprint provides order, use it — but reconcile with actual modules
   if (blueprint?.moduleOrder?.length) {
-    return blueprint.moduleOrder;
+    const order = [...blueprint.moduleOrder];
+    // Append any generated modules missing from the blueprint order
+    // (AI sometimes drops modules from moduleOrder while still generating them)
+    const orderSet = new Set(order);
+    for (const mod of finalModules) {
+      if (!orderSet.has(mod.moduleName)) {
+        // Insert before footer if present, otherwise append
+        const footerIdx = order.findIndex(
+          (n) => n.toLowerCase().includes("footer"),
+        );
+        if (footerIdx !== -1) {
+          order.splice(footerIdx, 0, mod.moduleName);
+        } else {
+          order.push(mod.moduleName);
+        }
+        orderSet.add(mod.moduleName);
+        log.warn(
+          "pipeline",
+          `Module "${mod.moduleName}" missing from blueprint order — inserted`,
+        );
+      }
+    }
+    return order;
   }
 
   // For create intent, use the order from finalModules

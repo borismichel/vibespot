@@ -43,12 +43,22 @@ ${moduleList}${libraryList}
 - For **reuse**: if the user references a module from the library, put it in \`reuseModules\` with the source template name. Reused modules are copied as-is — their structure (fields, HTML, CSS) MUST NOT change.
 - For **style_change**: set \`designSystemChanges: true\`. All modules become affected since they need the updated design system.
 - For **question**: set \`intent: "question"\` and provide the answer in the \`answer\` field. The pipeline will short-circuit.
+- When the user references "the rest of the page", "match the page style", "consistent with other sections", or similar cross-module language, they want the target module to match the shared design system. Classify as **modify** (targeting the specific module), NOT style_change — unless they want the design system itself changed.
 - \`guidesNeeded\` determines which reference guides downstream stages receive. Only include what's actually needed:
   - "design" — for new pages, layout changes, design system work
   - "content" — for new pages, content-heavy changes
   - "conversion" — for any module code generation
   - "hubspot_rules" — for any module code generation
   - "humanify" — when generating user-facing copy
+
+## Conversation Context
+
+You receive recent chat history (up to 3 prior exchanges). Use it to resolve:
+- **Back-references**: "same section", "that module", "the one above" → look at which module was modified in the previous turn
+- **Corrections**: "I meant the hero", "no, the stakes section", "I was referencing X" → the user is correcting YOUR previous classification. Re-apply the PREVIOUS request to the correct module. This is NOT a question — it's a "modify" intent.
+- **Follow-ups**: "now make it bigger", "also add a CTA" → applies to the module(s) from the previous turn
+
+CRITICAL: When the user corrects a misclassification (e.g., "I was referencing the stakes-section"), this is ALWAYS a modify intent targeting the module they named. NEVER classify corrections as "question".
 
 ## Compound Requests
 
