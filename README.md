@@ -28,7 +28,7 @@ Opens a browser with:
 - **Live preview on the right** — see your page render in real-time
 - **Agentic pipeline** — multi-stage AI generation with real-time progress
 - **Project sidebar** — create, open, resume, or delete projects
-- **Module management** — reorder via drag-and-drop, edit fields, delete modules
+- **Module management** — reorder via drag-and-drop, edit fields, delete modules from module list or module library
 - **Starter templates** — SaaS, Portfolio, Restaurant, Event
 - **GitHub import** — convert existing React projects
 - **Field editor** — tweak text, colors, images directly
@@ -132,6 +132,7 @@ Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, GitHub, vib
 
 ## What's New (v1.0)
 
+- **Template & module deletion** (v1.0.4) — delete templates from disk, option to delete exclusive modules, delete module button in module library preview
 - **Brand assets redesign** (v1.0.2) — hover-expand cards with per-asset Upload/Extract, Extract All, brand voice extractor, cross-template product context sharing via rendered preview HTML
 - **Agentic pipeline** (v1.0.0) — 4-stage AI generation: Intent Analyzer → Page Architect (Design System + Module Planner) → Module Developer (parallel) → Quality Check (auto-fix)
 - **Incremental preview** (v1.0.0) — completed modules appear immediately with themed placeholders for pending ones

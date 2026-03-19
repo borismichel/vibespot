@@ -2,6 +2,8 @@
  * Multi-template management functions.
  */
 
+import { existsSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import type { ModuleFiles } from "../../ai/engine.js";
 import type { VibeSession, TemplateEntry, PageType } from "./types.js";
 import { getSession } from "./store.js";
@@ -158,14 +160,53 @@ export function renameTemplate(templateId: string, newLabel: string): boolean {
 
 /**
  * Remove a template by ID.
+ * If deleteModules is true, also remove modules that are exclusive to this
+ * template (not used by any other template) from session and disk.
  */
-export function removeTemplate(templateId: string): boolean {
+export function removeTemplate(templateId: string, deleteModules = false): boolean {
   const activeSession = getSession();
   if (!activeSession) return false;
   const idx = activeSession.templates.findIndex((t) => t.id === templateId);
   if (idx < 0) return false;
 
-  activeSession.templates.splice(idx, 1);
+  const removed = activeSession.templates.splice(idx, 1)[0];
+
+  // Delete template file(s) from disk
+  if (activeSession.themePath) {
+    const templatesDir = join(activeSession.themePath, "templates");
+    const filename = `${removed.id}.html`;
+    const filePath = join(templatesDir, filename);
+    if (existsSync(filePath)) rmSync(filePath, { force: true });
+    // Also remove blog listing template if applicable
+    if (removed.pageType === "blog_post") {
+      const listingPath = join(templatesDir, `${removed.id}-listing.html`);
+      if (existsSync(listingPath)) rmSync(listingPath, { force: true });
+    }
+  }
+
+  // Delete exclusive modules from disk + remaining templates
+  if (deleteModules && removed.modules.length > 0) {
+    // Collect module names still used by other templates
+    const usedElsewhere = new Set<string>();
+    for (const tpl of activeSession.templates) {
+      for (const mod of tpl.modules) usedElsewhere.add(mod.moduleName);
+    }
+    // Also check flat session modules
+    for (const mod of activeSession.modules) usedElsewhere.add(mod.moduleName);
+
+    const exclusiveModules = removed.modules
+      .map((m) => m.moduleName)
+      .filter((name) => !usedElsewhere.has(name));
+
+    // Remove from disk
+    if (activeSession.themePath && exclusiveModules.length > 0) {
+      const modulesDir = join(activeSession.themePath, "modules");
+      for (const name of exclusiveModules) {
+        const modDir = join(modulesDir, `${name}.module`);
+        if (existsSync(modDir)) rmSync(modDir, { recursive: true, force: true });
+      }
+    }
+  }
 
   // If we removed the active template, switch to the first remaining one
   if (activeSession.activeTemplateId === templateId) {

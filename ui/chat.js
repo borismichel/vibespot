@@ -259,6 +259,13 @@ function ensurePipelineBubble() {
   scrollToBottom();
 }
 
+function markStepDone(el) {
+  el.classList.add("pipeline-step--done");
+  el.classList.remove("pipeline-step--active");
+  const icon = el.querySelector(".pipeline-step__icon");
+  if (icon) icon.textContent = "✓";
+}
+
 function handleAgentStep(msg) {
   ensurePipelineBubble();
 
@@ -267,15 +274,13 @@ function handleAgentStep(msg) {
   const existingStep = pipelineStepsEl.querySelector(`[data-step="${CSS.escape(msg.step)}"]:not(.pipeline-step--done)`);
   if (existingStep) {
     // Mark the current one as done and create a fresh one below
-    existingStep.classList.add("pipeline-step--done");
-    existingStep.classList.remove("pipeline-step--active");
+    markStepDone(existingStep);
   } else {
     // Mark all other active steps as done
     const existing = pipelineStepsEl.querySelectorAll(".pipeline-step");
     existing.forEach((el) => {
       if (!el.classList.contains("pipeline-step--done")) {
-        el.classList.add("pipeline-step--done");
-        el.classList.remove("pipeline-step--active");
+        markStepDone(el);
       }
     });
   }
@@ -356,10 +361,7 @@ function handlePipelineComplete(msg) {
 
   // Mark all steps as done (search whole bubble since quality_check is outside pipelineStepsEl)
   const bubble = streamingMsgEl || pipelineBubbleEl;
-  bubble.querySelectorAll(".pipeline-step").forEach((el) => {
-    el.classList.add("pipeline-step--done");
-    el.classList.remove("pipeline-step--active");
-  });
+  bubble.querySelectorAll(".pipeline-step").forEach((el) => markStepDone(el));
 
   // Add completion stats after the last element in the bubble
   const stats = document.createElement("div");
@@ -397,10 +399,7 @@ function handlePipelinePartial(msg) {
   if (timerEl) timerEl.remove();
 
   const bubble = streamingMsgEl || pipelineBubbleEl;
-  bubble.querySelectorAll(".pipeline-step").forEach((el) => {
-    el.classList.add("pipeline-step--done");
-    el.classList.remove("pipeline-step--active");
-  });
+  bubble.querySelectorAll(".pipeline-step").forEach((el) => markStepDone(el));
 
   const stats = document.createElement("div");
   stats.className = "pipeline-stats pipeline-stats--partial";

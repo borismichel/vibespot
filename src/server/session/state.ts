@@ -2,7 +2,7 @@
  * State mutation functions for the active session.
  */
 
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { ModuleFiles, GeneratedAssets } from "../../ai/engine.js";
 import type { ChatMessage, TemplateEntry, SessionAsset, FieldDef } from "./types.js";
@@ -130,6 +130,19 @@ export function removeModule(moduleName: string): void {
   activeSession.moduleOrder = activeSession.moduleOrder.filter(
     (n) => n !== moduleName
   );
+
+  // Also remove from all templates
+  for (const tpl of activeSession.templates) {
+    tpl.modules = tpl.modules.filter((m) => m.moduleName !== moduleName);
+    tpl.moduleOrder = tpl.moduleOrder.filter((n) => n !== moduleName);
+  }
+
+  // Delete module directory from disk
+  if (activeSession.themePath) {
+    const modDir = join(activeSession.themePath, "modules", `${moduleName}.module`);
+    if (existsSync(modDir)) rmSync(modDir, { recursive: true, force: true });
+  }
+
   activeSession.updatedAt = Date.now();
   syncFlatFieldsToTemplate();
 }

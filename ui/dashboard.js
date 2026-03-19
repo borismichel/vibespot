@@ -269,6 +269,31 @@ function closeModulePreview() {
 // Close button for module preview
 document.getElementById("dashboard-preview-close").addEventListener("click", closeModulePreview);
 
+// Delete button for module preview
+document.getElementById("dashboard-preview-delete").addEventListener("click", async () => {
+  const moduleName = activePreviewModule;
+  if (!moduleName) return;
+
+  const ok = await vibeConfirm(
+    `Delete module "${moduleName}"?`,
+    "This will remove it from all templates and delete it from disk.",
+    { confirmLabel: "Delete" }
+  );
+  if (!ok) return;
+
+  try {
+    await fetch("/api/modules", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ moduleName, deleteEntirely: true }),
+    });
+    closeModulePreview();
+    await refreshDashboard();
+  } catch (err) {
+    await vibeAlert("Failed to delete module: " + err.message, "Error");
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Brand assets
 // ---------------------------------------------------------------------------
@@ -447,19 +472,50 @@ async function openTemplate(templateId) {
 }
 
 async function confirmDeleteTemplate(templateId) {
-  const ok = await vibeConfirm("Delete this template?", "This cannot be undone.", { confirmLabel: "Delete" });
-  if (!ok) return;
+  const result = await vibeDeleteTemplateDialog();
+  if (!result) return; // cancelled
+
+  const deleteModules = result === "with_modules";
 
   try {
     await fetch("/api/templates", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ templateId }),
+      body: JSON.stringify({ templateId, deleteModules }),
     });
     await refreshDashboard();
   } catch (err) {
     await vibeAlert("Failed to delete: " + err.message, "Error");
   }
+}
+
+/**
+ * Three-option dialog: delete template only, delete template + modules, or cancel.
+ * @returns {Promise<"template_only"|"with_modules"|null>}
+ */
+function vibeDeleteTemplateDialog() {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-overlay";
+    overlay.innerHTML = `
+      <div class="confirm-dialog">
+        <div class="confirm-dialog__title">Delete template?</div>
+        <p class="confirm-dialog__warn">This cannot be undone.</p>
+        <div class="confirm-dialog__actions" style="flex-direction:column;gap:8px">
+          <button class="btn btn--danger" data-action="with_modules" style="width:100%">Delete template and its modules</button>
+          <button class="btn btn--secondary" data-action="template_only" style="width:100%">Delete template only (keep modules)</button>
+          <button class="btn btn--secondary" data-action="cancel" style="width:100%">Cancel</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = (val) => { overlay.remove(); resolve(val); };
+    overlay.querySelector('[data-action="with_modules"]').addEventListener("click", () => close("with_modules"));
+    overlay.querySelector('[data-action="template_only"]').addEventListener("click", () => close("template_only"));
+    overlay.querySelector('[data-action="cancel"]').addEventListener("click", () => close(null));
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(null); });
+  });
 }
 
 async function cloneTemplateAction(templateId) {

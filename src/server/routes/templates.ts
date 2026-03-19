@@ -156,12 +156,12 @@ export function handleTemplatesRoute(method: string, req: IncomingMessage, res: 
   if (method === "DELETE") {
     readBody(req, (body) => {
       try {
-        const { templateId } = JSON.parse(body);
+        const { templateId, deleteModules } = JSON.parse(body);
         if (!templateId) {
           jsonResponse(res, 400, { error: "templateId is required" });
           return;
         }
-        const removed = removeTemplate(templateId);
+        const removed = removeTemplate(templateId, !!deleteModules);
         if (!removed) {
           jsonResponse(res, 404, { error: "Template not found" });
           return;

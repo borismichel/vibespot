@@ -2150,17 +2150,11 @@ body { display: flex; }
 
 .pipeline-step--done .pipeline-step__icon {
   animation: none;
-  visibility: hidden;
-  width: 0;
   display: inline-block;
-  position: relative;
 }
 
 .pipeline-step--done .pipeline-step__icon::after {
-  content: "✓";
-  font-size: 13px;
-  visibility: visible;
-  position: relative;
+  content: "";
 }
 
 .pipeline-step__decision {

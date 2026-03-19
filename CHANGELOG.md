@@ -4,6 +4,24 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.0.4 — 2026-03-19
+
+Template and module deletion improvements, pipeline step alignment fix.
+
+### Template Deletion
+- **Delete template from disk** — deleting a template now removes its `.html` file (and blog listing template) from the theme directory, not just from the session
+- **Delete modules option** — template delete dialog now offers three choices: delete template + its exclusive modules, delete template only (keep modules), or cancel
+- **Exclusive module detection** — only modules not used by any other template are removed when "delete with modules" is chosen
+
+### Module Library
+- **Delete module button** — module library preview panel now has a "Delete module" button that removes the module from all templates and deletes the `.module` directory from disk
+- **Full cleanup on removeModule** — `removeModule()` now removes the module from all templates (not just the active one) and deletes the directory from disk immediately
+
+### UI
+- **Pipeline step checkmark alignment** — replaced CSS pseudo-element trick (`width: 0` + `::after`) with direct text replacement, so the `✓` icon occupies the same inline space as the spinner and stays aligned with the label
+
+---
+
 ## v1.0.3 — 2026-03-19
 
 Fix nested HubL conditionals breaking button rendering and downstream CSS.
