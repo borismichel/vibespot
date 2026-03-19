@@ -20,7 +20,7 @@ import {
 } from "./session.js";
 import { commitThemeState, commitTemplateState, isGitAvailable } from "./project-git.js";
 import { buildPreviewHtml, buildModulePreviewHtml } from "./preview.js";
-import { handleGenerateStream, handleAgenticGenerate, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback } from "./ai-handler.js";
+import { handleGenerateStream, handleAgenticGenerate, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine } from "./ai-handler.js";
 import { loadConfig, getHubSpotPak, getActiveHubSpotAccount } from "../utils/config.js";
 import { detectHubSpotAuth, detectDataCenter, detectHubSpotAuthFromConfig } from "../utils/detect.js";
 import { applyAutoFixes, parseUploadErrors, parseApiErrors } from "./auto-fix.js";
@@ -587,12 +587,93 @@ function handleWsConnection(ws: WebSocket): void {
             type: "modules_updated",
             modules: getOrderedModules().map((m) => m.moduleName),
           }));
+
+          // Suggest brand asset extraction if none exist yet
+          {
+            const sess = getSession();
+            if (sess && agenticCheck.useAgentic && !sess.brandAssets?.styleguide && !sess.brandAssets?.brandvoice && !sess.brandAssets?.themeContext) {
+              ws.send(JSON.stringify({ type: "suggest_brand_extraction" }));
+            }
+          }
         } catch (err) {
           ws.send(JSON.stringify({
             type: "error",
             message: err instanceof Error ? err.message : String(err),
           }));
         }
+        break;
+      }
+
+      case "extract_brand_assets": {
+        const session = getSession();
+        if (!session) {
+          ws.send(JSON.stringify({ type: "error", message: "No active session" }));
+          break;
+        }
+
+        // Fire-and-forget — run extraction in background, never block the UI
+        (async () => {
+          try {
+            const config = loadConfig();
+            const { engine, apiKey, model } = resolveAgenticEngine(config);
+
+            // Extract theme context from rendered preview HTML
+            const { buildPreviewHtml } = await import("./preview.js");
+            const previewHtml = buildPreviewHtml();
+            if (!previewHtml || previewHtml.length < 50) return;
+
+            const { extractThemeContext } = await import("./agent/stages/context-extractor.js");
+            const themeContext = await extractThemeContext(
+              previewHtml,
+              session.brandAssets?.themeContext,
+              engine,
+              apiKey,
+              model,
+            );
+
+            const { mkdirSync, writeFileSync } = await import("node:fs");
+
+            if (themeContext) {
+              if (!session.brandAssets) session.brandAssets = {};
+              session.brandAssets.themeContext = themeContext;
+              session.updatedAt = Date.now();
+
+              const assetDir = join(session.themePath, ".vibespot");
+              if (!existsSync(assetDir)) mkdirSync(assetDir, { recursive: true });
+              writeFileSync(join(assetDir, "theme-context.md"), themeContext);
+
+              saveSession();
+              ws.send(JSON.stringify({ type: "brand_asset_extracted", assetType: "themeContext" }));
+            }
+
+            // Also extract styleguide if missing
+            if (!session.brandAssets?.styleguide) {
+              try {
+                const { extractDesignContext } = await import("../ai/design-extractor.js");
+                const styleguide = await extractDesignContext(session.themePath);
+                if (styleguide) {
+                  if (!session.brandAssets) session.brandAssets = {};
+                  session.brandAssets.styleguide = styleguide;
+                  session.updatedAt = Date.now();
+
+                  const assetDir = join(session.themePath, ".vibespot");
+                  if (!existsSync(assetDir)) mkdirSync(assetDir, { recursive: true });
+                  writeFileSync(join(assetDir, "styleguide.md"), styleguide);
+
+                  saveSession();
+                  ws.send(JSON.stringify({ type: "brand_asset_extracted", assetType: "styleguide" }));
+                }
+              } catch { /* non-critical */ }
+            }
+
+            ws.send(JSON.stringify({ type: "brand_extraction_complete" }));
+          } catch (err) {
+            ws.send(JSON.stringify({
+              type: "brand_extraction_error",
+              message: err instanceof Error ? err.message : String(err),
+            }));
+          }
+        })();
         break;
       }
 

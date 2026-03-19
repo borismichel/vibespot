@@ -15,7 +15,7 @@
 
 export function buildDesignSystemPrompt(
   themeName: string,
-  brandAssets?: { styleguide?: string; brandvoice?: string },
+  brandAssets?: { styleguide?: string; brandvoice?: string; themeContext?: string },
 ): string {
   const parts: string[] = [];
 
@@ -110,6 +110,9 @@ Good system font stacks by style:
   if (brandAssets?.styleguide) {
     parts.push(`\n\n## Brand Style Guide\n${brandAssets.styleguide}`);
   }
+  if (brandAssets?.themeContext) {
+    parts.push(`\n\n## Product Context\n${brandAssets.themeContext}`);
+  }
 
   return parts.join("");
 }
@@ -145,7 +148,7 @@ export const DESIGN_SYSTEM_SCHEMA = {
 export function buildModulePlannerPrompt(
   themeName: string,
   sharedCss: string,
-  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean },
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string },
   guidesNeeded?: string[],
 ): string {
   const parts: string[] = [];
@@ -178,6 +181,9 @@ ${sharedCss}
 
   if (brandAssets?.brandvoice) {
     parts.push(`\n\n## Brand Voice\n${brandAssets.brandvoice}`);
+  }
+  if (brandAssets?.themeContext) {
+    parts.push(`\n\n## Product Context\n${brandAssets.themeContext}`);
   }
   if (brandAssets?.humanify !== false && guidesNeeded?.includes("humanify")) {
     parts.push(`\n\n## Anti-AI Copy Rules\n${getArchitectHumanifySummary()}`);
@@ -226,7 +232,7 @@ export const PAGE_ARCHITECT_SCHEMA = DESIGN_SYSTEM_SCHEMA;
 /** @deprecated Use buildDesignSystemPrompt + buildModulePlannerPrompt instead */
 export function buildPageArchitectPrompt(
   themeName: string,
-  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean },
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string },
   guidesNeeded?: string[],
 ): string {
   return buildDesignSystemPrompt(themeName, brandAssets);

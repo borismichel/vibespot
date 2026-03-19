@@ -35,6 +35,7 @@ function connectWebSocket() {
     ws.close();
     ws = null;
   }
+  brandExtractionPromptShown = false;
 
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   ws = new WebSocket(`${protocol}//${location.host}`);
@@ -173,6 +174,18 @@ function handleWsMessage(msg) {
       break;
     case "agentic_prompt":
       handleAgenticPrompt();
+      break;
+    case "suggest_brand_extraction":
+      handleSuggestBrandExtraction();
+      break;
+    case "brand_asset_extracted":
+      handleBrandAssetExtracted(msg.assetType);
+      break;
+    case "brand_extraction_complete":
+      handleBrandExtractionComplete();
+      break;
+    case "brand_extraction_error":
+      appendSystemMessage("Brand extraction failed: " + (msg.message || "Unknown error"));
       break;
   }
 }
@@ -438,6 +451,53 @@ async function handleAgenticPrompt() {
       body: JSON.stringify({ agenticMode: agreed }),
     });
   } catch { /* ignore */ }
+}
+
+// ---------------------------------------------------------------------------
+// Brand asset extraction prompt
+// ---------------------------------------------------------------------------
+
+let brandExtractionPromptShown = false;
+
+function handleSuggestBrandExtraction() {
+  if (brandExtractionPromptShown) return;
+  brandExtractionPromptShown = true;
+
+  const el = document.createElement("div");
+  el.className = "chat-msg chat-msg--system brand-extraction-prompt";
+  el.innerHTML = `
+    <div class="chat-msg__system" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span>Extract product context &amp; styleguide from your page? Helps keep future templates consistent.</span>
+      <button class="btn btn--sm btn--primary" id="btn-accept-extraction">Extract</button>
+      <button class="btn btn--sm btn--outline" id="btn-dismiss-extraction">Dismiss</button>
+    </div>
+  `;
+
+  messagesEl.appendChild(el);
+  scrollToBottom();
+
+  el.querySelector("#btn-accept-extraction").addEventListener("click", () => {
+    el.querySelector(".brand-extraction-prompt__actions").innerHTML =
+      '<span class="brand-extraction-prompt__status">Extracting...</span>';
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "extract_brand_assets" }));
+    }
+  });
+
+  el.querySelector("#btn-dismiss-extraction").addEventListener("click", () => {
+    el.remove();
+  });
+}
+
+function handleBrandAssetExtracted(assetType) {
+  const labelMap = { themeContext: "Product context", styleguide: "Styleguide", brandvoice: "Brand voice" };
+  const label = labelMap[assetType] || assetType;
+  appendSystemMessage(`${label} extracted and saved.`);
+}
+
+function handleBrandExtractionComplete() {
+  const prompt = document.querySelector(".brand-extraction-prompt");
+  if (prompt) prompt.remove();
 }
 
 // ---------------------------------------------------------------------------

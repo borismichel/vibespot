@@ -52,6 +52,7 @@ export function handleDashboardRoute(res: ServerResponse): void {
     brandAssets: {
       hasStyleguide: !!session.brandAssets?.styleguide,
       hasBrandvoice: !!session.brandAssets?.brandvoice,
+      hasThemeContext: !!session.brandAssets?.themeContext,
       humanify: session.brandAssets?.humanify !== false,
     },
   });
@@ -313,6 +314,7 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
     jsonResponse(res, 200, {
       styleguide: session.brandAssets?.styleguide || null,
       brandvoice: session.brandAssets?.brandvoice || null,
+      themeContext: session.brandAssets?.themeContext || null,
     });
     return;
   }
@@ -340,17 +342,18 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
           jsonResponse(res, 400, { error: "content is required" });
           return;
         }
-        if (type !== "styleguide" && type !== "brandvoice") {
-          jsonResponse(res, 400, { error: `Invalid type: ${type}. Must be "styleguide" or "brandvoice"` });
+        if (type !== "styleguide" && type !== "brandvoice" && type !== "themeContext") {
+          jsonResponse(res, 400, { error: `Invalid type: ${type}. Must be "styleguide", "brandvoice", or "themeContext"` });
           return;
         }
 
+        const filename = type === "themeContext" ? "theme-context.md" : `${type}.md`;
         session.brandAssets[type] = content;
         session.updatedAt = Date.now();
 
         const assetDir = join(session.themePath, ".vibespot");
         ensureDir(assetDir);
-        writeFile(join(assetDir, `${type}.md`), content);
+        writeFile(join(assetDir, filename), content);
 
         saveSession();
         jsonResponse(res, 200, { ok: true });
@@ -365,7 +368,7 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
     readBody(req, (body) => {
       try {
         const { type } = JSON.parse(body);
-        if (type !== "styleguide" && type !== "brandvoice") {
+        if (type !== "styleguide" && type !== "brandvoice" && type !== "themeContext") {
           jsonResponse(res, 400, { error: `Invalid type: ${type}` });
           return;
         }
@@ -375,7 +378,8 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
         }
         session.updatedAt = Date.now();
 
-        const filePath = join(session.themePath, ".vibespot", `${type}.md`);
+        const delFilename = type === "themeContext" ? "theme-context.md" : `${type}.md`;
+        const filePath = join(session.themePath, ".vibespot", delFilename);
         if (existsSync(filePath)) rmSync(filePath);
 
         saveSession();
@@ -391,8 +395,56 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
 }
 
 // ---------------------------------------------------------------------------
-// Design extraction from theme
+// Brand asset extraction from theme
 // ---------------------------------------------------------------------------
+
+/** Save a single brand asset to session + disk. */
+function saveBrandAsset(
+  session: ReturnType<typeof getSession>,
+  type: "styleguide" | "brandvoice" | "themeContext",
+  content: string,
+): void {
+  if (!session) return;
+  if (!session.brandAssets) session.brandAssets = {};
+  session.brandAssets[type] = content;
+  session.updatedAt = Date.now();
+
+  const filename = type === "themeContext" ? "theme-context.md" : `${type}.md`;
+  const assetDir = join(session.themePath, ".vibespot");
+  ensureDir(assetDir);
+  writeFile(join(assetDir, filename), content);
+}
+
+/** Extract a single brand asset by type. */
+async function extractSingleAsset(
+  session: NonNullable<ReturnType<typeof getSession>>,
+  type: "styleguide" | "brandvoice" | "themeContext",
+  sourcePath?: string,
+): Promise<string | null> {
+  if (type === "styleguide") {
+    const { extractDesignContext } = await import("../../ai/design-extractor.js");
+    return extractDesignContext(sourcePath || session.themePath);
+  }
+
+  // brandvoice and themeContext need AI + rendered preview HTML
+  const { resolveAgenticEngine } = await import("../ai-handler.js");
+  const { loadConfig } = await import("../../utils/config.js");
+  const config = loadConfig();
+  const { engine, apiKey, model } = resolveAgenticEngine(config);
+
+  const { buildPreviewHtml } = await import("../preview.js");
+  const previewHtml = buildPreviewHtml();
+  if (!previewHtml || previewHtml.length < 50) return null;
+
+  if (type === "brandvoice") {
+    const { extractBrandvoice } = await import("../agent/stages/brandvoice-extractor.js");
+    return extractBrandvoice(previewHtml, engine, apiKey, model);
+  }
+
+  // themeContext
+  const { extractThemeContext } = await import("../agent/stages/context-extractor.js");
+  return extractThemeContext(previewHtml, session.brandAssets?.themeContext, engine, apiKey, model);
+}
 
 export function handleDesignExtractRoute(req: IncomingMessage, res: ServerResponse): void {
   const session = getSession();
@@ -404,24 +456,46 @@ export function handleDesignExtractRoute(req: IncomingMessage, res: ServerRespon
   readBody(req, (body) => {
     (async () => {
       try {
-        const { sourcePath } = body ? JSON.parse(body) : {};
-        // Default to the current theme path, or a provided source path
-        const themePath = sourcePath || session.themePath;
+        const parsed = body ? JSON.parse(body) : {};
+        const type = parsed.type || "styleguide";
+        const sourcePath = parsed.sourcePath;
 
-        const { extractDesignContext } = await import("../../ai/design-extractor.js");
-        const styleguide = await extractDesignContext(themePath);
+        if (type === "all") {
+          // Extract all three in parallel
+          const types = ["styleguide", "brandvoice", "themeContext"] as const;
+          const results = await Promise.allSettled(
+            types.map((t) => extractSingleAsset(session, t, sourcePath)),
+          );
 
-        // Save to the current working theme
-        if (!session.brandAssets) session.brandAssets = {};
-        session.brandAssets.styleguide = styleguide;
-        session.updatedAt = Date.now();
+          const extracted: Record<string, string | null> = {};
+          for (let i = 0; i < types.length; i++) {
+            const r = results[i];
+            const content = r.status === "fulfilled" ? r.value : null;
+            if (content) {
+              saveBrandAsset(session, types[i], content);
+            }
+            extracted[types[i]] = content;
+          }
 
-        const assetDir = join(session.themePath, ".vibespot");
-        ensureDir(assetDir);
-        writeFile(join(assetDir, "styleguide.md"), styleguide);
+          saveSession();
+          jsonResponse(res, 200, { ok: true, type: "all", extracted });
+          return;
+        }
 
+        if (type !== "styleguide" && type !== "brandvoice" && type !== "themeContext") {
+          jsonResponse(res, 400, { error: `Invalid type: ${type}` });
+          return;
+        }
+
+        const content = await extractSingleAsset(session, type, sourcePath);
+        if (!content) {
+          jsonResponse(res, 200, { ok: false, type, error: "No content to extract from" });
+          return;
+        }
+
+        saveBrandAsset(session, type, content);
         saveSession();
-        jsonResponse(res, 200, { ok: true, styleguide });
+        jsonResponse(res, 200, { ok: true, type, content });
       } catch (err) {
         jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
       }

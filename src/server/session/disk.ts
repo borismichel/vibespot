@@ -218,10 +218,12 @@ export function scanThemeFromDisk(themePath: string): void {
   // Load brand assets from .vibespot/ directory
   const sgPath = join(themePath, ".vibespot", "styleguide.md");
   const bvPath = join(themePath, ".vibespot", "brandvoice.md");
-  if (existsSync(sgPath) || existsSync(bvPath)) {
+  const tcPath = join(themePath, ".vibespot", "theme-context.md");
+  if (existsSync(sgPath) || existsSync(bvPath) || existsSync(tcPath)) {
     if (!activeSession.brandAssets) activeSession.brandAssets = {};
     if (existsSync(sgPath)) activeSession.brandAssets.styleguide = safeRead(sgPath);
     if (existsSync(bvPath)) activeSession.brandAssets.brandvoice = safeRead(bvPath);
+    if (existsSync(tcPath)) activeSession.brandAssets.themeContext = safeRead(tcPath);
   }
 
   // Scan template files and create per-template TemplateEntry objects

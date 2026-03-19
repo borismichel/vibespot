@@ -181,7 +181,7 @@ function takeSnapshot(): SessionSnapshot {
 /**
  * Resolve the API engine type and key/model for agentic pipeline.
  */
-function resolveAgenticEngine(config: ReturnType<typeof loadConfig>): {
+export function resolveAgenticEngine(config: ReturnType<typeof loadConfig>): {
   engine: AgentEngine;
   apiKey: string;
   model: string;

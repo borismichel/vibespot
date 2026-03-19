@@ -14,7 +14,7 @@ export function buildModuleDeveloperPrompt(
   themeName: string,
   sharedCss: string,
   guidesNeeded?: string[],
-  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean },
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string },
 ): string {
   const parts: string[] = [];
 
@@ -74,6 +74,10 @@ You produce a single module with these fields:
 
   if (!guidesNeeded || guidesNeeded.includes("conversion")) {
     parts.push(`\n\n## Conversion Guide\n${getConversionGuide()}`);
+  }
+
+  if (brandAssets?.themeContext) {
+    parts.push(`\n\n## Product Context\n${brandAssets.themeContext}`);
   }
 
   if (brandAssets?.humanify !== false && guidesNeeded?.includes("humanify")) {

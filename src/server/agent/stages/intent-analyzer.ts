@@ -35,6 +35,7 @@ export async function runIntentAnalyzer(
     snapshot.themeName,
     moduleNames,
     libraryModules,
+    snapshot.brandAssets?.themeContext,
   );
 
   // Build messages with recent conversation history for context resolution

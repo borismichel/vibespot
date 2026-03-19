@@ -273,31 +273,31 @@ document.getElementById("dashboard-preview-close").addEventListener("click", clo
 // Brand assets
 // ---------------------------------------------------------------------------
 
+const ASSET_LABELS = { styleguide: "Styleguide", brandvoice: "Brand Voice", themeContext: "Product Context" };
+const ASSET_FILES = { styleguide: "styleguide.md", brandvoice: "brandvoice.md", themeContext: "theme-context.md" };
+const ASSET_FLAGS = { styleguide: "hasStyleguide", brandvoice: "hasBrandvoice", themeContext: "hasThemeContext" };
+
 function renderBrandAssets(assets) {
-  const sgIcon = document.getElementById("brand-icon-styleguide");
-  const bvIcon = document.getElementById("brand-icon-brandvoice");
+  for (const [type, flagKey] of Object.entries(ASSET_FLAGS)) {
+    const card = document.querySelector(`.brand-asset-card[data-asset="${type}"]`);
+    if (!card) continue;
+    const icon = card.querySelector(".brand-asset-card__icon");
+    const hasAsset = !!assets[flagKey];
 
-  if (assets.hasStyleguide) {
-    sgIcon.textContent = "\u2713";
-    sgIcon.classList.add("brand-asset-upload__icon--done");
-  } else {
-    sgIcon.textContent = "+";
-    sgIcon.classList.remove("brand-asset-upload__icon--done");
+    if (hasAsset) {
+      icon.textContent = "\u2713";
+      icon.classList.add("brand-asset-card__icon--done");
+    } else {
+      icon.textContent = "+";
+      icon.classList.remove("brand-asset-card__icon--done");
+    }
+
+    // Toggle which action set is visible on hover
+    const actions = card.querySelector(".brand-asset-card__actions");
+    const manage = card.querySelector(".brand-asset-card__manage");
+    if (actions) actions.classList.toggle("hidden", hasAsset);
+    if (manage) manage.classList.toggle("hidden", !hasAsset);
   }
-
-  if (assets.hasBrandvoice) {
-    bvIcon.textContent = "\u2713";
-    bvIcon.classList.add("brand-asset-upload__icon--done");
-  } else {
-    bvIcon.textContent = "+";
-    bvIcon.classList.remove("brand-asset-upload__icon--done");
-  }
-
-  // Show/hide action buttons based on asset existence
-  const sgActions = document.getElementById("brand-actions-styleguide");
-  if (sgActions) sgActions.classList.toggle("hidden", !assets.hasStyleguide);
-  const bvActions = document.getElementById("brand-actions-brandvoice");
-  if (bvActions) bvActions.classList.toggle("hidden", !assets.hasBrandvoice);
 
   // Humanify toggle
   const humanifyCheckbox = document.getElementById("humanify-checkbox");
@@ -306,37 +306,24 @@ function renderBrandAssets(assets) {
   }
 }
 
-async function viewStyleguide() {
+async function viewBrandAsset(type) {
   try {
     const res = await fetch("/api/brand-assets");
     const data = await res.json();
-    if (data.styleguide) {
-      await vibeViewContent(data.styleguide, "Styleguide", "styleguide.md");
+    const content = data[type];
+    if (content) {
+      await vibeViewContent(content, ASSET_LABELS[type], ASSET_FILES[type]);
     } else {
-      await vibeAlert("No styleguide found.", "Info");
+      await vibeAlert(`No ${ASSET_LABELS[type].toLowerCase()} found.`, "Info");
     }
   } catch (err) {
-    await vibeAlert("Failed to load styleguide: " + err.message, "Error");
-  }
-}
-
-async function viewBrandvoice() {
-  try {
-    const res = await fetch("/api/brand-assets");
-    const data = await res.json();
-    if (data.brandvoice) {
-      await vibeViewContent(data.brandvoice, "Brand Voice", "brandvoice.md");
-    } else {
-      await vibeAlert("No brand voice found.", "Info");
-    }
-  } catch (err) {
-    await vibeAlert("Failed to load brand voice: " + err.message, "Error");
+    await vibeAlert(`Failed to load: ${err.message}`, "Error");
   }
 }
 
 async function deleteBrandAsset(type) {
-  const label = type === "styleguide" ? "styleguide" : "brand voice";
-  const ok = await vibeConfirm(`Remove ${label}?`, "This will delete the file from disk.", { confirmLabel: "Remove", confirmClass: "btn--danger" });
+  const label = ASSET_LABELS[type] || type;
+  const ok = await vibeConfirm(`Remove ${label.toLowerCase()}?`, "This will delete the file from disk.", { confirmLabel: "Remove", confirmClass: "btn--danger" });
   if (!ok) return;
   try {
     const res = await fetch("/api/brand-assets", {
@@ -352,10 +339,57 @@ async function deleteBrandAsset(type) {
   }
 }
 
-document.getElementById("btn-view-styleguide")?.addEventListener("click", viewStyleguide);
-document.getElementById("btn-view-brandvoice")?.addEventListener("click", viewBrandvoice);
-document.getElementById("btn-delete-styleguide")?.addEventListener("click", () => deleteBrandAsset("styleguide"));
-document.getElementById("btn-delete-brandvoice")?.addEventListener("click", () => deleteBrandAsset("brandvoice"));
+async function extractBrandAsset(type, card) {
+  const labelEl = card.querySelector(".brand-asset-card__label");
+  const origLabel = labelEl?.textContent;
+  if (labelEl) labelEl.textContent = "Extracting...";
+  card.classList.add("brand-asset-card--extracting");
+  try {
+    const res = await fetch("/api/brand-assets/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type }),
+    });
+    const data = await res.json();
+    if (data.ok && data.content) {
+      await refreshDashboard();
+      const view = await vibeConfirm(
+        `${ASSET_LABELS[type]} extracted.`,
+        "Would you like to view it?",
+        { confirmLabel: "View", confirmClass: "btn--primary" },
+      );
+      if (view) await vibeViewContent(data.content, ASSET_LABELS[type], ASSET_FILES[type]);
+    } else {
+      await vibeAlert(data.error || "Nothing to extract — generate some modules first.", "Info");
+    }
+  } catch (err) {
+    await vibeAlert("Extraction failed: " + err.message, "Error");
+  } finally {
+    card.classList.remove("brand-asset-card--extracting");
+    if (labelEl) labelEl.textContent = origLabel;
+  }
+}
+
+// Event delegation for brand asset cards
+document.getElementById("dashboard-brand-assets")?.addEventListener("click", (e) => {
+  const card = e.target.closest(".brand-asset-card");
+  if (!card) return;
+  const type = card.dataset.asset;
+  if (!type) return;
+
+  const action = e.target.closest("[data-action]")?.dataset?.action;
+  if (action === "view") { viewBrandAsset(type); return; }
+  if (action === "delete") { deleteBrandAsset(type); return; }
+  if (action === "extract") { extractBrandAsset(type, card); return; }
+});
+
+// File upload via label inside cards
+document.getElementById("dashboard-brand-assets")?.addEventListener("change", (e) => {
+  if (e.target.type !== "file") return;
+  const card = e.target.closest(".brand-asset-card");
+  if (!card || !e.target.files[0]) return;
+  handleBrandFileSelected(card.dataset.asset, e.target.files[0]);
+});
 
 // ---------------------------------------------------------------------------
 // Actions
@@ -541,33 +575,42 @@ document.getElementById("dashboard-deploy-btn").addEventListener("click", () => 
   }
 });
 
-// Brand asset file inputs
-document.getElementById("brand-upload-styleguide").querySelector("input").addEventListener("change", (e) => {
-  if (e.target.files[0]) handleBrandFileSelected("styleguide", e.target.files[0]);
-});
-document.getElementById("brand-upload-brandvoice").querySelector("input").addEventListener("change", (e) => {
-  if (e.target.files[0]) handleBrandFileSelected("brandvoice", e.target.files[0]);
-});
-
-// Extract design from theme
-document.getElementById("btn-extract-design")?.addEventListener("click", async () => {
-  const btn = document.getElementById("btn-extract-design");
+// Extract All button
+document.getElementById("btn-extract-all")?.addEventListener("click", async () => {
+  const btn = document.getElementById("btn-extract-all");
   const origText = btn.textContent;
   btn.textContent = "Extracting...";
   btn.disabled = true;
+
+  // Mark all cards as extracting
+  const cards = document.querySelectorAll(".brand-asset-card");
+  const savedLabels = new Map();
+  cards.forEach((card) => {
+    const labelEl = card.querySelector(".brand-asset-card__label");
+    if (labelEl) {
+      savedLabels.set(card, labelEl.textContent);
+      labelEl.textContent = "Extracting...";
+    }
+    card.classList.add("brand-asset-card--extracting");
+  });
 
   try {
     const res = await fetch("/api/brand-assets/extract", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ type: "all" }),
     });
     const data = await res.json();
     if (data.ok) {
       await refreshDashboard();
-      const view = await vibeConfirm("Design system extracted and saved as styleguide.", "Would you like to view it?", { confirmLabel: "View Styleguide", confirmClass: "btn--primary" });
-      if (view && data.styleguide) {
-        await vibeViewContent(data.styleguide, "Styleguide", "styleguide.md");
+      const extracted = data.extracted || {};
+      const names = Object.entries(extracted)
+        .filter(([, v]) => v)
+        .map(([k]) => ASSET_LABELS[k] || k);
+      if (names.length > 0) {
+        await vibeAlert(`Extracted: ${names.join(", ")}`, "Done");
+      } else {
+        await vibeAlert("Nothing to extract \u2014 generate some modules first.", "Info");
       }
     } else {
       await vibeAlert(data.error || "Extraction failed", "Error");
@@ -577,6 +620,11 @@ document.getElementById("btn-extract-design")?.addEventListener("click", async (
   } finally {
     btn.textContent = origText;
     btn.disabled = false;
+    cards.forEach((card) => {
+      card.classList.remove("brand-asset-card--extracting");
+      const labelEl = card.querySelector(".brand-asset-card__label");
+      if (labelEl && savedLabels.has(card)) labelEl.textContent = savedLabels.get(card);
+    });
   }
 });
 

@@ -7,6 +7,7 @@ export function buildIntentAnalyzerPrompt(
   themeName: string,
   moduleNames: string[],
   libraryModuleNames: { name: string; usedIn: string[] }[],
+  themeContext?: string,
 ): string {
   const moduleList =
     moduleNames.length > 0
@@ -18,13 +19,17 @@ export function buildIntentAnalyzerPrompt(
       ? `\n\nModule library (reusable from other templates):\n${libraryModuleNames.map((m) => `- ${m.name} (used in: ${m.usedIn.join(", ")})`).join("\n")}`
       : "";
 
+  const contextSection = themeContext
+    ? `\n\n## Product Context\n${themeContext}`
+    : "";
+
   return `You are the Intent Analyzer for vibeSpot, a HubSpot CMS page builder.
 
 Your job: classify the user's request and plan which modules need work. You do NOT generate module code — you only plan.
 
 ## Theme: "${themeName}"
 
-${moduleList}${libraryList}
+${moduleList}${libraryList}${contextSection}
 
 ## Classification Rules
 

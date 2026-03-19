@@ -807,69 +807,90 @@ body { display: flex; }
   gap: 12px;
 }
 
-.brand-asset-upload {
+/* Brand asset cards — ghost buttons with hover-expand actions */
+.brand-asset-card {
+  display: flex;
+  align-items: stretch;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.brand-asset-card:hover {
+  border-color: var(--accent);
+}
+.brand-asset-card__base {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: border-color 0.15s ease;
+  padding: 8px 14px;
 }
-
-.brand-asset-upload:hover {
-  border-color: var(--accent);
-}
-
-.brand-asset-upload__icon {
-  width: 24px;
-  height: 24px;
+.brand-asset-card__icon {
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   background: var(--bg-hover);
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
+  flex-shrink: 0;
 }
-
-.brand-asset-upload__icon--done {
+.brand-asset-card__icon--done {
   background: rgba(74,222,128,0.15);
   color: var(--success);
 }
-
-.brand-asset-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.brand-asset-actions {
-  display: flex;
-  gap: 2px;
-}
-.brand-asset-action {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 14px;
-  padding: 2px 4px;
-  border-radius: var(--radius-sm);
-  transition: color 0.15s, background 0.15s;
-}
-.brand-asset-action:hover {
-  color: var(--accent);
-  background: var(--bg-hover);
-}
-.brand-asset-action--delete:hover {
-  color: var(--error);
-}
-
-.brand-asset-upload__label {
+.brand-asset-card__label {
   font-size: 13px;
   color: var(--text);
+  white-space: nowrap;
+}
+
+/* Slide-in actions on hover */
+.brand-asset-card__actions,
+.brand-asset-card__manage {
+  display: flex;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-width 0.2s ease, opacity 0.15s ease;
+}
+.brand-asset-card:hover > .brand-asset-card__actions:not(.hidden),
+.brand-asset-card:hover > .brand-asset-card__manage:not(.hidden) {
+  max-width: 180px;
+  opacity: 1;
+}
+
+.brand-asset-card__btn {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.brand-asset-card__btn:hover {
+  background: var(--bg-active);
+  color: var(--accent);
+}
+.brand-asset-card__btn--danger:hover {
+  color: var(--error);
+}
+/* Hide file input inside label */
+.brand-asset-card__btn input[type="file"] { display: none; }
+
+/* Extracting state */
+.brand-asset-card--extracting {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 /* Back button in dashboard topbar */

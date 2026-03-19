@@ -60,6 +60,7 @@ export interface VibeSession {
     styleguide?: string;
     brandvoice?: string;
     humanify?: boolean;
+    themeContext?: string;
   };
   assets?: SessionAsset[];
 
@@ -90,7 +91,7 @@ export interface SessionSnapshot {
   messages: ReadonlyArray<Readonly<ChatMessage>>;
   themeName: string;
   themePath: string;
-  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean };
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string };
 }
 
 export interface FieldDef {

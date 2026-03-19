@@ -4,6 +4,34 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.0.2 — 2026-03-19
+
+Brand assets redesign, per-asset extraction, and cross-template context sharing.
+
+### Brand Assets UI
+- **Hover-expand cards** — each brand asset (styleguide, brand voice, product context) is a ghost button that reveals Upload and Extract actions on hover
+- **Per-asset extraction** — extract styleguide, brand voice, or product context individually via AI
+- **Extract All** — single button runs all three extractors in parallel
+- **Extracting state** — cards show "Extracting..." label with dimmed state during AI extraction
+- **Event delegation** — unified click/change handling replaces 8+ individual listeners
+
+### Brand Voice Extractor (new)
+- **AI-powered brand voice extraction** — analyzes rendered preview HTML to extract tone, voice characteristics, vocabulary patterns, sentence style, and dos/don'ts
+- Used as context for consistent copy across pages in the same theme
+
+### Cross-Template Context Sharing
+- **Product context extraction** — AI extracts a product/company brief (name, value props, target audience, terminology) from the rendered preview
+- **Preview-based extraction** — both brand voice and product context extractors now use the fully rendered preview HTML (with HubL resolved to actual field values) instead of raw template placeholders
+- **Prompt injection** — product context is injected into Intent Analyzer, Page Architect, and Module Developer prompts for brand-consistent generation
+- **Post-generation suggestion** — after first pipeline run, a dismissible chat prompt offers to extract all brand assets (never blocks preview)
+
+### Session & Persistence
+- **themeContext** added to `brandAssets` in session and snapshot types
+- **theme-context.md** loaded from `.vibespot/` directory on session restore
+- **Brand asset CRUD** — GET/POST/DELETE endpoints support all three asset types
+
+---
+
 ## v1.0.1 — 2026-03-18
 
 Pipeline reliability, intent analyzer improvements, and UI polish.
