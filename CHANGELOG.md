@@ -4,6 +4,15 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.0.3 — 2026-03-19
+
+Fix nested HubL conditionals breaking button rendering and downstream CSS.
+
+### Bug Fix
+- **Nested conditional rendering** — HubL renderer's `RE_IF_PATTERN` regex now matches innermost if/endif blocks first, then peels layers outward. Previously, the non-greedy body pattern paired outer `{% if %}` with inner `{% endif %}` tags, causing button text and closing `</a>` tags to be consumed by mismatched orphan conditionals. This produced empty button rectangles and broke CSS for all downstream modules.
+
+---
+
 ## v1.0.2 — 2026-03-19
 
 Brand assets redesign, per-asset extraction, and cross-template context sharing.

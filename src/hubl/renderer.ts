@@ -170,7 +170,9 @@ const RE_MODULE_TAG = /\{%[-\s]*module\b.*?%\}/gs;
 const RE_TEMPLATE_TAGS = /\{%[-\s]*(extends|block|endblock|set)\b.*?%\}/gs;
 const RE_ANNOTATIONS = /\{#.*?#\}/gs;
 const RE_CONTENT_VARS = /\{\{[-\s]*content\.\w+.*?\}\}/gs;
-const RE_IF_PATTERN = /\{%[-\s]*if\s+(.*?)\s*-?%\}([\s\S]*?)\{%[-\s]*endif\s*-?%\}/g;
+// Match only INNERMOST if/endif blocks (body must not contain other {% if %} tags).
+// The while-loop peels layers from inside out, resolving nested conditionals correctly.
+const RE_IF_PATTERN = /\{%[-\s]*if\s+(.*?)\s*-?%\}((?:(?!\{%[-\s]*if\s)[\s\S])*?)\{%[-\s]*endif\s*-?%\}/g;
 
 /**
  * Strip HubSpot-specific directives that have no meaning in local preview.
