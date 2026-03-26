@@ -13,6 +13,7 @@ const activePolls = {};
 const ENGINE_LABELS = {
   "claude-code": "Claude Code",
   "anthropic-api": "Anthropic API",
+  "claude-oauth": "Claude (OAuth)",
   "openai-api": "OpenAI API",
   "gemini-cli": "Gemini CLI",
   "gemini-api": "Gemini API",
@@ -99,6 +100,7 @@ function renderAITab(body, data) {
   const allEngines = [
     { id: "claude-code", label: "Claude Code" },
     { id: "anthropic-api", label: "Anthropic API" },
+    { id: "claude-oauth", label: "Claude (OAuth)" },
     { id: "openai-api", label: "OpenAI API" },
     { id: "gemini-cli", label: "Gemini CLI" },
     { id: "gemini-api", label: "Gemini API" },
@@ -223,6 +225,74 @@ function renderAITab(body, data) {
     keysSection.appendChild(createApiKeyCard(prov.key, prov.name, prov.placeholder, keyInfo));
   }
   body.appendChild(keysSection);
+
+  // Claude OAuth section
+  const oauthSection = el("section", "settings__section");
+  oauthSection.appendChild(sectionTitle("Claude OAuth"));
+  oauthSection.appendChild(desc("Use your Claude Pro/Max subscription. Run `claude setup-token` in your terminal to get a token, then paste it below."));
+
+  const oauthCard = el("div", "settings__card");
+  const oauthInfo = env.tools?.claudeOAuth;
+
+  if (oauthInfo?.authenticated) {
+    const statusRow = el("div", "settings__card-row");
+    const statusLabel = el("span", "settings__card-label");
+    statusLabel.textContent = "Connected";
+    statusLabel.style.color = "var(--vibe-green)";
+    if (oauthInfo.expiresAt) {
+      const hrs = Math.max(0, Math.round((new Date(oauthInfo.expiresAt) - Date.now()) / 3600000));
+      statusLabel.textContent += ` (token expires in ${hrs}h)`;
+    }
+    statusRow.appendChild(statusLabel);
+
+    const disconnectBtn = el("button", "btn btn--sm btn--danger");
+    disconnectBtn.textContent = "Disconnect";
+    disconnectBtn.addEventListener("click", async () => {
+      await fetch("/api/settings/claude-oauth/logout", { method: "POST" });
+      refreshSettings();
+    });
+    statusRow.appendChild(disconnectBtn);
+    oauthCard.appendChild(statusRow);
+  }
+
+  const inputRow = el("div", "settings__card-row");
+  inputRow.style.gap = "8px";
+  const tokenInput = el("input", "settings__apikey-input");
+  tokenInput.type = "password";
+  tokenInput.placeholder = oauthInfo?.authenticated ? "••••••••••••• (saved)" : "sk-ant-oat01-...";
+  inputRow.appendChild(tokenInput);
+
+  const saveBtn = el("button", "btn btn--sm btn--primary");
+  saveBtn.textContent = "Save Token";
+  saveBtn.addEventListener("click", async () => {
+    const token = tokenInput.value.trim();
+    if (!token) return;
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+    try {
+      const res = await fetch("/api/settings/claude-oauth/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_token: token }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        tokenInput.value = "";
+        refreshSettings();
+      } else {
+        alert(data.error || "Failed to save token");
+      }
+    } catch (err) {
+      alert("Failed: " + err.message);
+    }
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save Token";
+  });
+  inputRow.appendChild(saveBtn);
+  oauthCard.appendChild(inputRow);
+
+  oauthSection.appendChild(oauthCard);
+  body.appendChild(oauthSection);
 
   // CLI Tools section with toggles
   const cliSection = el("section", "settings__section");
@@ -1102,6 +1172,7 @@ function getModelsForEngine(engine) {
         { id: "haiku", label: "Claude Haiku" },
       ];
     case "anthropic-api":
+    case "claude-oauth":
       return [
         { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
         { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
@@ -1135,7 +1206,8 @@ function getModelsForEngine(engine) {
 function getCurrentModel(engine, config) {
   switch (engine) {
     case "claude-code": return config.claudeCodeModel || "sonnet";
-    case "anthropic-api": return config.anthropicApiModel || "claude-sonnet-4-6";
+    case "anthropic-api":
+    case "claude-oauth": return config.anthropicApiModel || "claude-sonnet-4-6";
     case "openai-api": return config.openaiApiModel || "gpt-4o";
     default: return null;
   }

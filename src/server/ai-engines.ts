@@ -6,8 +6,9 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { spawn } from "node:child_process";
 import { getConversionGuide } from "../ai/prompts.js";
 import { loadConfig } from "../utils/config.js";
+import { getValidAccessToken, OAUTH_EXTRA_HEADERS, OAUTH_SYSTEM_PREFIX } from "../utils/claude-oauth.js";
 import { getSession } from "./session.js";
-import { buildVibeSystemPrompt, buildStateContext, buildMessagesWithContext, getPromptContext, type MultimodalMessage } from "./ai-prompts.js";
+import { buildVibeSystemPrompt, buildVibeSystemPromptBlocks, buildStateContext, buildMessagesWithContext, getPromptContext, type SystemPromptBlock, type MultimodalMessage } from "./ai-prompts.js";
 import { log } from "./log.js";
 import type { UploadedFileContext } from "./routes/upload-files.js";
 
@@ -60,41 +61,24 @@ export const CLI_STATUS_MESSAGES = [
 ];
 
 // ---------------------------------------------------------------------------
-// Anthropic Streaming API
+// Anthropic Streaming API (shared helper + public wrappers)
 // ---------------------------------------------------------------------------
 
 const RATE_LIMIT_DELAYS = [10, 20, 40, 60, 120]; // seconds
 
-export async function streamWithAnthropicAPI(
-  userMessage: string,
-  apiKey: string,
-  themeName: string,
+/**
+ * Shared streaming helper for all Anthropic-based engines.
+ * Accepts a pre-built SDK client and system prompt (string or blocks).
+ */
+async function _streamAnthropic(
+  client: InstanceType<Awaited<ReturnType<typeof getAnthropicSDK>>>,
+  system: string | SystemPromptBlock[],
+  messages: MultimodalMessage[],
   model: string,
   onChunk: (chunk: string) => void,
   onStatus?: (status: string) => void,
   onFinish?: (fullResponse: string) => void,
-  fileContexts?: UploadedFileContext[]
 ): Promise<void> {
-  const AnthropicSDK = await getAnthropicSDK();
-  const client = new AnthropicSDK({ apiKey });
-  const conversionGuide = getConversionGuide();
-  const session = getSession()!;
-  const editMode = session.modules.length > 0;
-  const messages = buildMessagesWithContext(userMessage, fileContexts);
-  const ctx = getPromptContext();
-  const systemPrompt = buildVibeSystemPrompt(conversionGuide, themeName, editMode, ctx.pageType, ctx.brandAssets);
-
-  log.info("anthropic", "API call", {
-    model,
-    systemPromptLength: systemPrompt.length,
-    messageCount: messages.length,
-    messageRoles: messages.map((m) => m.role),
-    lastMessageLength: typeof messages[messages.length - 1]?.content === "string"
-      ? (messages[messages.length - 1].content as string).length
-      : "multimodal",
-    conversionGuideLength: conversionGuide.length,
-  });
-
   for (let attempt = 0; ; attempt++) {
     try {
       let fullResponse = "";
@@ -111,7 +95,7 @@ export async function streamWithAnthropicAPI(
         const stream = client.messages.stream({
           model,
           max_tokens: 48000,
-          system: systemPrompt,
+          system: system as any,
           messages: messages as unknown as import("@anthropic-ai/sdk").MessageParam[],
         });
 
@@ -147,6 +131,81 @@ export async function streamWithAnthropicAPI(
       if (onStatus) onStatus("Retrying...");
     }
   }
+}
+
+/** Prepare common Anthropic call context (messages, system prompt blocks). */
+function prepareAnthropicContext(userMessage: string, themeName: string, fileContexts?: UploadedFileContext[]) {
+  const conversionGuide = getConversionGuide();
+  const session = getSession()!;
+  const editMode = session.modules.length > 0;
+  const messages = buildMessagesWithContext(userMessage, fileContexts);
+  const ctx = getPromptContext();
+  const systemBlocks = buildVibeSystemPromptBlocks(conversionGuide, themeName, editMode, ctx.pageType, ctx.brandAssets);
+  return { messages, systemBlocks, conversionGuide, editMode };
+}
+
+export async function streamWithAnthropicAPI(
+  userMessage: string,
+  apiKey: string,
+  themeName: string,
+  model: string,
+  onChunk: (chunk: string) => void,
+  onStatus?: (status: string) => void,
+  onFinish?: (fullResponse: string) => void,
+  fileContexts?: UploadedFileContext[]
+): Promise<void> {
+  const AnthropicSDK = await getAnthropicSDK();
+  const client = new AnthropicSDK({ apiKey });
+  const { messages, systemBlocks } = prepareAnthropicContext(userMessage, themeName, fileContexts);
+
+  log.info("anthropic", "API call", {
+    model,
+    systemBlockCount: systemBlocks.length,
+    cachedBlocks: systemBlocks.filter((b) => b.cache_control).length,
+    messageCount: messages.length,
+  });
+
+  await _streamAnthropic(client, systemBlocks, messages, model, onChunk, onStatus, onFinish);
+}
+
+// ---------------------------------------------------------------------------
+// Claude OAuth Streaming API — uses OAuth token + required headers
+// ---------------------------------------------------------------------------
+
+export async function streamWithClaudeOAuth(
+  userMessage: string,
+  themeName: string,
+  model: string,
+  onChunk: (chunk: string) => void,
+  onStatus?: (status: string) => void,
+  onFinish?: (fullResponse: string) => void,
+  fileContexts?: UploadedFileContext[]
+): Promise<void> {
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) throw new Error("Claude OAuth session expired. Please re-authenticate in Settings.");
+
+  const AnthropicSDK = await getAnthropicSDK();
+  const client = new AnthropicSDK({
+    authToken: accessToken,
+    defaultHeaders: OAUTH_EXTRA_HEADERS,
+  } as any);
+
+  const { messages, systemBlocks } = prepareAnthropicContext(userMessage, themeName, fileContexts);
+
+  // Prepend required Claude Code system prefix as separate first block
+  const oauthBlocks: SystemPromptBlock[] = [
+    { type: "text", text: OAUTH_SYSTEM_PREFIX },
+    ...systemBlocks,
+  ];
+
+  log.info("anthropic-oauth", "API call", {
+    model,
+    systemBlockCount: oauthBlocks.length,
+    cachedBlocks: oauthBlocks.filter((b) => b.cache_control).length,
+    messageCount: messages.length,
+  });
+
+  await _streamAnthropic(client, oauthBlocks, messages, model, onChunk, onStatus, onFinish);
 }
 
 // ---------------------------------------------------------------------------

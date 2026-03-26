@@ -4,6 +4,7 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { run } from "./shell.js";
 import { loadConfig, maskApiKey, isCliToolEnabled, getActiveHubSpotAccount, type AIEngineType, type HubSpotAccountConfig } from "./config.js";
 import { detectDataCenterFromPak } from "../hubspot/api.js";
+import { hasValidOAuthToken, getOAuthTokenInfo } from "./claude-oauth.js";
 
 const whichCmd = process.platform === "win32" ? "where" : "which";
 
@@ -333,6 +334,7 @@ export interface EnvironmentStatus {
     hubspot: ToolInfo & { authenticated: boolean; portalName: string; portalId: string; dataCenter: string; accounts: HubSpotAccount[]; uploadMode: "api" | "cli" };
     github: ToolInfo & { authenticated: boolean; username: string };
     claudeCode: CLIToolInfo;
+    claudeOAuth: { authenticated: boolean; expiresAt?: string };
     geminiCli: CLIToolInfo;
     codexCli: CLIToolInfo;
   };
@@ -379,6 +381,12 @@ export function detectEnvironment(): EnvironmentStatus {
   const gh = detectGitHubCLI();
   const ghAuth = gh.found ? detectGitHubAuth() : { authenticated: false, username: "" };
 
+  // Claude OAuth token check
+  const claudeOAuth = {
+    authenticated: hasValidOAuthToken(),
+    expiresAt: getOAuthTokenInfo()?.expiresAt,
+  };
+
   // AI CLI tools — only check if enabled in config (lazy loading)
   const enabledTools = config.enabledCLITools || [];
   const claude = isCliToolEnabled("claude-code") ? detectClaudeCode() : { ...DISABLED_CLI, name: "Claude Code" };
@@ -401,6 +409,7 @@ export function detectEnvironment(): EnvironmentStatus {
   // Build available engines — CLI tools must be enabled + authenticated
   const available: AIEngineType[] = [];
   if (claude.found && claude.authenticated) available.push("claude-code");
+  if (claudeOAuth.authenticated) available.push("claude-oauth");
   if (anthropicKey.configured) available.push("anthropic-api");
   if (openaiKey.configured) available.push("openai-api");
   if (gemini.found && gemini.authenticated) available.push("gemini-cli");
@@ -414,6 +423,7 @@ export function detectEnvironment(): EnvironmentStatus {
       hubspot: hsInfo,
       github: { ...gh, ...ghAuth },
       claudeCode: claude,
+      claudeOAuth,
       geminiCli: gemini,
       codexCli: codex,
     },

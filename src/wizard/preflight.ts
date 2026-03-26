@@ -9,6 +9,7 @@ import {
   hasAnthropicKey,
   nodeVersionOk,
 } from "../utils/detect.js";
+import { hasValidOAuthToken } from "../utils/claude-oauth.js";
 import { run, runPassthrough } from "../utils/shell.js";
 import { saveConfig, loadConfig, getHubSpotPak, getActiveHubSpotAccount, addHubSpotAccount, type AIEngineType } from "../utils/config.js";
 import { validatePak } from "../hubspot/api.js";
@@ -154,11 +155,14 @@ export async function runPreflight(): Promise<PreflightResult> {
     "claude-code": "Claude Code",
     "api": "Anthropic API",
     "anthropic-api": "Anthropic API",
+    "claude-oauth": "Claude (OAuth)",
     "openai-api": "OpenAI API",
     "gemini-api": "Gemini API",
     "gemini-cli": "Gemini CLI",
     "codex-cli": "OpenAI Codex",
   };
+
+  const hasOAuth = hasValidOAuthToken();
 
   let aiEngine: AIEngineType;
   const lastUsed = config.aiEngine;
@@ -173,6 +177,15 @@ export async function runPreflight(): Promise<PreflightResult> {
       hint: lastUsed === "claude-code"
         ? "last used — recommended"
         : "uses your existing Claude subscription — recommended",
+    });
+  }
+  if (hasOAuth) {
+    available.push({
+      value: "claude-oauth",
+      label: "Claude (OAuth)",
+      hint: lastUsed === "claude-oauth"
+        ? "last used"
+        : "uses your Claude Pro/Max subscription via OAuth",
     });
   }
   if (gemini.found) {

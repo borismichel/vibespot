@@ -33,6 +33,200 @@ export function getPromptContext(): { pageType?: string; brandAssets?: { stylegu
   };
 }
 
+// ---------------------------------------------------------------------------
+// Anthropic prompt caching — system prompt as block array with cache_control
+// ---------------------------------------------------------------------------
+
+export interface SystemPromptBlock {
+  type: "text";
+  text: string;
+  cache_control?: { type: "ephemeral" };
+}
+
+/**
+ * Build the system prompt as an array of blocks for Anthropic API engines.
+ * Static reference guides are marked with cache_control for prompt caching.
+ */
+export function buildVibeSystemPromptBlocks(
+  conversionGuide: string,
+  themeName: string,
+  editMode: boolean = false,
+  pageType?: string,
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean },
+): SystemPromptBlock[] {
+  // Block 1: Core instructions (semi-static — varies by themeName)
+  const core = buildCoreInstructions(themeName, editMode);
+  const blocks: SystemPromptBlock[] = [{ type: "text", text: core }];
+
+  // Block 2: Reference guides — CACHED (identical across all calls)
+  if (editMode) {
+    const guides = `## HubSpot CMS Rules\n${getHubspotRules()}\n\n## Conversion Guide Reference\n${conversionGuide}`;
+    blocks.push({ type: "text", text: guides, cache_control: { type: "ephemeral" } });
+  } else {
+    const guides = `## Design Quality
+- Use modern, clean design with proper spacing and typography
+- Include responsive CSS (mobile breakpoint at 767px)
+- Add scroll animation classes where appropriate
+- Use CSS custom properties for the design system
+- Make content editable through fields.json (headlines, text, colors, images, links)
+
+## Scroll Animation CSS Fallback (IMPORTANT)
+When using scroll-animate classes (opacity: 0 → visible), you MUST include a CSS-only fallback animation in sharedCss that auto-reveals elements after a delay. This ensures content is visible even if the JS file fails to load:
+\`\`\`css
+@keyframes scroll-animate-fallback {
+  to { opacity: 1; transform: none; }
+}
+.scroll-animate {
+  animation: scroll-animate-fallback 0.1s 3s forwards;
+}
+.scroll-animate.visible {
+  animation: none;
+}
+\`\`\`
+This makes elements appear after 3 seconds if JS never adds the .visible class. Once JS runs normally and adds .visible, the animation is cancelled.
+
+## Design Guide
+${getDesignGuide()}
+
+## Content & Copywriting Guide
+${getContentGuide()}
+
+## HubSpot CMS Rules
+${getHubspotRules()}
+
+## Conversion Guide Reference
+${conversionGuide}`;
+    blocks.push({ type: "text", text: guides, cache_control: { type: "ephemeral" } });
+  }
+
+  // Block 3: Dynamic content (changes per session/template — NOT cached)
+  const dynamic = buildDynamicSection(pageType, brandAssets);
+  if (dynamic) {
+    blocks.push({ type: "text", text: dynamic });
+  }
+
+  // Block 4: Format reminder
+  blocks.push({
+    type: "text",
+    text: `## REMINDER — Output Format (CRITICAL)\nYour response MUST contain a \`\`\`vibespot-modules code block with the full JSON. Without this block, no modules will be created. Do NOT respond with only text, tables, or descriptions. The JSON block is mandatory.`,
+  });
+
+  return blocks;
+}
+
+/** Build the dynamic (per-session) prompt sections. */
+function buildDynamicSection(
+  pageType?: string,
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean },
+): string {
+  const parts: string[] = [];
+
+  if (pageType) {
+    const section = getPageTypeGuide(pageType);
+    if (section) parts.push(`## Page Type Context\n${section}`);
+  }
+
+  if (brandAssets?.styleguide) {
+    parts.push(`## Brand Style Guide\n${brandAssets.styleguide}`);
+  }
+  if (brandAssets?.brandvoice) {
+    parts.push(`## Brand Voice\n${brandAssets.brandvoice}`);
+  }
+  if (brandAssets?.humanify !== false) {
+    const humanifyGuide = getHumanifyGuide();
+    if (humanifyGuide) parts.push(`## Anti-AI Copy Rules (Humanify)\n${humanifyGuide}`);
+  }
+
+  return parts.join("\n\n");
+}
+
+/** Build the core instructions block (reused by both string and block builders). */
+function buildCoreInstructions(themeName: string, editMode: boolean): string {
+  return `You are vibeSpot, an AI that builds HubSpot CMS landing pages from natural language descriptions.
+
+## Your Role
+You generate native HubSpot CMS modules directly from user descriptions. Every module you create is immediately compatible with HubSpot's drag-and-drop page editor.
+
+## Output Format — CRITICAL
+You MUST include a \`\`\`vibespot-modules code block with ALL module data as JSON. This is the ONLY way modules get created. A text summary, table, or description of modules does NOT work — you must output the actual JSON.
+
+\`\`\`vibespot-modules
+{
+  "modules": [
+    {
+      "moduleName": "Hero",
+      "fieldsJson": "...",
+      "metaJson": "...",
+      "moduleHtml": "...",
+      "moduleCss": "...",
+      "moduleJs": null
+    }
+  ],
+  "sharedCss": "...",
+  "sharedJs": "..."
+}
+\`\`\`
+
+NEVER respond with only a text summary. The vibespot-modules JSON block is mandatory.
+
+## Rules
+- fieldsJson, metaJson must be valid JSON strings
+- moduleHtml uses HubL template syntax ({{ module.field_name }})
+- moduleCss is vanilla CSS (no Tailwind, no Sass)
+- moduleJs is optional vanilla JS (wrapped in IIFE)
+- NEVER use CDN imports (@import url(), <link> to external CDNs like Google Fonts, cdnjs, unpkg, jsdelivr)
+- For fonts, use system font stacks with good fallbacks. Define them as CSS custom properties in sharedCss:
+  --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'SF Mono', SFMono-Regular, Consolas, monospace;
+- All assets must be self-contained — no external HTTP requests in CSS or HTML
+- Use "type": "text" (NEVER "textarea" — it's deprecated)
+- NEVER use "name": "name" (reserved) — use "item_name" instead
+- NEVER put literal \\n newline sequences in field default values — use plain text without line breaks
+- Wrap style fields in a "styles" group with "tab": "STYLE"
+- All CSS classes must use a unique prefix "${themeName}-" to avoid theme conflicts
+- Use BEM naming: ${themeName}-module__element--modifier
+- metaJson must include: host_template_types: ["PAGE"], is_available_for_new_content: true
+- For repeater groups, use "occurrence": { "min": 0, "max": 100 } and iterate with {% for %}
+- Color fields: type "color", default { "color": "#hex", "opacity": 100 }
+- Link fields: type "link", default { "url": { "href": "#", "type": "EXTERNAL" }, "open_in_new_tab": false, "no_follow": false }
+- Image fields: type "image", default { "src": "https://placehold.co/800x600/1a1a2e/ffffff?text=Replace+in+HubSpot", "alt": "Placeholder image", "width": 800, "height": 600 }
+
+## Images & Media
+- Users can upload images that get placed in the theme's assets/ folder automatically
+- When the user uploads an image and wants it on the page, reference it with: {{ get_asset_url("${themeName}/assets/filename.ext") }}
+- IMPORTANT: get_asset_url() paths must include the theme name prefix "${themeName}/" because HubSpot resolves from the Design Manager root
+- For background images with uploaded assets: style="background-image: url('{{ get_asset_url(\\"${themeName}/assets/filename.ext\\") }}')"
+- For images without an uploaded asset, use image fields (type "image") with placehold.co defaults
+- ALWAYS use image fields (type "image") so users can swap images in the page editor
+- Use placehold.co URLs as defaults so the preview looks complete (e.g. https://placehold.co/800x600/1a1a2e/ffffff?text=Hero+Image)
+- In module.html, render images with: <img src="{{ module.field_name.src }}" alt="{{ module.field_name.alt }}" width="{{ module.field_name.width }}" height="{{ module.field_name.height }}">
+- For background images in CSS, use inline styles: style="background-image: url('{{ module.field_name.src }}')"
+- Size placeholders appropriately for their context (hero: 1920x800, cards: 600x400, icons: 200x200, avatars: 150x150)
+- If the user's intent is ambiguous (design reference vs page asset), ask them to clarify
+
+## Navigation & Anchor Links
+- For anchor links, add an id attribute directly on the module's root element in module.html:
+  <section id="pricing" class="...">  (NOT on an external wrapper — HubSpot's dnd system strips those)
+- The id should be the moduleName lowercased with spaces replaced by hyphens (e.g. "Pricing Cards" → id="pricing-cards")
+- For navigation/menu modules, use anchor links that match these ids: e.g. href="#features"
+- Always include smooth scrolling behavior in navigation link clicks
+- For nav modules, make menu items editable via a repeater group with "label" (text) and "anchor" (text) fields` +
+    (editMode
+      ? `
+
+## When modifying existing modules
+The current template's modules are listed in page order in the user message. This sequence forms the page narrative.
+
+- **Modify**: When the user references an existing module by name or describes changes to existing content, update that module's code. Keep the moduleName unchanged.
+- **Add**: When the user asks for a new section, create a new module and insert it at the narratively correct position. Consider the page flow: navigation → hero → content sections → social proof → CTA → footer.
+- **Rearrange**: When the user asks to reorder sections, include a "moduleOrder" array in the vibespot-modules JSON with the new sequence of module names.
+- **Remove**: When the user asks to remove a section, omit it from the output.
+- **Preserve**: Always include ALL modules you want to keep (modified + unchanged) in your output. Modules omitted from the output will be removed from the page.
+- **Design consistency**: Match the existing theme's design language — reuse the same CSS custom properties, class naming prefix, spacing scale, and typography.`
+      : "");
+}
+
 /**
  * Build the system prompt for vibe coding mode.
  */

@@ -14,6 +14,7 @@ import type { PipelinePlan, PageBlueprint, DesignSystemOutput, PipelineEvent } f
 import type { SessionSnapshot } from "../../session/types.js";
 import {
   buildDesignSystemPrompt,
+  buildDesignSystemPromptBlocks,
   buildModulePlannerPrompt,
   DESIGN_SYSTEM_SCHEMA,
   MODULE_PLANNER_SCHEMA,
@@ -39,10 +40,14 @@ export async function runPageArchitect(
     label: "Creating design system...",
   });
 
+  const isAnthropicEngine = engine === "anthropic-api" || engine === "claude-oauth";
   const designPrompt = buildDesignSystemPrompt(
     snapshot.themeName,
     snapshot.brandAssets,
   );
+  const designBlocks = isAnthropicEngine
+    ? buildDesignSystemPromptBlocks(snapshot.themeName, snapshot.brandAssets)
+    : undefined;
 
   let designUserContent = `## User Request\n${userMessage}`;
   if (snapshot.modules.length > 0 && plan.designSystemChanges) {
@@ -51,6 +56,7 @@ export async function runPageArchitect(
 
   const designResult = await callAgent(engine, apiKey, model, {
     systemPrompt: designPrompt,
+    systemBlocks: designBlocks,
     messages: [{ role: "user", content: designUserContent }],
     structuredOutput: {
       schema: DESIGN_SYSTEM_SCHEMA as unknown as Record<string, unknown>,

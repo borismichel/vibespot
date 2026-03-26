@@ -109,6 +109,7 @@ export async function doctorCommand(): Promise<void> {
     "claude-code": "Claude Code",
     "api": "Anthropic API",
     "anthropic-api": "Anthropic API",
+    "claude-oauth": "Claude (OAuth)",
     "openai-api": "OpenAI API",
     "gemini-api": "Gemini API",
     "gemini-cli": "Gemini CLI",

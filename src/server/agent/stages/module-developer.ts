@@ -11,6 +11,7 @@ import type { ModuleSpec, PipelineEvent } from "../types.js";
 import { createConcurrencyLimiter } from "../types.js";
 import {
   buildModuleDeveloperPrompt,
+  buildModuleDeveloperPromptBlocks,
   buildModuleUserMessage,
   MODULE_DEVELOPER_SCHEMA,
 } from "../prompts/module-developer.js";
@@ -41,12 +42,16 @@ export async function runModuleDeveloper(
     label: `Generating ${specs.length} module${specs.length === 1 ? "" : "s"}...`,
   });
 
+  const isAnthropicEngine = engine === "anthropic-api" || engine === "claude-oauth";
   const systemPrompt = buildModuleDeveloperPrompt(
     themeName,
     sharedCss,
     guidesNeeded,
     brandAssets,
   );
+  const systemBlocks = isAnthropicEngine
+    ? buildModuleDeveloperPromptBlocks(themeName, sharedCss, guidesNeeded, brandAssets)
+    : undefined;
 
   const limit = createConcurrencyLimiter(concurrency);
   const total = specs.length;
@@ -82,6 +87,8 @@ export async function runModuleDeveloper(
             engine,
             apiKey,
             model,
+            0,
+            systemBlocks,
           );
 
           onEvent({
@@ -137,6 +144,7 @@ async function generateSingleModule(
   apiKey: string,
   model: string,
   retryCount = 0,
+  systemBlocks?: import("../engine-adapter.js").SystemPromptBlock[],
 ): Promise<ModuleFiles> {
   const userContent = buildModuleUserMessage(
     userMessage,
@@ -146,6 +154,7 @@ async function generateSingleModule(
 
   const result = await callAgent(engine, apiKey, model, {
     systemPrompt,
+    systemBlocks,
     messages: [{ role: "user", content: userContent }],
     structuredOutput: {
       schema: MODULE_DEVELOPER_SCHEMA as unknown as Record<string, unknown>,
@@ -168,6 +177,7 @@ async function generateSingleModule(
         apiKey,
         model,
         retryCount + 1,
+        systemBlocks,
       );
     }
     throw new Error(

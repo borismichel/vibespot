@@ -9,6 +9,8 @@
  * module developers reference it.
  */
 
+import type { SystemPromptBlock } from "../engine-adapter.js";
+
 // ---------------------------------------------------------------------------
 // Stage 2a: Design System
 // ---------------------------------------------------------------------------
@@ -115,6 +117,44 @@ Good system font stacks by style:
   }
 
   return parts.join("");
+}
+
+/**
+ * Build design system prompt as blocks with cache control.
+ * The design guide summary is static and cached.
+ */
+export function buildDesignSystemPromptBlocks(
+  themeName: string,
+  brandAssets?: { styleguide?: string; brandvoice?: string; themeContext?: string },
+): SystemPromptBlock[] {
+  // Build core prompt without the design guide (pass empty brandAssets to skip dynamic parts)
+  const full = buildDesignSystemPrompt(themeName);
+  // Split at the design guide marker
+  const marker = "\n\n## Design Guide\n";
+  const markerIdx = full.indexOf(marker);
+
+  if (markerIdx === -1) {
+    // Fallback: no split possible, return as single block
+    return [{ type: "text", text: full }];
+  }
+
+  const corePart = full.slice(0, markerIdx);
+  const designGuide = `## Design Guide\n${getArchitectDesignSummary()}`;
+
+  const blocks: SystemPromptBlock[] = [
+    { type: "text", text: corePart },
+    { type: "text", text: designGuide, cache_control: { type: "ephemeral" } },
+  ];
+
+  // Dynamic brand assets
+  const dynamicParts: string[] = [];
+  if (brandAssets?.styleguide) dynamicParts.push(`## Brand Style Guide\n${brandAssets.styleguide}`);
+  if (brandAssets?.themeContext) dynamicParts.push(`## Product Context\n${brandAssets.themeContext}`);
+  if (dynamicParts.length > 0) {
+    blocks.push({ type: "text", text: dynamicParts.join("\n\n") });
+  }
+
+  return blocks;
 }
 
 /** JSON Schema for Design System output. */

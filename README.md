@@ -75,6 +75,7 @@ vibeSpot needs an AI engine to generate code. Use **one** of these:
 | Engine | Install | Notes |
 |--------|---------|-------|
 | Anthropic API | No install — just need an API key | Get one at [console.anthropic.com](https://console.anthropic.com) |
+| Claude OAuth | Run `claude setup-token` → paste token | Uses your Claude Pro/Max subscription |
 | OpenAI API | No install — just need an API key | Any OpenAI model |
 | Gemini API | No install — just need an API key | Google Gemini models |
 | [Claude Code](https://claude.ai/code) | `npm install -g @anthropic-ai/claude-code` | Uses your Claude subscription |
@@ -123,7 +124,7 @@ Most users only need `npx vibespot` — the web UI handles everything.
 
 Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, GitHub, vibeSpot) and saved in `~/.vibespot/config.json`:
 
-- `aiEngine` — Your preferred AI engine (`anthropic-api`, `openai-api`, `gemini-api`, `claude-code`, `gemini-cli`, `codex-cli`)
+- `aiEngine` — Your preferred AI engine (`anthropic-api`, `claude-oauth`, `openai-api`, `gemini-api`, `claude-code`, `gemini-cli`, `codex-cli`)
 - `anthropicApiKey`, `openaiApiKey`, `geminiApiKey` — API keys (stored locally, never sent except to the provider)
 - `hubspotAccounts` — Connected HubSpot accounts (PAK-based auth)
 - `hubspotUploadMode` — `api` (default, direct API) or `cli` (legacy, requires HubSpot CLI)

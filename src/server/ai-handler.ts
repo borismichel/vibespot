@@ -12,11 +12,13 @@ import { parseAndApplyModules } from "./ai-parser.js";
 import { log } from "./log.js";
 import {
   streamWithAnthropicAPI,
+  streamWithClaudeOAuth,
   streamWithOpenAIAPI,
   streamWithGeminiAPI,
   generateWithClaudeCode,
   generateWithCLI,
 } from "./ai-engines.js";
+import { hasValidOAuthToken, getValidAccessToken } from "../utils/claude-oauth.js";
 import { getFileContexts } from "./routes/upload-files.js";
 import { runAgentPipeline, isAgenticCapable, isCLIEngine } from "./agent/pipeline.js";
 import type { AgentEngine } from "./agent/engine-adapter.js";
@@ -97,6 +99,11 @@ export async function handleGenerateStream(
           config.anthropicApiModel || "claude-sonnet-4-6", onChunk, onStatus, finishResponse, fileContexts);
         break;
       }
+      case "claude-oauth": {
+        await streamWithClaudeOAuth(userMessage, session.themeName,
+          config.anthropicApiModel || "claude-sonnet-4-6", onChunk, onStatus, finishResponse, fileContexts);
+        break;
+      }
       case "openai-api": {
         const apiKey = getApiKeyForEngine("openai-api", config);
         if (!apiKey) throw new Error("OpenAI API key not configured. Open Settings to add one.");
@@ -133,6 +140,7 @@ export async function handleGenerateStream(
  */
 function detectDefaultEngine(): AIEngineType {
   const config = loadConfig();
+  if (hasValidOAuthToken()) return "claude-oauth";
   if (config.anthropicApiKey || process.env.ANTHROPIC_API_KEY) return "anthropic-api";
   if (config.openaiApiKey || process.env.OPENAI_API_KEY) return "openai-api";
   if (config.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY) return "gemini-api";
@@ -201,7 +209,16 @@ export function resolveAgenticEngine(config: ReturnType<typeof loadConfig>): {
     return { engine: engineType as AgentEngine, apiKey: "", model };
   }
 
-  const apiKey = getApiKeyForEngine(engineType, config);
+  // Claude OAuth resolves its token at call time in the engine adapter
+  let apiKey: string | undefined;
+  if (engineType === "claude-oauth") {
+    if (!hasValidOAuthToken()) {
+      throw new Error("Claude OAuth session expired. Please re-authenticate in Settings.");
+    }
+    apiKey = "oauth"; // Token resolved fresh in engine adapter (auto-refresh)
+  } else {
+    apiKey = getApiKeyForEngine(engineType, config);
+  }
   if (!apiKey) {
     throw new Error(`API key not configured for ${engineType}. Open Settings to add one.`);
   }
@@ -209,6 +226,7 @@ export function resolveAgenticEngine(config: ReturnType<typeof loadConfig>): {
   let model: string;
   switch (engineType) {
     case "anthropic-api":
+    case "claude-oauth":
       model = config.anthropicApiModel || "claude-sonnet-4-6";
       break;
     case "openai-api":

@@ -12,6 +12,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { spawnCLI } from "../ai-engines.js";
 import { tryParseJSON, tryRepairTruncatedJSON } from "../ai-parser.js";
 import { loadConfig } from "../../utils/config.js";
+import { OAUTH_EXTRA_HEADERS, OAUTH_SYSTEM_PREFIX } from "../../utils/claude-oauth.js";
 import { log } from "../log.js";
 
 // ---------------------------------------------------------------------------
@@ -35,8 +36,17 @@ export interface StructuredOutputSpec {
   name: string;
 }
 
+/** System prompt block with optional cache control (for Anthropic prompt caching). */
+export interface SystemPromptBlock {
+  type: "text";
+  text: string;
+  cache_control?: { type: "ephemeral" };
+}
+
 export interface AgentCallOptions {
   systemPrompt: string;
+  /** When provided, used instead of systemPrompt for Anthropic engines (enables prompt caching). */
+  systemBlocks?: SystemPromptBlock[];
   messages: AgentMessage[];
   structuredOutput?: StructuredOutputSpec;
   maxTokens?: number;
@@ -50,6 +60,7 @@ export type AgentCallResult =
 
 export type AgentEngine =
   | "anthropic-api"
+  | "claude-oauth"
   | "openai-api"
   | "gemini-api"
   | "claude-code"
@@ -126,12 +137,30 @@ async function callAnthropic(
   apiKey: string,
   model: string,
   opts: AgentCallOptions,
+  extraHeaders?: Record<string, string>,
+  systemPrefix?: string,
 ): Promise<AgentCallResult> {
   const AnthropicSDK = await getAnthropicSDK();
-  const client = new AnthropicSDK({ apiKey });
+  const client = new AnthropicSDK({
+    apiKey,
+    ...(extraHeaders ? { defaultHeaders: extraHeaders } : {}),
+  });
 
   const messages =
     opts.messages as unknown as import("@anthropic-ai/sdk").MessageParam[];
+
+  // Resolve system prompt: prefer blocks (with cache control), fall back to string
+  let system: string | SystemPromptBlock[] = opts.systemPrompt;
+  if (opts.systemBlocks) {
+    system = systemPrefix
+      ? [{ type: "text" as const, text: systemPrefix }, ...opts.systemBlocks]
+      : opts.systemBlocks;
+  } else if (systemPrefix) {
+    system = [
+      { type: "text" as const, text: systemPrefix },
+      { type: "text" as const, text: opts.systemPrompt },
+    ];
+  }
 
   if (opts.structuredOutput) {
     // Use tool_use to enforce structured output
@@ -146,7 +175,7 @@ async function callAnthropic(
       const response = await client.messages.create({
         model,
         max_tokens: opts.maxTokens || 16000,
-        system: opts.systemPrompt,
+        system: system as any,
         messages,
         tools: [tool],
         tool_choice: { type: "tool", name: opts.structuredOutput!.name },
@@ -176,7 +205,7 @@ async function callAnthropic(
     const stream = client.messages.stream({
       model,
       max_tokens: opts.maxTokens || 16000,
-      system: opts.systemPrompt,
+      system: system as any,
       messages,
     });
 
@@ -185,6 +214,87 @@ async function callAnthropic(
         event.type === "content_block_delta" &&
         event.delta.type === "text_delta"
       ) {
+        fullText += event.delta.text;
+        if (opts.onChunk) opts.onChunk(event.delta.text);
+      }
+    }
+
+    return { type: "text" as const, text: fullText };
+  }, opts.onStatus);
+}
+
+/**
+ * OAuth variant — uses authToken (Bearer) instead of apiKey, adds required headers + system prefix.
+ */
+async function callAnthropicOAuth(
+  accessToken: string,
+  model: string,
+  opts: AgentCallOptions,
+): Promise<AgentCallResult> {
+  const AnthropicSDK = await getAnthropicSDK();
+  const client = new AnthropicSDK({
+    authToken: accessToken,
+    defaultHeaders: OAUTH_EXTRA_HEADERS,
+  } as any);
+
+  const messages =
+    opts.messages as unknown as import("@anthropic-ai/sdk").MessageParam[];
+
+  // Build system with OAuth prefix + optional cache blocks
+  let system: string | SystemPromptBlock[];
+  if (opts.systemBlocks) {
+    system = [
+      { type: "text" as const, text: OAUTH_SYSTEM_PREFIX },
+      ...opts.systemBlocks,
+    ];
+  } else {
+    system = [
+      { type: "text" as const, text: OAUTH_SYSTEM_PREFIX },
+      { type: "text" as const, text: opts.systemPrompt },
+    ];
+  }
+
+  if (opts.structuredOutput) {
+    const tool: Anthropic.Tool = {
+      name: opts.structuredOutput.name,
+      description: `Return the result as structured JSON matching the ${opts.structuredOutput.name} schema.`,
+      input_schema: opts.structuredOutput.schema as Anthropic.Tool.InputSchema,
+    };
+
+    return withRateLimitRetry(async () => {
+      const response = await client.messages.create({
+        model,
+        max_tokens: opts.maxTokens || 16000,
+        system: system as any,
+        messages,
+        tools: [tool],
+        tool_choice: { type: "tool", name: opts.structuredOutput!.name },
+      });
+
+      for (const block of response.content) {
+        if (block.type === "tool_use") {
+          return { type: "structured" as const, data: stringifyJsonFields(block.input) };
+        }
+      }
+
+      const textParts = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text);
+      return { type: "text" as const, text: textParts.join("") };
+    }, opts.onStatus);
+  }
+
+  return withRateLimitRetry(async () => {
+    let fullText = "";
+    const stream = client.messages.stream({
+      model,
+      max_tokens: opts.maxTokens || 16000,
+      system: system as any,
+      messages,
+    });
+
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
         fullText += event.delta.text;
         if (opts.onChunk) opts.onChunk(event.delta.text);
       }
@@ -532,7 +642,7 @@ async function callAgentCLI(
 // Unified entry points
 // ---------------------------------------------------------------------------
 
-const API_ENGINES = new Set(["anthropic-api", "openai-api", "gemini-api"]);
+const API_ENGINES = new Set(["anthropic-api", "claude-oauth", "openai-api", "gemini-api"]);
 
 /**
  * Call an AI agent via API with optional structured output enforcement.
@@ -554,6 +664,13 @@ export async function callAgentAPI(
   switch (engine) {
     case "anthropic-api":
       return callAnthropic(apiKey, model, opts);
+    case "claude-oauth": {
+      // Resolve fresh OAuth token at call time (auto-refreshes if needed)
+      const { getValidAccessToken } = await import("../../utils/claude-oauth.js");
+      const oauthToken = await getValidAccessToken();
+      if (!oauthToken) throw new Error("Claude OAuth session expired. Please re-authenticate in Settings.");
+      return callAnthropicOAuth(oauthToken, model, opts);
+    }
     case "openai-api":
       return callOpenAI(apiKey, model, opts);
     case "gemini-api":
@@ -597,6 +714,7 @@ export function isAgenticCapable(
 ): engine is AgentEngine {
   return (
     engine === "anthropic-api" ||
+    engine === "claude-oauth" ||
     engine === "openai-api" ||
     engine === "gemini-api" ||
     engine === "claude-code" ||

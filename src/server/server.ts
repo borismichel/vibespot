@@ -55,6 +55,11 @@ import {
   handleSettingsJobRoute,
 } from "./routes/settings.js";
 import {
+  handleClaudeOAuthSaveRoute,
+  handleClaudeOAuthStatusRoute,
+  handleClaudeOAuthLogoutRoute,
+} from "./routes/claude-oauth.js";
+import {
   handleThemesRoute,
   handleThemeSwitchRoute,
   handleDeleteLocalThemeRoute,
@@ -334,6 +339,21 @@ function handleApiRoute(
 
     case "/api/settings/cli-toggle":
       if (method === "POST") handleSettingsCliToggleRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/settings/claude-oauth/save":
+      if (method === "POST") handleClaudeOAuthSaveRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/settings/claude-oauth/status":
+      if (method === "GET") handleClaudeOAuthStatusRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/settings/claude-oauth/logout":
+      if (method === "POST") handleClaudeOAuthLogoutRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
@@ -868,6 +888,7 @@ ${errorContext}`;
     const engineLabels: Record<string, string> = {
       "claude-code": "Claude Code",
       "anthropic-api": "Anthropic API",
+      "claude-oauth": "Claude (OAuth)",
       "openai-api": "OpenAI API",
       "gemini-cli": "Gemini CLI",
       "gemini-api": "Gemini API",

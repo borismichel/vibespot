@@ -9,6 +9,7 @@ import {
   getHubspotRules,
 } from "../../../ai/prompts.js";
 import type { ModuleFiles } from "../../../ai/engine.js";
+import type { SystemPromptBlock } from "../engine-adapter.js";
 
 export function buildModuleDeveloperPrompt(
   themeName: string,
@@ -85,6 +86,53 @@ You produce a single module with these fields:
   }
 
   return parts.join("");
+}
+
+/**
+ * Build the module developer prompt as an array of blocks with cache control.
+ * Static reference guides (conversion guide + HubSpot rules) are marked for caching.
+ * These are identical across all parallel module generation calls in a batch.
+ */
+export function buildModuleDeveloperPromptBlocks(
+  themeName: string,
+  sharedCss: string,
+  guidesNeeded?: string[],
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string },
+): SystemPromptBlock[] {
+  const blocks: SystemPromptBlock[] = [];
+
+  // Block 1: Core instructions (varies by themeName + sharedCss)
+  let core = buildModuleDeveloperPrompt(themeName, "", [], brandAssets ? { ...brandAssets, humanify: false } : undefined);
+  if (sharedCss) {
+    core += `\n\n## Theme Shared CSS (use these custom properties)\n\`\`\`css\n${sharedCss}\n\`\`\``;
+  }
+  blocks.push({ type: "text", text: core });
+
+  // Block 2: Reference guides — CACHED (identical across all module calls)
+  const guideParts: string[] = [];
+  if (!guidesNeeded || guidesNeeded.includes("hubspot_rules")) {
+    guideParts.push(`## HubSpot CMS Rules\n${getHubspotRules()}`);
+  }
+  if (!guidesNeeded || guidesNeeded.includes("conversion")) {
+    guideParts.push(`## Conversion Guide\n${getConversionGuide()}`);
+  }
+  if (guideParts.length > 0) {
+    blocks.push({ type: "text", text: guideParts.join("\n\n"), cache_control: { type: "ephemeral" } });
+  }
+
+  // Block 3: Dynamic content (brand assets, humanify)
+  const dynamicParts: string[] = [];
+  if (brandAssets?.themeContext) {
+    dynamicParts.push(`## Product Context\n${brandAssets.themeContext}`);
+  }
+  if (brandAssets?.humanify !== false && guidesNeeded?.includes("humanify")) {
+    dynamicParts.push(`## Anti-AI Copy Rules\n${getModuleDevHumanifySummary()}`);
+  }
+  if (dynamicParts.length > 0) {
+    blocks.push({ type: "text", text: dynamicParts.join("\n\n") });
+  }
+
+  return blocks;
 }
 
 /**

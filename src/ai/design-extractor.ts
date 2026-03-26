@@ -200,6 +200,29 @@ export async function extractDesignContext(
       break;
     }
 
+    case "claude-oauth": {
+      const { getValidAccessToken, OAUTH_EXTRA_HEADERS, OAUTH_SYSTEM_PREFIX } = await import("../utils/claude-oauth.js");
+      const accessToken = await getValidAccessToken();
+      if (!accessToken) throw new Error("Claude OAuth session expired. Please re-authenticate in Settings.");
+
+      const AnthropicSDK = await getAnthropicSDK();
+      const client = new AnthropicSDK({ authToken: accessToken, defaultHeaders: OAUTH_EXTRA_HEADERS } as any);
+      const response = await client.messages.create({
+        model: config.anthropicApiModel || "claude-sonnet-4-6",
+        max_tokens: 8000,
+        system: [
+          { type: "text", text: OAUTH_SYSTEM_PREFIX },
+          { type: "text", text: systemPrompt },
+        ] as any,
+        messages: [{ role: "user", content: userMessage }],
+      });
+      text = response.content
+        .filter((block): block is { type: "text"; text: string } => block.type === "text")
+        .map((block) => block.text)
+        .join("");
+      break;
+    }
+
     case "openai-api": {
       const apiKey = getApiKeyForEngine("openai-api");
       if (!apiKey) throw new Error("OpenAI API key not configured. Open Settings to add one.");

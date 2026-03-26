@@ -85,7 +85,12 @@ async function getModelCatalog(): Promise<Record<string, ModelEntry[]>> {
   if (anthropicKey) {
     jobs.push(
       fetchAnthropicModels(anthropicKey)
-        .then((models) => { if (models.length) catalog["anthropic-api"] = models; })
+        .then((models) => {
+          if (models.length) {
+            catalog["anthropic-api"] = models;
+            catalog["claude-oauth"] = models; // same model list
+          }
+        })
         .catch(() => {}),
     );
   }
@@ -173,7 +178,7 @@ export function handleSettingsEngineRoute(req: IncomingMessage, res: ServerRespo
       const { engine, model } = JSON.parse(body);
 
       const validEngines: AIEngineType[] = [
-        "claude-code", "anthropic-api", "openai-api", "gemini-cli", "gemini-api", "codex-cli",
+        "claude-code", "anthropic-api", "claude-oauth", "openai-api", "gemini-cli", "gemini-api", "codex-cli",
       ];
       if (!validEngines.includes(engine)) {
         jsonResponse(res, 400, { error: `Invalid engine: ${engine}` });
@@ -187,6 +192,7 @@ export function handleSettingsEngineRoute(req: IncomingMessage, res: ServerRespo
             configUpdate.claudeCodeModel = model;
             break;
           case "anthropic-api":
+          case "claude-oauth":
             configUpdate.anthropicApiModel = model;
             break;
           case "openai-api":

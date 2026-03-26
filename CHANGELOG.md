@@ -4,6 +4,28 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.0.5 — 2026-03-26
+
+Claude OAuth engine and Anthropic prompt caching.
+
+### Claude OAuth (`claude-oauth`)
+- **New auth variant** — use your Claude Pro/Max subscription via OAuth token, no API key needed
+- **Token paste flow** — run `claude setup-token` in terminal, paste the `sk-ant-oat01-...` token in Settings
+- **Auto-refresh** — access tokens (8h lifetime) are automatically refreshed 5 minutes before expiry
+- **Token storage** — `~/.vibespot/claude-oauth.json` with restricted permissions (0o600)
+- **Full pipeline support** — works with both streaming (single-call) and agentic (multi-stage) modes
+- **Settings UI** — Claude OAuth section with status display, token input, and disconnect button
+- **CLI wizard** — `claude-oauth` available as engine option in preflight wizard
+
+### Anthropic Prompt Caching
+- **Ephemeral cache control** — system prompts split into blocks with `cache_control: { type: "ephemeral" }` on static content
+- **Streaming mode** — `buildVibeSystemPromptBlocks()` marks conversion guide, HubSpot rules, design guide, and content guide for caching
+- **Agentic pipeline** — module developer marks HubSpot rules + conversion guide (~42K tokens) for caching across N parallel module calls
+- **Design system stage** — design guide marked for caching
+- Applies to both `anthropic-api` and `claude-oauth` engines
+
+---
+
 ## v1.0.4 — 2026-03-19
 
 Template and module deletion improvements, pipeline step alignment fix.

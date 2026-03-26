@@ -6,6 +6,7 @@ import { readFile, writeFile, fileExists } from "./fs.js";
 export type AIEngineType =
   | "claude-code"
   | "anthropic-api"
+  | "claude-oauth"
   | "openai-api"
   | "gemini-cli"
   | "gemini-api"
