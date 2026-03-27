@@ -76,9 +76,15 @@ export function validateModules(
       issues,
     );
 
-    // --- CSS prefix check ---
-    checkCssPrefix(
+    // --- CSS prefix auto-fix ---
+    fixedModule.moduleCss = fixCssPrefix(
       fixedModule.moduleCss,
+      fixedModule.moduleName,
+      themeName,
+      issues,
+    );
+    fixedModule.moduleHtml = fixHtmlClassPrefix(
+      fixedModule.moduleHtml,
       fixedModule.moduleName,
       themeName,
       issues,
@@ -228,44 +234,119 @@ function stripCdnImports(
   return fixed;
 }
 
-function checkCssPrefix(
+/** Classes that should NOT be prefixed (framework/HubSpot/utility). */
+const SKIP_CLASSES = new Set([
+  "visible", "active", "scroll-animate", "hidden", "open", "closed",
+  "fade-in", "fade-out", "is-active", "is-open", "is-visible",
+]);
+function shouldSkipClass(name: string): boolean {
+  return (
+    SKIP_CLASSES.has(name) ||
+    name.startsWith("body-wrapper") ||
+    name.startsWith("dnd-") ||
+    name.startsWith("row-") ||
+    name.startsWith("hs-") ||
+    name.startsWith("hs_")
+  );
+}
+
+/**
+ * Auto-fix CSS classes that don't use the theme prefix.
+ * Adds `themeName-` prefix to unprefixed class selectors in CSS and returns the fixed CSS.
+ */
+function fixCssPrefix(
   css: string,
   moduleName: string,
   themeName: string,
   issues: ValidationIssue[],
-): void {
-  if (!css) return;
+): string {
+  if (!css) return css;
 
-  // Check for class selectors that don't use the theme prefix
+  const prefix = themeName + "-";
+
+  // Collect unprefixed class names (deduplicated, ordered by first occurrence)
   const classPattern = /\.([a-zA-Z][\w-]*)/g;
+  const unprefixedSet = new Set<string>();
   let match;
-  let unprefixed = 0;
 
   while ((match = classPattern.exec(css)) !== null) {
     const className = match[1];
-    // Skip common utility/framework classes and pseudo-classes
-    if (
-      className.startsWith(themeName + "-") ||
-      className === "visible" ||
-      className === "active" ||
-      className === "scroll-animate" ||
-      className.startsWith("body-wrapper") ||
-      className.startsWith("dnd-") ||
-      className.startsWith("row-")
-    ) {
-      continue;
+    if (!className.startsWith(prefix) && !shouldSkipClass(className)) {
+      unprefixedSet.add(className);
     }
-    unprefixed++;
   }
 
-  if (unprefixed > 3) {
+  if (unprefixedSet.size <= 3) return css; // minor — don't bother
+
+  // Replace each unprefixed class with the prefixed version
+  let fixed = css;
+  for (const name of unprefixedSet) {
+    // Replace in selectors: .className → .prefix-className
+    // Use word boundary to avoid partial matches
+    const selectorRe = new RegExp(`\\.${escapeRegex(name)}(?=[\\s,{:+~>\\[\\]])`, "g");
+    fixed = fixed.replace(selectorRe, `.${prefix}${name}`);
+  }
+
+  if (fixed !== css) {
     issues.push({
       module: moduleName,
       field: "moduleCss",
-      message: `${unprefixed} CSS classes without "${themeName}-" prefix`,
-      autoFixed: false,
+      message: `${unprefixedSet.size} CSS classes auto-prefixed with "${prefix}"`,
+      autoFixed: true,
     });
   }
+
+  return fixed;
+}
+
+/**
+ * Auto-fix class references in HTML to match prefixed CSS classes.
+ */
+function fixHtmlClassPrefix(
+  html: string,
+  moduleName: string,
+  themeName: string,
+  issues: ValidationIssue[],
+): string {
+  if (!html) return html;
+
+  const prefix = themeName + "-";
+
+  // Find all class="..." attributes and check for unprefixed classes
+  const classAttrRe = /class="([^"]*)"/g;
+  let anyFixed = false;
+
+  const fixed = html.replace(classAttrRe, (fullMatch, classValue: string) => {
+    const classes = classValue.split(/\s+/);
+    let changed = false;
+    const newClasses = classes.map((cls: string) => {
+      if (cls && !cls.startsWith(prefix) && !shouldSkipClass(cls) && /^[a-zA-Z][\w-]*$/.test(cls)) {
+        changed = true;
+        return prefix + cls;
+      }
+      return cls;
+    });
+    if (changed) {
+      anyFixed = true;
+      return `class="${newClasses.join(" ")}"`;
+    }
+    return fullMatch;
+  });
+
+  if (anyFixed) {
+    issues.push({
+      module: moduleName,
+      field: "moduleHtml",
+      message: `HTML class references auto-prefixed with "${prefix}"`,
+      autoFixed: true,
+    });
+  }
+
+  return fixed;
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function fixHublSyntax(

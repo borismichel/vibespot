@@ -977,28 +977,24 @@ function serveStatic(pathname: string, uiDir: string, req: IncomingMessage, res:
   const isHtml = ext === ".html";
 
   try {
-    let cached = staticCache.get(fullPath);
-    if (!cached) {
-      const buffer = readFileSync(fullPath);
-      const etag = '"' + createHash("md5").update(buffer).digest("hex").slice(0, 16) + '"';
-      cached = { buffer, etag, contentType };
-      staticCache.set(fullPath, cached);
-    }
+    // Always re-read from disk to pick up changes during development
+    const buffer = readFileSync(fullPath);
+    const etag = '"' + createHash("md5").update(buffer).digest("hex").slice(0, 16) + '"';
 
     // Check If-None-Match for 304
     const clientEtag = req.headers["if-none-match"];
-    if (clientEtag === cached.etag) {
+    if (clientEtag === etag) {
       res.writeHead(304);
       res.end();
       return;
     }
 
     res.writeHead(200, {
-      "Content-Type": cached.contentType,
-      "Cache-Control": isHtml ? "no-cache" : "public, max-age=3600",
-      "ETag": cached.etag,
+      "Content-Type": contentType,
+      "Cache-Control": "no-cache",
+      "ETag": etag,
     });
-    res.end(cached.buffer);
+    res.end(buffer);
   } catch {
     res.writeHead(500, { "Content-Type": "text/plain" });
     res.end("Internal Server Error");

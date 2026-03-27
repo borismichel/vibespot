@@ -4,6 +4,25 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.0.6 — 2026-03-27
+
+Preview stays visible during modifications, quality check auto-fixes, question answers in chat.
+
+### Preview Improvements
+- **Preview stays visible during modify/question** — no more blank spinner page while modules regenerate
+- **Static file serving** — removed stale in-memory cache and aggressive browser caching (`no-cache` + ETag revalidation)
+
+### Quality Check Auto-Fix
+- **CSS prefix auto-fix** — unprefixed CSS class selectors now auto-prefixed with `themeName-` (was report-only)
+- **HTML class auto-fix** — corresponding HTML `class="..."` attributes updated to match prefixed CSS
+- Both CSS and HTML fixes marked as `autoFixed: true` in quality check output
+
+### Question Intent
+- **Answer text displayed in chat** — pipeline `answer` field now sent in `pipeline_complete` event and rendered in the chat bubble
+- **Stats line** — shows "Answered in Xs" instead of "Generated 0 modules"
+
+---
+
 ## v1.0.5 — 2026-03-26
 
 Claude OAuth engine and Anthropic prompt caching.

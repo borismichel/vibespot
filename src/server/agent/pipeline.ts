@@ -94,6 +94,7 @@ export async function runAgentPipeline(
       modulesGenerated: 0,
       modulesUnchanged: snapshot.modules.length,
       durationMs,
+      answer: plan.answer,
     });
     return {
       modules: [...snapshot.modules],

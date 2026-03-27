@@ -128,5 +128,153 @@ function showGeneratingPreview() {
   previewFrame.srcdoc = html;
 }
 
+// ---------------------------------------------------------------------------
+// "Working on it" overlay for modules being regenerated
+// ---------------------------------------------------------------------------
+
+const WORKING_MESSAGES = [
+  "Rethinking this section\u2026",
+  "Rewriting the code\u2026",
+  "Giving this a fresh coat of paint\u2026",
+  "Making it better\u2026",
+  "Tweaking the layout\u2026",
+  "Polishing the details\u2026",
+  "Almost there\u2026",
+  "Updating the design\u2026",
+  "Improving the copy\u2026",
+  "Refining the structure\u2026",
+];
+
+/**
+ * Inject the overlay CSS into the preview iframe (once).
+ */
+function ensureOverlayStyles(doc) {
+  if (doc.getElementById("vibespot-working-css")) return;
+  const style = doc.createElement("style");
+  style.id = "vibespot-working-css";
+  style.textContent = `
+    .vibespot-module--working { position: relative; }
+    .vibespot-module--working > *:not(.vibespot-working-overlay) {
+      filter: blur(3px) saturate(0.4);
+      opacity: 0.5;
+      transition: filter 0.4s ease, opacity 0.4s ease;
+      pointer-events: none;
+    }
+    .vibespot-working-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .vibespot-working-overlay__spinner {
+      width: 36px; height: 36px;
+      border: 3px solid rgba(232,97,58,0.15);
+      border-top-color: rgba(232,97,58,0.8);
+      border-radius: 50%;
+      animation: vw-spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+    .vibespot-working-overlay__text {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px; font-weight: 500;
+      color: rgba(255,255,255,0.7);
+      text-align: center;
+      max-width: 280px;
+      transition: opacity 0.5s ease;
+    }
+    .vibespot-working-overlay__text.fade { opacity: 0; }
+    @keyframes vw-spin { to { transform: rotate(360deg); } }
+  `;
+  doc.head.appendChild(style);
+}
+
+/** Active carousel intervals keyed by module name */
+const workingIntervals = new Map();
+
+/**
+ * Mark modules as "being worked on" — adds blur overlay with rotating messages.
+ */
+function markModulesWorking(moduleNames) {
+  try {
+    const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+    if (!doc || !doc.body) return;
+    ensureOverlayStyles(doc);
+
+    for (const name of moduleNames) {
+      const el = doc.querySelector(`[data-module="${name}"]`);
+      if (!el || el.classList.contains("vibespot-module--working")) continue;
+
+      el.classList.add("vibespot-module--working");
+
+      const overlay = doc.createElement("div");
+      overlay.className = "vibespot-working-overlay";
+      overlay.innerHTML = `
+        <div class="vibespot-working-overlay__spinner"></div>
+        <div class="vibespot-working-overlay__text"></div>
+      `;
+      el.appendChild(overlay);
+
+      // Scroll to first working module
+      if (name === moduleNames[0]) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+
+      // Start message carousel
+      const textEl = overlay.querySelector(".vibespot-working-overlay__text");
+      let idx = Math.floor(Math.random() * WORKING_MESSAGES.length);
+      textEl.textContent = WORKING_MESSAGES[idx];
+
+      const interval = setInterval(() => {
+        textEl.classList.add("fade");
+        setTimeout(() => {
+          idx = (idx + 1) % WORKING_MESSAGES.length;
+          textEl.textContent = WORKING_MESSAGES[idx];
+          textEl.classList.remove("fade");
+        }, 500);
+      }, 3500);
+      workingIntervals.set(name, interval);
+    }
+  } catch { /* cross-origin */ }
+}
+
+/**
+ * Clear working overlay from a specific module (when it completes).
+ */
+function clearModuleWorking(moduleName) {
+  const interval = workingIntervals.get(moduleName);
+  if (interval) { clearInterval(interval); workingIntervals.delete(moduleName); }
+
+  try {
+    const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+    if (!doc) return;
+    const el = doc.querySelector(`[data-module="${moduleName}"]`);
+    if (!el) return;
+    el.classList.remove("vibespot-module--working");
+    const overlay = el.querySelector(".vibespot-working-overlay");
+    if (overlay) overlay.remove();
+  } catch { /* cross-origin */ }
+}
+
+/**
+ * Clear all working overlays.
+ */
+function clearAllModulesWorking() {
+  for (const [name, interval] of workingIntervals) {
+    clearInterval(interval);
+  }
+  workingIntervals.clear();
+
+  try {
+    const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+    if (!doc) return;
+    doc.querySelectorAll(".vibespot-module--working").forEach((el) => {
+      el.classList.remove("vibespot-module--working");
+      const overlay = el.querySelector(".vibespot-working-overlay");
+      if (overlay) overlay.remove();
+    });
+  } catch { /* cross-origin */ }
+}
+
 // Preview refresh is triggered by setup.js after a session is created.
 // Do NOT auto-refresh here.

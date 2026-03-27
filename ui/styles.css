@@ -2214,6 +2214,14 @@ body { display: flex; }
   opacity: 0.8;
 }
 
+.pipeline-answer {
+  padding: 8px 0 4px;
+  font-size: 13px;
+  color: var(--text-primary, #e8e8e8);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .pipeline-stats {
   font-size: 12px;
   color: var(--success, #4ade80);

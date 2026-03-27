@@ -145,6 +145,7 @@ function handleWsMessage(msg) {
 
     case "error":
       stopPipelineTimer();
+      if (typeof clearAllModulesWorking === "function") clearAllModulesWorking();
       finishStreaming();
       pipelineBubbleEl = null;
       pipelineStepsEl = null;
@@ -213,7 +214,8 @@ function ensurePipelineBubble() {
     isStreaming = true;
     sendBtn.disabled = true;
     streamStartTime = Date.now();
-    if (typeof showGeneratingPreview === "function") showGeneratingPreview();
+    // Don't replace the preview with a spinner — agentic mode uses
+    // incremental placeholders and keeps the existing page visible.
   }
 
   // If startStreaming() already created an empty bubble, repurpose it
@@ -347,6 +349,14 @@ function handleModuleProgress(msg) {
     failed: "✗",
   };
   statusEl.textContent = statusLabels[msg.status] || msg.status;
+
+  // Mark/clear working overlay in the preview
+  if (msg.status === "generating" && typeof markModulesWorking === "function") {
+    markModulesWorking([msg.module]);
+  } else if ((msg.status === "complete" || msg.status === "failed") && typeof clearModuleWorking === "function") {
+    clearModuleWorking(msg.module);
+  }
+
   scrollToBottom();
 }
 
@@ -354,6 +364,7 @@ function handlePipelineComplete(msg) {
   if (!pipelineBubbleEl) return;
 
   stopPipelineTimer();
+  if (typeof clearAllModulesWorking === "function") clearAllModulesWorking();
 
   // Remove the live timer element
   const timerEl = pipelineBubbleEl.querySelector(".pipeline-timer");
@@ -363,13 +374,26 @@ function handlePipelineComplete(msg) {
   const bubble = streamingMsgEl || pipelineBubbleEl;
   bubble.querySelectorAll(".pipeline-step").forEach((el) => markStepDone(el));
 
+  // Show answer text for question intents
+  if (msg.answer) {
+    const answerEl = document.createElement("div");
+    answerEl.className = "pipeline-answer";
+    answerEl.textContent = msg.answer;
+    bubble.appendChild(answerEl);
+  }
+
   // Add completion stats after the last element in the bubble
   const stats = document.createElement("div");
   stats.className = "pipeline-stats";
   const duration = formatDuration(msg.durationMs);
-  stats.textContent = `Generated ${msg.modulesGenerated} module${msg.modulesGenerated === 1 ? "" : "s"} in ${duration}`;
-  if (msg.modulesUnchanged > 0) {
-    stats.textContent += ` (${msg.modulesUnchanged} unchanged)`;
+  if (msg.answer) {
+    // For questions, just show duration
+    stats.textContent = `Answered in ${duration}`;
+  } else {
+    stats.textContent = `Generated ${msg.modulesGenerated} module${msg.modulesGenerated === 1 ? "" : "s"} in ${duration}`;
+    if (msg.modulesUnchanged > 0) {
+      stats.textContent += ` (${msg.modulesUnchanged} unchanged)`;
+    }
   }
   // Place stats after quality_check step (or after modules if no quality step)
   const qualityStep = bubble.querySelector('[data-step="quality_check"]');
@@ -378,7 +402,7 @@ function handlePipelineComplete(msg) {
   } else if (pipelineModulesEl) {
     pipelineModulesEl.after(stats);
   } else {
-    pipelineStepsEl.appendChild(stats);
+    bubble.appendChild(stats);
   }
 
   clearStreamStatus();
@@ -394,6 +418,7 @@ function handlePipelinePartial(msg) {
   if (!pipelineBubbleEl) return;
 
   stopPipelineTimer();
+  if (typeof clearAllModulesWorking === "function") clearAllModulesWorking();
 
   const timerEl = pipelineBubbleEl.querySelector(".pipeline-timer");
   if (timerEl) timerEl.remove();
@@ -727,10 +752,8 @@ function startStreaming() {
   sendBtn.disabled = true;
   streamStartTime = Date.now();
 
-  // Show generating preview with spinner + fun messages
-  if (typeof showGeneratingPreview === "function") {
-    showGeneratingPreview();
-  }
+  // Don't show generating preview here — agentic mode keeps the page visible.
+  // For single-call mode, showGeneratingPreview() is called on first "stream" event.
 
   const time = formatMessageTime(streamStartTime);
   const div = document.createElement("div");
@@ -788,7 +811,13 @@ function flushStreamRender() {
 }
 
 function handleStreamStatus(status) {
-  if (!streamingMsgEl) startStreaming();
+  if (!streamingMsgEl) {
+    startStreaming();
+    // Single-call mode — show generating preview (agentic mode never sends stream_status)
+    if (typeof showGeneratingPreview === "function" && !pipelineBubbleEl) {
+      showGeneratingPreview();
+    }
+  }
 
   lastStreamStatus = status;
 
