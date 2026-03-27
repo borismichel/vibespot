@@ -15,4 +15,5 @@ vibespot-blog-project.json
 .issues
 .redesign.md
 docs/
+!ui/docs/
 .superpowers/

@@ -195,6 +195,18 @@ function handleRequest(req: IncomingMessage, res: ServerResponse, uiDir: string)
     return;
   }
 
+  // Documentation — served from ui/docs/ directory
+  if (url.pathname === "/docs") {
+    res.writeHead(301, { Location: "/docs/" });
+    res.end();
+    return;
+  }
+  if (url.pathname.startsWith("/docs/")) {
+    const docPath = url.pathname.slice(5) || "/index.html"; // strip "/docs"
+    serveStatic(docPath, join(uiDir, "docs"), req, res);
+    return;
+  }
+
   // Static files from ui/ directory
   serveStatic(url.pathname, uiDir, req, res);
 }

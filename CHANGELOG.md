@@ -4,6 +4,23 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.0.7 — 2026-03-27
+
+User-facing documentation, Docs link in sidebar.
+
+### Documentation
+- **Complete SPA documentation** at `/docs/` — 12 sections covering setup, editor, AI generation, editing, deploying, version history, settings, CLI, shortcuts, and troubleshooting
+- **Interactive UI mockups** — editor layout, setup screen, settings panel, upload flow (pure CSS, no images)
+- **Client-side search** with keyboard navigation (/ to focus, arrow keys, Enter)
+- **Sticky sidebar nav** with scroll spy highlighting
+- **Interactive pipeline diagram** with hover tooltips
+- **Collapsible sections**, tabbed content, step lists, callout boxes, code copy buttons
+- **Mobile responsive** — sidebar collapses to hamburger on narrow screens
+- **Docs link** added to project rail sidebar (book icon, opens in new tab)
+- Files located at `ui/docs/` (tracked by git, included in npm package)
+
+---
+
 ## v1.0.6 — 2026-03-27
 
 Preview stays visible during modifications, quality check auto-fixes, question answers in chat.

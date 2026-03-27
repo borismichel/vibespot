@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vibeSpot Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+
+<!-- ================================================================
+     Topbar
+     ================================================================ -->
+<header class="doc-topbar">
+  <button class="doc-menu-btn" id="doc-menu-btn">&#9776;</button>
+  <a href="#getting-started" class="doc-topbar__logo">
+    vibeSpot <span>Docs</span>
+  </a>
+  <div class="doc-topbar__search">
+    <span class="doc-topbar__search-icon">&#128269;</span>
+    <input type="text" id="doc-search-input" placeholder="Search docs..." autocomplete="off">
+    <span class="doc-topbar__shortcut">/</span>
+  </div>
+  <a href="/" class="doc-topbar__back">&larr; Back to App</a>
+</header>
+
+<!-- Search Results Dropdown -->
+<div id="doc-search-results" class="doc-search-results"></div>
+
+<!-- ================================================================
+     Layout: Sidebar + Main
+     ================================================================ -->
+<div class="doc-layout">
+
+<!-- ================================================================
+     Sidebar Navigation
+     ================================================================ -->
+<nav class="doc-sidebar">
+
+  <div class="doc-nav__section">
+    <span class="doc-nav__heading">Getting Started</span>
+    <a class="doc-nav__link" href="#getting-started">Overview</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#quick-start">Quick Start</a>
+  </div>
+
+  <div class="doc-nav__section">
+    <span class="doc-nav__heading">Setup</span>
+    <a class="doc-nav__link" href="#setup">Setup &amp; Configuration</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#ai-engines">AI Engines</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#hubspot-setup">HubSpot Connection</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#config">Configuration File</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#env-vars">Environment Variables</a>
+  </div>
+
+  <div class="doc-nav__section">
+    <span class="doc-nav__heading">Using vibeSpot</span>
+    <a class="doc-nav__link" href="#editor">The Editor</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#editor-layout">Layout</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#chat-panel">Chat</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#preview-panel">Preview</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#code-editor">Code Editor</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#module-sidebar">Modules</a>
+    <a class="doc-nav__link" href="#creating-pages">Creating Pages</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#first-page">Your First Page</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#templates">Templates</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#module-library">Module Library</a>
+  </div>
+
+  <div class="doc-nav__section">
+    <span class="doc-nav__heading">AI & Editing</span>
+    <a class="doc-nav__link" href="#ai-generation">AI Generation</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#agentic-pipeline">Agentic Pipeline</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#intent-types">Intents</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#prompt-tips">Prompt Tips</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#brand-assets">Brand Assets</a>
+    <a class="doc-nav__link" href="#editing">Editing &amp; Customization</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#field-editor">Field Editor</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#design-system">Design System</a>
+  </div>
+
+  <div class="doc-nav__section">
+    <span class="doc-nav__heading">Deploy & History</span>
+    <a class="doc-nav__link" href="#deploying">Deploying to HubSpot</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#auto-fix">Auto-Fix</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#creating-page-hubspot">Creating a Page</a>
+    <a class="doc-nav__link" href="#version-history">Version History</a>
+  </div>
+
+  <div class="doc-nav__section">
+    <span class="doc-nav__heading">Reference</span>
+    <a class="doc-nav__link" href="#settings">Settings</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#settings-ai">AI Tab</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#settings-hubspot">HubSpot Tab</a>
+    <a class="doc-nav__link" href="#cli-commands">CLI Commands</a>
+    <a class="doc-nav__link" href="#shortcuts">Shortcuts</a>
+    <a class="doc-nav__link" href="#troubleshooting">Troubleshooting</a>
+  </div>
+
+</nav>
+
+<!-- ================================================================
+     Main Content
+     ================================================================ -->
+<main class="doc-main">
+
+<!-- ============================================================
+     Section 1: Getting Started
+     ============================================================ -->
+<div class="doc-section" id="getting-started">
+  <h1>vibeSpot Documentation</h1>
+  <p class="doc-subtitle">The AI-powered HubSpot CMS landing page builder. Describe a page in plain English, preview it live, then deploy to HubSpot in one click.</p>
+
+  <h2 id="what-is-vibespot">What is vibeSpot? <a href="#what-is-vibespot" class="doc-anchor">#</a></h2>
+  <p>vibeSpot is an open-source tool that turns natural language descriptions into fully functional HubSpot CMS themes. It provides a <strong>vibe coding</strong> interface: you type what you want on the left, and a live preview updates on the right. Under the hood, an AI pipeline generates native HubSpot modules complete with HubL templates, <code>fields.json</code>, CSS, and JavaScript &mdash; ready to deploy to any HubSpot portal.</p>
+  <p>vibeSpot also ships a CLI wizard for converting existing React or Lovable projects into HubSpot CMS themes, and a <code>doctor</code> command to verify your environment is correctly set up.</p>
+
+  <h3 id="prerequisites">Prerequisites</h3>
+  <ul>
+    <li><strong>Node.js 18+</strong> &mdash; required for the runtime. Run <code>node -v</code> to check.</li>
+    <li><strong>Git</strong> &mdash; used for version history (auto-commit after each generation). Run <code>git --version</code> to check.</li>
+    <li><strong>An AI engine</strong> &mdash; at least one of: Claude Code CLI, Anthropic API key, OpenAI API key, Gemini API key, or Gemini/Codex CLI. See <a href="#ai-engines">AI Engines</a> for details.</li>
+  </ul>
+
+  <h3 id="installation">Installation</h3>
+  <p>The fastest way to get started is with <code>npx</code>, which downloads and runs vibeSpot without a global install:</p>
+  <pre><code>npx vibespot</code></pre>
+  <p>For repeated use, install globally:</p>
+  <pre><code>npm install -g vibespot
+vibespot</code></pre>
+  <p>This starts the web UI on <code>http://localhost:4200</code> and opens your browser automatically.</p>
+
+  <h3 id="quick-start">Quick Start</h3>
+  <ol class="doc-steps">
+    <li><strong>Install and launch.</strong> Run <code>npx vibespot</code> in your terminal. The web interface opens at <code>localhost:4200</code>. On first run, vibeSpot detects available AI engines and prompts you to configure one if needed.</li>
+    <li><strong>Create a theme.</strong> Click <strong>New Theme</strong> on the setup screen and give it a name (e.g., <code>my-saas-landing</code>). This creates a working directory at <code>~/vibespot-themes/my-saas-landing</code> with the standard HubSpot theme structure.</li>
+    <li><strong>Describe your page.</strong> In the chat panel, type a detailed description of the page you want. For example: <em>"Create a SaaS landing page for a project management tool called Taskflow. Include a hero with headline and CTA, a 3-column features grid, customer logos, a pricing table with 3 tiers, testimonials, and a footer."</em></li>
+    <li><strong>Watch the pipeline generate.</strong> The agentic pipeline analyzes your intent, designs a CSS system, plans modules, generates each one in parallel, then validates the output. You will see real-time progress cards for each stage. The live preview updates as modules complete.</li>
+    <li><strong>Deploy to HubSpot.</strong> Click the <strong>Deploy</strong> button in the topbar. Select your HubSpot account (or add one with a Personal Access Key), and vibeSpot uploads the theme. Once complete, a celebration screen with confetti shows a direct link to create a landing page in your HubSpot portal.</li>
+  </ol>
+
+  <h3 id="features">Key Features</h3>
+  <div class="doc-features">
+    <div class="doc-feature">
+      <div class="doc-feature__icon">&#9889;</div>
+      <div class="doc-feature__title">Agentic Pipeline</div>
+      <div class="doc-feature__desc">4-stage AI pipeline: intent analysis, design system, parallel module generation, and quality validation.</div>
+    </div>
+    <div class="doc-feature">
+      <div class="doc-feature__icon">&#128065;</div>
+      <div class="doc-feature__title">Live Preview</div>
+      <div class="doc-feature__desc">HubL subset renderer with responsive toggles for desktop, tablet, and mobile viewports.</div>
+    </div>
+    <div class="doc-feature">
+      <div class="doc-feature__icon">&#128295;</div>
+      <div class="doc-feature__title">No-Code Field Editor</div>
+      <div class="doc-feature__desc">Edit text, images, colors, links, and more with a visual form. Changes reflect instantly in the preview.</div>
+    </div>
+    <div class="doc-feature">
+      <div class="doc-feature__icon">&#128640;</div>
+      <div class="doc-feature__title">One-Click Deploy</div>
+      <div class="doc-feature__desc">Upload your theme to HubSpot via API. Auto-fix handles common upload errors automatically.</div>
+    </div>
+    <div class="doc-feature">
+      <div class="doc-feature__icon">&#127912;</div>
+      <div class="doc-feature__title">Multi-Engine AI</div>
+      <div class="doc-feature__desc">Works with Anthropic, OpenAI, Gemini, Claude Code, Gemini CLI, and Codex CLI.</div>
+    </div>
+    <div class="doc-feature">
+      <div class="doc-feature__icon">&#128338;</div>
+      <div class="doc-feature__title">Version History</div>
+      <div class="doc-feature__desc">Git-based auto-commits after each generation. Browse and restore any previous version.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     Section 2: Setup & Configuration
+     ============================================================ -->
+<div class="doc-section" id="setup">
+  <h2 id="setup-heading">Setup &amp; Configuration <a href="#setup" class="doc-anchor">#</a></h2>
+  <p>vibeSpot stores its configuration at <code>~/.vibespot/config.json</code>. You can configure everything through the Settings panel in the web UI, or by editing the config file directly.</p>
+
+  <h3 id="ai-engines">AI Engines</h3>
+  <p>vibeSpot supports seven AI engines. You only need one to get started. The table below compares them:</p>
+
+  <table>
+    <thead>
+      <tr><th>Engine</th><th>Type</th><th>Setup</th><th>Cost Model</th><th>Best For</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Claude Code</td><td>CLI</td><td>Install <code>claude</code> CLI, authenticate</td><td>Included in Claude subscription</td><td>Subscribers who want zero API costs</td></tr>
+      <tr><td>Anthropic API</td><td>API</td><td>Add <code>ANTHROPIC_API_KEY</code></td><td>Pay-per-token</td><td>Fastest structured output, reliable</td></tr>
+      <tr><td>Claude OAuth</td><td>API</td><td>Run <code>claude setup-token</code>, paste token</td><td>Included in Claude subscription</td><td>Subscribers without API budget</td></tr>
+      <tr><td>OpenAI API</td><td>API</td><td>Add <code>OPENAI_API_KEY</code></td><td>Pay-per-token</td><td>GPT-4o users, existing OpenAI budget</td></tr>
+      <tr><td>Gemini API</td><td>API</td><td>Add <code>GEMINI_API_KEY</code></td><td>Free tier available</td><td>Cost-conscious users, free quota</td></tr>
+      <tr><td>Gemini CLI</td><td>CLI</td><td>Install <code>gemini</code> CLI, authenticate</td><td>Free (with Google account)</td><td>Free option without API keys</td></tr>
+      <tr><td>Codex CLI</td><td>CLI</td><td>Install <code>codex</code> CLI, authenticate</td><td>Included in OpenAI subscription</td><td>OpenAI subscribers</td></tr>
+    </tbody>
+  </table>
+
+  <div class="doc-tabs">
+    <div class="doc-tabs__bar">
+      <button class="doc-tabs__tab active" data-tab="tab-anthropic">Anthropic API</button>
+      <button class="doc-tabs__tab" data-tab="tab-claude-code">Claude Code</button>
+      <button class="doc-tabs__tab" data-tab="tab-claude-oauth">Claude OAuth</button>
+      <button class="doc-tabs__tab" data-tab="tab-openai">OpenAI API</button>
+      <button class="doc-tabs__tab" data-tab="tab-gemini-api">Gemini API</button>
+      <button class="doc-tabs__tab" data-tab="tab-gemini-cli">Gemini CLI</button>
+      <button class="doc-tabs__tab" data-tab="tab-codex">Codex CLI</button>
+    </div>
+    <div class="doc-tabs__panel active" id="tab-anthropic">
+      <p>The Anthropic API is the recommended engine for the best structured output quality.</p>
+      <ol class="doc-steps">
+        <li>Sign up at <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a> and create an API key.</li>
+        <li>In vibeSpot Settings &rarr; AI tab, paste the key into the Anthropic API Key field. Or set the environment variable: <code>export ANTHROPIC_API_KEY=sk-ant-...</code></li>
+        <li>Select <strong>Anthropic API</strong> as the engine. The default model is <code>claude-sonnet-4-20250514</code>.</li>
+      </ol>
+    </div>
+    <div class="doc-tabs__panel" id="tab-claude-code">
+      <p>Claude Code is a CLI tool that runs as a subprocess. It is included in your Claude Pro/Team/Enterprise subscription at no extra API cost.</p>
+      <ol class="doc-steps">
+        <li>Install the Claude CLI: <code>npm install -g @anthropic-ai/claude-code</code></li>
+        <li>Authenticate: <code>claude auth</code></li>
+        <li>In vibeSpot Settings &rarr; AI tab &rarr; CLI Tools section, toggle <strong>Claude Code</strong> on. vibeSpot checks if the CLI is installed and authenticated. Then select <strong>Claude Code</strong> in the Engine section above.</li>
+      </ol>
+    </div>
+    <div class="doc-tabs__panel" id="tab-claude-oauth">
+      <p>Claude OAuth lets you use the Anthropic API through your Claude subscription without a separate API key.</p>
+      <ol class="doc-steps">
+        <li>Make sure the Claude CLI is installed: <code>npm install -g @anthropic-ai/claude-code</code></li>
+        <li>Run <code>claude setup-token</code> and follow the browser-based auth flow.</li>
+        <li>Copy the token and paste it into vibeSpot Settings &rarr; AI tab &rarr; Claude OAuth section.</li>
+      </ol>
+      <div class="doc-callout doc-callout--warning">
+        <div class="doc-callout__label">&#9888; Token Expiration</div>
+        <p>OAuth tokens expire periodically. If you see authentication errors, run <code>claude setup-token</code> again and paste the new token.</p>
+      </div>
+    </div>
+    <div class="doc-tabs__panel" id="tab-openai">
+      <p>Use OpenAI's GPT-4o or any compatible model through the OpenAI API.</p>
+      <ol class="doc-steps">
+        <li>Get an API key from <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>.</li>
+        <li>Paste the key in Settings &rarr; AI tab &rarr; OpenAI API Key, or set <code>export OPENAI_API_KEY=sk-...</code></li>
+        <li>Select <strong>OpenAI API</strong> as the engine and choose your preferred model.</li>
+      </ol>
+    </div>
+    <div class="doc-tabs__panel" id="tab-gemini-api">
+      <p>Google's Gemini API offers a generous free tier suitable for experimentation.</p>
+      <ol class="doc-steps">
+        <li>Get an API key from <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>.</li>
+        <li>Paste the key in Settings &rarr; AI tab &rarr; Google AI API Key, or set <code>export GEMINI_API_KEY=...</code> (or <code>GOOGLE_AI_API_KEY</code>).</li>
+        <li>Select <strong>Gemini API</strong> as the engine.</li>
+      </ol>
+    </div>
+    <div class="doc-tabs__panel" id="tab-gemini-cli">
+      <p>The Gemini CLI runs as a local subprocess, similar to Claude Code.</p>
+      <ol class="doc-steps">
+        <li>Install the Gemini CLI: <code>npm install -g @google/gemini-cli</code></li>
+        <li>Authenticate with your Google account.</li>
+        <li>In vibeSpot Settings &rarr; AI tab &rarr; CLI Tools section, toggle <strong>Gemini CLI</strong> on. Then select it in the Engine section above.</li>
+      </ol>
+    </div>
+    <div class="doc-tabs__panel" id="tab-codex">
+      <p>OpenAI's Codex CLI runs as a subprocess, included in OpenAI subscriptions.</p>
+      <ol class="doc-steps">
+        <li>Install the Codex CLI: <code>npm install -g @openai/codex</code></li>
+        <li>Authenticate with your OpenAI account.</li>
+        <li>In vibeSpot Settings &rarr; AI tab &rarr; CLI Tools section, toggle <strong>Codex CLI</strong> on. Then select it in the Engine section above.</li>
+      </ol>
+    </div>
+  </div>
+
+  <h3 id="hubspot-setup">HubSpot Connection</h3>
+  <p>vibeSpot uploads themes to HubSpot using one of two methods:</p>
+  <ul>
+    <li><strong>API mode (recommended)</strong> &mdash; Uses the HubSpot CMS API directly with a Personal Access Key. Uploads modules in parallel for speed. No HubSpot CLI required.</li>
+    <li><strong>CLI mode (legacy)</strong> &mdash; Uses the <code>hs</code> CLI tool to upload sequentially. Slower but works if API mode encounters issues.</li>
+  </ul>
+  <ol class="doc-steps">
+    <li><strong>Get a Personal Access Key (PAK).</strong> Go to your HubSpot portal &rarr; Settings &rarr; Account Setup &rarr; Integrations &rarr; Private Apps, or visit <code>app.hubspot.com/personal-access-key/{portalId}</code> directly. Create a key with the <strong>Content</strong> scope (Design Manager read/write). Copy the key (starts with <code>pat-na1-</code> or <code>pat-eu1-</code>).</li>
+    <li><strong>Add the account in vibeSpot.</strong> Open Settings &rarr; HubSpot tab &rarr; Add Account. Paste the PAK. vibeSpot validates it and detects your portal ID and data center (NA1 or EU1).</li>
+    <li><strong>Select the account.</strong> If you have multiple portals, click the one you want to deploy to. The active account is shown with a green indicator.</li>
+  </ol>
+  <div class="doc-callout doc-callout--info">
+    <div class="doc-callout__label">&#8505; Multi-Account Support</div>
+    <p>You can add multiple HubSpot accounts (different portals or data centers). Switch between them in Settings &rarr; HubSpot tab before uploading. vibeSpot detects EU1 data centers automatically from your PAK prefix.</p>
+  </div>
+
+  <h3 id="config">Configuration File</h3>
+  <p>All settings are stored in <code>~/.vibespot/config.json</code>. Here is a reference of all fields:</p>
+  <table>
+    <thead>
+      <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>aiEngine</code></td><td>string</td><td>Active AI engine: <code>"anthropic-api"</code>, <code>"claude-code"</code>, <code>"claude-oauth"</code>, <code>"openai-api"</code>, <code>"gemini-api"</code>, <code>"gemini-cli"</code>, <code>"codex-cli"</code></td></tr>
+      <tr><td><code>anthropicApiKey</code></td><td>string</td><td>Anthropic API key (starts with <code>sk-ant-</code>)</td></tr>
+      <tr><td><code>openaiApiKey</code></td><td>string</td><td>OpenAI API key (starts with <code>sk-</code>)</td></tr>
+      <tr><td><code>geminiApiKey</code></td><td>string</td><td>Google AI / Gemini API key</td></tr>
+      <tr><td><code>claudeCodeModel</code></td><td>string</td><td>Model override for Claude Code CLI</td></tr>
+      <tr><td><code>anthropicApiModel</code></td><td>string</td><td>Anthropic API model (default: <code>claude-sonnet-4-20250514</code>)</td></tr>
+      <tr><td><code>openaiApiModel</code></td><td>string</td><td>OpenAI API model (default: <code>gpt-4o</code>)</td></tr>
+      <tr><td><code>hubspotAccounts</code></td><td>array</td><td>List of HubSpot accounts with PAK, portal ID, and data center</td></tr>
+      <tr><td><code>activeHubSpotAccount</code></td><td>string</td><td>Portal ID of the currently active HubSpot account</td></tr>
+      <tr><td><code>hubspotUploadMode</code></td><td>string</td><td><code>"api"</code> (default) or <code>"cli"</code></td></tr>
+      <tr><td><code>enabledCLITools</code></td><td>string[]</td><td>Array of enabled CLI tool IDs: <code>["claude-code", "gemini-cli", "codex-cli"]</code>. Only enabled tools are checked on startup.</td></tr>
+      <tr><td><code>agenticMode</code></td><td>boolean</td><td>Enable the 4-stage agentic pipeline. <code>undefined</code> on first run (vibeSpot prompts you to choose), then <code>true</code> or <code>false</code>.</td></tr>
+      <tr><td><code>agenticConcurrency</code></td><td>number</td><td>Max parallel module generation calls (default: <code>20</code>)</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="env-vars">Environment Variables</h3>
+  <p>API keys can also be set as environment variables. The config file takes precedence &mdash; environment variables are used as fallbacks when no key is set in the config:</p>
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Anthropic API key for Claude models</td></tr>
+      <tr><td><code>OPENAI_API_KEY</code></td><td>OpenAI API key for GPT models</td></tr>
+      <tr><td><code>GEMINI_API_KEY</code></td><td>Google AI API key for Gemini models</td></tr>
+      <tr><td><code>GOOGLE_AI_API_KEY</code></td><td>Alternative name for the Gemini API key (same effect as <code>GEMINI_API_KEY</code>)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================================
+     Section 3: The Editor
+     ============================================================ -->
+<div class="doc-section" id="editor">
+  <h2 id="editor-heading">The Editor <a href="#editor" class="doc-anchor">#</a></h2>
+  <p>The vibeSpot editor is a browser-based environment for building HubSpot CMS pages. It combines a chat-driven AI assistant with a live preview and code editing capabilities.</p>
+
+  <h3 id="editor-layout">Layout Overview</h3>
+  <p>The editor has three main panels separated by a draggable resize handle:</p>
+  <ul>
+    <li><strong>Left panel</strong> (380px default) &mdash; Contains a module bar button at the top (click to open the module slideout) and the chat interface below it. The module slideout overlays the chat when open. The chat header shows the template name and active AI engine.</li>
+    <li><strong>Resize handle</strong> &mdash; A 4px draggable divider between panels. Turns orange on hover. Drag to resize the left/right split. The left panel has a minimum width of 300px and maximum of 600px.</li>
+    <li><strong>Right panel</strong> (fills remaining space) &mdash; Live preview of the rendered page (default) or the code editor (toggle via the Preview/Code tabs). The preview includes browser chrome with dots and a URL bar.</li>
+  </ul>
+
+  <!-- Editor Layout Mockup -->
+  <div class="doc-mockup">
+    <div class="mock-topbar">
+      <span class="mock-topbar__back">&lsaquo;</span>
+      <span class="mock-topbar__pill">my-startup</span>
+      <span class="mock-topbar__spacer"></span>
+      <div class="mock-topbar__responsive">
+        <span class="active" title="Desktop">&#9633;</span><span title="Tablet">&#9645;</span><span title="Mobile">&#9647;</span>
+      </div>
+      <span class="mock-topbar__spacer"></span>
+      <span class="mock-topbar__btn" title="Feedback">&#128172;</span>
+      <span class="mock-topbar__btn" title="Theme toggle">&#9788;</span>
+      <span class="mock-topbar__btn" title="Version history">&#128339;</span>
+      <span class="mock-topbar__btn mock-topbar__btn--accent">&#8593; Deploy</span>
+    </div>
+    <div class="mock-editor">
+      <div class="mock-editor__left">
+        <div class="mock-modules">
+          <div class="mock-modules__header"><span style="display:flex;align-items:center;gap:6px">&#9638;&#9638; Modules</span> <span class="mock-modules__count">5</span></div>
+          <div class="mock-module-item"><span class="mock-module-item__grip">&#8942;&#8942;</span><span class="mock-module-item__name">Navigation Bar</span><span class="mock-module-item__actions"><span class="mock-module-item__action" title="Edit fields">&#9998;</span><span class="mock-module-item__action" title="Delete">&times;</span></span></div>
+          <div class="mock-module-item"><span class="mock-module-item__grip">&#8942;&#8942;</span><span class="mock-module-item__name">Hero Banner</span><span class="mock-module-item__actions"><span class="mock-module-item__action">&#9998;</span><span class="mock-module-item__action">&times;</span></span></div>
+          <div class="mock-module-item"><span class="mock-module-item__grip">&#8942;&#8942;</span><span class="mock-module-item__name">Features Grid</span><span class="mock-module-item__actions"><span class="mock-module-item__action">&#9998;</span><span class="mock-module-item__action">&times;</span></span></div>
+          <div class="mock-module-item"><span class="mock-module-item__grip">&#8942;&#8942;</span><span class="mock-module-item__name">Pricing Cards</span><span class="mock-module-item__actions"><span class="mock-module-item__action">&#9998;</span><span class="mock-module-item__action">&times;</span></span></div>
+          <div class="mock-module-item"><span class="mock-module-item__grip">&#8942;&#8942;</span><span class="mock-module-item__name">Footer</span><span class="mock-module-item__actions"><span class="mock-module-item__action">&#9998;</span><span class="mock-module-item__action">&times;</span></span></div>
+        </div>
+        <div class="mock-chat">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--doc-border)">
+            <span style="font-size:11px;font-weight:600;color:var(--doc-text-dim)">Chat</span>
+            <span style="font-size:10px;color:var(--doc-text-muted)">Claude (OAuth)</span>
+          </div>
+          <div class="mock-chat__messages">
+            <div class="mock-chat__msg mock-chat__msg--user"><span class="mock-chat__avatar">Y</span><div class="mock-chat__bubble">Build a SaaS landing page for an AI writing tool. Dark theme, modern.</div></div>
+            <div class="mock-chat__msg mock-chat__msg--ai"><span class="mock-chat__avatar">AI</span>
+              <div class="mock-chat__pipeline">
+                <div class="mock-chat__step">&#10004; Analyzing your request...</div>
+                <div class="mock-chat__step">&#10004; Creating design system...</div>
+                <div class="mock-chat__step">&#10004; Generating 5 modules...</div>
+                <div class="mock-chat__step">&#10004; Quality check...</div>
+                <div class="mock-chat__module-cards">
+                  <span class="mock-chat__module-card mock-chat__module-card--done">&#10004; Navigation</span>
+                  <span class="mock-chat__module-card mock-chat__module-card--done">&#10004; Hero</span>
+                  <span class="mock-chat__module-card mock-chat__module-card--done">&#10004; Features</span>
+                  <span class="mock-chat__module-card mock-chat__module-card--done">&#10004; Pricing</span>
+                  <span class="mock-chat__module-card mock-chat__module-card--done">&#10004; Footer</span>
+                </div>
+                <div style="color:var(--doc-green);margin-top:4px;font-size:10px">Generated 5 modules in 42s</div>
+              </div>
+            </div>
+            <div class="mock-chat__msg mock-chat__msg--user"><span class="mock-chat__avatar">Y</span><div class="mock-chat__bubble">Make the hero headline bigger and add a gradient.</div></div>
+            <div class="mock-chat__msg mock-chat__msg--ai"><span class="mock-chat__avatar">AI</span>
+              <div class="mock-chat__pipeline">
+                <div class="mock-chat__step">&#10004; Analyzing your request...</div>
+                <div class="mock-chat__step mock-chat__step--active">&#10227; Generating 1 module...</div>
+                <div class="mock-chat__module-cards">
+                  <span class="mock-chat__module-card mock-chat__module-card--active">Hero Banner generating...</span>
+                </div>
+                <div style="color:var(--doc-text-muted);margin-top:4px;font-size:10px">14s</div>
+              </div>
+            </div>
+          </div>
+          <div class="mock-chat__input">
+            <span style="color:var(--doc-text-muted);font-size:13px;cursor:pointer" title="Attach file">&#128206;</span>
+            <input class="mock-chat__input-field" placeholder="Describe your landing page..." disabled>
+            <span style="color:var(--doc-text-muted);font-size:12px;cursor:pointer" title="Starter templates">&#9638;&#9638;</span>
+            <span class="mock-chat__input-btn">&#9654;</span>
+          </div>
+        </div>
+      </div>
+      <div class="mock-editor__resize" title="Drag to resize panels"></div>
+      <div class="mock-editor__right">
+        <div class="mock-preview">
+          <div class="mock-preview__tabs"><span class="mock-preview__tab active">Preview</span><span class="mock-preview__tab">Code</span></div>
+          <div class="mock-preview__chrome">
+            <div class="mock-preview__dots"><span class="mock-preview__dot"></span><span class="mock-preview__dot"></span><span class="mock-preview__dot"></span></div>
+            <div class="mock-preview__url">my-startup.vibespot.app</div>
+          </div>
+          <div class="mock-preview__body">
+            <div class="mock-preview__section" style="background:rgba(255,255,255,0.02);padding:6px 14px;display:flex;justify-content:space-between;font-size:10px">
+              <span style="font-weight:600;color:var(--doc-text)">WriteAI</span>
+              <span style="color:var(--doc-text-muted)">Features &middot; Pricing &middot; About</span>
+            </div>
+            <div class="mock-preview__section mock-preview__hero">
+              <div class="mock-preview__hero-title">Write Better. Faster.</div>
+              <div class="mock-preview__hero-sub">AI-powered writing assistant for teams that ship.</div>
+              <span class="mock-preview__hero-btn">Start Free Trial</span>
+            </div>
+            <div class="mock-preview__cards">
+              <div class="mock-preview__card"><div class="mock-preview__card-title">Smart Drafts</div><div class="mock-preview__card-text">Generate first drafts in seconds</div></div>
+              <div class="mock-preview__card"><div class="mock-preview__card-title">Team Collab</div><div class="mock-preview__card-text">Real-time editing with your team</div></div>
+              <div class="mock-preview__card"><div class="mock-preview__card-title">Brand Voice</div><div class="mock-preview__card-text">Consistent tone across all content</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mock-statusbar">
+      <span>Connected</span>
+      <span class="mock-statusbar__spacer"></span>
+      <span class="mock-statusbar__dot"></span>
+      <span>ALCMST (144870572)</span>
+      <span class="mock-statusbar__spacer"></span>
+      <span>Claude (OAuth)</span>
+    </div>
+  </div>
+
+  <p>The topbar provides access to theme settings, upload, version history, responsive viewport toggle, and the settings gear.</p>
+
+  <h3 id="chat-panel">Chat Panel</h3>
+  <p>The chat panel is your primary way to interact with the AI. Type a message describing what you want and press <kbd>Enter</kbd> to send. Use <kbd>Shift</kbd>+<kbd>Enter</kbd> to insert a new line without sending.</p>
+  <p>During generation, the chat panel shows a real-time pipeline progress UI with stage indicators and per-module status cards. Each module progresses through: <em>queued</em> &rarr; <em>generating...</em> &rarr; <em>validating...</em> &rarr; <em>&#10004;</em> (complete) or <em>&#10007;</em> (failed). If a module fails, it may show <em>retrying...</em> before a second attempt.</p>
+
+  <h4 id="file-attachments-chat">File Attachments</h4>
+  <p>You can attach files to your messages for additional context:</p>
+  <ul>
+    <li><strong>Images</strong> (up to 10 MB) &mdash; PNG, JPEG, SVG, WebP, GIF. The AI can see these via vision and use them as design references.</li>
+    <li><strong>Documents</strong> &mdash; PDF, DOCX, MD, TXT. Text is extracted and provided to the AI as content context.</li>
+  </ul>
+  <p>Drag and drop files onto the chat input, or click the attachment button to browse.</p>
+
+  <h4 id="starter-templates">Starter Templates</h4>
+  <p>For quick starts, the chat suggests four starter templates on an empty theme:</p>
+  <ul>
+    <li><strong>SaaS Landing Page</strong> &mdash; Hero, features grid, pricing, testimonials, CTA, footer</li>
+    <li><strong>Portfolio</strong> &mdash; About section, project gallery, skills, contact form</li>
+    <li><strong>Restaurant</strong> &mdash; Hero with imagery, menu sections, reservation CTA, location map, hours</li>
+    <li><strong>Event / Conference</strong> &mdash; Event hero with date, speakers, schedule, sponsors, registration CTA</li>
+  </ul>
+
+  <h3 id="preview-panel">Preview Panel</h3>
+  <p>The preview panel renders your page using a local HubL subset renderer. It supports variables, conditionals, loops, filters, <code>scope_css</code>, and <code>require_css</code>/<code>require_js</code> tags. The preview automatically refreshes when modules are updated.</p>
+  <p>Use the responsive toggle buttons in the topbar to switch viewports:</p>
+  <ul>
+    <li><strong>Desktop</strong> &mdash; 100% width</li>
+    <li><strong>Tablet</strong> &mdash; 768px</li>
+    <li><strong>Mobile</strong> &mdash; 375px</li>
+  </ul>
+  <p>During AI generation, modules that are being regenerated show a working overlay with a progress indicator. Modules that have already been generated remain visible and interactive.</p>
+
+  <h3 id="code-editor">Code Editor</h3>
+  <p>Switch to the code editor tab to directly edit module files. The file tree is grouped by module name, and each module contains:</p>
+  <ul>
+    <li><code>module.html</code> &mdash; The HubL template</li>
+    <li><code>module.css</code> &mdash; Module-scoped CSS</li>
+    <li><code>module.js</code> &mdash; Client-side JavaScript</li>
+    <li><code>fields.json</code> &mdash; Field definitions for the HubSpot content editor</li>
+  </ul>
+  <p>At the theme level, you also have access to <code>shared.css</code> (design system utilities) and <code>shared.js</code> (scroll animations, shared behaviors).</p>
+  <p>The editor uses CodeMirror 6 with syntax highlighting for HTML, CSS, JavaScript, and JSON. Save your changes with <kbd>Cmd</kbd>+<kbd>S</kbd> (or <kbd>Ctrl</kbd>+<kbd>S</kbd> on Windows/Linux) to write to disk and refresh the preview.</p>
+
+  <h3 id="module-sidebar">Module Sidebar</h3>
+  <p>The module sidebar is a <strong>toggleable slideout</strong> panel. Click the <strong>Modules</strong> button (grid icon + count badge) at the top of the left panel to open it. The slideout slides in from the left over the chat area. Click the <strong>&times;</strong> button or the Modules button again to close it.</p>
+  <p>The slideout has two views that swap in place:</p>
+  <ul>
+    <li><strong>Module List</strong> (default) &mdash; Shows all modules in the current template. The header displays the title "Modules", a count badge, a <strong>+</strong> button to add modules from the library, and a close button.</li>
+    <li><strong>Field Editor</strong> &mdash; Opens when you click the gear icon (&#9881;) on a module. Shows a back arrow to return to the module list, the module name, and a dynamic form for editing field values.</li>
+  </ul>
+  <p>Each module item in the list has:</p>
+  <ul>
+    <li><strong>Drag handle</strong> (&#x2837;) &mdash; Grab and drag to reorder modules. The preview updates immediately to reflect the new page order.</li>
+    <li><strong>Module name</strong> &mdash; The display name of the module (e.g., "Hero Banner").</li>
+    <li><strong>Edit fields</strong> (&#9881; gear icon, visible on hover) &mdash; Switches the slideout to the field editor view for that module.</li>
+    <li><strong>Delete</strong> (&times; icon, visible on hover) &mdash; Removes the module from the template after confirmation. If used in other templates, it remains in the library.</li>
+  </ul>
+
+  <h4 id="field-editor-sidebar">Field Editor</h4>
+  <p>The field editor renders a dynamic form based on the module's <code>fields.json</code>. Each field type uses a specific HTML control:</p>
+  <ul>
+    <li><strong>text</strong> &mdash; Standard text input (<code>&lt;input type="text"&gt;</code>)</li>
+    <li><strong>richtext</strong> &mdash; Multi-line textarea (<code>&lt;textarea rows="3"&gt;</code>)</li>
+    <li><strong>color</strong> &mdash; Native color picker paired with a hex text input. Both stay in sync.</li>
+    <li><strong>image</strong> &mdash; Text input for image URL</li>
+    <li><strong>link</strong> &mdash; Text input for URL</li>
+    <li><strong>number</strong> &mdash; Numeric input (<code>&lt;input type="number"&gt;</code>)</li>
+    <li><strong>boolean</strong> &mdash; Standard HTML checkbox (<code>&lt;input type="checkbox"&gt;</code>)</li>
+    <li><strong>choice</strong> &mdash; Native dropdown select populated from the field's choices array</li>
+    <li><strong>group</strong> &mdash; A labeled fieldset containing child fields. Groups with <code>"tab": "STYLE"</code> are labeled as style fields.</li>
+  </ul>
+  <p>All field changes are debounced at 300ms and trigger an automatic preview refresh. No manual save is needed.</p>
+</div>
+
+<!-- ============================================================
+     Section 4: Creating Pages
+     ============================================================ -->
+<div class="doc-section" id="creating-pages">
+  <h2 id="creating-pages-heading">Creating Pages <a href="#creating-pages" class="doc-anchor">#</a></h2>
+  <p>vibeSpot supports multiple ways to start a project, from a blank slate to importing existing work.</p>
+
+  <h3 id="starting-project">Starting a Project</h3>
+
+  <!-- Setup Screen Mockup -->
+  <div class="doc-mockup">
+    <div class="mock-topbar">
+      <span style="font-size:16px">&#10038;</span>
+      <span class="mock-topbar__title">vibeSpot</span>
+      <span class="mock-topbar__spacer"></span>
+      <span class="mock-topbar__btn">&#128172; Feedback</span>
+      <span class="mock-topbar__btn" title="Theme toggle">&#9788;</span>
+    </div>
+    <div class="mock-setup">
+      <div class="mock-setup__rail">
+        <div class="mock-setup__rail-dot mock-setup__rail-dot--active">M</div>
+        <div class="mock-setup__rail-dot">P</div>
+        <div class="mock-setup__rail-dot">D</div>
+        <div style="flex:1"></div>
+        <div style="font-size:9px;color:var(--doc-text-muted);margin-bottom:4px">&#128214;</div>
+        <div style="font-size:9px;color:var(--doc-text-muted)">&#9881;</div>
+      </div>
+      <div class="mock-setup__main">
+        <div style="font-size:36px">&#10038;</div>
+        <div class="mock-setup__logo">vibeSpot</div>
+        <div class="mock-setup__subtitle">Build HubSpot landing pages with AI</div>
+        <div class="mock-setup__actions">
+          <div class="mock-setup__action"><div class="mock-setup__action-icon">+</div><div class="mock-setup__action-label">New Theme</div><div class="mock-setup__action-desc">Start from scratch</div></div>
+          <div class="mock-setup__action"><div class="mock-setup__action-icon">&#9654;</div><div class="mock-setup__action-label">Continue</div><div class="mock-setup__action-desc">Resume saved project</div></div>
+          <div class="mock-setup__action"><div class="mock-setup__action-icon">&#8595;</div><div class="mock-setup__action-label">From HubSpot</div><div class="mock-setup__action-desc">Fetch existing theme</div></div>
+          <div class="mock-setup__action"><div class="mock-setup__action-icon">&#8635;</div><div class="mock-setup__action-label">Convert React</div><div class="mock-setup__action-desc">Import React project<br><span style="font-size:9px;color:var(--doc-yellow)">Experimental</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p>The setup screen presents four options:</p>
+  <ul>
+    <li><strong>New Theme</strong> &mdash; Creates a fresh HubSpot theme directory at <code>~/vibespot-themes/your-theme-name</code>. Initializes the standard folder structure (<code>modules/</code>, <code>templates/</code>, <code>css/</code>, <code>js/</code>) and a git repository for version tracking.</li>
+    <li><strong>Continue (Resume)</strong> &mdash; Reopens an existing project from the sidebar list. Your chat history, modules, and all templates are preserved exactly where you left off.</li>
+    <li><strong>From HubSpot (Fetch)</strong> &mdash; Downloads an existing theme from your HubSpot portal. vibeSpot scans the fetched modules and imports them into a session so you can modify them with AI or by hand.</li>
+    <li><strong>Convert React (Experimental)</strong> &mdash; Clones a React or Lovable project from a Git URL and converts its components into native HubSpot modules. The conversion uses the built-in conversion guide to map React patterns to HubL equivalents.</li>
+  </ul>
+
+  <h3 id="first-page">Your First Page</h3>
+  <p>Follow these steps to build your first landing page from scratch:</p>
+  <ol class="doc-steps">
+    <li><strong>Create a new theme.</strong> Click <strong>New Theme</strong> on the setup screen. Enter a kebab-case name like <code>taskflow-landing</code>. The editor opens with an empty canvas.</li>
+    <li><strong>Write a detailed prompt.</strong> The more specific you are, the better the result. Include the page purpose, sections you want, specific content (headlines, feature descriptions), and design preferences (colors, style). For example: <em>"Build a landing page for Taskflow, a project management SaaS. Use a deep blue (#1a365d) and white palette. Include: hero with headline 'Ship Projects Faster', subheadline about team collaboration, and a 'Start Free Trial' CTA button. Then a 3-column features section with icons. Then a pricing table with Free/Pro/Enterprise tiers. End with a testimonial carousel and a minimal footer."</em></li>
+    <li><strong>Watch the pipeline work.</strong> The agentic pipeline runs through four stages. You will see: intent analysis (what type of request), design system creation (CSS variables and shared styles), parallel module generation (each module built concurrently), and quality validation (auto-fixing common issues). The live preview populates incrementally as modules complete.</li>
+    <li><strong>Refine with follow-up prompts.</strong> After the initial generation, send follow-up messages to modify specific modules: <em>"Change the hero background to a gradient from #1a365d to #2d3748"</em> or <em>"Add a FAQ section with 5 questions about Taskflow"</em>. The pipeline intelligently determines which modules to regenerate and which to keep.</li>
+    <li><strong>Edit fields visually.</strong> Click the <strong>Modules</strong> button to open the module slideout, then click the gear icon (&#9881;) on any module to open the field editor. Change headlines, body text, button labels, colors, and images without writing code. The preview updates in real time (300ms debounce).</li>
+    <li><strong>Deploy.</strong> Click the <strong>Deploy</strong> button in the topbar. Select your HubSpot account and watch the upload progress. When complete, click the link to go to your HubSpot portal and create a new landing page using your theme.</li>
+  </ol>
+
+  <div class="doc-callout doc-callout--tip">
+    <div class="doc-callout__label">&#10024; Prompt Examples</div>
+    <p><strong>SaaS:</strong> "Create a landing page for CloudSync, a file syncing tool. Hero with animated gradient, features with icons, pricing with toggle for monthly/annual, and footer with social links."</p>
+    <p><strong>Agency:</strong> "Build a digital agency portfolio page. Full-bleed hero video placeholder, a services grid (4 services), case studies with image cards, team section, and a contact form."</p>
+    <p><strong>Event:</strong> "Design a tech conference page for DevSummit 2026. Hero with event date and location, speaker grid with photos, 2-day schedule in tabs, sponsor logos, and early-bird registration CTA."</p>
+  </div>
+
+  <h3 id="templates">Templates</h3>
+  <p>Each theme can contain multiple templates. Templates define different page layouts that share the same module library and design system.</p>
+  <p>Supported page types:</p>
+  <ul>
+    <li><strong>Landing Page</strong> &mdash; The default. Full-width marketing pages.</li>
+    <li><strong>Blog Post</strong> &mdash; Content-focused layout with sidebar.</li>
+    <li><strong>Website Page</strong> &mdash; Standard pages for your site (About, Contact, etc.).</li>
+    <li><strong>Module Only</strong> &mdash; Generate standalone modules without a page template.</li>
+  </ul>
+  <p>Template operations available:</p>
+  <ul>
+    <li><strong>Create</strong> &mdash; Add a new template to the theme. Each template starts with its own chat history.</li>
+    <li><strong>Clone</strong> &mdash; Duplicate an existing template, including its module assignments and field values.</li>
+    <li><strong>Rename</strong> &mdash; Change the template display name.</li>
+    <li><strong>Delete</strong> &mdash; Remove a template. You can choose whether to also delete modules that are only used in that template, or keep them in the library.</li>
+  </ul>
+  <p>Each template maintains its own chat history, so you can have separate conversations for different pages in the same theme.</p>
+
+  <h3 id="module-library">Module Library</h3>
+  <p>All generated modules live in a shared library within the theme. The module list shows which templates each module is used in (e.g., "Used in: Landing Page, About Page").</p>
+  <ul>
+    <li><strong>Add to template</strong> &mdash; Browse the library and add any existing module to the current template without regenerating it.</li>
+    <li><strong>Preview before adding</strong> &mdash; See how a module looks before committing it to a template.</li>
+    <li><strong>Cross-template sharing</strong> &mdash; A single module (like a navbar or footer) can be used across multiple templates. Changes to the module propagate everywhere.</li>
+    <li><strong>Delete from library</strong> &mdash; Permanently remove a module and its files. This removes it from all templates that reference it.</li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     Section 5: AI Generation
+     ============================================================ -->
+<div class="doc-section" id="ai-generation">
+  <h2 id="ai-generation-heading">AI Generation <a href="#ai-generation" class="doc-anchor">#</a></h2>
+  <p>vibeSpot offers two generation modes: a simpler single-call mode and a more powerful agentic pipeline. The agentic pipeline is the default and recommended mode.</p>
+
+  <h3 id="single-call">Single-Call Mode</h3>
+  <p>In single-call mode, the AI generates all modules in a single API request. The response contains a <code>vibespot-modules</code> JSON code block with all module definitions. This mode is simpler but less reliable for complex pages because the AI must produce all modules in one shot.</p>
+  <p>To use single-call mode, disable the agentic pipeline toggle in Settings &rarr; AI tab. Single-call mode may be useful for quick single-module additions or when using CLI engines that do not support structured output.</p>
+  <div class="doc-callout doc-callout--info">
+    <div class="doc-callout__label">&#8505; When to use single-call</div>
+    <p>Single-call mode is best for simple requests like adding a single module or making a small change. For full page generation, the agentic pipeline produces significantly better results.</p>
+  </div>
+
+  <h3 id="agentic-pipeline">Agentic Pipeline</h3>
+  <p>The agentic pipeline breaks page generation into four specialized stages, each optimized for its task. This produces more cohesive designs, better code quality, and more reliable output.</p>
+
+  <div class="doc-pipeline">
+    <div class="doc-pipeline__stage">
+      <div class="doc-pipeline__stage-num">1</div>
+      <div class="doc-pipeline__stage-label">Intent Analyzer</div>
+      <div class="doc-pipeline__stage-desc">Classifies request &amp; plans modules</div>
+      <div class="doc-pipeline__tooltip">Analyzes your message to determine the intent (create, modify, add, remove, rearrange, style change, or question). Plans which modules to generate, modify, keep, or reuse. Questions short-circuit the pipeline and return a direct answer.</div>
+    </div>
+    <div class="doc-pipeline__arrow">&rarr;</div>
+    <div class="doc-pipeline__stage">
+      <div class="doc-pipeline__stage-num">2</div>
+      <div class="doc-pipeline__stage-label">Page Architect</div>
+      <div class="doc-pipeline__stage-desc">Design system &amp; module specs</div>
+      <div class="doc-pipeline__tooltip">Two sequential calls: first creates the design system (CSS custom properties in :root, shared CSS with component styles and responsive rules, shared JS). Then plans each module with a name, description, content brief, and layout notes using the finalized CSS as context.</div>
+    </div>
+    <div class="doc-pipeline__arrow">&rarr;</div>
+    <div class="doc-pipeline__stage">
+      <div class="doc-pipeline__stage-num">3</div>
+      <div class="doc-pipeline__stage-label">Module Developer</div>
+      <div class="doc-pipeline__stage-desc">Parallel generation</div>
+      <div class="doc-pipeline__tooltip">Generates all planned modules in parallel with a configurable concurrency limit (default: 20). Each module receives the shared CSS, the conversion guide, and HubSpot rules as context. Uses structured JSON output for reliable parsing of module.html, module.css, module.js, and fields.json.</div>
+    </div>
+    <div class="doc-pipeline__arrow">&rarr;</div>
+    <div class="doc-pipeline__stage">
+      <div class="doc-pipeline__stage-num">4</div>
+      <div class="doc-pipeline__stage-label">Quality Check</div>
+      <div class="doc-pipeline__stage-desc">Validation &amp; auto-fix</div>
+      <div class="doc-pipeline__tooltip">Rule-based validation and automatic repair: fixes unbalanced HubL tags (orphan closers removed, missing closers appended), renames reserved field names (name &rarr; item_name, label &rarr; section_label), converts deprecated field types (textarea &rarr; text), strips CDN @import statements, replaces now() with local_dt, auto-prefixes unprefixed CSS classes with the theme name, updates matching HTML class attributes, and ensures meta.json has all required fields.</div>
+    </div>
+  </div>
+
+  <h3 id="intent-types">Intent Types</h3>
+  <p>The Intent Analyzer classifies every message into one of seven intents. This determines how the pipeline processes your request:</p>
+  <table>
+    <thead>
+      <tr><th>Intent</th><th>Description</th><th>Example Prompt</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>create</code></td><td>Generate a full page from scratch</td><td>"Create a SaaS landing page with hero, features, pricing, and footer"</td></tr>
+      <tr><td><code>modify</code></td><td>Change an existing module's content, style, or structure</td><td>"Change the hero background to dark blue and update the headline"</td></tr>
+      <tr><td><code>add</code></td><td>Add one or more new modules to the existing page</td><td>"Add a FAQ section after the pricing table"</td></tr>
+      <tr><td><code>remove</code></td><td>Delete a module from the page</td><td>"Remove the testimonials section"</td></tr>
+      <tr><td><code>rearrange</code></td><td>Reorder existing modules without changing their content</td><td>"Move the CTA section above the footer"</td></tr>
+      <tr><td><code>style_change</code></td><td>Update the design system or shared CSS without module changes</td><td>"Change the primary color to green and increase font sizes"</td></tr>
+      <tr><td><code>question</code></td><td>Ask about the page, modules, or HubSpot features (no generation)</td><td>"What modules does this page have?"</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="prompt-tips">Prompt Tips</h3>
+  <div class="doc-callout doc-callout--tip">
+    <div class="doc-callout__label">&#10024; Writing Effective Prompts</div>
+    <p><strong>Be specific about content.</strong> Instead of "add a features section," write "add a 3-column features section with icons for Speed (rocket icon), Security (shield icon), and Reliability (uptime chart icon), each with a headline and 2-sentence description."</p>
+    <p><strong>Reference modules by name.</strong> After initial generation, refer to modules by their names: "modify the <code>hero</code> module to add a background video" or "change the <code>pricing-table</code> to include an Enterprise tier."</p>
+    <p><strong>Use "modify X to..." for changes.</strong> Be explicit about what you want changed vs. what should stay the same. The AI preserves unchanged modules when you reference specific ones.</p>
+    <p><strong>Provide color values.</strong> If you have a brand palette, include hex codes: "Use #1a365d as the primary color and #e2e8f0 as the light background."</p>
+    <p><strong>Describe layout preferences.</strong> Mention grid columns, spacing, alignment: "Use a 2-column layout with the image on the left and text on the right."</p>
+  </div>
+  <div class="doc-callout doc-callout--warning">
+    <div class="doc-callout__label">&#9888; Common Pitfalls</div>
+    <p><strong>Avoid vague requests.</strong> "Make it look better" gives the AI little to work with. Instead specify what you want improved: "Increase the whitespace between sections and add subtle hover animations to the feature cards."</p>
+    <p><strong>Do not overload a single prompt.</strong> If you want to create a full page and then heavily customize multiple modules, do it in steps: first generate, then refine individual modules in follow-up messages.</p>
+  </div>
+
+  <h3 id="brand-assets">Brand Assets</h3>
+  <p>Brand assets provide persistent context that the AI uses across all generations. They live in the theme and are sent with every pipeline call.</p>
+  <ul>
+    <li><strong>Styleguide</strong> &mdash; Design system documentation: typography, color palette, spacing scale, component styles. Upload a <code>.md</code> or <code>.txt</code> file, or let the AI extract a styleguide from your existing theme.</li>
+    <li><strong>Brand Voice</strong> &mdash; Tone and messaging guidelines: formal vs. casual, target audience, key phrases, words to avoid. Ensures the AI writes copy that matches your brand.</li>
+    <li><strong>Product Context</strong> &mdash; Auto-generated from your rendered theme. The AI analyzes existing modules to understand page structure, content patterns, and design conventions. Updated automatically after each generation.</li>
+    <li><strong>Humanify</strong> &mdash; A toggle that strips AI-sounding copy patterns from generated content. Removes em dashes, banned words like "delve," "leverage," "cutting-edge," and "game-changing." Eliminates cliche openers like "In today's fast-paced world." Produces more natural, human-sounding text.</li>
+  </ul>
+
+  <h3 id="file-attachments">File Attachments</h3>
+  <p>Attach files to your chat messages to give the AI additional context:</p>
+  <ul>
+    <li><strong>Images as design references</strong> &mdash; Upload screenshots, mockups, or design comps. The AI uses vision to analyze the layout, colors, typography, and structure, then generates modules that match. Supported formats: PNG, JPEG, SVG, WebP, GIF. Max 10 MB per file.</li>
+    <li><strong>Documents as content context</strong> &mdash; Upload product briefs, copy documents, or content spreadsheets. Text is extracted from PDFs and DOCX files and provided to the AI as context for generating accurate, on-brand content. Supported formats: PDF, DOCX, MD, TXT.</li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     Section 6: Editing & Customization
+     ============================================================ -->
+<div class="doc-section" id="editing">
+  <h2 id="editing-heading">Editing &amp; Customization <a href="#editing" class="doc-anchor">#</a></h2>
+  <p>After AI generation, you have full control over every aspect of your page. vibeSpot provides three editing paths depending on your needs.</p>
+
+  <h3 id="field-editor">No-Code Field Editing</h3>
+  <p>The fastest way to tweak content. Open the module slideout (click the <strong>Modules</strong> button), then click the gear icon (&#9881;) on any module. The slideout switches to the field editor view with a form generated from the module's <code>fields.json</code>. See <a href="#field-editor-sidebar">Field Editor controls</a> for the full list of supported field types.</p>
+  <div class="doc-callout doc-callout--tip">
+    <div class="doc-callout__label">Instant feedback</div>
+    <p>All field changes are debounced at 300ms and trigger an automatic preview refresh. No save button needed.</p>
+  </div>
+
+  <h3 id="code-editing">Direct Code Editing</h3>
+  <p>For precise control, switch to the <strong>Code</strong> tab in the right panel. The file tree groups files by module, and the editor uses CodeMirror 6 with syntax highlighting for HTML (with HubL), CSS, JavaScript, and JSON.</p>
+  <ul>
+    <li>Save with <kbd>Cmd</kbd>+<kbd>S</kbd> (or <kbd>Ctrl</kbd>+<kbd>S</kbd>) to write changes to disk and refresh the preview</li>
+    <li>A dirty dot (<strong>&middot;</strong>) appears next to the filename when you have unsaved changes</li>
+    <li>Editable files: <code>module.html</code>, <code>module.css</code>, <code>module.js</code>, <code>fields.json</code>, plus theme-level <code>shared.css</code> and <code>shared.js</code></li>
+  </ul>
+
+  <h3 id="module-ordering">Reordering Modules</h3>
+  <p>Module order in the slideout list equals page order. Open the module slideout and drag items by their grip handle (&#x2837;) to rearrange. The preview updates immediately.</p>
+  <p>Recommended landing page flow: Navigation &rarr; Hero &rarr; Features/Content &rarr; Social Proof &rarr; CTA/Pricing &rarr; Footer.</p>
+
+  <h3 id="design-system">Design System</h3>
+  <p>The agentic pipeline generates a consistent design system stored in the theme's shared CSS:</p>
+  <ul>
+    <li><strong>CSS custom properties</strong> in <code>:root</code> &mdash; colors, typography (clamp-based), spacing scale, border radii, shadows, and transition speeds.</li>
+    <li><strong>Theme prefix</strong> &mdash; All classes prefixed with the theme name (e.g., <code>.taskflow-hero__title</code>) using BEM naming to avoid HubSpot conflicts.</li>
+    <li><strong>Shared CSS</strong> &mdash; Reusable utility classes (containers, grids, buttons, cards, section backgrounds, scroll animations) referenced by all modules.</li>
+    <li><strong>Shared JS</strong> &mdash; IntersectionObserver-based scroll animations with a CSS-only 3-second fallback if JS fails to load.</li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     Section 7: Deploying to HubSpot
+     ============================================================ -->
+<div class="doc-section" id="deploying">
+  <h2 id="deploying-heading">Deploying to HubSpot <a href="#deploying" class="doc-anchor">#</a></h2>
+  <p>Once your page looks right in the preview, deploy it to your HubSpot portal in a single click.</p>
+
+  <h3 id="upload-flow">Upload Flow</h3>
+
+  <!-- Upload Mockup -->
+  <div class="doc-mockup">
+    <div class="mock-topbar">
+      <span class="mock-topbar__title">Deploying to HubSpot</span>
+      <span class="mock-topbar__spacer"></span>
+      <span class="mock-topbar__btn">Dismiss</span>
+    </div>
+    <div class="mock-upload">
+      <div class="mock-upload__progress">
+        <div class="mock-upload__bar-bg"><div class="mock-upload__bar-fill"></div></div>
+        <div class="mock-upload__status">Uploading to HubSpot... <strong>36/50 files (72%)</strong></div>
+      </div>
+      <div class="mock-upload__log">
+        <span class="green">&#10003;</span> Auto-fix: textarea &rarr; text in Hero Banner/fields.json<br>
+        <span class="green">&#10003;</span> Auto-fix: reserved "name" &rarr; "item_name" in FAQ/fields.json<br>
+        <span class="accent">&#8593;</span> modules/hero-banner.module/module.html<br>
+        <span class="accent">&#8593;</span> modules/hero-banner.module/module.css<br>
+        <span class="accent">&#8593;</span> modules/hero-banner.module/fields.json<br>
+        <span class="accent">&#8593;</span> modules/features-grid.module/module.html<br>
+        <span class="green">&#10003;</span> 36 of 50 files uploaded...
+      </div>
+    </div>
+  </div>
+
+  <ol class="doc-steps">
+    <li><strong>Connect your HubSpot account.</strong> If you have not added an account yet, go to Settings &rarr; HubSpot tab and add your Personal Access Key. vibeSpot validates the key and detects your portal.</li>
+    <li><strong>Select the target account.</strong> If you have multiple portals, make sure the correct one is active (green indicator in Settings &rarr; HubSpot).</li>
+    <li><strong>Click Deploy.</strong> The <strong>Deploy</strong> button (orange, top-right of topbar) starts the deployment process. vibeSpot writes files to disk, applies auto-fixes, then uploads the theme structure, shared assets, and all modules.</li>
+    <li><strong>Monitor progress.</strong> A progress indicator shows the upload status. In API mode (default), modules upload in parallel for speed. In CLI mode, they upload sequentially.</li>
+    <li><strong>Create a page in HubSpot.</strong> When the upload completes, a celebration screen appears with confetti and a direct link to your HubSpot portal. Click it to open HubSpot and create a landing page using your new theme.</li>
+  </ol>
+  <div class="doc-callout doc-callout--info">
+    <div class="doc-callout__label">&#8505; API vs. CLI Upload Mode</div>
+    <p><strong>API mode</strong> (recommended) uses the HubSpot CMS API directly. It uploads modules in parallel and is significantly faster. Requires a Personal Access Key with CMS scope.</p>
+    <p><strong>CLI mode</strong> (legacy) uses the <code>hs upload</code> command from the HubSpot CLI. It uploads files sequentially and is slower but can be useful as a fallback.</p>
+  </div>
+
+  <h3 id="auto-fix">Auto-Fix</h3>
+  <div class="doc-callout doc-callout--info">
+    <div class="doc-callout__label">Two layers of auto-fix</div>
+    <p>The <strong>quality check</strong> (agentic pipeline stage 4) fixes issues before modules reach you &mdash; HubL syntax, CSS prefixes, reserved names, meta.json fields. The <strong>upload auto-fix</strong> below runs separately when a HubSpot upload fails, then retries.</p>
+  </div>
+  <p>When an upload fails, vibeSpot scans the theme files for known HubSpot compatibility issues, applies fixes, and retries (up to 3 attempts):</p>
+  <table>
+    <thead>
+      <tr><th>Issue</th><th>Auto-Fix</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>textarea</code> field type</td><td>Replaced with <code>text</code> (HubSpot deprecated <code>textarea</code>)</td></tr>
+      <tr><td>Reserved field name <code>name</code></td><td>Renamed to <code>item_name</code></td></tr>
+      <tr><td>Reserved field name <code>label</code></td><td>Renamed to <code>section_label</code></td></tr>
+      <tr><td><code>now()</code> function call</td><td>Replaced with <code>local_dt</code> (HubL-compatible date variable)</td></tr>
+      <tr><td>CDN <code>@import</code> in CSS</td><td>Stripped (HubSpot blocks external CSS imports)</td></tr>
+      <tr><td>Invalid link field defaults</td><td>Reset to valid <code>{ url: { href, type }, open_in_new_tab, no_follow }</code> structure</td></tr>
+      <tr><td>Invalid color field format</td><td>RGBA/RGB/named colors converted to hex <code>#RRGGBB</code></td></tr>
+      <tr><td>HubDB template references</td><td>Files removed (HubDB requires CMS Hub Pro/Enterprise)</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="ai-error-fix">AI Error Fix</h3>
+  <p>If auto-fix cannot resolve an upload error, the <strong>"Fix with AI"</strong> button appears. This sends the error messages to Claude, which:</p>
+  <ol>
+    <li>Scans all module files in the theme for the root cause</li>
+    <li>Identifies the specific code that triggered the error</li>
+    <li>Applies targeted fixes across all affected modules</li>
+    <li>Retries the upload automatically</li>
+  </ol>
+  <p>This is especially useful for HubL syntax errors, invalid field configurations, or template rendering issues that rule-based auto-fix cannot handle.</p>
+
+  <h3 id="creating-page-hubspot">Creating a Page in HubSpot</h3>
+  <p>After a successful upload, follow these steps in HubSpot to create a live landing page:</p>
+  <ol class="doc-steps">
+    <li><strong>Go to Content &rarr; Landing Pages</strong> in your HubSpot portal.</li>
+    <li><strong>Click "Create"</strong> and select "Landing Page."</li>
+    <li><strong>Choose your theme</strong> from the template selector. Your vibeSpot theme appears under your portal's themes.</li>
+    <li><strong>Select a template</strong> from the templates you created in vibeSpot.</li>
+    <li><strong>Drag modules</strong> from the sidebar into the page layout, or use the pre-configured module order from vibeSpot.</li>
+    <li><strong>Edit content</strong> using HubSpot's native content editor. All the fields you configured in vibeSpot are editable here.</li>
+    <li><strong>Publish</strong> when ready. Your page is live.</li>
+  </ol>
+
+  <h3 id="multi-account">Multi-Account Support</h3>
+  <p>vibeSpot supports multiple HubSpot portal connections. This is useful for agencies managing client portals or teams with staging and production environments.</p>
+  <ul>
+    <li>Add multiple accounts in Settings &rarr; HubSpot tab, each with its own Personal Access Key.</li>
+    <li>Switch the active account before uploading. The active account is shown with a green indicator.</li>
+    <li>vibeSpot detects the data center automatically: keys starting with <code>CiRldTE</code> are EU1, all others are NA1. This ensures the correct regional URL is used (<code>app-eu1.hubspot.com</code> vs. <code>app.hubspot.com</code>).</li>
+    <li>Remove accounts you no longer need from the list.</li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     Section 8: Version History
+     ============================================================ -->
+<div class="doc-section" id="version-history">
+  <h2 id="version-history-heading">Version History <a href="#version-history" class="doc-anchor">#</a></h2>
+  <p>vibeSpot automatically tracks every generation as a git commit in the theme directory. This gives you a full timeline of changes with the ability to roll back to any previous state.</p>
+
+  <h3 id="how-version-history-works">How It Works</h3>
+  <p>Each time the AI pipeline generates or modifies modules, vibeSpot creates a git commit in the theme's local repository. The commit message describes what changed (e.g., "Generated hero, features, pricing, footer" or "Modified hero: updated headline and background color"). No manual saving is required.</p>
+
+  <h3 id="browsing-history">Browsing Versions</h3>
+  <p>Click the clock icon in the topbar to open the version history panel. You will see a timeline of all versions with:</p>
+  <ul>
+    <li>Timestamp for each version</li>
+    <li>Description of what changed</li>
+    <li>Per-template filtering to see changes for a specific template</li>
+  </ul>
+
+  <h3 id="rolling-back">Rolling Back</h3>
+  <p>Click any version in the timeline to restore the theme to that point. This is a non-destructive operation: vibeSpot creates a new commit that reverts to the selected state, so you never lose the intermediate history. You can always go forward again to a newer version.</p>
+
+  <div class="doc-callout doc-callout--tip">
+    <div class="doc-callout__label">&#10024; Tip</div>
+    <p>Use version history as an undo system. If an AI generation goes in the wrong direction, roll back to the previous version and try a different prompt.</p>
+  </div>
+</div>
+
+<!-- ============================================================
+     Section 9: Settings Reference
+     ============================================================ -->
+<div class="doc-section" id="settings">
+  <h2 id="settings-heading">Settings Reference <a href="#settings" class="doc-anchor">#</a></h2>
+  <p>Open the Settings panel by clicking the gear icon in the topbar. Settings are organized into four tabs.</p>
+
+  <h3 id="settings-ai">AI Tab</h3>
+
+  <!-- Settings Mockup -->
+  <div class="doc-mockup">
+    <div class="mock-settings">
+      <div class="mock-settings__tabs">
+        <span class="mock-settings__tab active">AI</span>
+        <span class="mock-settings__tab">HubSpot</span>
+        <span class="mock-settings__tab">GitHub</span>
+        <span class="mock-settings__tab">vibeSpot</span>
+      </div>
+
+      <div class="mock-settings__section-title">Engine</div>
+      <p style="font-size:10px;color:var(--doc-text-muted);margin:0 0 6px">Choose which AI engine generates your modules. API engines need an API key. CLI engines must be toggled on below first.</p>
+      <div class="mock-settings__engines">
+        <span class="mock-settings__engine-btn disabled">Claude Code</span>
+        <span class="mock-settings__engine-btn">Anthropic API</span>
+        <span class="mock-settings__engine-btn active">Claude (OAuth)</span>
+        <span class="mock-settings__engine-btn disabled">OpenAI API</span>
+        <span class="mock-settings__engine-btn disabled">Gemini API</span>
+        <span class="mock-settings__engine-btn disabled">Gemini CLI</span>
+        <span class="mock-settings__engine-btn disabled">Codex CLI</span>
+      </div>
+
+      <div class="mock-settings__row">
+        <span class="mock-settings__label">Model</span>
+        <span class="mock-settings__input" style="display:flex;align-items:center;color:var(--doc-text-dim)">claude-sonnet-4-6 &#9662;</span>
+      </div>
+
+      <div class="mock-settings__section-title" style="margin-top:12px">Agentic Pipeline</div>
+      <div class="mock-settings__row">
+        <span style="flex:1;font-size:10px;color:var(--doc-text-dim)">Multi-stage AI generation with parallel module development</span>
+        <span class="mock-settings__toggle active"></span>
+        <span style="font-size:10px;color:var(--doc-green);min-width:36px">Active</span>
+      </div>
+
+      <div class="mock-settings__section-title" style="margin-top:12px">API Keys</div>
+      <div class="mock-settings__key-row">
+        <span class="mock-settings__label">Anthropic</span>
+        <span style="flex:1"></span>
+        <span class="mock-settings__key-status mock-settings__key-status--set">&#10003; sk-ant-...4f2x</span>
+      </div>
+      <div class="mock-settings__key-row">
+        <span class="mock-settings__label">OpenAI</span>
+        <span style="flex:1"></span>
+        <span class="mock-settings__key-status mock-settings__key-status--missing">Not configured</span>
+      </div>
+      <div class="mock-settings__key-row">
+        <span class="mock-settings__label">Google AI</span>
+        <span style="flex:1"></span>
+        <span class="mock-settings__key-status mock-settings__key-status--missing">Not configured</span>
+      </div>
+
+      <div class="mock-settings__section-title" style="margin-top:12px">Claude OAuth</div>
+      <p style="font-size:10px;color:var(--doc-text-muted);margin:0 0 6px">Use your Claude Pro/Max subscription. Run <code style="font-size:10px">claude setup-token</code> in your terminal.</p>
+      <div class="mock-settings__row">
+        <span style="font-size:10px;color:var(--doc-green)">&#10003; Connected (token expires in 7h)</span>
+        <span style="flex:1"></span>
+        <span class="mock-topbar__btn" style="font-size:10px;color:var(--doc-red);border-color:rgba(239,68,68,0.3)">Disconnect</span>
+      </div>
+
+      <div class="mock-settings__section-title" style="margin-top:12px">CLI Tools</div>
+      <p style="font-size:10px;color:var(--doc-text-muted);margin:0 0 6px">Toggle CLI tools on to check availability. Disabled tools add zero overhead.</p>
+      <div class="mock-settings__key-row">
+        <span class="mock-settings__toggle"></span>
+        <span class="mock-settings__label">Claude Code</span>
+        <span style="flex:1"></span>
+        <span style="font-size:10px;color:var(--doc-text-muted)">Disabled</span>
+      </div>
+      <div class="mock-settings__key-row">
+        <span class="mock-settings__toggle"></span>
+        <span class="mock-settings__label">Gemini CLI</span>
+        <span style="flex:1"></span>
+        <span style="font-size:10px;color:var(--doc-text-muted)">Disabled</span>
+      </div>
+      <div class="mock-settings__key-row">
+        <span class="mock-settings__toggle"></span>
+        <span class="mock-settings__label">Codex CLI</span>
+        <span style="flex:1"></span>
+        <span style="font-size:10px;color:var(--doc-text-muted)">Disabled</span>
+      </div>
+    </div>
+  </div>
+
+  <p>The AI tab controls which engine powers the generation pipeline and how it operates.</p>
+  <ul>
+    <li><strong>Engine selector</strong> &mdash; Seven buttons, one for each supported engine. The active engine is highlighted in orange. Unavailable engines are grayed out &mdash; API engines require a key, CLI engines must first be toggled on in the CLI Tools section below.</li>
+    <li><strong>Model dropdown</strong> &mdash; A dynamic model catalog populated from the selected engine's available models. You can also type a custom model identifier for newly released models.</li>
+    <li><strong>Agentic pipeline toggle</strong> &mdash; An iOS-style toggle switch that enables or disables the 4-stage pipeline. When off, vibeSpot falls back to single-call mode. A sub-label shows the current status (Active, Disabled, or Not configured). On first use, vibeSpot prompts you to choose.</li>
+    <li><strong>API keys section</strong> &mdash; Input fields for Anthropic, OpenAI, and Google AI API keys. Keys are displayed masked (only last 4 characters visible) after saving.</li>
+    <li><strong>Claude OAuth</strong> &mdash; A section to paste the OAuth token generated by <code>claude setup-token</code>. Shows the token status (valid/expired).</li>
+    <li><strong>CLI tools</strong> &mdash; Toggle switches for Claude Code, Gemini CLI, and Codex CLI. CLI tools must be toggled <strong>on</strong> before they appear as selectable engines in the Engine section above. This lazy-detection approach means disabled tools add zero startup overhead. Once toggled on, vibeSpot checks if the CLI is installed and authenticated. If not installed, an install button appears. If installed but not authenticated, an auth button appears.</li>
+  </ul>
+
+  <h3 id="settings-hubspot">HubSpot Tab</h3>
+  <ul>
+    <li><strong>Upload mode toggle</strong> &mdash; Switch between API (recommended) and CLI (legacy) upload modes.</li>
+    <li><strong>Account list</strong> &mdash; Shows all connected HubSpot accounts with portal ID, account name, and data center. The active account has a green indicator.</li>
+    <li><strong>Add account</strong> &mdash; Paste a Personal Access Key to connect a new portal. vibeSpot validates the key and detects the portal metadata.</li>
+    <li><strong>Switch/remove</strong> &mdash; Click an account to make it active. Click the remove button to disconnect it.</li>
+  </ul>
+
+  <h3 id="settings-github">GitHub Tab</h3>
+  <p>The GitHub tab configures authentication for source imports (used by the "Convert React" flow).</p>
+  <ul>
+    <li><strong>GitHub CLI authentication</strong> &mdash; Uses <code>gh auth</code> to authenticate with GitHub. Required for cloning private repositories during React-to-HubSpot conversion.</li>
+  </ul>
+
+  <h3 id="settings-vibespot">vibeSpot Tab</h3>
+  <ul>
+    <li><strong>Theme toggle</strong> &mdash; Switch between dark and light mode for the vibeSpot UI.</li>
+    <li><strong>About</strong> &mdash; Project information, author, and links.</li>
+    <li><strong>Version</strong> &mdash; The currently installed version of vibeSpot.</li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     Section 10: CLI Commands
+     ============================================================ -->
+<div class="doc-section" id="cli-commands">
+  <h2 id="cli-commands-heading">CLI Commands <a href="#cli-commands" class="doc-anchor">#</a></h2>
+  <p>vibeSpot provides several CLI commands for different workflows. The default command (no subcommand) starts the web UI.</p>
+
+  <table>
+    <thead>
+      <tr><th>Command</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>vibespot</code></td><td>Start the web UI (default)</td></tr>
+      <tr><td><code>vibespot wizard</code></td><td>Interactive CLI wizard</td></tr>
+      <tr><td><code>vibespot init</code></td><td>Environment check &amp; setup</td></tr>
+      <tr><td><code>vibespot convert</code></td><td>React-to-HubSpot conversion</td></tr>
+      <tr><td><code>vibespot upload</code></td><td>Upload theme to HubSpot</td></tr>
+      <tr><td><code>vibespot doctor</code></td><td>Diagnostics &amp; health check</td></tr>
+    </tbody>
+  </table>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      <code>vibespot</code> &mdash; Start the Web UI
+    </button>
+    <div class="doc-collapse__content">
+      <p>Starts the HTTP server on port 4200 and opens the browser automatically. This is the main way to use vibeSpot.</p>
+      <pre><code>vibespot</code></pre>
+      <p>The server runs a WebSocket connection for real-time pipeline updates, serves the static UI assets, handles AI requests, and manages sessions. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop the server.</p>
+    </div>
+  </div>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      <code>vibespot wizard</code> &mdash; Interactive CLI Wizard
+    </button>
+    <div class="doc-collapse__content">
+      <p>A guided 6-step terminal wizard for converting React projects into HubSpot themes. Runs entirely in the terminal without a browser.</p>
+      <pre><code>vibespot wizard</code></pre>
+      <p>Steps:</p>
+      <ol>
+        <li><strong>Preflight</strong> &mdash; Checks Node.js, Git, AI engine availability, and HubSpot CLI.</li>
+        <li><strong>Source</strong> &mdash; Clone a Git repository or select a local directory containing a React project.</li>
+        <li><strong>Theme Setup</strong> &mdash; Configure the HubSpot theme name, template type, and target account.</li>
+        <li><strong>Conversion</strong> &mdash; AI analyzes React components and generates equivalent HubSpot modules with HubL templates.</li>
+        <li><strong>Upload</strong> &mdash; Deploys the generated theme to HubSpot.</li>
+        <li><strong>Next Steps</strong> &mdash; Shows links to create pages in HubSpot and tips for further customization.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      <code>vibespot init</code> &mdash; Environment Check &amp; Setup
+    </button>
+    <div class="doc-collapse__content">
+      <p>Runs the preflight check from the wizard as a standalone command. Verifies all prerequisites and offers to configure missing items.</p>
+      <pre><code>vibespot init</code></pre>
+      <p>Checks: Node.js version, Git installation, available AI engines, API key configuration, HubSpot CLI installation.</p>
+    </div>
+  </div>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      <code>vibespot convert</code> &mdash; React-to-HubSpot Conversion
+    </button>
+    <div class="doc-collapse__content">
+      <p>Converts a React or Lovable project into HubSpot CMS modules without uploading. Useful if you want to review and edit the generated files before deploying.</p>
+      <pre><code>vibespot convert --source ./my-react-app --theme my-hubspot-theme</code></pre>
+      <p>The output is written to <code>~/vibespot-themes/my-hubspot-theme</code>. You can then open it in the web UI for further editing or upload it separately.</p>
+    </div>
+  </div>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      <code>vibespot upload</code> &mdash; Upload Theme to HubSpot
+    </button>
+    <div class="doc-collapse__content">
+      <p>Uploads an existing theme directory to your HubSpot portal. Can be used independently of the web UI.</p>
+      <pre><code>vibespot upload --theme my-hubspot-theme</code></pre>
+      <p>Uses the active HubSpot account from your configuration. The auto-fix system runs automatically if upload errors occur.</p>
+    </div>
+  </div>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      <code>vibespot doctor</code> &mdash; Diagnostics
+    </button>
+    <div class="doc-collapse__content">
+      <p>Read-only diagnostics command that checks your entire environment without making any changes.</p>
+      <pre><code>vibespot doctor</code></pre>
+      <p>Reports on: Node.js version (requires 18+), Git installation, HubSpot CLI status, available AI CLI tools (Claude Code, Gemini CLI, Codex CLI), whether API keys are configured (Anthropic, OpenAI, Gemini &mdash; checks presence, not validity), active AI engine, and last-used theme path.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     Section 11: Keyboard Shortcuts
+     ============================================================ -->
+<div class="doc-section" id="shortcuts">
+  <h2 id="shortcuts-heading">Keyboard Shortcuts <a href="#shortcuts" class="doc-anchor">#</a></h2>
+
+  <table>
+    <thead>
+      <tr><th>Shortcut</th><th>Action</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><kbd>Enter</kbd></td><td>Send message</td><td>Chat input</td></tr>
+      <tr><td><kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>New line</td><td>Chat input</td></tr>
+      <tr><td><kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save file</td><td>Code editor</td></tr>
+      <tr><td><kbd>Escape</kbd></td><td>Close modal or dialog</td><td>Any overlay</td></tr>
+      <tr><td><kbd>Escape</kbd></td><td>Close settings panel</td><td>Settings panel</td></tr>
+      <tr><td><kbd>/</kbd></td><td>Focus search</td><td>Documentation</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================================
+     Section 12: Troubleshooting
+     ============================================================ -->
+<div class="doc-section" id="troubleshooting">
+  <h2 id="troubleshooting-heading">Troubleshooting <a href="#troubleshooting" class="doc-anchor">#</a></h2>
+  <p>Common issues and how to resolve them:</p>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      "No AI engine available"
+    </button>
+    <div class="doc-collapse__content">
+      <p>vibeSpot could not detect any configured AI engine. You need at least one of the following:</p>
+      <ul>
+        <li>Install the Claude Code CLI: <code>npm install -g @anthropic-ai/claude-code</code> then <code>claude auth</code></li>
+        <li>Add an Anthropic API key in Settings &rarr; AI tab or via <code>export ANTHROPIC_API_KEY=sk-ant-...</code></li>
+        <li>Add an OpenAI or Gemini API key</li>
+      </ul>
+      <p>Run <code>vibespot doctor</code> to see a full diagnostic of available engines.</p>
+    </div>
+  </div>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      "Upload failed"
+    </button>
+    <div class="doc-collapse__content">
+      <p>Upload failures are usually caused by one of:</p>
+      <ul>
+        <li><strong>Invalid PAK permissions.</strong> Your Personal Access Key needs the <strong>CMS</strong> scope (Design Manager read/write). Regenerate the key with the correct permissions.</li>
+        <li><strong>HubL syntax errors.</strong> The auto-fix system handles most of these automatically. If it does not, click "Fix with AI" to let Claude diagnose and repair the issue.</li>
+        <li><strong>CLI mode issues.</strong> If using CLI mode, try switching to API mode in Settings &rarr; HubSpot tab. API mode is more reliable.</li>
+      </ul>
+      <p>Check the error message in the upload progress panel for specific details.</p>
+    </div>
+  </div>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      "Rate limited by Anthropic API"
+    </button>
+    <div class="doc-collapse__content">
+      <p>When the Anthropic API returns a rate limit error, vibeSpot automatically retries with exponential backoff. The retry intervals are: 10 seconds, 20 seconds, 40 seconds, 60 seconds, and 120 seconds. In most cases the request succeeds on retry without any action needed.</p>
+      <p>If rate limiting persists, you may be hitting your account's rate cap. Consider upgrading your Anthropic plan or reducing <code>agenticConcurrency</code> in your config to lower the number of parallel API calls.</p>
+    </div>
+  </div>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      "Claude OAuth session expired"
+    </button>
+    <div class="doc-collapse__content">
+      <p>OAuth tokens have a limited lifespan. When the token expires, generation fails with an authentication error.</p>
+      <p>To fix: run <code>claude setup-token</code> in your terminal, complete the browser-based authentication, and paste the new token into Settings &rarr; AI tab &rarr; Claude OAuth section.</p>
+    </div>
+  </div>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      "Module not rendering in preview"
+    </button>
+    <div class="doc-collapse__content">
+      <p>If a module appears blank or broken in the preview, check:</p>
+      <ul>
+        <li><strong>fields.json validity.</strong> Open the module's <code>fields.json</code> in the code editor and verify it is valid JSON. A trailing comma or mismatched bracket will cause parsing failure.</li>
+        <li><strong>HubL syntax.</strong> Look for unbalanced tags (e.g., <code>{% if %}</code> without <code>{% endif %}</code>). The quality check catches most of these, but manual edits can introduce new issues.</li>
+        <li><strong>JavaScript errors.</strong> Open the browser console (<kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>J</kbd>) to check for runtime errors in the module's JS.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      "CSS not applying"
+    </button>
+    <div class="doc-collapse__content">
+      <p>The most common causes of CSS not applying:</p>
+      <ul>
+        <li><strong>Missing theme prefix.</strong> All CSS classes should be prefixed with the theme name (e.g., <code>.my-theme-hero__title</code>). Without the prefix, styles may conflict with HubSpot's global CSS or be too generic to match.</li>
+        <li><strong>CDN imports stripped.</strong> External <code>@import</code> statements (like Google Fonts) are automatically removed because HubSpot does not allow CDN imports. Use system fonts or self-hosted alternatives.</li>
+        <li><strong>Scoped CSS issues.</strong> The <code>scope_css</code> HubL tag wraps module CSS in a scope. Make sure your selectors work within this scope.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
+      "Blank preview during generation"
+    </button>
+    <div class="doc-collapse__content">
+      <p>Occasionally the preview iframe can get into a stale state during rapid generation cycles. To fix:</p>
+      <ul>
+        <li>Hard refresh the page with <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>) to clear the browser cache.</li>
+        <li>If the issue persists, check the browser console for errors. An incomplete WebSocket reconnection can sometimes stall preview updates.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="doc-callout doc-callout--danger">
+    <div class="doc-callout__label">&#9888; Still stuck?</div>
+    <p>Run <code>vibespot doctor</code> for a full environment diagnostic. If the issue is not listed here, check the <a href="https://github.com/borismichel/vibespot/issues" target="_blank">GitHub Issues</a> page or open a new issue with the error output.</p>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script src="docs.js"></script>
+</body>
+</html>
