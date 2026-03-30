@@ -3696,6 +3696,7 @@ body { display: flex; }
   cursor: pointer;
   border-radius: 8px;
   transition: all 0.15s;
+  text-decoration: none;
 }
 
 .project-rail__settings-btn:hover {
