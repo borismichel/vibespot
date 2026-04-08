@@ -4,6 +4,21 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.0.9 — 2026-04-08
+
+MD file uploads, CLI timeout fix, pipeline robustness.
+
+### File Uploads
+- **Markdown file support** — `.md`/`.markdown` files now upload reliably via extension-based MIME fallback (browsers often misreport these as `application/octet-stream`)
+- **File content in agentic pipeline** — uploaded document text is now included in AI context for all pipeline stages (was missing — files were silently ignored)
+
+### Pipeline Reliability
+- **CLI engine timeout** increased from 5 → 10 minutes for large prompts (configurable via `spawnCLI` parameter)
+- **Module planner prompt optimized** — shared CSS summarized to class/variable names only (98% smaller), fixing timeouts on complex pages
+- **Structured output validation** — module planner results validated before use; graceful fallback instead of crash on malformed AI output (`Cannot read properties of undefined`)
+
+---
+
 ## v1.0.7 — 2026-03-27
 
 User-facing documentation, Docs link in sidebar.

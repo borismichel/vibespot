@@ -436,7 +436,8 @@ export function spawnCLI(
   bin: string,
   args: string[],
   prompt: string,
-  onChunk?: (chunk: string) => void
+  onChunk?: (chunk: string) => void,
+  timeout?: number
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const env = { ...process.env };
@@ -492,14 +493,16 @@ export function spawnCLI(
       child.stdin.end();
     }
 
+    const timeoutMs = timeout || 600_000; // default 10 minutes
+    const timeoutMin = Math.round(timeoutMs / 60_000);
     const timer = setTimeout(() => {
       child.kill();
       settle(() => reject(new Error(
-        `${bin} timed out after 5 minutes.\n` +
+        `${bin} timed out after ${timeoutMin} minutes.\n` +
         (stderr ? `Stderr: ${stderr.slice(0, 500)}\n` : "") +
         `Partial output (${stdout.length} chars): ${stdout.slice(0, 500)}`
       )));
-    }, 300_000);
+    }, timeoutMs);
 
     // Clear timeout when process exits normally
     child.on("close", () => clearTimeout(timer));

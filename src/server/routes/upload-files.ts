@@ -34,6 +34,19 @@ const DOCUMENT_MIMES = new Set([
 
 const SUPPORTED_MIMES = new Set([...IMAGE_MIMES, ...DOCUMENT_MIMES]);
 
+// Browsers often report .md files as application/octet-stream or empty string
+const EXT_MIME_MAP: Record<string, string> = {
+  ".md": "text/markdown",
+  ".txt": "text/plain",
+  ".markdown": "text/markdown",
+};
+
+function resolveMime(originalName: string, reportedMime: string): string {
+  if (SUPPORTED_MIMES.has(reportedMime)) return reportedMime;
+  const ext = originalName.slice(originalName.lastIndexOf(".")).toLowerCase();
+  return EXT_MIME_MAP[ext] ?? reportedMime;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -102,11 +115,12 @@ export function handleFileUploadRoute(req: IncomingMessage, res: ServerResponse)
   const bb = Busboy({ headers: req.headers, limits: { fileSize: MAX_FILE_SIZE, files: 10 } });
 
   bb.on("file", (fieldname, fileStream, info) => {
-    const { filename: originalName, mimeType } = info;
+    const { filename: originalName, mimeType: rawMime } = info;
     fileCount++;
 
+    const mimeType = resolveMime(originalName, rawMime);
     if (!SUPPORTED_MIMES.has(mimeType)) {
-      errors.push(`Unsupported file type: ${originalName} (${mimeType})`);
+      errors.push(`Unsupported file type: ${originalName} (${rawMime})`);
       fileStream.resume(); // drain the stream
       return;
     }

@@ -168,20 +168,33 @@ export async function runPageArchitect(
 
   let modulePlan: { modules: PageBlueprint["modules"]; moduleOrder: string[]; narrative: string };
 
+  const fallbackPlan = {
+    modules: plan.newModules.map((m) => ({
+      name: m.name,
+      description: m.description,
+      contentBrief: "Generate appropriate content",
+      layoutNotes: "Use responsive layout",
+    })),
+    moduleOrder: plan.newModules.map((m) => m.name),
+    narrative: "Page generated from user request",
+  };
+
   if (plannerResult.type !== "structured") {
     log.warn("page-architect", "Module planner: did not get structured output, using fallback");
-    modulePlan = {
-      modules: plan.newModules.map((m) => ({
-        name: m.name,
-        description: m.description,
-        contentBrief: "Generate appropriate content",
-        layoutNotes: "Use responsive layout",
-      })),
-      moduleOrder: plan.newModules.map((m) => m.name),
-      narrative: "Page generated from user request",
-    };
+    modulePlan = fallbackPlan;
   } else {
-    modulePlan = plannerResult.data as typeof modulePlan;
+    const raw = plannerResult.data as Record<string, unknown>;
+    // Validate expected shape — AI may return unexpected structures
+    if (Array.isArray(raw?.modules) && raw.modules.length > 0) {
+      modulePlan = raw as typeof modulePlan;
+      modulePlan.moduleOrder = modulePlan.moduleOrder || modulePlan.modules.map((m) => m.name);
+      modulePlan.narrative = modulePlan.narrative || "Page generated from user request";
+    } else {
+      log.warn("page-architect", "Module planner: structured output missing 'modules' array, using fallback", {
+        keys: raw ? Object.keys(raw) : [],
+      });
+      modulePlan = fallbackPlan;
+    }
     log.info("page-architect", "Module plan", {
       moduleCount: modulePlan.modules.length,
     });

@@ -185,6 +185,34 @@ export const DESIGN_SYSTEM_SCHEMA = {
 // Stage 2b: Module Planner
 // ---------------------------------------------------------------------------
 
+/**
+ * Extract CSS class names and custom property names from a CSS string.
+ * The module planner only needs to know WHAT classes/vars exist, not their
+ * full implementation — this cuts the prompt by 80%+ for large design systems.
+ */
+function summarizeCss(css: string): string {
+  // Extract class names (deduplicated, preserving order)
+  const classNames = [...new Set(
+    [...css.matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => `.${m[1]}`)
+  )];
+
+  // Extract custom properties from :root
+  const varNames = [...new Set(
+    [...css.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1])
+  )];
+
+  // Extract @media breakpoints
+  const breakpoints = [...new Set(
+    [...css.matchAll(/@media\s*\([^)]+\)/g)].map((m) => m[0])
+  )];
+
+  const lines: string[] = [];
+  if (varNames.length > 0) lines.push(`CSS Variables: ${varNames.join(", ")}`);
+  if (classNames.length > 0) lines.push(`CSS Classes: ${classNames.join(", ")}`);
+  if (breakpoints.length > 0) lines.push(`Breakpoints: ${breakpoints.join(", ")}`);
+  return lines.join("\n");
+}
+
 export function buildModulePlannerPrompt(
   themeName: string,
   sharedCss: string,
@@ -192,6 +220,7 @@ export function buildModulePlannerPrompt(
   guidesNeeded?: string[],
 ): string {
   const parts: string[] = [];
+  const cssSummary = summarizeCss(sharedCss);
 
   parts.push(`You are the Module Planner for vibeSpot, a HubSpot CMS page builder.
 
@@ -201,12 +230,10 @@ The Design System has already been created. Your module plans MUST reference the
 
 ## Theme: "${themeName}"
 
-## Available CSS Classes
-The following shared CSS classes are available for modules to use. Reference these in your layoutNotes:
+## Available CSS Classes & Variables
+Reference these in your layoutNotes:
 
-\`\`\`css
-${sharedCss}
-\`\`\`
+${cssSummary}
 
 ## Output Rules
 - Module names: descriptive, title-case (e.g., "Hero Banner", "Pricing Cards")

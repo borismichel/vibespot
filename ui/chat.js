@@ -542,17 +542,26 @@ const DOC_TYPES = new Set([
   "text/markdown", "text/plain",
 ]);
 const SUPPORTED_TYPES = new Set([...IMAGE_TYPES, ...DOC_TYPES]);
+// Browsers often report .md files as application/octet-stream or empty string
+const EXT_MIME_MAP = { ".md": "text/markdown", ".txt": "text/plain", ".markdown": "text/markdown" };
 
 function addPendingFile(file) {
-  if (!SUPPORTED_TYPES.has(file.type)) {
-    showToast(`Unsupported file type: ${file.name}`);
+  let f = file;
+  if (!SUPPORTED_TYPES.has(f.type)) {
+    const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
+    const mapped = EXT_MIME_MAP[ext];
+    if (mapped) {
+      f = new File([f], f.name, { type: mapped });
+    } else {
+      showToast(`Unsupported file type: ${f.name}`);
+      return;
+    }
+  }
+  if (f.size > MAX_FILE_SIZE) {
+    showToast(`File too large (>10MB): ${f.name}`);
     return;
   }
-  if (file.size > MAX_FILE_SIZE) {
-    showToast(`File too large (>10MB): ${file.name}`);
-    return;
-  }
-  pendingFiles.push(file);
+  pendingFiles.push(f);
   renderFileChips();
 }
 

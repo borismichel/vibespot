@@ -265,6 +265,20 @@ export async function handleAgenticGenerate(
 
     const snapshot = takeSnapshot();
 
+    // Resolve uploaded file content and append to user message
+    const fileContexts = fileIds?.length ? getFileContexts(fileIds) : undefined;
+    let enrichedMessage = userMessage;
+    if (fileContexts?.length) {
+      for (const fc of fileContexts) {
+        if (fc.type === "document" && fc.extractedText) {
+          enrichedMessage += `\n\n---\n[Attached document: ${fc.originalName}]\n${fc.extractedText}`;
+        }
+        if (fc.type === "image" && fc.usage === "asset" && fc.assetPath) {
+          enrichedMessage += `\n\n[Uploaded image: ${fc.originalName} → available as get_asset_url("${fc.assetPath}")]`;
+        }
+      }
+    }
+
     // Build library module list for intent analyzer
     const library = getModuleLibrary();
     const currentModuleNames = new Set(
@@ -275,7 +289,7 @@ export async function handleAgenticGenerate(
       .map((e) => ({ name: e.module.moduleName, usedIn: e.usedIn }));
 
     const result = await runAgentPipeline(
-      userMessage,
+      enrichedMessage,
       snapshot,
       engine,
       apiKey,
