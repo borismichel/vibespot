@@ -156,13 +156,48 @@ function walkNodes(node: FigmaNode, callback: (node: FigmaNode, depth: number) =
   }
 }
 
-/** Get top-level frames from the first page (CANVAS) of the document. */
-function getTopLevelFrames(document: FigmaNode): FigmaNode[] {
-  const canvas = document.children?.[0]; // first page
+/** Find a node by ID anywhere in the tree. */
+function findNodeById(root: FigmaNode, id: string): FigmaNode | null {
+  if (root.id === id) return root;
+  if (root.children) {
+    for (const child of root.children) {
+      const found = findNodeById(child, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+const FRAME_TYPES = new Set(["FRAME", "COMPONENT", "COMPONENT_SET", "SECTION"]);
+
+/**
+ * Get top-level frames from the document.
+ * When nodeId is provided, use that node directly — either as a single frame
+ * or, if it's a SECTION/page, use its frame children.
+ */
+function getTopLevelFrames(document: FigmaNode, nodeId?: string): FigmaNode[] {
+  if (nodeId) {
+    const target = findNodeById(document, nodeId);
+    if (!target) return [];
+
+    // If the target itself is a leaf frame, return it as the only frame
+    if (target.type === "FRAME" || target.type === "COMPONENT" || target.type === "COMPONENT_SET") {
+      // If it has FRAME children, treat them as sections; otherwise treat the node itself as the page
+      const childFrames = (target.children || []).filter((n) => FRAME_TYPES.has(n.type));
+      return childFrames.length > 0 ? childFrames : [target];
+    }
+
+    // If it's a SECTION or CANVAS (page), return its frame children
+    if (target.children) {
+      return target.children.filter((n) => FRAME_TYPES.has(n.type));
+    }
+    return [];
+  }
+
+  // No nodeId — default: first page's top-level frames
+  const canvas = document.children?.[0];
   if (!canvas?.children) return [];
-  return canvas.children.filter(
-    (n) => n.type === "FRAME" || n.type === "COMPONENT" || n.type === "COMPONENT_SET",
-  );
+  return canvas.children.filter((n) => FRAME_TYPES.has(n.type));
 }
 
 // ---------------------------------------------------------------------------
@@ -563,8 +598,8 @@ export async function extractFigmaDesign(
 
   log.info("figma", `Fetched file: ${fileData.name}`);
 
-  // 2. Get top-level frames
-  const topFrames = getTopLevelFrames(fileData.document);
+  // 2. Get top-level frames (scoped to nodeId when provided)
+  const topFrames = getTopLevelFrames(fileData.document, nodeId);
   if (topFrames.length === 0) {
     throw new Error("No frames found in the Figma file. The file may be empty or structured differently.");
   }

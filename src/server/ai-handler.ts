@@ -313,9 +313,10 @@ export async function handleAgenticGenerate(
 }
 
 /**
- * Run the agentic pipeline for a Figma design import.
- * The extraction has already been done — this serializes the design data
- * and feeds it through the standard pipeline as a rich context document.
+ * Run the streamlined Figma conversion pipeline.
+ * Bypasses the full agentic pipeline — CSS is generated deterministically from
+ * design tokens, sections map directly to module specs, and the AI only
+ * translates each section to HubL (no creative decisions).
  */
 export async function handleFigmaImport(
   extraction: import("./figma/types.js").FigmaExtraction,
@@ -329,7 +330,7 @@ export async function handleFigmaImport(
   generatingSessionId = capturedSessionId;
 
   try {
-    const { serializeFigmaExtraction, buildFigmaPromptPrefix } = await import("./figma/serialize.js");
+    const { runFigmaConversion } = await import("./agent/figma-pipeline.js");
 
     const config = loadConfig();
     const { engine, apiKey, model } = resolveAgenticEngine(config);
@@ -337,24 +338,15 @@ export async function handleFigmaImport(
 
     const snapshot = takeSnapshot();
 
-    // Build enriched message from Figma extraction
-    const prefix = buildFigmaPromptPrefix(extraction, themeName);
-    const designDoc = serializeFigmaExtraction(extraction);
-    const enrichedMessage = prefix + designDoc;
-
-    // Note: frame screenshots are saved to disk during extraction but not passed
-    // as vision content here — the text serialization provides sufficient context
-    // for all engine types. Vision enhancement can be added in a future iteration.
-
-    const result = await runAgentPipeline(
-      enrichedMessage,
-      snapshot,
+    const result = await runFigmaConversion(
+      extraction,
+      themeName,
       engine,
       apiKey,
       model,
       concurrency,
       onEvent,
-      [], // no library modules — fresh import
+      snapshot.brandAssets,
     );
 
     const current = getSession();

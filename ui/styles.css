@@ -380,6 +380,28 @@ body { display: flex; }
   gap: 10px;
 }
 
+/* Figma extraction progress */
+.figma-progress {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-height: 120px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+.figma-progress__line {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.figma-progress__line:last-child {
+  color: var(--text);
+}
+
 /* Figma import summary */
 .figma-summary {
   background: var(--bg-input);

@@ -1211,29 +1211,63 @@ document.getElementById("figma-extract-btn")?.addEventListener("click", async ()
   btn.textContent = "Extracting...";
   urlInput.disabled = true;
 
+  const progressEl = document.getElementById("figma-progress");
+  progressEl.classList.remove("hidden");
+  progressEl.innerHTML = `<span class="figma-progress__line">Connecting to Figma...</span>`;
+
   try {
     const res = await fetch("/api/figma/extract", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
     });
-    const data = await res.json();
 
-    if (!data.ok) {
-      showError(data.error || "Extraction failed");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let result = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE events from buffer
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const event = JSON.parse(line.slice(6));
+          if (event.type === "progress") {
+            const span = document.createElement("span");
+            span.className = "figma-progress__line";
+            span.textContent = event.message;
+            progressEl.appendChild(span);
+            progressEl.scrollTop = progressEl.scrollHeight;
+          } else if (event.type === "complete") {
+            result = event;
+          }
+        } catch { /* skip malformed lines */ }
+      }
+    }
+
+    if (!result || !result.ok) {
+      showError(result?.error || "Extraction failed");
       btn.disabled = false;
       btn.textContent = "Extract";
       urlInput.disabled = false;
       return;
     }
 
-    figmaExtractionId = data.extractionId;
-    renderFigmaSummary(data.summary);
+    figmaExtractionId = result.extractionId;
+    progressEl.classList.add("hidden");
+    renderFigmaSummary(result.summary);
 
     // Auto-fill theme name from extraction summary
     const nameInput = document.getElementById("figma-theme-name");
     if (nameInput) {
-      nameInput.value = data.summary.suggestedThemeName || data.summary.fileName
+      nameInput.value = result.summary.suggestedThemeName || result.summary.fileName
         ?.toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, "")
@@ -1297,26 +1331,85 @@ document.getElementById("figma-theme-name")?.addEventListener("keydown", (e) => 
   if (e.key === "Enter") { e.preventDefault(); document.getElementById("figma-generate-btn")?.click(); }
 });
 
-function startFigmaImport(extractionId, themeName) {
-  showLoading("Importing from Figma...");
+async function startFigmaImport(extractionId, themeName) {
+  // Disable generate button
+  const genBtn = document.getElementById("figma-generate-btn");
+  if (genBtn) { genBtn.disabled = true; genBtn.textContent = "Converting..."; }
 
-  // Transition to app screen — WebSocket will be connected there
-  showApp(themeName);
+  // Show progress in the same progress element
+  const progressEl = document.getElementById("figma-progress");
+  progressEl.classList.remove("hidden");
+  progressEl.innerHTML = `<span class="figma-progress__line">Creating theme...</span>`;
 
-  // Wait for WebSocket connection, then send figma_import
-  const waitForWs = setInterval(() => {
-    if (typeof ws !== "undefined" && ws && ws.readyState === WebSocket.OPEN) {
-      clearInterval(waitForWs);
-      ws.send(JSON.stringify({
-        type: "figma_import",
-        extractionId,
-        themeName,
-      }));
+  // 1. Create theme on server first
+  try {
+    const res = await fetch("/api/setup/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: themeName }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      showError(data.error);
+      if (genBtn) { genBtn.disabled = false; genBtn.textContent = "Generate Page"; }
+      return;
     }
-  }, 100);
+  } catch (err) {
+    showError("Failed to create theme: " + err.message);
+    if (genBtn) { genBtn.disabled = false; genBtn.textContent = "Generate Page"; }
+    return;
+  }
 
-  // Timeout after 10 seconds
-  setTimeout(() => clearInterval(waitForWs), 10000);
+  // 2. Run pipeline via SSE — stay on setup screen
+  try {
+    const res = await fetch("/api/figma/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ extractionId, themeName }),
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let result = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const event = JSON.parse(line.slice(6));
+          if (event.type === "progress") {
+            const span = document.createElement("span");
+            span.className = "figma-progress__line";
+            span.textContent = event.message;
+            progressEl.appendChild(span);
+            progressEl.scrollTop = progressEl.scrollHeight;
+          } else if (event.type === "complete") {
+            result = event;
+          }
+        } catch { /* skip malformed */ }
+      }
+    }
+
+    if (!result || !result.ok) {
+      showError(result?.error || "Conversion failed");
+      if (genBtn) { genBtn.disabled = false; genBtn.textContent = "Generate Page"; }
+      return;
+    }
+
+    // 3. Done — navigate to the app
+    if (genBtn) genBtn.textContent = "Done!";
+    setTimeout(() => showApp(themeName), 500);
+  } catch (err) {
+    showError("Conversion failed: " + err.message);
+    if (genBtn) { genBtn.disabled = false; genBtn.textContent = "Generate Page"; }
+  }
 }
 
 function esc(str) {

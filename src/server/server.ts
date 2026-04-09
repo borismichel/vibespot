@@ -91,7 +91,7 @@ import {
   handleCodeUpdateRoute,
 } from "./routes/modules.js";
 import { handleFileUploadRoute } from "./routes/upload-files.js";
-import { handleFigmaTestTokenRoute, handleFigmaExtractRoute } from "./routes/figma.js";
+import { handleFigmaTestTokenRoute, handleFigmaExtractRoute, handleFigmaGenerateRoute } from "./routes/figma.js";
 
 // ---------------------------------------------------------------------------
 // MIME types for static serving
@@ -472,6 +472,11 @@ function handleApiRoute(
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
+    case "/api/figma/generate":
+      if (method === "POST") handleFigmaGenerateRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
     default:
       // Prefix match for job polling: /api/settings/job/:id
       if (path.startsWith("/api/settings/job/") && method === "GET") {
@@ -665,21 +670,27 @@ function handleWsConnection(ws: WebSocket): void {
         }
 
         try {
-          // Create theme scaffold + session
-          const { join } = await import("node:path");
-          const { homedir } = await import("node:os");
-          const { existsSync } = await import("node:fs");
-          const { createThemeScaffold } = await import("../hubspot/theme-scaffold.js");
-          const workspaceDir = join(homedir(), "vibespot-themes");
-          const themePath = join(workspaceDir, themeName);
+          // Theme + session should already exist (created via /api/setup/create)
+          // Fall back to creating them if not (e.g. direct WebSocket call)
+          const session = getSession();
+          if (!session || session.themeName !== themeName) {
+            const { join } = await import("node:path");
+            const { homedir } = await import("node:os");
+            const { existsSync } = await import("node:fs");
+            const { createThemeScaffold } = await import("../hubspot/theme-scaffold.js");
+            const workspaceDir = join(homedir(), "vibespot-themes");
+            const themePath = join(workspaceDir, themeName);
 
-          if (!existsSync(workspaceDir)) {
-            const { mkdirSync } = await import("node:fs");
-            mkdirSync(workspaceDir, { recursive: true });
+            if (!existsSync(workspaceDir)) {
+              const { mkdirSync } = await import("node:fs");
+              mkdirSync(workspaceDir, { recursive: true });
+            }
+            if (!existsSync(themePath)) {
+              createThemeScaffold(themePath, themeName);
+            }
+            createSession(themePath, themeName);
+            saveSession();
           }
-          createThemeScaffold(themePath, themeName);
-          createSession(themePath, themeName);
-          saveSession();
 
           ws.send(JSON.stringify({ type: "figma_import_started", fileName: extraction.fileName }));
 
