@@ -4,6 +4,29 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.0.10 — 2026-04-09
+
+Figma design import — paste a Figma URL, extract structure and assets, generate a full HubSpot page.
+
+### Figma Import
+- **"From Figma" on setup screen** — paste a `figma.com/design/...` URL, extract design tokens, text content, section structure, and image assets
+- **Figma API client** — parses Figma file tree, extracts colors, typography, spacing, effects, and text content with role inference (headline/body/cta/label)
+- **Frame screenshots** — exports top-level frames as PNG for visual reference
+- **Embedded image export** — batch-exports IMAGE fill nodes as theme assets (50 per request)
+- **Rate limit retry** — exponential backoff (10s → 120s) on Figma API 429 responses
+- **Extraction summary** — shows file name, section count, asset count, font families, color swatches, and section tags before generating
+- **Full pipeline integration** — serialized Figma extraction fed through agentic pipeline (Intent → Architect → Developer → Quality Check)
+- **Auto theme scaffold** — creates theme directory, session, and git commit on completion
+- **Settings tab** — dedicated "Figma" tab with PAT input, test connection button, and help link
+- **Inline token prompt** — if no token configured, "From Figma" panel offers inline save or links to Figma Settings tab
+- **Deep link to settings** — "Add one in Settings" link opens Settings directly on the Figma tab
+
+### UI
+- **Setup button grid** — 5 columns (was 4) with wider container (620px) to prevent label wrapping
+- **`openSettings()` deep linking** — accepts optional tab parameter for navigating directly to a specific settings tab
+
+---
+
 ## v1.0.9 — 2026-04-08
 
 MD file uploads, CLI timeout fix, pipeline robustness.

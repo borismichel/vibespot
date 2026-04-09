@@ -30,13 +30,14 @@ Opens a browser with:
 - **Project sidebar** — create, open, resume, or delete projects
 - **Module management** — reorder via drag-and-drop, edit fields, delete modules from module list or module library
 - **Starter templates** — SaaS, Portfolio, Restaurant, Event
+- **Figma import** — paste a Figma URL to extract design tokens, text, and assets, then generate a full page
 - **GitHub import** — convert existing React projects
 - **Field editor** — tweak text, colors, images directly
 - **File uploads** — attach images and documents via drag-and-drop or paperclip button
 - **Upload to HubSpot** — per-file progress, auto-fix, celebration popup with direct portal link
 - **Version history** — per-template git commits with rollback
 - **Light/dark mode** — toggle or auto-detect system preference
-- **Tabbed settings** — AI engines, HubSpot accounts, GitHub, vibeSpot config
+- **Tabbed settings** — AI engines, HubSpot accounts, Figma, GitHub, vibeSpot config
 - **ZIP download** — export your theme as a ZIP file
 
 ### Agentic Pipeline
@@ -122,17 +123,19 @@ Most users only need `npx vibespot` — the web UI handles everything.
 
 ## Configuration
 
-Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, GitHub, vibeSpot) and saved in `~/.vibespot/config.json`:
+Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, Figma, GitHub, vibeSpot) and saved in `~/.vibespot/config.json`:
 
 - `aiEngine` — Your preferred AI engine (`anthropic-api`, `claude-oauth`, `openai-api`, `gemini-api`, `claude-code`, `gemini-cli`, `codex-cli`)
 - `anthropicApiKey`, `openaiApiKey`, `geminiApiKey` — API keys (stored locally, never sent except to the provider)
 - `hubspotAccounts` — Connected HubSpot accounts (PAK-based auth)
 - `hubspotUploadMode` — `api` (default, direct API) or `cli` (legacy, requires HubSpot CLI)
 - `agenticConcurrency` — Max parallel module generation calls (default: 20)
+- `figmaToken` — Figma Personal Access Token for design import
 - `enabledCLITools` — Which CLI tools to detect on settings load
 
 ## What's New (v1.0)
 
+- **Figma design import** (v1.0.10) — paste a Figma URL to extract design tokens, text, section structure, and image assets, then generate a full HubSpot page via the agentic pipeline
 - **Template & module deletion** (v1.0.4) — delete templates from disk, option to delete exclusive modules, delete module button in module library preview
 - **Brand assets redesign** (v1.0.2) — hover-expand cards with per-asset Upload/Extract, Extract All, brand voice extractor, cross-template product context sharing via rendered preview HTML
 - **Agentic pipeline** (v1.0.0) — 4-stage AI generation: Intent Analyzer → Page Architect (Design System + Module Planner) → Module Developer (parallel) → Quality Check (auto-fix)
