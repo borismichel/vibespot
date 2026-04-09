@@ -144,6 +144,7 @@ export function handleSettingsStatusRoute(res: ServerResponse): void {
     enabledCLITools: config.enabledCLITools || [],
     agenticMode: config.agenticMode,
     agenticConcurrency: config.agenticConcurrency,
+    figmaToken: config.figmaToken ? "••••" + config.figmaToken.slice(-4) : null,
   };
 
   const sessionCount = listSessions().length;
@@ -225,6 +226,7 @@ export function handleSettingsApiKeyRoute(req: IncomingMessage, res: ServerRespo
           case "anthropic": configUpdate.anthropicApiKey = ""; break;
           case "openai": configUpdate.openaiApiKey = ""; break;
           case "gemini": configUpdate.geminiApiKey = ""; break;
+          case "figma": configUpdate.figmaToken = ""; break;
           default:
             jsonResponse(res, 400, { error: `Unknown provider: ${provider}` });
             return;
@@ -239,6 +241,7 @@ export function handleSettingsApiKeyRoute(req: IncomingMessage, res: ServerRespo
         case "anthropic": configUpdate.anthropicApiKey = apiKey; break;
         case "openai": configUpdate.openaiApiKey = apiKey; break;
         case "gemini": configUpdate.geminiApiKey = apiKey; break;
+        case "figma": configUpdate.figmaToken = apiKey; break;
         default:
           jsonResponse(res, 400, { error: `Unknown provider: ${provider}` });
           return;

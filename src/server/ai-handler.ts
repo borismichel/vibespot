@@ -313,6 +313,63 @@ export async function handleAgenticGenerate(
 }
 
 /**
+ * Run the agentic pipeline for a Figma design import.
+ * The extraction has already been done — this serializes the design data
+ * and feeds it through the standard pipeline as a rich context document.
+ */
+export async function handleFigmaImport(
+  extraction: import("./figma/types.js").FigmaExtraction,
+  themeName: string,
+  onEvent: (event: PipelineEvent) => void,
+): Promise<PipelineResult> {
+  const session = getSession();
+  if (!session) throw new Error("No active session");
+
+  const capturedSessionId = session.id;
+  generatingSessionId = capturedSessionId;
+
+  try {
+    const { serializeFigmaExtraction, buildFigmaPromptPrefix } = await import("./figma/serialize.js");
+
+    const config = loadConfig();
+    const { engine, apiKey, model } = resolveAgenticEngine(config);
+    const concurrency = config.agenticConcurrency || 20;
+
+    const snapshot = takeSnapshot();
+
+    // Build enriched message from Figma extraction
+    const prefix = buildFigmaPromptPrefix(extraction, themeName);
+    const designDoc = serializeFigmaExtraction(extraction);
+    const enrichedMessage = prefix + designDoc;
+
+    // Note: frame screenshots are saved to disk during extraction but not passed
+    // as vision content here — the text serialization provides sufficient context
+    // for all engine types. Vision enhancement can be added in a future iteration.
+
+    const result = await runAgentPipeline(
+      enrichedMessage,
+      snapshot,
+      engine,
+      apiKey,
+      model,
+      concurrency,
+      onEvent,
+      [], // no library modules — fresh import
+    );
+
+    const current = getSession();
+    if (!current || current.id !== capturedSessionId) {
+      log.warn("ai-handler", "Session changed during Figma import — discarding output");
+      throw new Error("Session changed during generation");
+    }
+
+    return result;
+  } finally {
+    generatingSessionId = null;
+  }
+}
+
+/**
  * Apply a pipeline result to the current session.
  * Called by the WebSocket handler after successful pipeline execution.
  */

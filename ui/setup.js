@@ -884,7 +884,7 @@ function togglePanel(action) {
   panels.forEach((p) => p.classList.add("hidden"));
   buttons.forEach((b) => b.classList.remove("active"));
 
-  const panelMap = { new: "panel-new", continue: "panel-continue", download: "panel-download", convert: "panel-convert" };
+  const panelMap = { new: "panel-new", continue: "panel-continue", download: "panel-download", figma: "panel-figma", convert: "panel-convert" };
   const panel = document.getElementById(panelMap[action]);
   if (panel) {
     panel.classList.remove("hidden");
@@ -898,6 +898,7 @@ function togglePanel(action) {
   // Focus input if applicable
   if (action === "new") setTimeout(() => document.getElementById("new-theme-name")?.focus(), 50);
   if (action === "convert") setTimeout(() => document.getElementById("import-url")?.focus(), 50);
+  if (action === "figma") initFigmaPanel();
 
   // Load remote themes on first open
   if (action === "download" && !remoteThemesLoaded) loadDownloadPanel();
@@ -1134,6 +1135,189 @@ document.getElementById("import-url").addEventListener("keydown", (e) => {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Figma import
+// ---------------------------------------------------------------------------
+
+let figmaExtractionId = null;
+
+async function initFigmaPanel() {
+  const tokenPrompt = document.getElementById("figma-token-prompt");
+  const urlSection = document.getElementById("figma-url-section");
+
+  // Check if token is configured
+  try {
+    const res = await fetch("/api/settings/status");
+    const data = await res.json();
+    const hasToken = !!data.config?.figmaToken;
+    tokenPrompt.classList.toggle("hidden", hasToken);
+    urlSection.style.opacity = hasToken ? "1" : "0.5";
+    urlSection.style.pointerEvents = hasToken ? "auto" : "none";
+  } catch {
+    tokenPrompt.classList.remove("hidden");
+  }
+
+  setTimeout(() => {
+    const urlInput = document.getElementById("figma-url");
+    if (urlInput && !urlInput.closest(".hidden")) urlInput.focus();
+  }, 50);
+}
+
+// Inline token save
+document.getElementById("figma-save-token")?.addEventListener("click", async () => {
+  const input = document.getElementById("figma-inline-token");
+  const token = input.value.trim();
+  if (!token) return;
+  const btn = document.getElementById("figma-save-token");
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+  try {
+    await fetch("/api/settings/apikey", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "figma", apiKey: token }),
+    });
+    input.value = "";
+    btn.textContent = "Saved!";
+    setTimeout(() => { btn.textContent = "Save"; btn.disabled = false; }, 1500);
+    initFigmaPanel(); // refresh state
+  } catch {
+    btn.textContent = "Failed";
+    setTimeout(() => { btn.textContent = "Save"; btn.disabled = false; }, 2000);
+  }
+});
+
+// Settings link in Figma panel
+document.getElementById("figma-open-settings")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (typeof openSettings === "function") openSettings("figma");
+});
+
+// Extract button
+document.getElementById("figma-extract-btn")?.addEventListener("click", async () => {
+  const urlInput = document.getElementById("figma-url");
+  const url = urlInput.value.trim();
+  if (!url) return;
+
+  // Basic client-side validation
+  if (!url.match(/figma\.com\/(design|file)\//)) {
+    showError("Not a valid Figma URL. Expected: figma.com/design/...");
+    return;
+  }
+
+  const btn = document.getElementById("figma-extract-btn");
+  btn.disabled = true;
+  btn.textContent = "Extracting...";
+  urlInput.disabled = true;
+
+  try {
+    const res = await fetch("/api/figma/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      showError(data.error || "Extraction failed");
+      btn.disabled = false;
+      btn.textContent = "Extract";
+      urlInput.disabled = false;
+      return;
+    }
+
+    figmaExtractionId = data.extractionId;
+    renderFigmaSummary(data.summary);
+
+    // Auto-fill theme name from extraction summary
+    const nameInput = document.getElementById("figma-theme-name");
+    if (nameInput) {
+      nameInput.value = data.summary.suggestedThemeName || data.summary.fileName
+        ?.toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+        .slice(0, 40) || "";
+    }
+
+    document.getElementById("figma-generate").classList.remove("hidden");
+    btn.textContent = "Extracted";
+  } catch (err) {
+    showError("Extraction failed: " + err.message);
+    btn.disabled = false;
+    btn.textContent = "Extract";
+    urlInput.disabled = false;
+  }
+});
+
+function renderFigmaSummary(summary) {
+  const container = document.getElementById("figma-summary");
+  container.classList.remove("hidden");
+
+  let html = `<div class="figma-summary">`;
+  html += `<div class="figma-summary__title">${esc(summary.fileName)}</div>`;
+  html += `<div class="figma-summary__stats">`;
+  html += `<span>${summary.sectionCount} section${summary.sectionCount !== 1 ? "s" : ""}</span>`;
+  html += `<span>${summary.assetCount} asset${summary.assetCount !== 1 ? "s" : ""}</span>`;
+  html += `<span>${summary.fontFamilies?.length || 0} font${(summary.fontFamilies?.length || 0) !== 1 ? "s" : ""}</span>`;
+  html += `</div>`;
+
+  // Color swatches
+  if (summary.colorPalette?.length) {
+    html += `<div class="figma-swatches">`;
+    for (const color of summary.colorPalette.slice(0, 8)) {
+      html += `<span class="figma-swatch" style="background:${esc(color)}" title="${esc(color)}"></span>`;
+    }
+    html += `</div>`;
+  }
+
+  // Section names
+  if (summary.sectionNames?.length) {
+    html += `<div class="figma-summary__sections">`;
+    for (const name of summary.sectionNames) {
+      html += `<span class="figma-summary__section-tag">${esc(name)}</span>`;
+    }
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+// Generate button
+document.getElementById("figma-generate-btn")?.addEventListener("click", () => {
+  const nameInput = document.getElementById("figma-theme-name");
+  const themeName = nameInput.value.trim();
+  if (!themeName) { nameInput.focus(); return; }
+  if (!figmaExtractionId) { showError("No extraction available — extract first"); return; }
+  startFigmaImport(figmaExtractionId, themeName);
+});
+
+document.getElementById("figma-theme-name")?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("figma-generate-btn")?.click(); }
+});
+
+function startFigmaImport(extractionId, themeName) {
+  showLoading("Importing from Figma...");
+
+  // Transition to app screen — WebSocket will be connected there
+  showApp(themeName);
+
+  // Wait for WebSocket connection, then send figma_import
+  const waitForWs = setInterval(() => {
+    if (typeof ws !== "undefined" && ws && ws.readyState === WebSocket.OPEN) {
+      clearInterval(waitForWs);
+      ws.send(JSON.stringify({
+        type: "figma_import",
+        extractionId,
+        themeName,
+      }));
+    }
+  }, 100);
+
+  // Timeout after 10 seconds
+  setTimeout(() => clearInterval(waitForWs), 10000);
+}
 
 function esc(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

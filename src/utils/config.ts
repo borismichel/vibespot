@@ -36,6 +36,8 @@ export interface VibeSpotConfig {
   hubspotAccounts?: HubSpotAccountConfig[];
   activeHubSpotAccount?: string; // portalId
   hubspotUploadMode?: "api" | "cli"; // default "api"
+  // Figma integration
+  figmaToken?: string;
   // CLI tool toggles — only enabled tools get checked on settings load
   enabledCLITools?: string[];
   // Agentic pipeline — multi-stage decomposed AI generation

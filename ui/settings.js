@@ -24,8 +24,13 @@ const ENGINE_LABELS = {
 // Open / Close
 // ---------------------------------------------------------------------------
 
-function openSettings() {
+function openSettings(tab) {
   if (typeof closeMenu === "function") closeMenu();
+  if (tab) {
+    activeTab = tab;
+    const tabs = document.querySelectorAll("#settings-tabs .settings__tab");
+    tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
+  }
   document.getElementById("settings-overlay").classList.remove("hidden");
   refreshSettings();
 }
@@ -78,6 +83,7 @@ function renderSettings(data) {
   switch (activeTab) {
     case "ai": renderAITab(body, data); break;
     case "hubspot": renderHubSpotTab(body, data); break;
+    case "figma": renderFigmaTab(body, data); break;
     case "github": renderGitHubTab(body, data); break;
     case "vibespot": renderVibeSpotTab(body, data); break;
   }
@@ -377,6 +383,70 @@ function renderAITab(body, data) {
     cliSection.appendChild(row);
   }
   body.appendChild(cliSection);
+}
+
+// ---------------------------------------------------------------------------
+// Figma Tab
+// ---------------------------------------------------------------------------
+
+function renderFigmaTab(body, data) {
+  const config = data.config;
+
+  const section = el("section", "settings__section");
+  section.appendChild(sectionTitle("Personal Access Token"));
+  section.appendChild(desc("Connect your Figma account to import designs directly into HubSpot CMS modules. Tokens are stored locally and only used to call the Figma API."));
+
+  const figmaToken = config.figmaToken;
+  const figmaKeyInfo = {
+    configured: !!figmaToken,
+    masked: figmaToken || "",
+  };
+  section.appendChild(createApiKeyCard("figma", "Figma PAT", "figd_...", figmaKeyInfo));
+
+  // Help link + Test Connection
+  const actionsRow = el("div", "settings__card-row");
+  actionsRow.style.paddingTop = "4px";
+  const helpLink = el("a", "settings__btn");
+  helpLink.textContent = "How to get a token";
+  helpLink.href = "https://help.figma.com/hc/en-us/articles/8085703771159";
+  helpLink.target = "_blank";
+  helpLink.style.textDecoration = "none";
+  helpLink.style.fontSize = "12px";
+  actionsRow.appendChild(helpLink);
+
+  const testBtn = el("button", "settings__btn settings__btn--small");
+  testBtn.textContent = "Test Connection";
+  testBtn.disabled = !figmaKeyInfo.configured;
+  testBtn.addEventListener("click", async () => {
+    testBtn.disabled = true;
+    testBtn.textContent = "Testing...";
+    try {
+      const res = await fetch("/api/figma/test-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const result = await res.json();
+      if (result.ok) {
+        testBtn.textContent = "\u2713 Connected as " + result.user;
+        testBtn.style.color = "var(--success)";
+      } else {
+        testBtn.textContent = "\u2717 " + (result.error || "Failed");
+        testBtn.style.color = "var(--warning)";
+      }
+    } catch {
+      testBtn.textContent = "\u2717 Connection failed";
+      testBtn.style.color = "var(--warning)";
+    }
+    setTimeout(() => {
+      testBtn.textContent = "Test Connection";
+      testBtn.style.color = "";
+      testBtn.disabled = !figmaKeyInfo.configured;
+    }, 3000);
+  });
+  actionsRow.appendChild(testBtn);
+  section.appendChild(actionsRow);
+  body.appendChild(section);
 }
 
 // ---------------------------------------------------------------------------

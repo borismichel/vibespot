@@ -188,7 +188,11 @@ function handleWsMessage(msg) {
     case "brand_extraction_error":
       appendSystemMessage("Brand extraction failed: " + (msg.message || "Unknown error"));
       break;
-  }
+
+    case "figma_import_started":
+      startStreaming();
+      appendSystemMessage("Importing from Figma: " + (msg.fileName || "design") + "...");
+      break;
 }
 
 // ---------------------------------------------------------------------------

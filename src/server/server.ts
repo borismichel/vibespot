@@ -17,10 +17,11 @@ import {
   writeModulesToDisk,
   saveSession,
   getActiveTemplate,
+  createSession,
 } from "./session.js";
 import { commitThemeState, commitTemplateState, isGitAvailable } from "./project-git.js";
 import { buildPreviewHtml, buildModulePreviewHtml } from "./preview.js";
-import { handleGenerateStream, handleAgenticGenerate, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine } from "./ai-handler.js";
+import { handleGenerateStream, handleAgenticGenerate, handleFigmaImport, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine } from "./ai-handler.js";
 import { loadConfig, getHubSpotPak, getActiveHubSpotAccount } from "../utils/config.js";
 import { detectHubSpotAuth, detectDataCenter, detectHubSpotAuthFromConfig } from "../utils/detect.js";
 import { applyAutoFixes, parseUploadErrors, parseApiErrors } from "./auto-fix.js";
@@ -90,6 +91,7 @@ import {
   handleCodeUpdateRoute,
 } from "./routes/modules.js";
 import { handleFileUploadRoute } from "./routes/upload-files.js";
+import { handleFigmaTestTokenRoute, handleFigmaExtractRoute } from "./routes/figma.js";
 
 // ---------------------------------------------------------------------------
 // MIME types for static serving
@@ -460,6 +462,16 @@ function handleApiRoute(
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
+    case "/api/figma/test-token":
+      if (method === "POST") handleFigmaTestTokenRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/figma/extract":
+      if (method === "POST") handleFigmaExtractRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
     default:
       // Prefix match for job polling: /api/settings/job/:id
       if (path.startsWith("/api/settings/job/") && method === "GET") {
@@ -627,6 +639,117 @@ function handleWsConnection(ws: WebSocket): void {
               ws.send(JSON.stringify({ type: "suggest_brand_extraction" }));
             }
           }
+        } catch (err) {
+          ws.send(JSON.stringify({
+            type: "error",
+            message: err instanceof Error ? err.message : String(err),
+          }));
+        }
+        break;
+      }
+
+      case "figma_import": {
+        const extractionId = String(msg.extractionId || "");
+        const themeName = String(msg.themeName || "");
+        if (!extractionId || !themeName) {
+          ws.send(JSON.stringify({ type: "error", message: "Missing extractionId or themeName" }));
+          break;
+        }
+
+        // Retrieve cached extraction
+        const { getCachedExtraction } = await import("./routes/figma.js");
+        const extraction = getCachedExtraction(extractionId);
+        if (!extraction) {
+          ws.send(JSON.stringify({ type: "error", message: "Extraction expired or not found. Please re-extract." }));
+          break;
+        }
+
+        try {
+          // Create theme scaffold + session
+          const { join } = await import("node:path");
+          const { homedir } = await import("node:os");
+          const { existsSync } = await import("node:fs");
+          const { createThemeScaffold } = await import("../hubspot/theme-scaffold.js");
+          const workspaceDir = join(homedir(), "vibespot-themes");
+          const themePath = join(workspaceDir, themeName);
+
+          if (!existsSync(workspaceDir)) {
+            const { mkdirSync } = await import("node:fs");
+            mkdirSync(workspaceDir, { recursive: true });
+          }
+          createThemeScaffold(themePath, themeName);
+          createSession(themePath, themeName);
+          saveSession();
+
+          ws.send(JSON.stringify({ type: "figma_import_started", fileName: extraction.fileName }));
+
+          // Run pipeline — identical event handling to chat agentic mode
+          const pipelineSteps: { step: string; label: string; decisions?: string[] }[] = [];
+          const pipelineModules: { name: string; status: "complete" | "failed" }[] = [];
+
+          const result = await handleFigmaImport(
+            extraction,
+            themeName,
+            (event) => {
+              if (event.type === "module_progress" && event.moduleFiles) {
+                const { moduleFiles, ...wsEvent } = event;
+                ws.send(JSON.stringify(wsEvent));
+              } else {
+                ws.send(JSON.stringify(event));
+              }
+
+              if (event.type === "agent_step") {
+                pipelineSteps.push({ step: event.step, label: event.label });
+              } else if (event.type === "agent_decision") {
+                const last = pipelineSteps[pipelineSteps.length - 1];
+                if (last) {
+                  if (!last.decisions) last.decisions = [];
+                  last.decisions.push(event.decision);
+                }
+              } else if (event.type === "design_system_ready") {
+                updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
+              } else if (event.type === "blueprint_ready") {
+                updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
+                reorderModules(event.moduleOrder);
+                ws.send(JSON.stringify({
+                  type: "modules_updated",
+                  modules: getOrderedModules().map((m) => m.moduleName),
+                }));
+              } else if (event.type === "module_progress" && event.status === "complete" && event.moduleFiles) {
+                updateModules({ modules: [{
+                  moduleName: event.module,
+                  fieldsJson: event.moduleFiles.fieldsJson,
+                  metaJson: event.moduleFiles.metaJson,
+                  moduleHtml: event.moduleFiles.moduleHtml,
+                  moduleCss: event.moduleFiles.moduleCss,
+                  moduleJs: event.moduleFiles.moduleJs,
+                }] });
+                ws.send(JSON.stringify({
+                  type: "modules_updated",
+                  modules: getOrderedModules().map((m) => m.moduleName),
+                }));
+                pipelineModules.push({ name: event.module, status: "complete" });
+              } else if (event.type === "module_progress" && event.status === "failed") {
+                pipelineModules.push({ name: event.module, status: "failed" });
+              }
+            },
+          );
+
+          applyPipelineResult(result, {
+            steps: pipelineSteps,
+            modules: pipelineModules,
+            stats: result.stats,
+          });
+
+          // Write to disk and commit
+          writeModulesToDisk();
+          commitThemeState(getSession()!.themePath, `Figma import: ${extraction.fileName}`);
+
+          ws.send(JSON.stringify({ type: "generation_complete" }));
+          ws.send(JSON.stringify({
+            type: "modules_updated",
+            modules: getOrderedModules().map((m) => m.moduleName),
+          }));
         } catch (err) {
           ws.send(JSON.stringify({
             type: "error",

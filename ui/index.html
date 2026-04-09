@@ -96,6 +96,10 @@
               <span class="setup__action-icon">&#8595;</span>
               <span>From HubSpot</span>
             </button>
+            <button class="setup__action-btn" data-action="figma">
+              <span class="setup__action-icon">&#9670;</span>
+              <span>From Figma</span>
+            </button>
             <button class="setup__action-btn" data-action="convert">
               <span class="setup__action-icon">&#8634;</span>
               <span>Convert React</span>
@@ -129,6 +133,30 @@
             <p class="setup__hint hidden" id="dl-hint">Enter the exact folder name of your theme in the HubSpot Design Manager</p>
             <div class="hidden" id="dl-no-account">
               <p class="setup__hint">Connect a HubSpot account in <a href="#" id="dl-open-settings">Settings</a> to download themes.</p>
+            </div>
+          </div>
+
+          <div class="setup__panel hidden" id="panel-figma">
+            <div id="figma-token-prompt" class="hidden">
+              <p class="setup__hint">A Figma Personal Access Token is required. <a href="#" id="figma-open-settings">Add one in Settings</a> or enter it below:</p>
+              <div class="setup__row">
+                <input type="password" class="setup__input setup__input--wide" id="figma-inline-token" placeholder="figd_..." />
+                <button class="btn btn--primary" id="figma-save-token">Save</button>
+              </div>
+            </div>
+            <div id="figma-url-section">
+              <div class="setup__row">
+                <input type="text" class="setup__input setup__input--wide" id="figma-url" placeholder="https://www.figma.com/design/..." />
+                <button class="btn btn--primary" id="figma-extract-btn">Extract</button>
+              </div>
+              <p class="setup__hint">Paste a Figma design URL to extract structure, text, and assets</p>
+            </div>
+            <div id="figma-summary" class="hidden"></div>
+            <div id="figma-generate" class="hidden">
+              <div class="setup__row">
+                <input type="text" class="setup__input setup__input--wide" id="figma-theme-name" placeholder="my-landing-page" />
+                <button class="btn btn--primary" id="figma-generate-btn">Generate Page</button>
+              </div>
             </div>
           </div>
 
@@ -529,6 +557,7 @@
       <div class="settings__tabs" id="settings-tabs">
         <button class="settings__tab active" data-tab="ai">AI</button>
         <button class="settings__tab" data-tab="hubspot">HubSpot</button>
+        <button class="settings__tab" data-tab="figma">Figma</button>
         <button class="settings__tab" data-tab="github">GitHub</button>
         <button class="settings__tab" data-tab="vibespot">vibeSpot</button>
       </div>
