@@ -402,6 +402,27 @@ body { display: flex; }
   color: var(--text);
 }
 
+/* Figma image mode toggle */
+.figma-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  margin-top: 4px;
+}
+.figma-toggle input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+.figma-toggle__hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-left: 4px;
+}
+
 /* Figma import summary */
 .figma-summary {
   background: var(--bg-input);

@@ -322,6 +322,7 @@ export async function handleFigmaImport(
   extraction: import("./figma/types.js").FigmaExtraction,
   themeName: string,
   onEvent: (event: PipelineEvent) => void,
+  options?: { useAssets?: boolean },
 ): Promise<PipelineResult> {
   const session = getSession();
   if (!session) throw new Error("No active session");
@@ -347,6 +348,7 @@ export async function handleFigmaImport(
       concurrency,
       onEvent,
       snapshot.brandAssets,
+      options?.useAssets,
     );
 
     const current = getSession();

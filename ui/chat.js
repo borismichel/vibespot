@@ -1670,7 +1670,10 @@ document.getElementById("responsive-toggle").addEventListener("click", (e) => {
 
   const chrome = document.getElementById("browser-chrome");
   const width = btn.dataset.width;
-  chrome.style.maxWidth = width === "100%" ? "none" : width;
+  const isFullWidth = width === "100%";
+  chrome.style.maxWidth = isFullWidth ? "none" : width;
+  chrome.style.flex = isFullWidth ? "1" : "none";
+  chrome.style.width = isFullWidth ? "" : width;
 
   // Update browser URL bar with theme name
   const urlEl = document.getElementById("browser-url");

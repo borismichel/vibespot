@@ -46,6 +46,7 @@ export async function runFigmaConversion(
   concurrency: number,
   onEvent: (event: PipelineEvent) => void,
   brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string },
+  useAssets?: boolean,
 ): Promise<PipelineResult> {
   const startTime = Date.now();
 
@@ -77,7 +78,7 @@ export async function runFigmaConversion(
     return limit(async (): Promise<{ moduleName: string; module?: ModuleFiles; error?: string }> => {
       onEvent({ type: "module_progress", module: spec.name, status: "generating", current: index + 1, total });
 
-      const userContent = buildFigmaModuleMessage(section, spec, extraction.assets, themeName);
+      const userContent = buildFigmaModuleMessage(section, spec, extraction.assets, themeName, useAssets !== false);
 
       let lastError = "";
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -322,10 +323,19 @@ body {
   box-shadow: var(--${t}-shadow, 0 8px 24px rgba(0,0,0,0.1));
 }
 
-/* Responsive */
+/* Responsive — tablet */
+@media (max-width: 1023px) {
+  .${t}-grid--3, .${t}-grid--4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Responsive — mobile */
 @media (max-width: 767px) {
   .${t}-grid--2, .${t}-grid--3, .${t}-grid--4 { grid-template-columns: 1fr; }
   .${t}-section { padding: var(--${t}-space-lg, 48px) 0; }
+  .${t}-container { padding: 0 var(--${t}-space-sm, 16px); }
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.25rem; }
 }`;
 
   const sharedCss = rootBlock + "\n" + utilityClasses;
@@ -469,6 +479,7 @@ function buildFigmaModuleMessage(
   spec: ModuleSpec,
   assets: FigmaAsset[],
   themeName: string,
+  useAssets: boolean,
 ): string {
   const parts: string[] = [];
 
@@ -479,6 +490,18 @@ TRANSLATE this Figma section into a HubSpot CMS module. This is a CONVERSION, no
 - Match the colors, spacing, and layout from the design tokens in the shared CSS
 - Do NOT invent new content — every word comes from the Figma design
 - Reference the shared CSS custom properties (--${themeName}-*) for all styling
+
+### Responsive Requirements
+The Figma design shows the DESKTOP layout. You MUST add responsive CSS:
+- Use the shared utility classes (${themeName}-container, ${themeName}-grid, ${themeName}-section)
+- Add a \`@media (max-width: 767px)\` block in moduleCss for mobile overrides:
+  - Stack horizontal layouts vertically (flex-direction: column)
+  - Make multi-column grids single-column
+  - Reduce font sizes for headings (scale down ~20-30%)
+  - Reduce section padding (roughly halve large values)
+  - Make images full-width (width: 100%)
+  - Hide purely decorative elements if they break mobile layout
+- Add a \`@media (max-width: 1023px)\` block for tablet if the layout has 3+ columns
 
 ## Section: "${section.name}" (${section.width}x${section.height}px)`);
 
@@ -516,12 +539,24 @@ TRANSLATE this Figma section into a HubSpot CMS module. This is a CONVERSION, no
     }
   }
 
-  // Available assets
+  // Image handling
   if (assets.length > 0) {
-    parts.push(`\n### Available Image Assets`);
-    for (const asset of assets) {
-      const filename = basename(asset.localPath);
-      parts.push(`- \`get_asset_url("${themeName}/assets/${filename}")\` — ${asset.name}`);
+    if (useAssets) {
+      parts.push(`\n### Available Image Assets — USE get_asset_url()`);
+      parts.push(`Images are uploaded as theme assets. Reference them with get_asset_url():`);
+      for (const asset of assets) {
+        const filename = basename(asset.localPath);
+        parts.push(`- \`get_asset_url("${themeName}/assets/${filename}")\` — ${asset.name}`);
+      }
+    } else {
+      parts.push(`\n### Images — USE IMAGE FIELDS WITH PLACEHOLDERS`);
+      parts.push(`Do NOT use get_asset_url(). Instead, create "image" type fields in fields.json for each image.`);
+      parts.push(`Set a descriptive default.src (e.g. "https://placehold.co/600x400?text=Hero+Image") and default.alt text.`);
+      parts.push(`In the module HTML, use: {{ module.field_name.src }} and {{ module.field_name.alt }}`);
+      parts.push(`This gives content editors full control to replace images in HubSpot.`);
+      for (const asset of assets) {
+        parts.push(`- "${asset.name}" — create an image field for this`);
+      }
     }
   }
 

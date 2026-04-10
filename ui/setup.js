@@ -1318,20 +1318,31 @@ function renderFigmaSummary(summary) {
   container.innerHTML = html;
 }
 
+// Image mode toggle hint
+document.getElementById("figma-use-assets")?.addEventListener("change", (e) => {
+  const hint = document.getElementById("figma-image-hint");
+  if (hint) {
+    hint.textContent = e.target.checked
+      ? "Images uploaded to HubSpot, no manual replacement needed"
+      : "Image fields with placeholders, swap in HubSpot editor";
+  }
+});
+
 // Generate button
 document.getElementById("figma-generate-btn")?.addEventListener("click", () => {
   const nameInput = document.getElementById("figma-theme-name");
   const themeName = nameInput.value.trim();
   if (!themeName) { nameInput.focus(); return; }
   if (!figmaExtractionId) { showError("No extraction available — extract first"); return; }
-  startFigmaImport(figmaExtractionId, themeName);
+  const useAssets = document.getElementById("figma-use-assets")?.checked ?? true;
+  startFigmaImport(figmaExtractionId, themeName, useAssets);
 });
 
 document.getElementById("figma-theme-name")?.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); document.getElementById("figma-generate-btn")?.click(); }
 });
 
-async function startFigmaImport(extractionId, themeName) {
+async function startFigmaImport(extractionId, themeName, useAssets = true) {
   // Disable generate button
   const genBtn = document.getElementById("figma-generate-btn");
   if (genBtn) { genBtn.disabled = true; genBtn.textContent = "Converting..."; }
@@ -1365,7 +1376,7 @@ async function startFigmaImport(extractionId, themeName) {
     const res = await fetch("/api/figma/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ extractionId, themeName }),
+      body: JSON.stringify({ extractionId, themeName, useAssets }),
     });
 
     const reader = res.body.getReader();
@@ -1403,9 +1414,9 @@ async function startFigmaImport(extractionId, themeName) {
       return;
     }
 
-    // 3. Done — navigate to the app
+    // 3. Done — navigate directly to chat (skip dashboard)
     if (genBtn) genBtn.textContent = "Done!";
-    setTimeout(() => showApp(themeName), 500);
+    setTimeout(() => showAppDirect(themeName), 500);
   } catch (err) {
     showError("Conversion failed: " + err.message);
     if (genBtn) { genBtn.disabled = false; genBtn.textContent = "Generate Page"; }

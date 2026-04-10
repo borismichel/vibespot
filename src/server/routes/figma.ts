@@ -16,6 +16,7 @@ import { updateModules, reorderModules } from "../session/state.js";
 import { writeModulesToDisk } from "../session/disk.js";
 import { commitThemeState } from "../project-git.js";
 import { handleFigmaImport, applyPipelineResult } from "../ai-handler.js";
+import { addTemplate } from "../session/templates.js";
 
 // ---------------------------------------------------------------------------
 // In-memory extraction cache (avoids sending large data through WebSocket)
@@ -209,9 +210,10 @@ function generateStyleguide(extraction: FigmaExtraction): string {
 // ---------------------------------------------------------------------------
 
 export function handleFigmaGenerateRoute(req: IncomingMessage, res: ServerResponse): void {
-  readJsonBody<{ extractionId?: string; themeName?: string }>(req, res, async (body) => {
+  readJsonBody<{ extractionId?: string; themeName?: string; useAssets?: boolean }>(req, res, async (body) => {
     const extractionId = body.extractionId;
     const themeName = body.themeName;
+    const useAssets = body.useAssets !== false; // default true
     if (!extractionId || !themeName) {
       jsonResponse(res, 400, { error: "Missing extractionId or themeName" });
       return;
@@ -252,7 +254,13 @@ export function handleFigmaGenerateRoute(req: IncomingMessage, res: ServerRespon
       saveSession();
       sendEvent({ type: "progress", message: "Styleguide saved." });
 
-      // 2. Run the agentic pipeline
+      // 2. Create a default template so modules sync correctly
+      if (session.templates.length === 0) {
+        addTemplate("landing_page", "Landing Page");
+        saveSession();
+      }
+
+      // 3. Run the conversion pipeline
       sendEvent({ type: "progress", message: "Starting AI conversion..." });
 
       const pipelineSteps: { step: string; label: string; decisions?: string[] }[] = [];
@@ -299,9 +307,10 @@ export function handleFigmaGenerateRoute(req: IncomingMessage, res: ServerRespon
             }
           }
         },
+        { useAssets },
       );
 
-      // 3. Apply result and write to disk
+      // 4. Apply result and write to disk
       applyPipelineResult(result, {
         steps: pipelineSteps,
         modules: pipelineModules,
