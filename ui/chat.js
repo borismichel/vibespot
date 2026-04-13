@@ -193,6 +193,14 @@ function handleWsMessage(msg) {
       startStreaming();
       appendSystemMessage("Importing from Figma: " + (msg.fileName || "design") + "...");
       break;
+
+    case "needs_setup":
+      // Clear stale UI if shown
+      messagesEl.innerHTML = "";
+      document.getElementById("module-items").innerHTML = "";
+      document.getElementById("module-count").textContent = "0";
+      break;
+  }
 }
 
 // ---------------------------------------------------------------------------

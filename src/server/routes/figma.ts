@@ -4,8 +4,8 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, writeFileSync, copyFileSync } from "node:fs";
+import { join, basename } from "node:path";
 import { jsonResponse, readJsonBody } from "../route-helpers.js";
 import { loadConfig } from "../../utils/config.js";
 import { log } from "../log.js";
@@ -254,13 +254,47 @@ export function handleFigmaGenerateRoute(req: IncomingMessage, res: ServerRespon
       saveSession();
       sendEvent({ type: "progress", message: "Styleguide saved." });
 
-      // 2. Create a default template so modules sync correctly
+      // 2. Create (or reset) a template for the Figma import
+      //    Figma import replaces all modules — clear existing ones first
       if (session.templates.length === 0) {
         addTemplate("landing_page", "Landing Page");
-        saveSession();
+      } else {
+        // Clear existing modules from the active template so the import starts fresh
+        session.modules = [];
+        session.moduleOrder = [];
+        session.sharedCss = "";
+        session.sharedJs = "";
+        const tpl = session.templates.find((t) => t.id === session.activeTemplateId);
+        if (tpl) {
+          tpl.modules = [];
+          tpl.moduleOrder = [];
+          tpl.sharedCss = "";
+          tpl.sharedJs = "";
+        }
+      }
+      saveSession();
+
+      // 3. Copy extracted assets into the theme's assets directory
+      if (useAssets && extraction.assets.length > 0) {
+        const themeAssetsDir = join(session.themePath, "assets");
+        mkdirSync(themeAssetsDir, { recursive: true });
+        let copied = 0;
+        for (const asset of extraction.assets) {
+          if (existsSync(asset.localPath)) {
+            const dest = join(themeAssetsDir, basename(asset.localPath));
+            try {
+              copyFileSync(asset.localPath, dest);
+              asset.localPath = dest; // update path so pipeline references the theme copy
+              copied++;
+            } catch { /* non-critical */ }
+          }
+        }
+        if (copied > 0) {
+          sendEvent({ type: "progress", message: `Copied ${copied} image assets to theme.` });
+        }
       }
 
-      // 3. Run the conversion pipeline
+      // 4. Run the conversion pipeline
       sendEvent({ type: "progress", message: "Starting AI conversion..." });
 
       const pipelineSteps: { step: string; label: string; decisions?: string[] }[] = [];
@@ -310,7 +344,7 @@ export function handleFigmaGenerateRoute(req: IncomingMessage, res: ServerRespon
         { useAssets },
       );
 
-      // 4. Apply result and write to disk
+      // 5. Apply result and write to disk
       applyPipelineResult(result, {
         steps: pipelineSteps,
         modules: pipelineModules,
