@@ -76,6 +76,17 @@
     <a class="doc-nav__link doc-nav__link--sub" href="#intent-types">Intents</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#prompt-tips">Prompt Tips</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#brand-assets">Brand Assets</a>
+    <a class="doc-nav__link" href="#plan-mode">Plan Mode</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#plan-mode-when">When to Use</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#plan-mode-flow">The Flow</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#plan-mode-pane">Plan Pane &amp; Editing</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#plan-mode-approval">Approval &amp; Discard</a>
+    <a class="doc-nav__link" href="#figma-import">Figma Import (Beta)</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#figma-token">Figma Token Setup</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#figma-extraction">What Gets Extracted</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#figma-image-modes">Image Modes</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#figma-pipeline">Translation Pipeline</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#figma-tips">Tips &amp; Limits</a>
     <a class="doc-nav__link" href="#editing">Editing &amp; Customization</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#field-editor">Field Editor</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#design-system">Design System</a>
@@ -557,18 +568,20 @@ vibespot</code></pre>
           <div class="mock-setup__action"><div class="mock-setup__action-icon">+</div><div class="mock-setup__action-label">New Theme</div><div class="mock-setup__action-desc">Start from scratch</div></div>
           <div class="mock-setup__action"><div class="mock-setup__action-icon">&#9654;</div><div class="mock-setup__action-label">Continue</div><div class="mock-setup__action-desc">Resume saved project</div></div>
           <div class="mock-setup__action"><div class="mock-setup__action-icon">&#8595;</div><div class="mock-setup__action-label">From HubSpot</div><div class="mock-setup__action-desc">Fetch existing theme</div></div>
-          <div class="mock-setup__action"><div class="mock-setup__action-icon">&#8635;</div><div class="mock-setup__action-label">Convert React</div><div class="mock-setup__action-desc">Import React project<br><span style="font-size:9px;color:var(--doc-yellow)">Experimental</span></div></div>
+          <div class="mock-setup__action"><div class="mock-setup__action-icon">&#9670;</div><div class="mock-setup__action-label">From Figma</div><div class="mock-setup__action-desc">Translate a design<br><span style="font-size:9px;color:var(--doc-yellow)">Beta</span></div></div>
+          <div class="mock-setup__action"><div class="mock-setup__action-icon">&#8635;</div><div class="mock-setup__action-label">From React</div><div class="mock-setup__action-desc">Import React project<br><span style="font-size:9px;color:var(--doc-yellow)">Beta</span></div></div>
         </div>
       </div>
     </div>
   </div>
 
-  <p>The setup screen presents four options:</p>
+  <p>The setup screen presents five options:</p>
   <ul>
     <li><strong>New Theme</strong> &mdash; Creates a fresh HubSpot theme directory at <code>~/vibespot-themes/your-theme-name</code>. Initializes the standard folder structure (<code>modules/</code>, <code>templates/</code>, <code>css/</code>, <code>js/</code>) and a git repository for version tracking.</li>
     <li><strong>Continue (Resume)</strong> &mdash; Reopens an existing project from the sidebar list. Your chat history, modules, and all templates are preserved exactly where you left off.</li>
     <li><strong>From HubSpot (Fetch)</strong> &mdash; Downloads an existing theme from your HubSpot portal. vibeSpot scans the fetched modules and imports them into a session so you can modify them with AI or by hand.</li>
-    <li><strong>Convert React (Experimental)</strong> &mdash; Clones a React or Lovable project from a Git URL and converts its components into native HubSpot modules. The conversion uses the built-in conversion guide to map React patterns to HubL equivalents.</li>
+    <li><strong>From Figma (Beta)</strong> &mdash; Paste a Figma URL and vibeSpot extracts design tokens, section structure, copy, and image assets, then translates each section into a HubSpot module. See the dedicated <a href="#figma-import">Figma Import</a> section for the full walkthrough.</li>
+    <li><strong>From React (Beta)</strong> &mdash; Clones a React or Lovable project from a Git URL and converts its components into native HubSpot modules. The conversion uses the built-in conversion guide to map React patterns to HubL equivalents.</li>
   </ul>
 
   <h3 id="first-page">Your First Page</h3>
@@ -712,6 +725,128 @@ vibespot</code></pre>
     <li><strong>Images as design references</strong> &mdash; Upload screenshots, mockups, or design comps. The AI uses vision to analyze the layout, colors, typography, and structure, then generates modules that match. Supported formats: PNG, JPEG, SVG, WebP, GIF. Max 10 MB per file.</li>
     <li><strong>Documents as content context</strong> &mdash; Upload product briefs, copy documents, or content spreadsheets. Text is extracted from PDFs and DOCX files and provided to the AI as context for generating accurate, on-brand content. Supported formats: PDF, DOCX, MD, TXT.</li>
   </ul>
+</div>
+
+<!-- ============================================================
+     Section: Plan Mode
+     ============================================================ -->
+<div class="doc-section" id="plan-mode">
+  <h2 id="plan-mode-heading">Plan Mode <a href="#plan-mode" class="doc-anchor">#</a></h2>
+  <p class="doc-subtitle">A deliberation phase that runs <em>before</em> any code is generated. Plan mode turns vague briefs into well-scoped plans through guided dialogue, then runs the agentic pipeline against the approved plan as a high-fidelity design brief.</p>
+
+  <p>Without plan mode, vibeSpot generates immediately on every chat message &mdash; fast, but unforgiving on vague prompts. The AI guesses at audience, content, and structure, and you find out what it guessed only after a full generation cycle. Plan mode flips the order: the AI asks targeted questions first, surfaces what's missing, and only generates after you've reviewed and approved a written plan. The plan is markdown, persisted to <code>{theme}/.vibespot/plan.md</code>, and reviewable in a dedicated tab in the right pane.</p>
+
+  <h3 id="plan-mode-when">When to Use Plan Mode</h3>
+  <p>Plan mode is opt-in via a prominent <strong>Plan Mode</strong> pill above the chat input. The toggle persists across sessions in <code>~/.vibespot/config.json</code> as <code>planMode</code>.</p>
+  <p>Use plan mode when:</p>
+  <ul>
+    <li><strong>You're starting from a vague brief.</strong> "Build a landing page for our new SaaS product" benefits hugely from elicitation before code is written.</li>
+    <li><strong>Multiple stakeholders need to review.</strong> The plan is a markdown document that can be reviewed, edited, and shared before it becomes a generated theme.</li>
+    <li><strong>You're doing exploratory design work.</strong> Iterating on the plan is much cheaper than iterating on generated modules.</li>
+    <li><strong>You want explicit control.</strong> The plan documents every section, content choice, and CTA decision before the AI commits to code.</li>
+  </ul>
+  <p>Skip plan mode when:</p>
+  <ul>
+    <li>You're making small changes to an existing page (use the regular chat &mdash; the agentic pipeline handles modifications well).</li>
+    <li>You already have a detailed brief; type it directly and let the agentic pipeline run.</li>
+    <li>You're using a Figma design as the source of truth (use <a href="#figma-import">Figma Import</a> instead).</li>
+  </ul>
+
+  <h3 id="plan-mode-flow">The Flow</h3>
+  <p>Plan mode follows three implicit phases. The AI tracks which phase to be in based on conversation history.</p>
+  <ol class="doc-steps">
+    <li><strong>Understand.</strong> Your first message in plan mode triggers an "ask first" response. The AI poses two to four high-leverage gap-filling questions: who is this for, what's the primary CTA, what content sections do you envision, what's the brand tone. The plan in the right pane is mostly TBD markers and an "Open questions" list.</li>
+    <li><strong>Research &amp; Draft.</strong> Once you've answered the most important questions, the AI proposes a concrete plan: page goal, audience, primary CTA, a numbered module list with brief descriptions, brand and tone notes. It references existing modules and brand assets in the theme so you don't have to re-state them. It may ask one or two narrow follow-ups to fill remaining gaps.</li>
+    <li><strong>Refine.</strong> Subsequent messages tweak the plan. "Move the FAQ above the pricing." "Change the primary CTA to 'Book a demo'." The AI confirms what changed in chat and updates the plan in the pane. It only asks clarifying questions when your edit creates a new ambiguity.</li>
+  </ol>
+
+  <h3 id="plan-mode-pane">The Plan Pane &amp; Inline Editing</h3>
+  <p>The <strong>Plan</strong> tab in the right pane (between Preview and Code) is the source of truth for the current plan. While plan mode is on, this tab auto-selects when you send a message so the latest plan is always visible.</p>
+  <p>Two modes inside the pane:</p>
+  <ul>
+    <li><strong>Read mode</strong> (default) &mdash; the markdown plan is rendered with proper headings, lists, tables, and emphasis. A persistent footer holds <strong>Approve plan</strong> and <strong>Discard &amp; start over</strong> buttons.</li>
+    <li><strong>Edit mode</strong> (pencil icon) &mdash; the rendered view becomes a textarea containing the raw markdown. Edit any section directly: rename headers, swap copy, reorder modules. <strong>Save</strong> persists your edits to <code>plan.md</code> and the next AI turn picks them up as context. <strong>Cancel</strong> reverts.</li>
+  </ul>
+  <p>Inline editing is the fastest path for small fixes (typo, copy tweak, section rename). Use chat for substantive changes that need the AI to revisit assumptions.</p>
+
+  <h4>Choice chips</h4>
+  <p>When the AI asks a question with discrete answers (e.g. "What's the primary goal?"), it can emit clickable answer chips below its message: <code>[Lead capture] [Sign-ups] [Demo bookings] [Brand awareness]</code>. Clicking a chip sends that value as the next user message. You can always type a free-text answer instead &mdash; the chips are a shortcut, not a constraint.</p>
+
+  <h3 id="plan-mode-approval">Approval &amp; Discard</h3>
+  <p>vibeSpot enforces a <strong>hard write-gate</strong> while plan mode is active: the agentic pipeline is refused, even if the AI mistakenly tries to emit a module-generation block. Generation is reachable only via two explicit actions:</p>
+  <ul>
+    <li><strong>Approve plan</strong> &mdash; The plan markdown is prepended to a synthesized "Implement the approved plan." message and the agentic pipeline runs against it. The Plan tab automatically switches to Preview so you watch modules generate in place. Plan mode flips off after approval; turn it back on for the next plan.</li>
+    <li><strong>Discard &amp; start over</strong> &mdash; Clears <code>plan.md</code>, exits plan mode, returns the chat to normal generation. Used when you want to scrap the current direction entirely.</li>
+  </ul>
+  <p>The plan persists across vibeSpot restarts. Open the same theme weeks later, toggle plan mode on, and your in-progress plan is right where you left it.</p>
+
+  <div class="doc-callout doc-callout--tip">
+    <div class="doc-callout__label">&#10024; Plan mode + brand assets</div>
+    <p>If your theme has a styleguide, brand voice, or product context loaded, the plan-mode AI uses them automatically. The plan will reference the right colors and tone without you re-stating them. After approval, the agentic pipeline gets the plan <em>and</em> the brand assets &mdash; double the alignment.</p>
+  </div>
+</div>
+
+<!-- ============================================================
+     Section: Figma Import
+     ============================================================ -->
+<div class="doc-section" id="figma-import">
+  <h2 id="figma-import-heading">Figma Import (Beta) <a href="#figma-import" class="doc-anchor">#</a></h2>
+  <p class="doc-subtitle">Translate a Figma design into a HubSpot CMS theme without re-implementing it. The pipeline preserves the design's exact colors, typography, copy, and section order &mdash; the AI is used only to translate each section to HubL, not to make creative decisions.</p>
+
+  <p>Most AI tools that "import from Figma" treat the design as a vague reference and let the model regenerate everything. vibeSpot does the opposite: design tokens are extracted mechanically and mapped directly to CSS variables; section structure becomes module structure 1:1; per-section text is fed to the AI as field defaults. The AI's only job is to convert each section's layout into HubL syntax.</p>
+
+  <h3 id="figma-token">Figma Token Setup</h3>
+  <ol class="doc-steps">
+    <li>Open Figma and go to <strong>Account Settings &rarr; Personal access tokens &rarr; Generate new token</strong>. Give it a descriptive name like "vibeSpot import." Scopes needed: <strong>File content (read-only)</strong>.</li>
+    <li>Copy the token (it's shown only once).</li>
+    <li>In vibeSpot, open <strong>Settings &rarr; Figma</strong> and paste the token. Click <strong>Test</strong> to verify it works. The token is stored locally in <code>~/.vibespot/config.json</code> as <code>figmaToken</code> and is never sent anywhere except the Figma API.</li>
+  </ol>
+  <p>You can also test the connection per-import: the import dialog accepts a one-off token if you don't want to save one globally.</p>
+
+  <h3 id="figma-extraction">What Gets Extracted</h3>
+  <p>Click <strong>From Figma</strong> on the setup screen, paste a Figma file URL (or a specific frame URL, which scopes the import to that frame and its descendants), and click <strong>Extract</strong>. Progress streams via Server-Sent Events as the pipeline pulls data from Figma's REST API.</p>
+  <p>The extractor produces:</p>
+  <ul>
+    <li><strong>Design tokens</strong> &mdash; Colors with usage counts (most-used fill becomes <code>--theme-color-bg</code>, top non-bg fill becomes <code>--theme-color-primary</code>, etc.); typography styles grouped by role (heading vs body, with exact px sizes); spacing values (sorted unique scale: xs, sm, md, lg, xl, section); effects (box shadows and border radii ready as <code>cssValue</code>).</li>
+    <li><strong>Section structure</strong> &mdash; Top-level frames in the file or selected frame become modules, in their original Figma order. Each section keeps its name (kebab-cased to a module name), dimensions, layout direction (horizontal/vertical/grid), item spacing, and padding.</li>
+    <li><strong>Per-section content</strong> &mdash; Every text node is captured with its role (headline, subhead, body, CTA, eyebrow, etc.), font size, font weight, and verbatim text. This becomes the field defaults in the generated module.</li>
+    <li><strong>Children structure</strong> &mdash; A summary of each section's children (e.g., "3 cards each containing: image, headline, body, button") so the AI knows the layout shape without trying to over-engineer it.</li>
+    <li><strong>Image assets</strong> &mdash; Every embedded image is downloaded from Figma's image-export API at 2&times; resolution as PNG. Filenames are sanitized; the full set is shown to you for confirmation before generation.</li>
+  </ul>
+  <p>After extraction, you see a summary screen: section count, color count, font families, and asset count. Name the theme (this becomes the kebab-case directory name and CSS-variable prefix), choose your image mode, and click <strong>Generate Page</strong>.</p>
+
+  <h3 id="figma-image-modes">Image Modes</h3>
+  <p>A toggle on the import screen controls how images are handled in the generated modules. Both modes copy the extracted PNGs to the theme's <code>assets/</code> directory.</p>
+  <ul>
+    <li><strong>Import images as assets</strong> <em>(default)</em> &mdash; Modules reference images via <code>get_asset_url(&quot;{theme}/assets/{filename}&quot;)</code>. The page renders pixel-identically to Figma out of the box. Best when the Figma assets are the final assets you want on the live page.</li>
+    <li><strong>Image fields with placeholders</strong> &mdash; Modules expose HubSpot image fields with <code>placehold.co</code> URLs as defaults. The Figma assets are still in <code>assets/</code>, but the modules don't reference them; instead, content editors swap in their own images via HubSpot's editor. Best when Figma images are mockups (stock photography, lorem ipsum imagery) and the real images will be different.</li>
+  </ul>
+
+  <h3 id="figma-pipeline">The Translation Pipeline</h3>
+  <p>Figma import runs a streamlined pipeline (separate from the agentic pipeline used by chat-driven generation) optimized for fidelity:</p>
+  <ol class="doc-steps">
+    <li><strong>Generate shared CSS</strong> &mdash; Deterministic mapping of design tokens to <code>:root</code> CSS variables and utility classes (<code>{theme}-container</code>, <code>{theme}-section</code>, <code>{theme}-grid</code>, <code>{theme}-btn</code>, etc.). Lightness analysis on the dominant color auto-selects light vs dark mode defaults. Standard responsive breakpoints (mobile and tablet) are emitted automatically. <strong>No AI involved</strong> &mdash; the design tokens are the spec.</li>
+    <li><strong>Map sections to module specs</strong> &mdash; Each Figma section becomes one module spec: name (kebab-cased), description (inferred from name + content), content brief (text grouped by role with exact strings), and layout notes (layout mode, gap, padding, background color, children summary).</li>
+    <li><strong>Translate each module</strong> &mdash; For each spec, the AI is invoked once with a system prompt that explicitly forbids invention: "TRANSLATE this design to HubL. Use these exact texts as field defaults. Match colors, spacing, and layout from the design tokens." Modules are generated in parallel (concurrency limited via the same <code>agenticConcurrency</code> setting; default 20). Structured output via the Module Developer JSON schema ensures reliable parsing.</li>
+    <li><strong>Validate &amp; auto-fix</strong> &mdash; The same quality-check stage as the agentic pipeline: balances HubL tags, normalizes reserved field names (<code>name</code> &rarr; <code>item_name</code>), upgrades deprecated field types, strips CDN imports.</li>
+  </ol>
+  <p>Progress streams to the chat panel as standard pipeline events: a "Mapped N modules" decision, then per-module "Generating&hellip;" / "Module complete" entries. After the run, the live preview shows the page with the Figma colors, copy, and section order intact.</p>
+
+  <h3 id="figma-tips">Tips &amp; Limits</h3>
+  <ul>
+    <li><strong>Use top-level frames as sections.</strong> The importer treats top-level frames in your Figma file (or in the selected frame) as the section boundary. If your design has everything in one giant frame, only that one frame becomes a module. Break your design into logical sections (Hero, Features, Pricing, Footer, etc.) as separate top-level frames for best results.</li>
+    <li><strong>Name your frames meaningfully.</strong> Frame names become module names. A frame called <code>Section 1</code> turns into a module called <code>section-1</code>; rename it to <code>Hero</code> so you get <code>hero</code>.</li>
+    <li><strong>Auto-layout produces better results.</strong> Frames with auto-layout export their layout direction, gap, and padding cleanly. Free-form positioning is supported but the AI has to infer layout from coordinates, which is less reliable.</li>
+    <li><strong>Figma rate limits apply.</strong> The image-export endpoint has limits; very asset-heavy files (50+ images) may take a minute or two to extract. Errors with status <code>429</code> indicate rate-limiting &mdash; wait and retry.</li>
+    <li><strong>Permissions matter.</strong> The token must have access to the file. <code>403</code> errors mean the file isn't shared with the token's owner or doesn't have view permission.</li>
+    <li><strong>Effects support is limited.</strong> Box shadows and border radii are extracted; gradients, blur effects, blend modes, and complex masks are ignored (HubL preview wouldn't render them faithfully anyway).</li>
+    <li><strong>Re-importing replaces modules.</strong> Importing a Figma URL into an existing theme clears the active template's modules first &mdash; the import is treated as a full page replacement, not an additive merge.</li>
+  </ul>
+
+  <div class="doc-callout doc-callout--tip">
+    <div class="doc-callout__label">&#10024; Workflow tip</div>
+    <p>For the highest-fidelity output: use auto-layout in Figma, name your frames as kebab-friendly section names ("Hero", "Trust Bar", "Final CTA"), and extract real copy + final imagery into the design before importing. The result is a HubSpot theme that's ready to deploy with no manual cleanup &mdash; content editors get a fully-fielded theme they just need to plug content into.</p>
+  </div>
 </div>
 
 <!-- ============================================================
@@ -987,7 +1122,7 @@ vibespot</code></pre>
   </ul>
 
   <h3 id="settings-github">GitHub Tab</h3>
-  <p>The GitHub tab configures authentication for source imports (used by the "Convert React" flow).</p>
+  <p>The GitHub tab configures authentication for source imports (used by the "From React" flow).</p>
   <ul>
     <li><strong>GitHub CLI authentication</strong> &mdash; Uses <code>gh auth</code> to authenticate with GitHub. Required for cloning private repositories during React-to-HubSpot conversion.</li>
   </ul>

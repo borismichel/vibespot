@@ -4,6 +4,63 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.1.0 — 2026-04-26
+
+Plan mode (deliberation phase before generation), streamlined Figma import (translation pipeline), Anthropic SDK upgrade with extended thinking, and an AI Capabilities settings panel.
+
+### Plan Mode
+- **Toggle from chat input** — prominent labeled pill (distinct from icon buttons) with clear On/Off state and accent glow when active
+- **Three-phase prompt** — Understand (ask 2–4 high-leverage questions) → Research (propose first plan) → Refine (iterative edits) — phase keyed off conversation turn count
+- **Plan pane in main window** — third tab next to Preview and Code; renders the markdown plan with full GFM-subset support (headings, lists, tables, code, blockquotes)
+- **Inline plan editing** — pencil icon swaps the rendered plan for a textarea; save persists to `.vibespot/plan.md` and the next AI turn picks up the edits as context
+- **Choice chips** — AI may emit a `vibespot-choices` JSON block with discrete options; rendered as clickable chips below the assistant message; clicking sends the value as next message
+- **Hard write-gate** — server refuses to enter the agentic pipeline while plan mode is active, even if the AI mistakenly emits a generation block; generation only via explicit `plan_approve` action
+- **Approval flow** — "Approve plan" prepends the plan as a `## Approved plan` section to a synthesized "Implement the approved plan." message; runs the agentic pipeline with the plan as a high-fidelity design brief
+- **Discard flow** — clears `plan.md`, exits plan mode, returns chat to normal generation
+- **Plan persists across sessions** — `.vibespot/plan.md` is loaded on theme open alongside other brand assets; toggle state persists in `~/.vibespot/config.json`
+- **Plan-mode system prompt** — instructs the AI to consider existing modules, module library, brand assets so plans can reference reusable components
+
+### Streamlined Figma Import
+- **Translation pipeline** — replaces the previous agentic-pipeline import path; the AI is used only to translate each section to HubL, not to make creative decisions
+- **Deterministic CSS generation** — design tokens map mechanically to `:root` CSS variables and utility classes (no AI guessing)
+- **Section-to-spec mapping** — each Figma section becomes one module spec with exact text, layout, and content from the design
+- **Module ordering preserved** — module order matches Figma's section order; existing modules in the active template are cleared before import to avoid jumbling
+- **Image asset copy** — extracted PNGs are copied from `/tmp/` to `{theme}/assets/` automatically; `useAssets` toggle on the import screen controls whether modules reference them via `get_asset_url()` or use HubSpot image fields with placeholders
+- **Responsive CSS by default** — Figma exports the desktop layout; the AI is instructed to add `@media (max-width: 767px)` and `@media (max-width: 1023px)` blocks per module
+- **Re-import replaces** — running a Figma import on an existing theme clears the active template's modules first (Figma is treated as a full page replacement)
+
+### Anthropic SDK Upgrade
+- **`@anthropic-ai/sdk` 0.39 → 0.91.1** — 52 minor versions of features including extended thinking, citations, Files API, batch API, improved prompt caching, Web Search and Code Execution tools
+- **Other dep bumps** — `commander` 13 → 14, `marked` 17 → 18 (UMD vendor refreshed), `execa` and `ws` to latest patch
+- **`npm audit fix`** — cleared `@xmldom/xmldom` and `picomatch` high-severity vulnerabilities
+- **Type fixes for the new SDK** — `MessageParam` namespace move (engine-adapter, ai-engines), `TextBlock` predicate updates (design-extractor)
+
+### AI Capabilities Panel
+- **New "AI Capabilities" section** under Settings → AI tab
+- **Extended thinking toggle** — Anthropic-only; configurable budget (Low ~4k / Medium ~16k / High ~32k tokens); Page Architect's two substages (Design System + Module Planner) opt in when enabled, Module Developer left untouched to avoid N× cost on parallel calls
+- **Status indicators** — Prompt Caching shows "Active" on Anthropic engines, "Anthropic only" elsewhere; Citations and Web Search show "Coming soon" badges
+- **Tool definition cache control** — `input_schema` for the Module Developer's tool is now `cache_control: { type: "ephemeral" }`, saving schema-encoding tokens on every parallel call after the first
+
+### UI
+- **"From Figma" button gets a Beta badge** to match "From React"
+- **"Convert React" renamed to "From React"** for consistency with "From HubSpot" / "From Figma"
+- **"Experimental" badge changed to "Beta"** across the setup screen and docs
+- **Plan Mode badge** appears in the chat header when active (replaces engine label); pill is colored with accent and a subtle glow ring
+
+### Documentation
+- **VIBESPOT_OVERVIEW.md** — comprehensive ~1,000-line system overview document covering architecture, agentic pipeline, plan mode, Figma import, sessions, integrations, and strategic opportunities
+- **README expanded** with Plan Mode and Figma Import sections; What's New leads with v1.1
+- **Docs site** — new sections for Plan Mode (with phase walkthrough) and Figma Import (with extraction details, image modes, and translation pipeline); sidebar updated; "From Figma" added to the setup mockup and "Starting a Project" list
+
+### Bug Fixes
+- **chat.js syntax error** — missing closing brace for `handleWsMessage` caused chat.js to fail silently on parse, which manifested as "0 modules and no chat history" for ALL projects (not just Figma imports). The bug was introduced when adding the `needs_setup` case
+- **Figma import module order** — modules now appear in the page in their Figma section order; old modules are cleared before import so they don't mix with new ones
+- **Plan-mode bubble gap** — when streaming finished, `finishStreaming()` re-rendered from `streamBuffer` (still containing the raw response with the fenced plan block), producing trailing `<br>` tags from stripped fences. Fixed by overwriting `streamBuffer` with the cleaned content on `plan_complete`
+- **Render-markdown trailing whitespace** — collapses runs of 3+ blank lines and trims trailing whitespace after stripping fenced blocks; prevents future similar regressions
+- **Choice chip "Other" handling** — clicking "Other" no longer auto-sends "Other" as a literal answer; instead clears + focuses the input with a contextual placeholder; AI is told via system prompt not to include "Other" since the chat input is always available for free-text answers
+
+---
+
 ## v1.0.10 — 2026-04-09
 
 Figma design import — paste a Figma URL, extract structure and assets, generate a full HubSpot page.
