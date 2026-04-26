@@ -236,11 +236,21 @@ Reference these in your layoutNotes:
 ${cssSummary}
 
 ## Output Rules
-- Module names: descriptive, title-case (e.g., "Hero Banner", "Pricing Cards")
+
+### Module names — CRITICAL
+- **If the user message lists "Existing Modules to Re-plan", you MUST use those exact names verbatim** in \`modules[].name\` and in \`moduleOrder\`. Do not rename them. Do not retitle-case them. Do not "improve" them. The names are identifiers, not labels. Mismatched names create duplicate modules instead of regenerating existing ones.
+- **For genuinely new modules** (not in any existing-modules list): use kebab-case identifiers (e.g., \`hero\`, \`pricing-cards\`, \`final-cta\`). This matches the convention used by Plan Mode and Figma Import.
+- The \`description\` and \`contentBrief\` fields can be any text — they describe the module to humans, while \`name\` is the canonical identifier.
+
+### Content & layout
 - Content briefs: describe the actual copy/content each module needs (headlines, body text, CTAs, stats)
 - Layout notes: describe the visual layout using the available CSS classes above
 - Reference specific CSS classes from the shared CSS in your layout notes (e.g., "Use ${themeName}-grid--3 for card layout, ${themeName}-section--dark for background")
-- moduleOrder: list module names in the order they should appear on the page`);
+
+### Module order
+- \`moduleOrder\`: list **all** modules' names in the order they should appear on the page, including:
+  - the ones you just planned (in \`modules\`)
+  - any "Existing Modules to Keep" the user listed (these are not in \`modules\`, but still belong in \`moduleOrder\`)`);
 
   if (!guidesNeeded || guidesNeeded.includes("content")) {
     parts.push(`\n\n## Content & Copywriting Guide\n${getArchitectContentSummary()}`);
@@ -268,7 +278,7 @@ export const MODULE_PLANNER_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          name: { type: "string", description: "Module name in title-case" },
+          name: { type: "string", description: "Module identifier. If this module already exists in the project, use the existing name verbatim. For new modules, use kebab-case (e.g., 'hero', 'pricing-cards')." },
           description: { type: "string", description: "What this module does" },
           contentBrief: { type: "string", description: "Specific content: headlines, body copy, stats, CTAs" },
           layoutNotes: { type: "string", description: "Visual layout approach referencing shared CSS classes" },

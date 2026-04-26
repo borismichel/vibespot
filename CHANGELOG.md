@@ -4,6 +4,25 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.1.1 — 2026-04-26
+
+Hotfix: stop the agentic pipeline from creating duplicate modules when re-styling an existing page.
+
+### The Bug
+When the Intent Analyzer classified a request as `style_change` or `modify` AND `designSystemChanges: true`, the Page Architect's Module Planner stage was given **zero context about existing modules**. Combined with the prompt rule "module names: descriptive, title-case", the planner re-invented module names instead of regenerating the existing ones. With Plan Mode and Figma Import producing kebab-case names (e.g. `hero`, `how-it-works`), regeneration produced Title Case duplicates (`Hero Field Journal`, `How It Works`) — the case-insensitive match in `updateModules` couldn't bridge the gap, so they were added as NEW modules. Result: a 7-module page becomes a 14-module page after one "Revise the entire page!" prompt.
+
+The bug had been latent for a long time; chat-driven generations historically used Title Case names too, so re-runs accidentally matched. Plan Mode and Figma Import introduced kebab-case identifiers, breaking the implicit naming continuity that was hiding the bug.
+
+### The Fix
+- **[page-architect.ts](src/server/agent/stages/page-architect.ts#L157)** — Removed the `!plan.designSystemChanges` gate. Existing modules are now always passed to the planner, split into two explicit sections: **"Existing Modules to Re-plan (PRESERVE THESE EXACT NAMES)"** for the Intent Analyzer's `affectedModules` and **"Existing Modules to Keep"** for the rest.
+- **[page-architect prompt](src/server/agent/prompts/page-architect.ts)** — Replaced the unconditional "title-case" rule with explicit guidance: existing names must be used verbatim (they're identifiers, not labels), new modules use kebab-case to match the Plan Mode / Figma Import convention. Schema description updated to match.
+- **[state.ts updateModules](src/server/session/state.ts)** — Defensive warning: when an arriving module name is similar-but-not-equal to an existing one (`hero` vs `Hero Field Journal`, `how-it-works` vs `How It Works`, `footer` vs `page-footer`), log a structured warning. The module is still added (we don't auto-merge — too risky for content), but drift is visible in logs.
+
+### Verification
+Re-running a "revise" prompt on an existing page now matches modules by exact name, regenerates the existing ones in place, and produces the same number of modules as before — no duplicates.
+
+---
+
 ## v1.1.0 — 2026-04-26
 
 Plan mode (deliberation phase before generation), streamlined Figma import (translation pipeline), Anthropic SDK upgrade with extended thinking, and an AI Capabilities settings panel.

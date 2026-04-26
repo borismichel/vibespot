@@ -154,8 +154,30 @@ export async function runPageArchitect(
   if (plan.newModules.length > 0) {
     plannerUserContent += `\n\n## Planned Modules\n${plan.newModules.map((m, i) => `${i + 1}. **${m.name}** — ${m.description}`).join("\n")}`;
   }
-  if (snapshot.modules.length > 0 && !plan.designSystemChanges) {
-    plannerUserContent += `\n\n## Existing Modules (keeping)\n${snapshot.modules.map((m) => `- ${m.moduleName}`).join("\n")}`;
+
+  // Always surface existing modules to the planner. Hiding them when the
+  // design system changes (the previous behavior) caused the planner to
+  // re-invent module names and produce duplicates instead of re-styling
+  // the existing ones. Split into two lists so the planner knows which
+  // names it MUST preserve vs which it may keep without re-planning.
+  if (snapshot.modules.length > 0) {
+    const affected = new Set(plan.affectedModules);
+    const modifying = snapshot.modules.filter((m) => affected.has(m.moduleName));
+    const keeping = snapshot.modules.filter((m) => !affected.has(m.moduleName));
+
+    if (modifying.length > 0) {
+      plannerUserContent +=
+        `\n\n## Existing Modules to Re-plan (PRESERVE THESE EXACT NAMES)\n` +
+        `These already exist and are being regenerated. Your output's module names MUST match these exactly — do NOT rename, retitle-case, or "improve" them. Their content/layout may change; their identifier must not.\n` +
+        modifying.map((m) => `- \`${m.moduleName}\``).join("\n");
+    }
+
+    if (keeping.length > 0) {
+      plannerUserContent +=
+        `\n\n## Existing Modules to Keep (do not re-plan)\n` +
+        `These stay as-is. Do NOT include them in your output. They will appear in the final \`moduleOrder\` (you can reference them by name when you list it).\n` +
+        keeping.map((m) => `- \`${m.moduleName}\``).join("\n");
+    }
   }
 
   const plannerResult = await callAgent(engine, apiKey, model, {

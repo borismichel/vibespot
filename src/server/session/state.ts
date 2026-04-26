@@ -8,6 +8,7 @@ import type { ModuleFiles, GeneratedAssets } from "../../ai/engine.js";
 import type { ChatMessage, TemplateEntry, SessionAsset, FieldDef } from "./types.js";
 import { getSession, saveSession } from "./store.js";
 import { getActiveTemplate } from "./templates.js";
+import { log } from "../log.js";
 
 // ---------------------------------------------------------------------------
 // Flat-field sync helpers (exported for use by templates.ts)
@@ -75,6 +76,30 @@ export function addSessionAsset(asset: SessionAsset): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * Normalize a module name for similarity matching: lowercase, strip
+ * dashes, underscores, and whitespace.
+ */
+function normalizeForSimilarity(name: string): string {
+  return name.toLowerCase().replace(/[\s\-_]+/g, "");
+}
+
+/**
+ * Heuristic: are two module names likely the SAME module under different
+ * naming conventions? Catches:
+ *   - case variants:   "how-it-works" vs "How It Works" → both "howitworks"
+ *   - prefix renames:  "hero" vs "Hero Field Journal" → "hero" prefix of "herofieldjournal"
+ *   - suffix renames:  "footer" vs "page-footer" → "footer" suffix
+ * Used only for warnings — never to merge modules automatically.
+ */
+function isSimilarModuleName(a: string, b: string): boolean {
+  const na = normalizeForSimilarity(a);
+  const nb = normalizeForSimilarity(b);
+  if (na === nb) return true;
+  if (na.length < 4 || nb.length < 4) return false;
+  return na.includes(nb) || nb.includes(na);
+}
+
+/**
  * Update session with newly generated/modified modules.
  * Merges new modules into existing state (updates existing, adds new).
  */
@@ -95,6 +120,22 @@ export function updateModules(assets: Partial<GeneratedAssets>): void {
       if (idx >= 0) {
         activeSession.modules[idx] = newMod;
       } else {
+        // Defensive: if the arriving name is a "case/format variant" of an
+        // existing module (kebab vs Title Case, etc.), this is almost
+        // certainly a planner/developer drift bug — the AI re-named an
+        // existing module instead of regenerating it. Log a warning so
+        // future divergences surface in logs even before they show up
+        // as duplicate modules in the UI.
+        const similar = activeSession.modules.find((m) =>
+          isSimilarModuleName(m.moduleName, newMod.moduleName)
+        );
+        if (similar) {
+          log.warn(
+            "session-state",
+            `Module "${newMod.moduleName}" looks like a renamed variant of existing "${similar.moduleName}" — adding as a new module. This usually indicates the Module Planner re-named an existing module. Check the prompt's "preserve existing names" rule.`,
+          );
+        }
+
         activeSession.modules.push(newMod);
         if (!activeSession.moduleOrder.some((n) => n.toLowerCase() === newNameLower)) {
           activeSession.moduleOrder.push(newMod.moduleName);
