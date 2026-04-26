@@ -18,6 +18,7 @@ import {
   reloadModulesFromDisk,
   reloadActiveTemplateFromDisk,
   getActiveTemplate,
+  syncFlatFieldsToTemplate,
 } from "../session.js";
 import { isGenerating } from "../ai-handler.js";
 import { applyAutoFixes } from "../auto-fix.js";
@@ -113,6 +114,7 @@ export function handleCodeUpdateRoute(req: IncomingMessage, res: ServerResponse)
           else tpl.sharedJs = data.content;
         }
         session.updatedAt = Date.now();
+        syncFlatFieldsToTemplate();
         saveSession();
         writeModulesToDisk();
         jsonResponse(res, 200, { ok: true });
@@ -150,6 +152,7 @@ export function handleCodeUpdateRoute(req: IncomingMessage, res: ServerResponse)
       }
 
       session.updatedAt = Date.now();
+      syncFlatFieldsToTemplate();
       saveSession();
       writeModulesToDisk();
       jsonResponse(res, 200, { ok: true });
