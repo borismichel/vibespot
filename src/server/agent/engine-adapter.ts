@@ -52,6 +52,12 @@ export interface AgentCallOptions {
   maxTokens?: number;
   onChunk?: (chunk: string) => void;
   onStatus?: (status: string) => void;
+  /**
+   * Extended thinking budget in tokens (Anthropic only). When set and the model
+   * supports it, the SDK enables `thinking: { type: "enabled", budget_tokens }`.
+   * Stages opt in (e.g. Page Architect) — not every call benefits.
+   */
+  thinkingBudgetTokens?: number;
 }
 
 export type AgentCallResult =
@@ -147,7 +153,7 @@ async function callAnthropic(
   });
 
   const messages =
-    opts.messages as unknown as import("@anthropic-ai/sdk").MessageParam[];
+    opts.messages as unknown as Anthropic.MessageParam[];
 
   // Resolve system prompt: prefer blocks (with cache control), fall back to string
   let system: string | SystemPromptBlock[] = opts.systemPrompt;
@@ -163,12 +169,15 @@ async function callAnthropic(
   }
 
   if (opts.structuredOutput) {
-    // Use tool_use to enforce structured output
+    // Use tool_use to enforce structured output. Cache the tool definition —
+    // it's identical across every parallel module-developer call, so this
+    // saves the schema-encoding tokens on every call after the first.
     const tool: Anthropic.Tool = {
       name: opts.structuredOutput.name,
       description: `Return the result as structured JSON matching the ${opts.structuredOutput.name} schema.`,
       input_schema:
         opts.structuredOutput.schema as Anthropic.Tool.InputSchema,
+      cache_control: { type: "ephemeral" },
     };
 
     return withRateLimitRetry(async () => {
@@ -179,6 +188,9 @@ async function callAnthropic(
         messages,
         tools: [tool],
         tool_choice: { type: "tool", name: opts.structuredOutput!.name },
+        ...(opts.thinkingBudgetTokens
+          ? { thinking: { type: "enabled" as const, budget_tokens: opts.thinkingBudgetTokens } }
+          : {}),
       });
 
       // Extract tool_use input from the response
@@ -207,6 +219,9 @@ async function callAnthropic(
       max_tokens: opts.maxTokens || 16000,
       system: system as any,
       messages,
+      ...(opts.thinkingBudgetTokens
+        ? { thinking: { type: "enabled" as const, budget_tokens: opts.thinkingBudgetTokens } }
+        : {}),
     });
 
     for await (const event of stream) {
@@ -238,7 +253,7 @@ async function callAnthropicOAuth(
   } as any);
 
   const messages =
-    opts.messages as unknown as import("@anthropic-ai/sdk").MessageParam[];
+    opts.messages as unknown as Anthropic.MessageParam[];
 
   // Build system with OAuth prefix + optional cache blocks
   let system: string | SystemPromptBlock[];
@@ -259,6 +274,7 @@ async function callAnthropicOAuth(
       name: opts.structuredOutput.name,
       description: `Return the result as structured JSON matching the ${opts.structuredOutput.name} schema.`,
       input_schema: opts.structuredOutput.schema as Anthropic.Tool.InputSchema,
+      cache_control: { type: "ephemeral" },
     };
 
     return withRateLimitRetry(async () => {
@@ -269,6 +285,9 @@ async function callAnthropicOAuth(
         messages,
         tools: [tool],
         tool_choice: { type: "tool", name: opts.structuredOutput!.name },
+        ...(opts.thinkingBudgetTokens
+          ? { thinking: { type: "enabled" as const, budget_tokens: opts.thinkingBudgetTokens } }
+          : {}),
       });
 
       for (const block of response.content) {
@@ -291,6 +310,9 @@ async function callAnthropicOAuth(
       max_tokens: opts.maxTokens || 16000,
       system: system as any,
       messages,
+      ...(opts.thinkingBudgetTokens
+        ? { thinking: { type: "enabled" as const, budget_tokens: opts.thinkingBudgetTokens } }
+        : {}),
     });
 
     for await (const event of stream) {
@@ -702,6 +724,27 @@ export async function callAgent(
   });
 
   return callAgentCLI(engine, model, opts);
+}
+
+/**
+ * Resolve the extended-thinking budget (in tokens) for the current engine
+ * and config. Returns 0 (no thinking) unless extended thinking is enabled
+ * AND the engine is Anthropic-based — extended thinking is an Anthropic
+ * feature; we don't try to emulate it on other engines.
+ */
+export function resolveThinkingBudget(engine: AgentEngine): number {
+  if (engine !== "anthropic-api" && engine !== "claude-oauth") return 0;
+  const cfg = loadConfig();
+  if (!cfg.extendedThinking) return 0;
+  switch (cfg.extendedThinkingBudget) {
+    case "high":
+      return 32000;
+    case "low":
+      return 4000;
+    case "medium":
+    default:
+      return 16000;
+  }
 }
 
 /**

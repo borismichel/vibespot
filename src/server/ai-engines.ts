@@ -96,7 +96,7 @@ async function _streamAnthropic(
           model,
           max_tokens: 48000,
           system: system as any,
-          messages: messages as unknown as import("@anthropic-ai/sdk").MessageParam[],
+          messages: messages as unknown as Anthropic.MessageParam[],
         });
 
         for await (const event of stream) {

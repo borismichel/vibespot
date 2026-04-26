@@ -215,6 +215,11 @@ function renderAITab(body, data) {
   agenticSection.appendChild(toggleRow);
   body.appendChild(agenticSection);
 
+  // AI Capabilities section — exposes Anthropic SDK features (extended
+  // thinking) and shows the status of features that auto-engage based on
+  // engine (prompt caching).
+  body.appendChild(renderAICapabilitiesSection(activeEngine, config));
+
   // API Keys section
   const keysSection = el("section", "settings__section");
   keysSection.appendChild(sectionTitle("API Keys"));
@@ -383,6 +388,131 @@ function renderAITab(body, data) {
     cliSection.appendChild(row);
   }
   body.appendChild(cliSection);
+}
+
+// ---------------------------------------------------------------------------
+// AI Capabilities — feature toggles + capability status per engine
+// ---------------------------------------------------------------------------
+
+function renderAICapabilitiesSection(activeEngine, config) {
+  const section = el("section", "settings__section");
+  section.appendChild(sectionTitle("AI Capabilities"));
+  section.appendChild(desc("Advanced model features. Some are configurable; others auto-engage based on the active engine."));
+
+  const isAnthropic = activeEngine === "anthropic-api" || activeEngine === "claude-oauth";
+  const isApi = activeEngine && !["claude-code", "gemini-cli", "codex-cli"].includes(activeEngine);
+
+  // ---- Prompt Caching (auto, status indicator only) ----
+  section.appendChild(capabilityRow({
+    label: "Prompt Caching",
+    description: "System prompts and tool schemas cached on Anthropic. Automatic — no setup needed.",
+    status: isAnthropic ? "active" : isApi ? "n/a" : "n/a",
+    statusText: isAnthropic ? "Active" : "Anthropic only",
+  }));
+
+  // ---- Extended Thinking (toggle + budget) ----
+  const thinkingActive = !!config.extendedThinking && isAnthropic;
+  const thinkingRow = capabilityRow({
+    label: "Extended Thinking",
+    description: "The model deliberates internally before responding. Higher quality on the Page Architect stage; slower and slightly more expensive.",
+    status: !isAnthropic ? "n/a" : thinkingActive ? "active" : "off",
+    statusText: !isAnthropic ? "Anthropic only" : thinkingActive ? "On" : "Off",
+    toggle: isAnthropic
+      ? {
+          active: thinkingActive,
+          onChange: async (val) => {
+            await fetch("/api/settings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ extendedThinking: val }),
+            });
+            refreshSettings();
+          },
+        }
+      : null,
+  });
+  section.appendChild(thinkingRow);
+
+  // Budget selector — only meaningful when thinking is enabled
+  if (isAnthropic && thinkingActive) {
+    const budgetRow = el("div", "settings__capability-sub");
+    const budgetLabel = el("span", "settings__capability-sub-label");
+    budgetLabel.textContent = "Budget";
+    budgetRow.appendChild(budgetLabel);
+
+    const budgetSelect = el("select", "settings__capability-select");
+    const budgets = [
+      { id: "low", label: "Low (~4k tokens)" },
+      { id: "medium", label: "Medium (~16k tokens)" },
+      { id: "high", label: "High (~32k tokens)" },
+    ];
+    for (const b of budgets) {
+      const opt = document.createElement("option");
+      opt.value = b.id;
+      opt.textContent = b.label;
+      if ((config.extendedThinkingBudget || "medium") === b.id) opt.selected = true;
+      budgetSelect.appendChild(opt);
+    }
+    budgetSelect.addEventListener("change", async () => {
+      await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ extendedThinkingBudget: budgetSelect.value }),
+      });
+      refreshSettings();
+    });
+    budgetRow.appendChild(budgetSelect);
+
+    const hint = el("span", "settings__capability-sub-hint");
+    hint.textContent = "Higher = more deliberation, more cost";
+    budgetRow.appendChild(hint);
+
+    section.appendChild(budgetRow);
+  }
+
+  // ---- Citations (auto-on for documents — status only) ----
+  section.appendChild(capabilityRow({
+    label: "Citations",
+    description: "When you upload PDFs/docs, the model can cite specific passages it referenced.",
+    status: "soon",
+    statusText: "Coming soon",
+  }));
+
+  // ---- Web Search (preview, not yet wired) ----
+  section.appendChild(capabilityRow({
+    label: "Web Search",
+    description: "Let the AI search the web for context (competitor pages, industry references) during planning. Adds cost and may surface irrelevant results.",
+    status: "soon",
+    statusText: "Coming soon",
+  }));
+
+  return section;
+}
+
+function capabilityRow({ label, description, status, statusText, toggle }) {
+  const row = el("div", "settings__capability-row");
+
+  const labelWrap = el("div", "settings__capability-label-wrap");
+  const labelEl = el("div", "settings__capability-label");
+  labelEl.textContent = label;
+  const badge = el("span", "settings__capability-badge settings__capability-badge--" + status);
+  badge.textContent = statusText;
+  labelEl.appendChild(badge);
+  labelWrap.appendChild(labelEl);
+
+  const descEl = el("div", "settings__capability-desc");
+  descEl.textContent = description;
+  labelWrap.appendChild(descEl);
+
+  row.appendChild(labelWrap);
+
+  if (toggle) {
+    const btn = el("button", "settings__toggle" + (toggle.active ? " active" : ""));
+    btn.addEventListener("click", () => toggle.onChange(!toggle.active));
+    row.appendChild(btn);
+  }
+
+  return row;
 }
 
 // ---------------------------------------------------------------------------

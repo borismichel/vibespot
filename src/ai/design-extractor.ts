@@ -200,8 +200,7 @@ export async function extractDesignContext(
         messages: [{ role: "user", content: userMessage }],
       });
       text = response.content
-        .filter((block): block is { type: "text"; text: string } => block.type === "text")
-        .map((block) => block.text)
+        .map((block) => (block.type === "text" ? block.text : ""))
         .join("");
       break;
     }
@@ -227,8 +226,7 @@ export async function extractDesignContext(
         messages: [{ role: "user", content: userMessage }],
       });
       text = response.content
-        .filter((block): block is { type: "text"; text: string } => block.type === "text")
-        .map((block) => block.text)
+        .map((block) => (block.type === "text" ? block.text : ""))
         .join("");
       break;
     }

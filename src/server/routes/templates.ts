@@ -346,9 +346,10 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
           jsonResponse(res, 400, { error: `Invalid type: ${type}. Must be "styleguide", "brandvoice", or "themeContext"` });
           return;
         }
+        const assetKey = type as "styleguide" | "brandvoice" | "themeContext";
 
-        const filename = type === "themeContext" ? "theme-context.md" : `${type}.md`;
-        session.brandAssets[type] = content;
+        const filename = assetKey === "themeContext" ? "theme-context.md" : `${assetKey}.md`;
+        session.brandAssets[assetKey] = content;
         session.updatedAt = Date.now();
 
         const assetDir = join(session.themePath, ".vibespot");
@@ -372,13 +373,14 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
           jsonResponse(res, 400, { error: `Invalid type: ${type}` });
           return;
         }
+        const delKey = type as "styleguide" | "brandvoice" | "themeContext";
 
         if (session.brandAssets) {
-          delete session.brandAssets[type];
+          delete session.brandAssets[delKey];
         }
         session.updatedAt = Date.now();
 
-        const delFilename = type === "themeContext" ? "theme-context.md" : `${type}.md`;
+        const delFilename = delKey === "themeContext" ? "theme-context.md" : `${delKey}.md`;
         const filePath = join(session.themePath, ".vibespot", delFilename);
         if (existsSync(filePath)) rmSync(filePath);
 

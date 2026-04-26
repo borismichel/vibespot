@@ -9,7 +9,7 @@
  */
 
 import type { AgentEngine } from "../engine-adapter.js";
-import { callAgent } from "../engine-adapter.js";
+import { callAgent, resolveThinkingBudget } from "../engine-adapter.js";
 import type { PipelinePlan, PageBlueprint, DesignSystemOutput, PipelineEvent } from "../types.js";
 import type { SessionSnapshot } from "../../session/types.js";
 import {
@@ -54,6 +54,7 @@ export async function runPageArchitect(
     designUserContent += `\n\n## Current Shared CSS (update this)\n\`\`\`css\n${snapshot.sharedCss}\n\`\`\``;
   }
 
+  const thinkingBudget = resolveThinkingBudget(engine);
   const designResult = await callAgent(engine, apiKey, model, {
     systemPrompt: designPrompt,
     systemBlocks: designBlocks,
@@ -63,6 +64,7 @@ export async function runPageArchitect(
       name: "design_system",
     },
     maxTokens: 16000,
+    ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
   });
 
   let designSystem: DesignSystemOutput;
@@ -164,6 +166,7 @@ export async function runPageArchitect(
       name: "module_plan",
     },
     maxTokens: 8000,
+    ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
   });
 
   let modulePlan: { modules: PageBlueprint["modules"]; moduleOrder: string[]; narrative: string };
