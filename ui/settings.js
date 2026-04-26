@@ -397,27 +397,35 @@ function renderAITab(body, data) {
 function renderAICapabilitiesSection(activeEngine, config) {
   const section = el("section", "settings__section");
   section.appendChild(sectionTitle("AI Capabilities"));
-  section.appendChild(desc("Advanced model features. Some are configurable; others auto-engage based on the active engine."));
+  section.appendChild(desc("Advanced model features. Some are configurable directly; some auto-engage based on the active engine."));
 
-  const isAnthropic = activeEngine === "anthropic-api" || activeEngine === "claude-oauth";
-  const isApi = activeEngine && !["claude-code", "gemini-cli", "codex-cli"].includes(activeEngine);
+  // Engine classification — different engines have different feature surfaces.
+  const isAnthropicAPI = activeEngine === "anthropic-api" || activeEngine === "claude-oauth";
+  const isClaudeCode = activeEngine === "claude-code";
+  const isAnthropicAny = isAnthropicAPI || isClaudeCode;
 
-  // ---- Prompt Caching (auto, status indicator only) ----
+  // ---- Prompt Caching (auto on Anthropic engines — status indicator only) ----
   section.appendChild(capabilityRow({
     label: "Prompt Caching",
-    description: "System prompts and tool schemas cached on Anthropic. Automatic — no setup needed.",
-    status: isAnthropic ? "active" : isApi ? "n/a" : "n/a",
-    statusText: isAnthropic ? "Active" : "Anthropic only",
+    description: isClaudeCode
+      ? "Claude Code manages prompt caching internally — automatic, no configuration needed."
+      : "System prompts and tool schemas cached on Anthropic. Automatic — no setup needed.",
+    status: isAnthropicAny ? "active" : "n/a",
+    statusText: isAnthropicAPI ? "Active" : isClaudeCode ? "Auto (CLI-managed)" : "Anthropic only",
   }));
 
   // ---- Extended Thinking (toggle + budget) ----
-  const thinkingActive = !!config.extendedThinking && isAnthropic;
+  const thinkingActive = !!config.extendedThinking && isAnthropicAPI;
   const thinkingRow = capabilityRow({
     label: "Extended Thinking",
-    description: "The model deliberates internally before responding. Higher quality on the Page Architect stage; slower and slightly more expensive.",
-    status: !isAnthropic ? "n/a" : thinkingActive ? "active" : "off",
-    statusText: !isAnthropic ? "Anthropic only" : thinkingActive ? "On" : "Off",
-    toggle: isAnthropic
+    description: isClaudeCode
+      ? "Claude Code uses thinking automatically when the model supports it. Budget can't be tuned via the CLI."
+      : "The model deliberates internally before responding. Higher quality on the Page Architect stage; slower and slightly more expensive.",
+    status: isAnthropicAPI ? (thinkingActive ? "active" : "off") : isClaudeCode ? "active" : "n/a",
+    statusText: isAnthropicAPI
+      ? thinkingActive ? "On" : "Off"
+      : isClaudeCode ? "Auto (CLI-managed)" : "Anthropic only",
+    toggle: isAnthropicAPI
       ? {
           active: thinkingActive,
           onChange: async (val) => {
@@ -434,7 +442,7 @@ function renderAICapabilitiesSection(activeEngine, config) {
   section.appendChild(thinkingRow);
 
   // Budget selector — only meaningful when thinking is enabled
-  if (isAnthropic && thinkingActive) {
+  if (isAnthropicAPI && thinkingActive) {
     const budgetRow = el("div", "settings__capability-sub");
     const budgetLabel = el("span", "settings__capability-sub-label");
     budgetLabel.textContent = "Budget";
@@ -470,18 +478,37 @@ function renderAICapabilitiesSection(activeEngine, config) {
     section.appendChild(budgetRow);
   }
 
+  // ---- Web Search (toggle on Anthropic API + Claude Code CLI) ----
+  const webSearchSupported = isAnthropicAny;
+  const webSearchActive = !!config.webSearch && webSearchSupported;
+  section.appendChild(capabilityRow({
+    label: "Web Search",
+    description: isClaudeCode
+      ? "Allow Claude Code to search the web (passes --allowed-tools WebSearch). Adds cost and may surface irrelevant results."
+      : "Let the AI search the web for context (competitor pages, industry references) during planning. Adds cost and may surface irrelevant results.",
+    status: !webSearchSupported ? "n/a" : webSearchActive ? "active" : "off",
+    statusText: !webSearchSupported
+      ? "Anthropic / Claude Code only"
+      : webSearchActive ? "On" : "Off",
+    toggle: webSearchSupported
+      ? {
+          active: webSearchActive,
+          onChange: async (val) => {
+            await fetch("/api/settings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ webSearch: val }),
+            });
+            refreshSettings();
+          },
+        }
+      : null,
+  }));
+
   // ---- Citations (auto-on for documents — status only) ----
   section.appendChild(capabilityRow({
     label: "Citations",
     description: "When you upload PDFs/docs, the model can cite specific passages it referenced.",
-    status: "soon",
-    statusText: "Coming soon",
-  }));
-
-  // ---- Web Search (preview, not yet wired) ----
-  section.appendChild(capabilityRow({
-    label: "Web Search",
-    description: "Let the AI search the web for context (competitor pages, industry references) during planning. Adds cost and may surface irrelevant results.",
     status: "soon",
     statusText: "Coming soon",
   }));

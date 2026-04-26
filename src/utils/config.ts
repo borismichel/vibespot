@@ -48,6 +48,8 @@ export interface VibeSpotConfig {
   // Anthropic SDK feature flags (apply to anthropic-api + claude-oauth)
   extendedThinking?: boolean;            // enable Claude extended thinking on reasoning-heavy stages
   extendedThinkingBudget?: "low" | "medium" | "high"; // approximates 4k / 16k / 32k thinking tokens
+  // Tool flags — apply to Anthropic API + Claude Code CLI
+  webSearch?: boolean;                   // allow the AI to use the web-search tool
 }
 
 const CONFIG_DIR = join(homedir(), ".vibespot");

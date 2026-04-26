@@ -9,7 +9,7 @@
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { spawnCLI } from "../ai-engines.js";
+import { spawnCLI, spawnClaudeCodeStreamJSON } from "../ai-engines.js";
 import { tryParseJSON, tryRepairTruncatedJSON } from "../ai-parser.js";
 import { loadConfig } from "../../utils/config.js";
 import { OAUTH_EXTRA_HEADERS, OAUTH_SYSTEM_PREFIX } from "../../utils/claude-oauth.js";
@@ -58,6 +58,16 @@ export interface AgentCallOptions {
    * Stages opt in (e.g. Page Architect) — not every call benefits.
    */
   thinkingBudgetTokens?: number;
+  /**
+   * Allow the model to use the web-search tool. Honored on:
+   *  - Anthropic API engines: appends `web_search_20250305` to `tools` (only
+   *    when `structuredOutput` is NOT set — structured output forces a single
+   *    tool, which would prevent the model from searching anyway).
+   *  - Claude Code CLI: passes `--allowedTools=WebSearch` so the agent's
+   *    internal allowlist permits it.
+   * Other engines silently ignore.
+   */
+  enableWebSearch?: boolean;
 }
 
 export type AgentCallResult =
@@ -211,7 +221,9 @@ async function callAnthropic(
     }, opts.onStatus);
   }
 
-  // Non-structured: regular text generation
+  // Non-structured: regular text generation. Optionally attach the
+  // server-side web_search tool — works only on the streaming text path
+  // because structured output forces a single tool_choice.
   return withRateLimitRetry(async () => {
     let fullText = "";
     const stream = client.messages.stream({
@@ -219,6 +231,9 @@ async function callAnthropic(
       max_tokens: opts.maxTokens || 16000,
       system: system as any,
       messages,
+      ...(opts.enableWebSearch
+        ? { tools: [{ type: "web_search_20250305" as const, name: "web_search" }] as Anthropic.ToolUnion[] }
+        : {}),
       ...(opts.thinkingBudgetTokens
         ? { thinking: { type: "enabled" as const, budget_tokens: opts.thinkingBudgetTokens } }
         : {}),
@@ -310,6 +325,9 @@ async function callAnthropicOAuth(
       max_tokens: opts.maxTokens || 16000,
       system: system as any,
       messages,
+      ...(opts.enableWebSearch
+        ? { tools: [{ type: "web_search_20250305" as const, name: "web_search" }] as Anthropic.ToolUnion[] }
+        : {}),
       ...(opts.thinkingBudgetTokens
         ? { thinking: { type: "enabled" as const, budget_tokens: opts.thinkingBudgetTokens } }
         : {}),
@@ -511,14 +529,22 @@ async function callGemini(
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve CLI binary and args for a given engine.
+ * Resolve CLI binary and args for a given engine. The `opts` allow us to
+ * react to per-call flags (e.g. enabling Web Search on Claude Code).
  */
-function resolveCLIBinary(engine: AgentEngine): { bin: string; args: string[] } {
+function resolveCLIBinary(
+  engine: AgentEngine,
+  opts?: AgentCallOptions,
+): { bin: string; args: string[] } {
   switch (engine) {
     case "claude-code": {
       const config = loadConfig();
       const args = ["--print"];
       if (config.claudeCodeModel) args.push("--model", config.claudeCodeModel);
+      // Web Search is exposed via Claude Code's tool allowlist. We add to
+      // the existing default toolset rather than replacing it (using the
+      // additive form `--allowedTools=WebSearch`).
+      if (opts?.enableWebSearch) args.push("--allowedTools=WebSearch");
       return { bin: "claude", args };
     }
     case "gemini-cli":
@@ -635,10 +661,32 @@ async function callAgentCLI(
   model: string,
   opts: AgentCallOptions,
 ): Promise<AgentCallResult> {
-  const { bin, args } = resolveCLIBinary(engine);
+  const { bin, args } = resolveCLIBinary(engine, opts);
   const prompt = buildCLIPrompt(opts);
 
-  const rawOutput = await spawnCLI(bin, args, prompt, opts.onChunk);
+  // Claude Code: use stream-json so we get structured events (assistant
+  // text deltas, tool calls, final result) instead of raw concatenated
+  // text. Tool-use events are surfaced via onStatus so the pipeline UI
+  // can show what the agent is doing.
+  let rawOutput: string;
+  if (engine === "claude-code") {
+    const streamArgs = [
+      ...args,
+      "--output-format", "stream-json",
+      "--include-partial-messages",
+      "--verbose",
+    ];
+    rawOutput = await spawnClaudeCodeStreamJSON(streamArgs, prompt, {
+      onChunk: opts.onChunk,
+      onToolUse: (toolName, input) => {
+        if (!opts.onStatus) return;
+        const summary = summarizeToolUse(toolName, input);
+        opts.onStatus(summary);
+      },
+    });
+  } else {
+    rawOutput = await spawnCLI(bin, args, prompt, opts.onChunk);
+  }
 
   if (!opts.structuredOutput) {
     return { type: "text", text: rawOutput };
@@ -658,6 +706,35 @@ async function callAgentCLI(
     outputLength: rawOutput.length,
   });
   return { type: "text", text: rawOutput };
+}
+
+/**
+ * Render a tool-use event as a short human-readable status line.
+ * Used to surface Claude Code agent activity (Web search, file reads,
+ * edits, etc.) into the pipeline UI status pane.
+ */
+function summarizeToolUse(name: string, input: Record<string, unknown> | undefined): string {
+  const i = input || {};
+  switch (name) {
+    case "WebSearch":
+    case "web_search":
+      return `Searching: "${String(i.query || "")}"`;
+    case "WebFetch":
+      return `Fetching: ${String(i.url || "")}`;
+    case "Read":
+      return `Reading ${String(i.file_path || i.path || "file")}`;
+    case "Edit":
+    case "Write":
+      return `Editing ${String(i.file_path || i.path || "file")}`;
+    case "Bash":
+      return `Running: ${String(i.command || "").slice(0, 60)}`;
+    case "Grep":
+      return `Searching for "${String(i.pattern || "")}"`;
+    case "Glob":
+      return `Globbing ${String(i.pattern || "")}`;
+    default:
+      return `Using ${name}`;
+  }
 }
 
 // ---------------------------------------------------------------------------

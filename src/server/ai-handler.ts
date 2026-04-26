@@ -454,6 +454,10 @@ export async function handlePlanModeStream(
     messages: [{ role: "user", content: enrichedMessage }],
     maxTokens: 8000,
     onChunk,
+    // Web search is most useful during deliberation (looking up competitors,
+    // industry references, brand examples). Honored on Anthropic API engines
+    // and Claude Code CLI; silently ignored elsewhere.
+    enableWebSearch: !!config.webSearch,
   });
 
   if (result.type === "text") return result.text;

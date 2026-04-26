@@ -147,6 +147,7 @@ export function handleSettingsStatusRoute(res: ServerResponse): void {
     planMode: config.planMode || false,
     extendedThinking: config.extendedThinking || false,
     extendedThinkingBudget: config.extendedThinkingBudget || "medium",
+    webSearch: config.webSearch || false,
     figmaToken: config.figmaToken ? "••••" + config.figmaToken.slice(-4) : null,
   };
 
@@ -613,6 +614,7 @@ export function handleSettingsGenericRoute(req: IncomingMessage, res: ServerResp
         "planMode",
         "extendedThinking",
         "extendedThinkingBudget",
+        "webSearch",
       ];
       // Validate enum
       if (data.extendedThinkingBudget !== undefined &&

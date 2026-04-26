@@ -429,6 +429,179 @@ export async function streamWithGeminiAPI(
 }
 
 // ---------------------------------------------------------------------------
+// Claude Code stream-json subprocess helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Event types emitted by Claude Code in `--output-format stream-json` mode.
+ * We type only the fields we read; the spec has more.
+ */
+export interface ClaudeCodeStreamEvent {
+  type: "system" | "assistant" | "user" | "result" | string;
+  /** Per-event subtype (e.g. "init" for system, "success"/"error_during_execution" for result). */
+  subtype?: string;
+  /** Free-form session metadata on `system` init events. */
+  session_id?: string;
+  /** Wraps an Anthropic-style message on `assistant`/`user` events. */
+  message?: {
+    content?: Array<
+      | { type: "text"; text: string }
+      | { type: "tool_use"; name: string; input?: Record<string, unknown> }
+      | { type: "tool_result"; tool_use_id?: string; content?: unknown }
+      | { type: "thinking"; thinking?: string }
+      | { type: string; [key: string]: unknown }
+    >;
+  };
+  /** On `result` events: final text and usage. */
+  result?: string;
+  total_cost_usd?: number;
+  duration_ms?: number;
+  num_turns?: number;
+  is_error?: boolean;
+  [key: string]: unknown;
+}
+
+export interface ClaudeCodeStreamHandlers {
+  /** Called for each assistant text fragment (extracted from message.content[].text). */
+  onChunk?: (chunk: string) => void;
+  /** Called when the agent decides to call a tool (e.g. WebSearch, Read, Bash). */
+  onToolUse?: (toolName: string, input: Record<string, unknown> | undefined) => void;
+  /** Called for any unrecognised event — useful for logging during development. */
+  onEvent?: (event: ClaudeCodeStreamEvent) => void;
+}
+
+/**
+ * Spawn `claude --output-format stream-json --include-partial-messages
+ * --verbose` and parse line-delimited JSON. Returns the full assistant text
+ * concatenated across all assistant events. Tool-use events are surfaced
+ * via the `onToolUse` callback; the pipeline can render them as agent
+ * decisions.
+ *
+ * Why this exists separately from `spawnCLI`:
+ *  - stream-json is Claude Code-specific (Gemini/Codex CLIs use plain text).
+ *  - Lines may split across stdout chunks → we need a line buffer.
+ *  - Events let us expose tool calls + final usage stats, not just raw text.
+ */
+export function spawnClaudeCodeStreamJSON(
+  args: string[],
+  prompt: string,
+  handlers: ClaudeCodeStreamHandlers = {},
+  timeout?: number,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const env = { ...process.env };
+    delete env.CLAUDECODE;
+
+    const child = spawn("claude", args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      env,
+    });
+
+    let assistantText = "";
+    let stderr = "";
+    let buffer = "";
+    let settled = false;
+    let resultEvent: ClaudeCodeStreamEvent | null = null;
+
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+
+    const handleEvent = (event: ClaudeCodeStreamEvent) => {
+      try {
+        if (event.type === "assistant" && event.message?.content) {
+          for (const block of event.message.content) {
+            if (block.type === "text" && typeof (block as { text?: string }).text === "string") {
+              const text = (block as { text: string }).text;
+              assistantText += text;
+              if (handlers.onChunk) handlers.onChunk(text);
+            } else if (block.type === "tool_use") {
+              const tu = block as { name?: string; input?: Record<string, unknown> };
+              if (tu.name && handlers.onToolUse) handlers.onToolUse(tu.name, tu.input);
+            }
+          }
+        }
+        if (event.type === "result") {
+          resultEvent = event;
+          // If the agent loop produced a `result.result` string and we never
+          // saw any assistant text events (some Claude Code modes emit only
+          // the final result), use it as a fallback.
+          if (!assistantText && typeof event.result === "string") {
+            assistantText = event.result;
+            if (handlers.onChunk) handlers.onChunk(event.result);
+          }
+        }
+        if (handlers.onEvent) handlers.onEvent(event);
+      } catch {
+        // One bad event must not poison the stream — keep going.
+      }
+    };
+
+    child.stdout.on("data", (d: Buffer) => {
+      buffer += d.toString();
+      // Each line is one complete JSON object.
+      let nl: number;
+      while ((nl = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (!line) continue;
+        try {
+          handleEvent(JSON.parse(line) as ClaudeCodeStreamEvent);
+        } catch {
+          // A non-JSON line. Could be a banner or warning the CLI printed
+          // outside the stream. Discard silently.
+        }
+      }
+    });
+
+    child.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+
+    child.on("error", (err) =>
+      settle(() => reject(new Error(`claude failed to start: ${err.message}`))),
+    );
+
+    child.on("close", (code) => {
+      // Flush any trailing buffered line.
+      if (buffer.trim()) {
+        try { handleEvent(JSON.parse(buffer.trim()) as ClaudeCodeStreamEvent); } catch {}
+        buffer = "";
+      }
+      settle(() => {
+        const errored = code !== 0 || (resultEvent && resultEvent.is_error);
+        if (errored) {
+          reject(new Error(
+            `claude exited with code ${code}.\n` +
+            (stderr ? `Stderr: ${stderr.slice(0, 500)}\n` : "") +
+            (assistantText ? `Output: ${assistantText.slice(0, 500)}` : "No output"),
+          ));
+        } else {
+          resolve(assistantText);
+        }
+      });
+    });
+
+    child.stdin.on("error", () => {});
+    const ok = child.stdin.write(prompt);
+    if (!ok) child.stdin.once("drain", () => child.stdin.end());
+    else child.stdin.end();
+
+    const timeoutMs = timeout || 600_000;
+    const timeoutMin = Math.round(timeoutMs / 60_000);
+    const timer = setTimeout(() => {
+      child.kill();
+      settle(() => reject(new Error(
+        `claude (stream-json) timed out after ${timeoutMin} minutes.\n` +
+        (stderr ? `Stderr: ${stderr.slice(0, 500)}\n` : "") +
+        `Partial output (${assistantText.length} chars): ${assistantText.slice(0, 500)}`,
+      )));
+    }, timeoutMs);
+    child.on("close", () => clearTimeout(timer));
+  });
+}
+
+// ---------------------------------------------------------------------------
 // CLI subprocess helper — sends prompt via stdin to avoid shell arg limits
 // ---------------------------------------------------------------------------
 
@@ -534,11 +707,18 @@ export async function generateWithClaudeCode(
 
   const args = ["--print"];
   if (config.claudeCodeModel) args.push("--model", config.claudeCodeModel);
+  if (config.webSearch) args.push("--allowedTools=WebSearch");
+  // Stream-json gives us structured events we can surface as live status
+  // (tool calls). --include-partial-messages preserves the live token-typing
+  // UX; --verbose is required to actually emit events.
+  args.push("--output-format", "stream-json", "--include-partial-messages", "--verbose");
 
   let statusIndex = 0;
   const sendStatus = onStatus || (() => {});
   sendStatus(CLI_STATUS_MESSAGES[0]);
 
+  // Heartbeat is now a fallback — once a real tool-use status arrives it
+  // overrides the rotating placeholder messages.
   const heartbeat = setInterval(() => {
     statusIndex++;
     const msg = CLI_STATUS_MESSAGES[Math.min(statusIndex, CLI_STATUS_MESSAGES.length - 1)];
@@ -546,12 +726,46 @@ export async function generateWithClaudeCode(
   }, 6000);
 
   try {
-    const result = await spawnCLI("claude", args, prompt, (chunk) => {
-      onChunk(chunk);
+    const result = await spawnClaudeCodeStreamJSON(args, prompt, {
+      onChunk: (chunk) => onChunk(chunk),
+      onToolUse: (toolName, input) => {
+        // Render tool calls as live status. This replaces the generic
+        // rotating placeholders with concrete agent activity.
+        sendStatus(summarizeClaudeCodeToolUse(toolName, input));
+      },
     });
     if (onFinish) onFinish(result);
   } finally {
     clearInterval(heartbeat);
+  }
+}
+
+/**
+ * Short human-readable status line for a Claude Code tool-use event.
+ * Mirrors the helper in engine-adapter.ts so single-call mode and the
+ * agentic CLI path produce the same status copy.
+ */
+function summarizeClaudeCodeToolUse(name: string, input: Record<string, unknown> | undefined): string {
+  const i = input || {};
+  switch (name) {
+    case "WebSearch":
+    case "web_search":
+      return `Searching: "${String(i.query || "")}"`;
+    case "WebFetch":
+      return `Fetching: ${String(i.url || "")}`;
+    case "Read":
+      return `Reading ${String(i.file_path || i.path || "file")}`;
+    case "Edit":
+    case "Write":
+      return `Editing ${String(i.file_path || i.path || "file")}`;
+    case "Bash":
+      return `Running: ${String(i.command || "").slice(0, 60)}`;
+    case "Grep":
+      return `Searching for "${String(i.pattern || "")}"`;
+    case "Glob":
+      return `Globbing ${String(i.pattern || "")}`;
+    default:
+      return `Using ${name}`;
   }
 }
 
