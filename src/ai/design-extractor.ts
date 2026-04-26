@@ -190,7 +190,13 @@ export async function extractDesignContext(
       const response = await client.messages.create({
         model: config.anthropicApiModel || "claude-sonnet-4-6",
         max_tokens: 8000,
-        system: systemPrompt,
+        system: [
+          {
+            type: "text",
+            text: systemPrompt,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
         messages: [{ role: "user", content: userMessage }],
       });
       text = response.content
@@ -212,7 +218,11 @@ export async function extractDesignContext(
         max_tokens: 8000,
         system: [
           { type: "text", text: OAUTH_SYSTEM_PREFIX },
-          { type: "text", text: systemPrompt },
+          {
+            type: "text",
+            text: systemPrompt,
+            cache_control: { type: "ephemeral" },
+          },
         ] as any,
         messages: [{ role: "user", content: userMessage }],
       });

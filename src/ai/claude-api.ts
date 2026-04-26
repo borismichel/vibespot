@@ -147,7 +147,13 @@ export class ClaudeAPIEngine implements AIEngine {
     const response = await this.client.messages.create({
       model: this.model,
       max_tokens: 8192,
-      system,
+      system: [
+        {
+          type: "text",
+          text: system,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
       messages: [{ role: "user", content: user }],
     });
 
