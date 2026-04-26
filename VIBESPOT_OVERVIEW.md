@@ -224,17 +224,19 @@ assets/                      # Bundled prompts/guides shipped to AI
 ### 6.1 Multi-engine support
 Seven AI engines, all unified behind a single `callAgent()` interface:
 
-| Engine | Type | Streaming | Structured output |
-|---|---|---|---|
-| `anthropic-api` | REST | yes | JSON schema |
-| `claude-oauth` | REST (Claude.ai OAuth tokens) | yes | JSON schema |
-| `openai-api` | REST | yes | JSON schema |
-| `gemini-api` | REST | yes | JSON schema |
-| `claude-code` | local CLI subprocess | yes | prompt-extracted JSON |
-| `gemini-cli` | local CLI subprocess | yes | prompt-extracted JSON |
-| `codex-cli` | local CLI subprocess | yes | prompt-extracted JSON |
+| Engine | Type | Streaming | Structured output | Web search |
+|---|---|---|---|---|
+| `anthropic-api` | REST | yes | JSON schema | toggleable (server-side `web_search_20250305` tool) |
+| `claude-oauth` | REST (Claude.ai OAuth tokens) | yes | JSON schema | toggleable (same tool) |
+| `openai-api` | REST | yes | JSON schema | not exposed |
+| `gemini-api` | REST | yes | JSON schema | not exposed |
+| `claude-code` | local CLI subprocess (stream-json) | yes (per-token via `--include-partial-messages`) | prompt-extracted JSON | toggleable (`--allowedTools=WebSearch`) |
+| `gemini-cli` | local CLI subprocess | yes | prompt-extracted JSON | not exposed |
+| `codex-cli` | local CLI subprocess | yes | prompt-extracted JSON | not exposed |
 
 Engine choice is per-user via Settings; auto-detection picks the first available. CLI engines need only the binary on `PATH` (no API key).
+
+**Claude Code uses `stream-json`** rather than plain text output. The CLI emits a line-delimited stream of typed events (assistant text deltas, tool calls, final result) which the helper `spawnClaudeCodeStreamJSON` parses. Tool calls (`Read`, `Edit`, `Bash`, `WebSearch`, `WebFetch`, `Grep`, `Glob`) are surfaced as live status lines in the pipeline UI ("Reading hero/module.html", "Searching: 'pricing best practices'", etc.) — the user sees real agent activity instead of opaque "thinking…" placeholders.
 
 ### 6.2 Two generation modes
 
@@ -305,7 +307,22 @@ A separate, narrower pipeline for Figma imports — bypassing the full agentic f
 Result: modules that *translate* a design rather than *re-invent* it.
 
 ### 6.6 Prompt caching
-For Anthropic engines, system prompts are built as cacheable blocks (`cache_control: { type: "ephemeral" }`). Repeated calls within the cache window (5min) reuse the cached prompt. Substantial cost reduction on multi-stage pipelines and agentic mode where many calls share identical system context.
+For Anthropic engines, system prompts are built as cacheable blocks (`cache_control: { type: "ephemeral" }`). Repeated calls within the cache window (5min) reuse the cached prompt. The Module Developer's tool definition (`input_schema` for the structured-output tool) is also cached — saves the schema-encoding tokens on every parallel call after the first. Substantial cost reduction on multi-stage pipelines and agentic mode where many calls share identical system context.
+
+### 6.7 AI Capabilities panel — exposed feature toggles
+
+Settings → AI tab includes an **AI Capabilities** section that surfaces SDK features as user-controllable toggles. Engine support varies; the panel is honest about which features apply where:
+
+| Capability | Anthropic API / OAuth | Claude Code CLI | Other engines |
+|---|---|---|---|
+| **Prompt Caching** | Active (auto) | Auto (CLI-managed) | Anthropic only |
+| **Extended Thinking** | Toggle + Low/Medium/High budget (4k/16k/32k tokens) | Auto (CLI-managed); budget not tunable from outside | Anthropic only |
+| **Web Search** | Toggle — adds `web_search_20250305` server-side tool to non-structured-output calls | Toggle — passes `--allowedTools=WebSearch` to the CLI | Anthropic / Claude Code only |
+| **Citations** | Coming soon | Coming soon | Coming soon |
+
+Web Search opts in automatically for plan mode (research is highest-value during deliberation). Other stages don't currently use it because structured-output calls force a single `tool_choice`, which conflicts with adding additional server-side tools.
+
+Extended thinking is wired specifically into Page Architect's two substages (Design System + Module Planner) — the highest-reasoning stages — and not into Module Developer (which runs N parallel calls and would multiply the cost without proportional quality lift).
 
 ---
 

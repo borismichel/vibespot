@@ -184,8 +184,9 @@ Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, Figma, GitH
 - **Plan mode** — deliberation phase before generation. Prominent toggle above chat input; AI asks elicitation questions, builds a markdown plan in a dedicated tab, only generates after Approve. Plan persists to `.vibespot/plan.md` across sessions.
 - **Streamlined Figma import** — replaces the old agentic-pipeline path with a translation pipeline that preserves Figma's exact design tokens, copy, and section order. Image assets copy into the theme automatically.
 - **Anthropic SDK upgrade** (0.39 → 0.91) — unlocks extended thinking, improved prompt caching, and tool/schema-level cache control.
-- **AI Capabilities settings panel** — toggle Extended Thinking on (Anthropic engines) with Low/Medium/High budget; status display for Prompt Caching, Citations (coming soon), Web Search (coming soon).
+- **AI Capabilities settings panel** — toggle Extended Thinking (Anthropic API engines, with Low/Medium/High budget) and Web Search (Anthropic API + Claude Code CLI). Prompt Caching shows as auto-active; Citations is the remaining "coming soon" item. Claude Code engines see honest "Auto (CLI-managed)" badges where the CLI handles the feature internally.
 - **Cache control on tool definitions** — Module Developer's identical tool schema is now cached, saving schema-encoding tokens on every parallel call after the first.
+- **Claude Code stream-json output** — both single-call mode and the agentic CLI path now use `--output-format stream-json --include-partial-messages --verbose`. Tool calls (`Read`, `Edit`, `Bash`, `WebSearch`, `WebFetch`, `Grep`, `Glob`) flow into the pipeline status pane as concrete activity ("Searching: '…'", "Reading hero/module.html") instead of generic rotating placeholders.
 
 ### v1.0.x
 - **Figma design import** (v1.0.10) — paste a Figma URL to extract design tokens, text, section structure, and image assets, then generate a full HubSpot page via the agentic pipeline

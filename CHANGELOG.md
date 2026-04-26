@@ -37,9 +37,15 @@ Plan mode (deliberation phase before generation), streamlined Figma import (tran
 
 ### AI Capabilities Panel
 - **New "AI Capabilities" section** under Settings → AI tab
-- **Extended thinking toggle** — Anthropic-only; configurable budget (Low ~4k / Medium ~16k / High ~32k tokens); Page Architect's two substages (Design System + Module Planner) opt in when enabled, Module Developer left untouched to avoid N× cost on parallel calls
-- **Status indicators** — Prompt Caching shows "Active" on Anthropic engines, "Anthropic only" elsewhere; Citations and Web Search show "Coming soon" badges
+- **Extended thinking toggle** — Anthropic API/OAuth; configurable budget (Low ~4k / Medium ~16k / High ~32k tokens); Page Architect's two substages (Design System + Module Planner) opt in when enabled, Module Developer left untouched to avoid N× cost on parallel calls
+- **Web Search toggle** — works on Anthropic API/OAuth (appends the `web_search_20250305` server-side tool to non-structured-output calls) AND Claude Code CLI (passes `--allowedTools=WebSearch`); auto-engages for plan mode where research is highest-value
+- **Status indicators** — Prompt Caching shows "Active" on Anthropic API, "Auto (CLI-managed)" on Claude Code, "Anthropic only" elsewhere; Extended Thinking shows the equivalent — toggleable on API, "Auto (CLI-managed)" on Claude Code; Citations is the remaining "Coming soon" item
 - **Tool definition cache control** — `input_schema` for the Module Developer's tool is now `cache_control: { type: "ephemeral" }`, saving schema-encoding tokens on every parallel call after the first
+
+### Claude Code stream-json
+- **New `spawnClaudeCodeStreamJSON` helper** — line-buffered JSON parser for `claude --output-format stream-json --include-partial-messages --verbose`; fault-tolerant (malformed lines silently dropped, parser never crashes); preserves live token-typing UX; captures the final `result` event for usage stats
+- **Tool-use visibility** — tool calls (`Read`, `Edit`, `Bash`, `WebSearch`, `WebFetch`, `Grep`, `Glob`, `Write`) are surfaced as live status lines in the pipeline UI ("Reading hero/module.html", "Searching: 'pricing best practices'", "Editing styleguide.md") instead of generic rotating placeholders
+- **Both Claude Code call sites upgraded** — the agentic CLI path (`callAgentCLI`) and the legacy single-call mode (`generateWithClaudeCode`) both use the new helper
 
 ### UI
 - **"From Figma" button gets a Beta badge** to match "From React"
