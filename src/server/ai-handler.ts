@@ -265,9 +265,16 @@ export async function handleAgenticGenerate(
 
     const snapshot = takeSnapshot();
 
+    // If an approved plan exists, prepend it as a design brief — the pipeline
+    // treats it as the spec rather than guessing at the user's intent.
+    const approvedPlan = snapshot.brandAssets?.plan;
+    let enrichedMessage = userMessage;
+    if (approvedPlan && approvedPlan.trim()) {
+      enrichedMessage = `## Approved plan\n\nBuild the page according to this plan exactly. The user reviewed and approved it; do not deviate from its goal, audience, sections, or content unless the user message below explicitly requests changes.\n\n${approvedPlan}\n\n---\n\n## User message\n\n${userMessage}`;
+    }
+
     // Resolve uploaded file content and append to user message
     const fileContexts = fileIds?.length ? getFileContexts(fileIds) : undefined;
-    let enrichedMessage = userMessage;
     if (fileContexts?.length) {
       for (const fc of fileContexts) {
         if (fc.type === "document" && fc.extractedText) {
@@ -381,6 +388,84 @@ export function applyPipelineResult(result: PipelineResult, pipelineMeta?: Pipel
   // Add assistant message to chat history with pipeline metadata
   addMessage("assistant", result.assistantMessage, pipelineMeta);
   saveSession();
+}
+
+// ---------------------------------------------------------------------------
+// Plan mode — deliberation phase before generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Stream a plan-mode AI response.
+ * Uses the existing engine adapter with a plan-focused system prompt.
+ * No module generation happens here — caller parses the response for
+ * `vibespot-plan` and `vibespot-choices` blocks.
+ */
+export async function handlePlanModeStream(
+  userMessage: string,
+  onChunk: (chunk: string) => void,
+  fileIds?: string[],
+): Promise<string> {
+  const session = getSession();
+  if (!session) throw new Error("No active session");
+
+  const config = loadConfig();
+  const { engine, apiKey, model } = resolveAgenticEngine(config);
+
+  // Lazy import to avoid circular dependency.
+  const [{ buildPlanModePrompt }, { callAgent }] = await Promise.all([
+    import("./agent/prompts/plan-mode.js"),
+    import("./agent/engine-adapter.js"),
+  ]);
+
+  // Count assistant turns in plan mode for phase guidance.
+  // Plan-mode messages share the same chat history; this is an approximation
+  // (every assistant turn in the current chat counts) but works for phase
+  // selection. Refresh logic: turn 0 = no prior assistant messages yet.
+  const turnCount = session.messages.filter((m) => m.role === "assistant").length;
+
+  const existingModuleNames = session.modules.map((m) => m.moduleName);
+  const library = getModuleLibrary();
+  const currentSet = new Set(existingModuleNames);
+  const libraryModules = library
+    .filter((e) => !currentSet.has(e.module.moduleName))
+    .map((e) => ({ name: e.module.moduleName, usedIn: e.usedIn }));
+
+  const systemPrompt = buildPlanModePrompt(
+    session.themeName,
+    session.brandAssets,
+    existingModuleNames,
+    libraryModules,
+    turnCount,
+  );
+
+  // Inline file context like the existing generators do.
+  const fileContexts = fileIds?.length ? getFileContexts(fileIds) : undefined;
+  let enrichedMessage = userMessage;
+  if (fileContexts?.length) {
+    for (const fc of fileContexts) {
+      if (fc.type === "document" && fc.extractedText) {
+        enrichedMessage += `\n\n---\n[Attached document: ${fc.originalName}]\n${fc.extractedText}`;
+      }
+    }
+  }
+
+  const result = await callAgent(engine, apiKey, model, {
+    systemPrompt,
+    messages: [{ role: "user", content: enrichedMessage }],
+    maxTokens: 8000,
+    onChunk,
+  });
+
+  if (result.type === "text") return result.text;
+  // Fallback (engines that may force structured output even without schema).
+  return JSON.stringify(result.data);
+}
+
+/**
+ * Check if plan mode is active in config.
+ */
+export function isPlanModeActive(): boolean {
+  return !!loadConfig().planMode;
 }
 
 /**

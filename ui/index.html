@@ -457,6 +457,15 @@
             </div>
           </div>
           <div class="chat__input-area">
+            <div class="chat__mode-bar">
+              <button class="plan-toggle" id="plan-mode-toggle" title="Plan mode — deliberate before generating" aria-pressed="false">
+                <span class="plan-toggle__indicator">
+                  <svg class="plan-toggle__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+                </span>
+                <span class="plan-toggle__label">Plan mode</span>
+                <span class="plan-toggle__state">Off</span>
+              </button>
+            </div>
             <div class="chat__file-chips" id="file-chips"></div>
             <div class="chat__input-wrapper">
               <textarea class="chat__input" id="chat-input" placeholder="Describe your landing page..." rows="1"></textarea>
@@ -488,6 +497,7 @@
       <main class="panel panel--right" id="panel-right">
         <div class="view-toggle" id="view-toggle">
           <button class="view-toggle__btn active" data-view="preview">Preview</button>
+          <button class="view-toggle__btn" data-view="plan" id="view-toggle-plan">Plan</button>
           <button class="view-toggle__btn" data-view="code">Code</button>
         </div>
 
@@ -502,6 +512,35 @@
               <div class="browser-chrome__url" id="browser-url">vibespot.app</div>
             </div>
             <iframe id="preview-frame" class="browser-chrome__frame" sandbox="allow-scripts allow-same-origin"></iframe>
+          </div>
+        </div>
+
+        <!-- Plan pane (deliberation phase) -->
+        <div class="plan-pane hidden" id="plan-pane">
+          <div class="plan-pane__scroll">
+            <div class="plan-pane__header">
+              <h2 class="plan-pane__title">Plan</h2>
+              <div class="plan-pane__header-actions">
+                <button class="plan-pane__icon-btn" id="plan-edit-toggle" title="Edit plan">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  <span>Edit</span>
+                </button>
+              </div>
+            </div>
+            <div class="plan-pane__content" id="plan-content">
+              <div class="plan-pane__empty">
+                <p>No plan yet.</p>
+                <p class="plan-pane__empty-hint">Toggle plan mode in the chat (icon next to send) and describe what you want to build. The assistant will ask clarifying questions and draft a plan here.</p>
+              </div>
+            </div>
+            <textarea class="plan-pane__editor hidden" id="plan-editor" spellcheck="false"></textarea>
+          </div>
+          <div class="plan-pane__footer">
+            <button class="btn btn--secondary plan-pane__discard" id="plan-discard-btn">Discard &amp; start over</button>
+            <div class="plan-pane__footer-spacer"></div>
+            <button class="btn btn--secondary hidden" id="plan-edit-cancel">Cancel</button>
+            <button class="btn btn--primary hidden" id="plan-edit-save">Save</button>
+            <button class="btn btn--primary plan-pane__approve" id="plan-approve-btn">Approve plan</button>
           </div>
         </div>
 
@@ -587,6 +626,7 @@
   <script src="/settings.js"></script>
   <script src="/upload-panel.js"></script>
   <script src="/chat.js"></script>
+  <script src="/plan.js"></script>
   <script src="/preview.js"></script>
   <script src="/field-editor.js"></script>
   <script src="/code-editor.js"></script>

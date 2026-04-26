@@ -219,11 +219,13 @@ export function scanThemeFromDisk(themePath: string): void {
   const sgPath = join(themePath, ".vibespot", "styleguide.md");
   const bvPath = join(themePath, ".vibespot", "brandvoice.md");
   const tcPath = join(themePath, ".vibespot", "theme-context.md");
-  if (existsSync(sgPath) || existsSync(bvPath) || existsSync(tcPath)) {
+  const planPath = join(themePath, ".vibespot", "plan.md");
+  if (existsSync(sgPath) || existsSync(bvPath) || existsSync(tcPath) || existsSync(planPath)) {
     if (!activeSession.brandAssets) activeSession.brandAssets = {};
     if (existsSync(sgPath)) activeSession.brandAssets.styleguide = safeRead(sgPath);
     if (existsSync(bvPath)) activeSession.brandAssets.brandvoice = safeRead(bvPath);
     if (existsSync(tcPath)) activeSession.brandAssets.themeContext = safeRead(tcPath);
+    if (existsSync(planPath)) activeSession.brandAssets.plan = safeRead(planPath);
   }
 
   // Scan template files and create per-template TemplateEntry objects

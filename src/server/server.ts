@@ -21,8 +21,10 @@ import {
 } from "./session.js";
 import { commitThemeState, commitTemplateState, isGitAvailable } from "./project-git.js";
 import { buildPreviewHtml, buildModulePreviewHtml } from "./preview.js";
-import { handleGenerateStream, handleAgenticGenerate, handleFigmaImport, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine } from "./ai-handler.js";
-import { loadConfig, getHubSpotPak, getActiveHubSpotAccount } from "../utils/config.js";
+import { handleGenerateStream, handleAgenticGenerate, handleFigmaImport, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine, handlePlanModeStream, isPlanModeActive } from "./ai-handler.js";
+import { handlePlanEditRoute, handlePlanDiscardRoute, savePlan, clearPlan } from "./routes/plan.js";
+import { parsePlanResponse } from "./plan-parser.js";
+import { loadConfig, saveConfig, getHubSpotPak, getActiveHubSpotAccount } from "../utils/config.js";
 import { detectHubSpotAuth, detectDataCenter, detectHubSpotAuthFromConfig } from "../utils/detect.js";
 import { applyAutoFixes, parseUploadErrors, parseApiErrors } from "./auto-fix.js";
 import { startStreamingJob, startJobSafe, getJob, addJobListener, removeJobListener } from "./process-manager.js";
@@ -477,6 +479,16 @@ function handleApiRoute(
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
+    case "/api/plan/edit":
+      if (method === "POST") handlePlanEditRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/plan/discard":
+      if (method === "POST") handlePlanDiscardRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
     default:
       // Prefix match for job polling: /api/settings/job/:id
       if (path.startsWith("/api/settings/job/") && method === "GET") {
@@ -510,10 +522,64 @@ function handleWsConnection(ws: WebSocket): void {
         const userMessage = String(msg.message || "");
         if (!userMessage.trim()) return;
 
+        const fileIds = Array.isArray(msg.fileIds) ? msg.fileIds as string[] : undefined;
+
+        // ---------------------------------------------------------------
+        // Plan-mode branch — DELIBERATION PHASE, no module generation.
+        //
+        // While planMode is active, the chat handler routes to the
+        // plan-mode stream and refuses to enter the agentic pipeline.
+        // Generation is reachable only via an explicit `plan_approve`
+        // WebSocket message, which clears the gate for one call.
+        // ---------------------------------------------------------------
+        if (isPlanModeActive()) {
+          addMessage("user", userMessage);
+          saveSession();
+
+          try {
+            ws.send(JSON.stringify({ type: "stream_status", content: "Planning..." }));
+            let fullResponse = "";
+            const fullText = await handlePlanModeStream(
+              userMessage,
+              (chunk) => {
+                fullResponse += chunk;
+                ws.send(JSON.stringify({ type: "stream", content: chunk }));
+              },
+              fileIds,
+            );
+
+            // Parse out plan + choices blocks; persist plan; emit cleaned chat.
+            const parsed = parsePlanResponse(fullText || fullResponse);
+
+            if (parsed.plan) {
+              savePlan(parsed.plan);
+              ws.send(JSON.stringify({ type: "plan_updated", plan: parsed.plan }));
+            }
+            if (parsed.choices) {
+              ws.send(JSON.stringify({
+                type: "plan_choices",
+                question: parsed.choices.question,
+                options: parsed.choices.options,
+              }));
+            }
+
+            // Persist the cleaned (chat-visible) content as the assistant message.
+            addMessage("assistant", parsed.cleanedContent);
+            saveSession();
+
+            ws.send(JSON.stringify({ type: "plan_complete", cleanedContent: parsed.cleanedContent }));
+            ws.send(JSON.stringify({ type: "generation_complete" }));
+          } catch (err) {
+            ws.send(JSON.stringify({
+              type: "error",
+              message: err instanceof Error ? err.message : String(err),
+            }));
+          }
+          break;
+        }
+
         addMessage("user", userMessage);
         saveSession();
-
-        const fileIds = Array.isArray(msg.fileIds) ? msg.fileIds as string[] : undefined;
 
         // Check if agentic mode should be used
         const agenticCheck = shouldUseAgenticMode();
@@ -1022,6 +1088,133 @@ ${errorContext}`;
         ws.send(JSON.stringify({ type: "pong" }));
         break;
 
+      // ---------------------------------------------------------------
+      // Plan approval — explicit gate clearance.
+      //
+      // The user clicked "Approve plan" in the Plan pane. We exit plan
+      // mode (so the next agentic call is allowed), prepend the plan as
+      // a design brief, and run the existing agentic pipeline.
+      // ---------------------------------------------------------------
+      case "plan_approve": {
+        const session = getSession();
+        if (!session) {
+          ws.send(JSON.stringify({ type: "error", message: "No active session" }));
+          break;
+        }
+        const planMd = session.brandAssets?.plan;
+        if (!planMd || !planMd.trim()) {
+          ws.send(JSON.stringify({ type: "error", message: "No plan to approve. Send a chat message first." }));
+          break;
+        }
+
+        // Flip plan mode off so this agentic call (and any subsequent ones
+        // until the user re-enables) goes through the normal pipeline.
+        saveConfig({ planMode: false });
+
+        const approvalMessage = "Implement the approved plan.";
+        addMessage("user", approvalMessage);
+        saveSession();
+
+        try {
+          const pipelineSteps: { step: string; label: string; decisions?: string[] }[] = [];
+          const pipelineModules: { name: string; status: "complete" | "failed" }[] = [];
+
+          const result = await handleAgenticGenerate(
+            approvalMessage,
+            (event) => {
+              if (event.type === "module_progress" && event.moduleFiles) {
+                const { moduleFiles, ...wsEvent } = event;
+                ws.send(JSON.stringify(wsEvent));
+              } else {
+                ws.send(JSON.stringify(event));
+              }
+
+              if (event.type === "agent_step") {
+                pipelineSteps.push({ step: event.step, label: event.label });
+              } else if (event.type === "agent_decision") {
+                const last = pipelineSteps[pipelineSteps.length - 1];
+                if (last) {
+                  if (!last.decisions) last.decisions = [];
+                  last.decisions.push(event.decision);
+                }
+              } else if (event.type === "design_system_ready") {
+                updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
+              } else if (event.type === "blueprint_ready") {
+                updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
+                reorderModules(event.moduleOrder);
+                ws.send(JSON.stringify({
+                  type: "modules_updated",
+                  modules: getOrderedModules().map((m) => m.moduleName),
+                }));
+              } else if (event.type === "module_progress" && event.status === "complete" && event.moduleFiles) {
+                updateModules({ modules: [{
+                  moduleName: event.module,
+                  fieldsJson: event.moduleFiles.fieldsJson,
+                  metaJson: event.moduleFiles.metaJson,
+                  moduleHtml: event.moduleFiles.moduleHtml,
+                  moduleCss: event.moduleFiles.moduleCss,
+                  moduleJs: event.moduleFiles.moduleJs,
+                }] });
+                ws.send(JSON.stringify({
+                  type: "modules_updated",
+                  modules: getOrderedModules().map((m) => m.moduleName),
+                }));
+                pipelineModules.push({ name: event.module, status: "complete" });
+              } else if (event.type === "module_progress" && event.status === "failed") {
+                pipelineModules.push({ name: event.module, status: "failed" });
+              }
+            },
+          );
+
+          applyPipelineResult(result, {
+            steps: pipelineSteps,
+            modules: pipelineModules,
+            stats: result.stats,
+          });
+
+          const currentSession = getSession();
+          if (currentSession) {
+            writeModulesToDisk();
+            const activeTpl = getActiveTemplate();
+            let commitHash: string | null = null;
+            if (activeTpl) {
+              const filePaths = activeTpl.moduleOrder.map((n: string) => `modules/${n}.module`);
+              if (activeTpl.templateFile) filePaths.push(activeTpl.templateFile);
+              if (activeTpl.sharedCss) filePaths.push(`css/${currentSession.themeName}-theme.css`);
+              if (activeTpl.sharedJs) filePaths.push(`js/${currentSession.themeName}-animations.js`);
+              commitHash = commitTemplateState(currentSession.themePath, activeTpl.id, "Approved plan: implementation", filePaths);
+            } else {
+              commitHash = commitThemeState(currentSession.themePath, "Approved plan: implementation");
+            }
+            if (commitHash) {
+              ws.send(JSON.stringify({ type: "version_created", hash: commitHash }));
+            }
+          }
+
+          ws.send(JSON.stringify({ type: "generation_complete" }));
+          ws.send(JSON.stringify({
+            type: "modules_updated",
+            modules: getOrderedModules().map((m) => m.moduleName),
+          }));
+        } catch (err) {
+          ws.send(JSON.stringify({
+            type: "error",
+            message: err instanceof Error ? err.message : String(err),
+          }));
+        }
+        break;
+      }
+
+      // ---------------------------------------------------------------
+      // Plan discard — clear plan and exit plan mode in one step.
+      // ---------------------------------------------------------------
+      case "plan_discard": {
+        clearPlan();
+        saveConfig({ planMode: false });
+        ws.send(JSON.stringify({ type: "plan_discarded" }));
+        break;
+      }
+
       default:
         ws.send(JSON.stringify({ type: "error", message: `Unknown type: ${msg.type}` }));
     }
@@ -1060,6 +1253,9 @@ ${errorContext}`;
         pageType: t.pageType,
         moduleCount: t.modules.length,
       })),
+      // Plan-mode state
+      planMode: !!cfg.planMode,
+      plan: session.brandAssets?.plan || "",
     }));
   } else {
     ws.send(JSON.stringify({ type: "needs_setup" }));

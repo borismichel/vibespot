@@ -144,6 +144,9 @@ export function handleSettingsStatusRoute(res: ServerResponse): void {
     enabledCLITools: config.enabledCLITools || [],
     agenticMode: config.agenticMode,
     agenticConcurrency: config.agenticConcurrency,
+    planMode: config.planMode || false,
+    extendedThinking: config.extendedThinking || false,
+    extendedThinkingBudget: config.extendedThinkingBudget || "medium",
     figmaToken: config.figmaToken ? "••••" + config.figmaToken.slice(-4) : null,
   };
 
@@ -604,7 +607,19 @@ export function handleSettingsGenericRoute(req: IncomingMessage, res: ServerResp
   readBody(req, (body) => {
     try {
       const data = JSON.parse(body);
-      const allowedKeys = ["agenticMode", "agenticConcurrency"];
+      const allowedKeys = [
+        "agenticMode",
+        "agenticConcurrency",
+        "planMode",
+        "extendedThinking",
+        "extendedThinkingBudget",
+      ];
+      // Validate enum
+      if (data.extendedThinkingBudget !== undefined &&
+          !["low", "medium", "high"].includes(data.extendedThinkingBudget)) {
+        jsonResponse(res, 400, { error: "extendedThinkingBudget must be 'low' | 'medium' | 'high'" });
+        return;
+      }
       const update: Record<string, unknown> = {};
 
       for (const key of allowedKeys) {

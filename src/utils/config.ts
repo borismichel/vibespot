@@ -43,6 +43,11 @@ export interface VibeSpotConfig {
   // Agentic pipeline — multi-stage decomposed AI generation
   agenticMode?: boolean;           // undefined = never prompted, true/false = user choice
   agenticConcurrency?: number;     // max parallel module generation calls (default 3)
+  // Plan mode — deliberation phase before generation
+  planMode?: boolean;              // when true, chat messages build a plan; generation only via approval
+  // Anthropic SDK feature flags (apply to anthropic-api + claude-oauth)
+  extendedThinking?: boolean;            // enable Claude extended thinking on reasoning-heavy stages
+  extendedThinkingBudget?: "low" | "medium" | "high"; // approximates 4k / 16k / 32k thinking tokens
 }
 
 const CONFIG_DIR = join(homedir(), ".vibespot");

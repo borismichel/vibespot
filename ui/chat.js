@@ -113,6 +113,11 @@ function handleWsMessage(msg) {
       if (historyBtn) {
         historyBtn.style.display = msg.gitAvailable ? "" : "none";
       }
+
+      // Hydrate plan-mode state (toggle + Plan pane content)
+      if (window.planController) {
+        window.planController.setInitialState(msg);
+      }
       break;
 
     case "stream":
@@ -199,6 +204,37 @@ function handleWsMessage(msg) {
       messagesEl.innerHTML = "";
       document.getElementById("module-items").innerHTML = "";
       document.getElementById("module-count").textContent = "0";
+      break;
+
+    case "plan_updated":
+      if (window.planController) window.planController.onPlanUpdated(msg.plan || "");
+      break;
+
+    case "plan_choices":
+      if (window.planController) window.planController.renderChoices(msg.question, msg.options);
+      break;
+
+    case "plan_complete":
+      // Replace the streaming bubble's content with the cleaned message
+      // (vibespot-plan + vibespot-choices fenced blocks stripped). We
+      // also overwrite streamBuffer so finishStreaming's final render
+      // doesn't re-introduce trailing <br> tags from the stripped block.
+      if (typeof msg.cleanedContent === "string") {
+        streamBuffer = msg.cleanedContent.trim();
+      }
+      if (streamingMsgEl) {
+        if (streamBuffer) {
+          streamingMsgEl.innerHTML = renderMarkdown(streamBuffer);
+        } else {
+          streamingMsgEl.innerHTML = '<em class="message__placeholder">Updated the plan in the Plan pane.</em>';
+        }
+      }
+      finishStreaming();
+      clearStreamStatus();
+      break;
+
+    case "plan_discarded":
+      if (window.planController) window.planController.onPlanDiscarded();
       break;
   }
 }
@@ -976,6 +1012,9 @@ function renderMarkdown(text) {
   text = text.replace(/```[\s\S]*?```/g, "");
   // Also strip unclosed code fences (truncated responses)
   text = text.replace(/```[\s\S]*$/g, "");
+  // Collapse runs of blank lines left behind by stripped fences (otherwise
+  // they become trailing <br> tags and produce visible empty space).
+  text = text.replace(/\n{3,}/g, "\n\n").trim();
 
   // Escape HTML to prevent XSS from AI/user content
   text = escapeHtml(text);
