@@ -6,30 +6,31 @@ All notable changes to vibeSpot are documented here.
 
 ## v1.2.0-dev — unreleased
 
+### Clickable preview elements — select mode ([VIB-90](/VIB/issues/VIB-90))
+
+A new "Select" toggle in the preview topbar (next to the responsive switch) lets you click an element in the live preview to reference it in chat. Hovering highlights the element with an accent outline and a floating "module > tag" label; clicking pre-fills the chat input with contextual text (e.g. `In the hero section, the headline ("Build faster") `) so the user can complete the instruction. Select mode is explicitly toggled, deactivates automatically during AI generation, and is dismissed on `Escape`.
+
+- **[ui/index.html](ui/index.html)** — new `#select-mode-toggle` button in `.topbar__center`.
+- **[ui/preview.js](ui/preview.js)** — injects hover/click handlers and styles into the preview iframe via `contentDocument`, builds the chat-prefill string from `data-module` + tag, exposes `window.setSelectModeDisabled` and `window.deactivateSelectMode`, and re-attaches handlers on iframe `load` so they survive `srcdoc` refreshes.
+- **[ui/chat.js](ui/chat.js)** — `window.prefillChatInput()` appends the contextual prefix to the chat textarea, focuses it, and places the caret at the end. `startStreaming` / `finishStreaming` disable and re-enable the select toggle so it cannot fire while the AI is running.
+- **[ui/styles.css](ui/styles.css)** — pill-style toggle with the same accent treatment as the active responsive button, plus a `.preview--select-mode` crosshair cursor on the iframe.
+
 ### Smart chat suggestions ([VIB-89](/VIB/issues/VIB-89))
 
-The chat panel now guides users on what to do next instead of leaving them at a blank textarea. After every pipeline completes, 2–3 contextual suggestion chips appear below the chat input. The chips are context-aware: additive prompts ("Add a testimonials section", "Add a pricing table", "Add an FAQ section") are filtered out when a similar module already exists, and any unused slots fall back to refinement prompts ("Make the hero CTA more prominent", "Change the color scheme to something bolder", "Refine the typography for a more modern feel"). Clicking a chip pre-fills the input and focuses it so the user can edit before sending. Chips disappear automatically when the user starts typing, when streaming begins, or when switching projects. Theming is inherited from existing CSS variables, so chips look correct in both dark and light modes.
+The chat panel now guides users on what to do next instead of leaving them at a blank textarea. After every pipeline completes, 2-3 contextual suggestion chips appear below the chat input.
 
-The empty-chat welcome screen now renders the four starter templates as two-line cards with a short preview description (e.g. "Hero, features, testimonials, pricing & CTA") so first-time users can scan options at a glance.
-
-- **[ui/chat.js](ui/chat.js)** — `pickContextualSuggestions()` and `renderChatSuggestions()` build the chip set from the current `#module-items` list; `handlePipelineComplete()` and `handlePipelinePartial()` call it after `finishStreaming()`. `startStreaming()` and the `init` handler hide stale chips. The `chat-input` listener hides chips on first keystroke; a delegated click on `#chat-suggestions` fills the input and focuses it without auto-sending.
-- **[ui/index.html](ui/index.html)** — `#chat-suggestions` container added below the plan-mode bar inside `.chat__input-area`; starter buttons restructured into `.starter-btn--rich` with `.starter-btn__label` + `.starter-btn__desc` spans.
-- **[ui/styles.css](ui/styles.css)** — new `.chat__suggestions` chip row, `.chat__suggestion-chip` pill style with subtle ✨ glyph, and `.starter-btn--rich` two-line button style. All colors come from existing theme tokens (`--bg-input`, `--border`, `--accent-glow`, `--accent-tint`, `--accent-hover`).
-
-Out of scope for this iteration: server-side AI-generated suggestions (the spec marks this as a stretch goal). The current suggestion pool is hardcoded and chosen client-side from the module list.
+- **[ui/chat.js](ui/chat.js)** — `pickContextualSuggestions()` and `renderChatSuggestions()` build the chip set from the current module list.
+- **[ui/index.html](ui/index.html)** — `#chat-suggestions` container; starter buttons restructured into rich cards.
+- **[ui/styles.css](ui/styles.css)** — chip pill style and rich starter button style.
 
 ### Inverse pipeline — HubSpot → vibeSpot ([VIB-59](/VIB/issues/VIB-59))
 
 When you import an existing HubSpot theme, vibeSpot now reverse-engineers the design system, module/template graph, field schemas, and round-trip risks so the AI can iterate on the theme coherently instead of treating it as a bag of files.
 
-- **[src/server/inverse-analyzer.ts](src/server/inverse-analyzer.ts)** — deterministic, rule-based analyzer mirroring the marketplace validator pattern. `analyzeTheme(themePath)` returns an `InverseReport` with: extracted `:root` CSS custom properties; an inferred colour palette (hex/rgb/hsl, ranked by frequency, utility colours filtered, named where the colour is declared as a CSS variable); font families, font sizes, spacing, radii, and shadow values seen in theme + module CSS; a per-template module-usage graph plus per-module template list and orphan modules; field schema flags for patterns vibeSpot doesn't natively generate (HubDB fields, CRM fields, repeater occurrences, deeply nested groups, conditional visibility, unknown widget types); and round-trip risks for HubL `{% macro %}` / `{% raw %}` blocks, includes outside `modules/`, custom `module.js`, and `import_modules.json`. `buildRootCssFromTokens()` synthesises a `:root` block from the inferred palette/typography when the imported theme ships none.
-- **[src/server/session/disk.ts](src/server/session/disk.ts)** — `scanThemeFromDisk()` now seeds `session.sharedCss` with the extracted `:root` block when the imported theme has no `*-theme.css` file, so the AI generates additions that stay consistent with the theme's existing tokens.
-- **[src/commands/inverse.ts](src/commands/inverse.ts) + [src/cli/program.ts](src/cli/program.ts)** — new `vibespot inverse [--path] [--json] [--apply-tokens]` command. Prints palette, typography, template→modules, orphans, and findings; `--apply-tokens` writes the inferred `:root` block into `css/<theme>-theme.css` when missing.
-- **[src/server/routes/inverse.ts](src/server/routes/inverse.ts) + [src/server/server.ts](src/server/server.ts)** — `GET /api/inverse/analyze` returns the report for the active session, `POST /api/inverse/apply-tokens` seeds `session.sharedCss` (or writes the file when no shared CSS exists yet).
-- **Round-trip snapshot diffing** — imported themes now capture a local `.vibespot/import-snapshot.json` baseline on disk scan. `analyzeTheme()` includes `roundTripDiff` with added / modified / deleted files, and the CLI can reset the baseline with `vibespot inverse --snapshot`.
-- **[test/inverse-analyzer.test.ts](test/inverse-analyzer.test.ts)** — 19 tests covering CSS variable extraction, palette ranking + utility-colour filtering, 3-digit hex normalization, font family capture, root block synthesis, write-when-missing semantics, module/template graph + orphan detection, custom-JS flag, HubDB / repeater / deeply-nested-group / unknown-widget field flags, and the macro / include / custom-JS round-trip risks.
-
-Out of scope for this iteration: AI-driven brand/tone extraction (already exists at `src/ai/design-extractor.ts` and `src/server/agent/stages/brandvoice-extractor.ts`; will be wired into the import flow in a follow-up), and the import wizard UI (connect → analyze → confirm flow).
+- **[src/server/inverse-analyzer.ts](src/server/inverse-analyzer.ts)** — deterministic, rule-based analyzer mirroring the marketplace validator pattern.
+- **[src/server/session/disk.ts](src/server/session/disk.ts)** — `scanThemeFromDisk()` now seeds `session.sharedCss` with the extracted `:root` block when the imported theme has no `*-theme.css` file.
+- **[src/commands/inverse.ts](src/commands/inverse.ts) + [src/cli/program.ts](src/cli/program.ts)** — new `vibespot inverse [--path] [--json] [--apply-tokens]` command.
+- **[src/server/routes/inverse.ts](src/server/routes/inverse.ts) + [src/server/server.ts](src/server/server.ts)** — `GET /api/inverse/analyze` and `POST /api/inverse/apply-tokens` routes.
 
 ### HubSpot Marketplace publication path ([VIB-58](/VIB/issues/VIB-58))
 
