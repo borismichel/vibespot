@@ -501,6 +501,16 @@
               </div>
             </div>
           </div>
+          <div class="history-timeline hidden" id="history-timeline" aria-label="Version history">
+            <button class="history-timeline__nav" id="history-timeline-undo" title="Undo (Ctrl+Z)" aria-label="Undo">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <div class="history-timeline__track" id="history-timeline-track"></div>
+            <button class="history-timeline__nav" id="history-timeline-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="history-timeline__tooltip hidden" id="history-timeline-tooltip" role="tooltip"></div>
+          </div>
           <div class="chat__input-area">
             <div class="chat__mode-bar">
               <button class="plan-toggle" id="plan-mode-toggle" title="Plan mode — deliberate before generating" aria-pressed="false">

@@ -5371,3 +5371,135 @@ body { display: flex; }
   font: inherit;
 }
 .marketplace-listing-form textarea { resize: vertical; }
+
+/* ---------------------------------------------------------------- History Timeline */
+/* Compact horizontal version-history strip above the chat input.   */
+.history-timeline {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-panel-solid);
+  flex-shrink: 0;
+  min-height: 32px;
+  max-height: 32px;
+}
+.history-timeline.hidden { display: none; }
+
+.history-timeline__nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.history-timeline__nav:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+.history-timeline__nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.history-timeline__track {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.history-timeline__track::-webkit-scrollbar { display: none; }
+
+.history-timeline__entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.history-timeline__entry:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+.history-timeline__entry--current {
+  background: var(--accent-tint);
+  border-color: var(--accent-glow);
+  color: var(--text);
+}
+.history-timeline__entry--initial {
+  font-style: italic;
+}
+.history-timeline__entry-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+.history-timeline__entry--current .history-timeline__entry-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+.history-timeline__entry-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-timeline__tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  max-width: 280px;
+  padding: 8px 10px;
+  background: var(--bg-panel-solid);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text);
+  pointer-events: none;
+}
+.history-timeline__tooltip.hidden { display: none; }
+.history-timeline__tooltip-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+.history-timeline__tooltip-meta {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+.history-timeline__tooltip-modules {
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
