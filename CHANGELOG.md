@@ -4,6 +4,22 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.1.2 — 2026-04-28
+
+Honest, current model dropdowns + a fix for the blank-on-open settings dialog.
+
+### Model Selection
+- **Specific Claude versions in Claude Code dropdown** — replaced the generic `opus`/`sonnet`/`haiku` aliases with pinned IDs (Claude Opus 4.7, Opus 4.6, Sonnet 4.6, Sonnet 4.5, Haiku 4.5). Picking a version now passes that exact ID to `claude --model` instead of letting the CLI pick whatever the alias resolves to today.
+- **Codex CLI dropdown shows current models** — added GPT-5.5 Codex, GPT-5 Codex, GPT-5.5, GPT-5, GPT-5 Mini, GPT-5 Pro, o4 Mini High, o4 Mini, o3 Pro, o3, o3 Mini, GPT-4o. Was stuck on `o4-mini` / `o3` / `gpt-4o`.
+- **Live model catalog now populates Codex CLI too** — when an OpenAI API key is configured, the `/v1/models` response feeds both the OpenAI API and Codex CLI dropdowns (cached 10 min).
+- **Live-fetch regex widened** — supports decimal-versioned IDs (`gpt-5.5*`, `gpt-4.1*`) and `-nano` / `-pro-high` reasoning variants.
+- **Static fallbacks added for Anthropic API, Claude OAuth, OpenAI API, Gemini API/CLI** — current versions show in the dropdown even before any API key is configured.
+
+### Bug Fixes
+- **Settings dialog opened to a blank page** — `btn-setup-settings` was registered as `addEventListener("click", openSettings)`, so the click `Event` was passed as the `tab` argument and overwrote `activeTab`. Wrapped in an arrow function so `openSettings()` is called with no argument and the AI tab renders by default.
+
+---
+
 ## v1.1.1 — 2026-04-26
 
 Hotfix: stop the agentic pipeline from creating duplicate modules when re-styling an existing page.

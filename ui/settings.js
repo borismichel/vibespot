@@ -1394,35 +1394,54 @@ function getModelsForEngine(engine) {
   switch (engine) {
     case "claude-code":
       return [
-        { id: "sonnet", label: "Claude Sonnet (default)" },
-        { id: "opus", label: "Claude Opus" },
-        { id: "haiku", label: "Claude Haiku" },
+        { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
+        { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
+        { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
+        { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+        { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
       ];
     case "anthropic-api":
     case "claude-oauth":
       return [
-        { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+        { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
         { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
+        { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
+        { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
         { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
       ];
     case "openai-api":
       return [
-        { id: "gpt-4o", label: "GPT-4o (default)" },
+        { id: "gpt-5.5", label: "GPT-5.5" },
+        { id: "gpt-5", label: "GPT-5 (default)" },
+        { id: "gpt-5-mini", label: "GPT-5 Mini" },
+        { id: "gpt-5-pro", label: "GPT-5 Pro" },
+        { id: "gpt-4o", label: "GPT-4o" },
         { id: "gpt-4o-mini", label: "GPT-4o Mini" },
-        { id: "o3", label: "o3" },
+        { id: "gpt-4.1", label: "GPT-4.1" },
         { id: "o4-mini", label: "o4 Mini" },
+        { id: "o3", label: "o3" },
+        { id: "o3-pro", label: "o3 Pro" },
       ];
     case "gemini-cli":
     case "gemini-api":
       return [
-        { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (default)" },
-        { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+        { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (default)" },
+        { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
         { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
       ];
     case "codex-cli":
       return [
-        { id: "o4-mini", label: "o4 Mini (default)" },
+        { id: "gpt-5.5-codex", label: "GPT-5.5 Codex" },
+        { id: "gpt-5-codex", label: "GPT-5 Codex (default)" },
+        { id: "gpt-5.5", label: "GPT-5.5" },
+        { id: "gpt-5", label: "GPT-5" },
+        { id: "gpt-5-mini", label: "GPT-5 Mini" },
+        { id: "gpt-5-pro", label: "GPT-5 Pro" },
+        { id: "o4-mini-high", label: "o4 Mini High" },
+        { id: "o4-mini", label: "o4 Mini" },
+        { id: "o3-pro", label: "o3 Pro" },
         { id: "o3", label: "o3" },
+        { id: "o3-mini", label: "o3 Mini" },
         { id: "gpt-4o", label: "GPT-4o" },
       ];
     default:
@@ -1432,10 +1451,10 @@ function getModelsForEngine(engine) {
 
 function getCurrentModel(engine, config) {
   switch (engine) {
-    case "claude-code": return config.claudeCodeModel || "sonnet";
+    case "claude-code": return config.claudeCodeModel || "claude-sonnet-4-6";
     case "anthropic-api":
     case "claude-oauth": return config.anthropicApiModel || "claude-sonnet-4-6";
-    case "openai-api": return config.openaiApiModel || "gpt-4o";
+    case "openai-api": return config.openaiApiModel || "gpt-5";
     default: return null;
   }
 }
@@ -1501,7 +1520,7 @@ document.getElementById("settings-overlay").addEventListener("click", (e) => {
   if (e.target.id === "settings-overlay") closeSettings();
 });
 
-document.getElementById("btn-setup-settings").addEventListener("click", openSettings);
+document.getElementById("btn-setup-settings").addEventListener("click", () => openSettings());
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !document.getElementById("settings-overlay").classList.contains("hidden")) {
