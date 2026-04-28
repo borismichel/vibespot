@@ -250,7 +250,7 @@ function populateProjectRail(info) {
 
       let stats = "";
       if (p.moduleCount != null) {
-        stats = p.moduleCount + " module" + (p.moduleCount !== 1 ? "s" : "");
+        stats = p.moduleCount + " section" + (p.moduleCount !== 1 ? "s" : "");
         if (p.templateCount > 1) stats += " \u00b7 " + p.templateCount + " templates";
         stats += p.updatedAt ? " \u00b7 " + timeAgo(p.updatedAt) : " \u00b7 on disk";
       } else {
