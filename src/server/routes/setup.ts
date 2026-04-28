@@ -149,8 +149,28 @@ function bootstrapFromStarter(themePath: string, themeName: string, starterId: s
   const session = getSession();
   if (!session) return;
 
-  session.modules = starter.modules.map((m) => ({ ...m }));
-  session.moduleOrder = [...starter.moduleOrder];
+  const modules = starter.modules.map((m) => ({ ...m }));
+  const moduleOrder = [...starter.moduleOrder];
+  const templateId = `lp-${themeName}`;
+
+  const entry: import("../session/types.js").TemplateEntry = {
+    id: templateId,
+    label: `${starter.name}`,
+    pageType: "landing_page",
+    templateFile: `templates/${templateId}.html`,
+    modules,
+    moduleOrder,
+    sharedCss: starter.sharedCss,
+    sharedJs: starter.sharedJs,
+    template: "",
+    messages: [],
+  };
+
+  session.templates = [entry];
+  session.activeTemplateId = templateId;
+
+  session.modules = modules;
+  session.moduleOrder = moduleOrder;
   session.sharedCss = starter.sharedCss;
   session.sharedJs = starter.sharedJs;
 
