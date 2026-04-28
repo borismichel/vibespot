@@ -145,7 +145,7 @@ function handleWsMessage(msg) {
       break;
 
     case "parse_warning":
-      appendSystemMessage(msg.message || "Module changes could not be applied.");
+      appendSystemMessage(msg.message || "Section changes could not be applied.");
       break;
 
     case "error":
@@ -246,7 +246,7 @@ function handleWsMessage(msg) {
 const STEP_LABELS = {
   analyzing: "Analyzing",
   designing: "Designing",
-  developing: "Developing",
+  developing: "Building",
   quality_check: "Quality Check",
 };
 const STEP_ORDER = ["analyzing", "designing", "developing", "quality_check"];
@@ -438,7 +438,7 @@ function handlePipelineComplete(msg) {
     // For questions, just show duration
     stats.textContent = `Answered in ${duration}`;
   } else {
-    stats.textContent = `Generated ${msg.modulesGenerated} module${msg.modulesGenerated === 1 ? "" : "s"} in ${duration}`;
+    stats.textContent = `Generated ${msg.modulesGenerated} section${msg.modulesGenerated === 1 ? "" : "s"} in ${duration}`;
     if (msg.modulesUnchanged > 0) {
       stats.textContent += ` (${msg.modulesUnchanged} unchanged)`;
     }
@@ -477,7 +477,7 @@ function handlePipelinePartial(msg) {
   const stats = document.createElement("div");
   stats.className = "pipeline-stats pipeline-stats--partial";
   const duration = formatDuration(msg.durationMs);
-  stats.textContent = `${msg.succeeded.length} modules succeeded, ${msg.failed.length} failed in ${duration}`;
+  stats.textContent = `${msg.succeeded.length} sections succeeded, ${msg.failed.length} failed in ${duration}`;
   const qualityStep = bubble.querySelector('[data-step="quality_check"]');
   if (qualityStep) {
     qualityStep.after(stats);
@@ -504,12 +504,12 @@ async function handleAgenticPrompt() {
     "vibeSpot can decompose AI generation into specialized agents:\n\n" +
     "• Intent Analyzer — classifies your request\n" +
     "• Page Architect — designs the page structure\n" +
-    "• Module Developer — generates each module in parallel\n" +
+    "• Section Developer — generates each section in parallel\n" +
     "• Validator — checks and auto-fixes errors\n\n" +
     "Tradeoffs:\n" +
     "✓ Better quality — each agent is focused on one task\n" +
     "✓ Structured output — eliminates JSON parsing failures\n" +
-    "✓ Only changed modules regenerated on edits\n" +
+    "✓ Only changed sections regenerated on edits\n" +
     "✗ Uses more calls per request (API calls or CLI subprocess calls)\n\n" +
     "You can change this anytime in Settings.",
     "Use Agentic Pipeline",
@@ -975,7 +975,7 @@ function finishStreaming() {
   if (streamingMsgEl && streamBuffer) {
     const rendered = renderMarkdown(streamBuffer);
     const visibleText = rendered.replace(/<[^>]*>/g, "").trim();
-    streamingMsgEl.innerHTML = visibleText ? rendered : "<em>Modules applied.</em>";
+    streamingMsgEl.innerHTML = visibleText ? rendered : "<em>Sections applied.</em>";
   }
 
   streamingMsgEl = null;
@@ -1099,7 +1099,7 @@ function appendRestoredAssistantMessage(text, timestamp, pipeline) {
       : "";
 
     const duration = formatDuration(pipeline.stats.durationMs);
-    let statsText = `Generated ${pipeline.stats.modulesGenerated} module${pipeline.stats.modulesGenerated === 1 ? "" : "s"} in ${duration}`;
+    let statsText = `Generated ${pipeline.stats.modulesGenerated} section${pipeline.stats.modulesGenerated === 1 ? "" : "s"} in ${duration}`;
     if (pipeline.stats.modulesUnchanged > 0) {
       statsText += ` (${pipeline.stats.modulesUnchanged} unchanged)`;
     }
@@ -1234,7 +1234,7 @@ function attachHistoryToggle() {
 async function doRollback(hash) {
   const scoped = currentTemplateId && !historyShowAll;
   const msg = scoped
-    ? "This template's modules will be restored to the selected version. Other templates are not affected."
+    ? "This template's sections will be restored to the selected version. Other templates are not affected."
     : "All theme files will be replaced, but chat history is preserved.";
   const ok = await vibeConfirm("Restore this version?", msg, { confirmLabel: "Restore", confirmClass: "btn--primary" });
   if (!ok) return;
@@ -1299,7 +1299,7 @@ function updateModuleList(moduleNames) {
       <span class="module-item__drag">⠿</span>
       <span class="module-item__name">${escapeHtml(name)}</span>
       <span class="module-item__edit" title="Edit fields">⚙</span>
-      <span class="module-item__delete" title="Delete module">&times;</span>
+      <span class="module-item__delete" title="Delete section">&times;</span>
     `;
 
     item.querySelector(".module-item__edit").addEventListener("click", (e) => {
@@ -1374,7 +1374,7 @@ async function toggleModuleLibraryDropdown() {
     );
 
     if (available.length === 0) {
-      dropdown.innerHTML = `<div class="module-library-dropdown__empty">No other modules available</div>`;
+      dropdown.innerHTML = `<div class="module-library-dropdown__empty">No other sections available</div>`;
     } else {
       dropdown.innerHTML = available.map((m) =>
         `<button class="module-library-dropdown__item" data-name="${escapeHtml(m.moduleName)}">
@@ -1460,7 +1460,7 @@ function confirmDeleteModule(moduleName) {
     overlay.innerHTML = `
       <div class="confirm-dialog">
         <div class="confirm-dialog__title">Remove "${escapeHtml(moduleName)}"?</div>
-        <p class="confirm-dialog__detail">Module will be removed from this page but kept in your library.</p>
+        <p class="confirm-dialog__detail">Section will be removed from this page but kept in your library.</p>
         <label class="confirm-dialog__toggle">
           <span class="confirm-dialog__toggle-switch">
             <input type="checkbox" data-role="toggle" />
