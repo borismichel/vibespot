@@ -30,6 +30,9 @@ export interface VibeSpotConfig {
   claudeCodeModel?: string;
   anthropicApiModel?: string;
   openaiApiModel?: string;
+  codexCliModel?: string;
+  geminiCliModel?: string;
+  geminiApiModel?: string;
   lastThemePath?: string;
   lastSourcePath?: string;
   // HubSpot account management

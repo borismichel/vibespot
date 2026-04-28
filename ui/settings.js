@@ -1447,6 +1447,9 @@ function getCurrentModel(engine, config) {
     case "anthropic-api":
     case "claude-oauth": return config.anthropicApiModel || "claude-sonnet-4-6";
     case "openai-api": return config.openaiApiModel || "gpt-5.5";
+    case "codex-cli": return config.codexCliModel || "gpt-5.5";
+    case "gemini-cli": return config.geminiCliModel || "gemini-2.5-pro";
+    case "gemini-api": return config.geminiApiModel || "gemini-2.5-pro";
     default: return null;
   }
 }

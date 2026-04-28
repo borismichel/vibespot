@@ -230,10 +230,19 @@ export function resolveAgenticEngine(config: ReturnType<typeof loadConfig>): {
       model = config.anthropicApiModel || "claude-sonnet-4-6";
       break;
     case "openai-api":
-      model = config.openaiApiModel || "gpt-4o";
+      model = config.openaiApiModel || "gpt-5.5";
       break;
     case "gemini-api":
-      model = "gemini-2.5-flash";
+      model = config.geminiApiModel || "gemini-2.5-pro";
+      break;
+    case "claude-code":
+      model = config.claudeCodeModel || "";
+      break;
+    case "codex-cli":
+      model = config.codexCliModel || "";
+      break;
+    case "gemini-cli":
+      model = config.geminiCliModel || "";
       break;
     default:
       model = "";
