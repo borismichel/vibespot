@@ -84,6 +84,7 @@ export function handleSetupInfoRoute(res: ServerResponse): void {
       id: session.id,
       themeName: session.themeName,
       moduleCount: session.modules.length,
+      isImported: !!session.isImported,
     } : null,
     hsInstalled,
     aiAvailable: env.availableEngines.length > 0,
@@ -285,7 +286,7 @@ async function finalizeFetchedTheme(themePath: string, themeName: string): Promi
   moduleCount: number;
   brandEnrichment: Awaited<ReturnType<typeof enrichImportedThemeBrandAssets>>;
 }> {
-  createSession(themePath, themeName);
+  createSession(themePath, themeName, { isImported: true });
   scanThemeFromDisk(themePath);
   saveSession();
 

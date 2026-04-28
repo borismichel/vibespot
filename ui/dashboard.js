@@ -26,6 +26,7 @@ const PAGE_TYPE_FULL_LABELS = {
 
 let currentDashboardTheme = "";
 let currentDashboardSessionId = "";
+let currentDashboardIsImported = false;
 
 async function showDashboard(themeName) {
   currentDashboardTheme = themeName;
@@ -46,7 +47,11 @@ async function showDashboard(themeName) {
     const themesRes = await fetch("/api/themes");
     const themesData = await themesRes.json();
     currentDashboardSessionId = themesData.activeTheme?.id || "";
-  } catch { currentDashboardSessionId = ""; }
+    currentDashboardIsImported = !!themesData.activeTheme?.isImported;
+  } catch {
+    currentDashboardSessionId = "";
+    currentDashboardIsImported = false;
+  }
 
   // Update URL
   const target = "#/dashboard/" + encodeURIComponent(themeName);
@@ -61,6 +66,7 @@ async function showDashboard(themeName) {
 function hideDashboard() {
   dashboardScreen.classList.add("hidden");
   currentDashboardTheme = "";
+  currentDashboardIsImported = false;
   closeModulePreview();
 }
 
@@ -82,7 +88,11 @@ async function refreshDashboard() {
     if (data.themePath) {
       document.getElementById("dashboard-theme-path-text").textContent = data.themePath;
     }
-    refreshInverseAnalysis();
+    if (currentDashboardIsImported) {
+      await refreshInverseAnalysis();
+    } else {
+      hideInverseAnalysis();
+    }
   } catch (err) {
     console.error("Failed to load dashboard:", err);
   }
@@ -91,6 +101,17 @@ async function refreshDashboard() {
 // ---------------------------------------------------------------------------
 // Import analysis
 // ---------------------------------------------------------------------------
+
+function hideInverseAnalysis() {
+  const section = document.getElementById("dashboard-inverse-section");
+  const summaryEl = document.getElementById("inverse-summary");
+  const status = document.getElementById("inverse-status");
+  const applyBtn = document.getElementById("btn-inverse-apply-tokens");
+  section?.classList.add("hidden");
+  if (summaryEl) summaryEl.innerHTML = "";
+  if (status) status.textContent = "Analyzing theme...";
+  if (applyBtn) applyBtn.classList.add("hidden");
+}
 
 async function refreshInverseAnalysis() {
   const section = document.getElementById("dashboard-inverse-section");
