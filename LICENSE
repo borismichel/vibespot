@@ -1,33 +1,103 @@
-vibeSpot - Personal Use License
+Functional Source License, Version 1.1, Apache 2.0 Future License
 
-Copyright (c) 2024-2026 Boris Michel. All rights reserved.
+Abbreviation
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to use,
-copy, and modify the Software for personal, non-commercial purposes only,
-subject to the following conditions:
+FSL-1.1-Apache-2.0
 
-1. NON-COMMERCIAL USE ONLY. The Software may not be used, in whole or in part,
-   for any commercial purpose. Commercial purpose includes, but is not limited
-   to: selling, licensing, sublicensing, or distributing the Software or any
-   derivative work for a fee; using the Software to provide paid services;
-   incorporating the Software into a product or service that is sold or
-   offered commercially.
+Notice
 
-2. NO REDISTRIBUTION FOR SALE. You may not sell, sublicense, or otherwise
-   transfer the Software or any derivative work to any third party for
-   commercial gain.
+Copyright 2024-2026 Boris Michel
 
-3. ATTRIBUTION. Any permitted use of the Software must retain this license
-   notice, the above copyright notice, and the following attribution:
-   "Built with vibeSpot by Boris Michel."
+Licensed Work
 
-4. NO WARRANTY. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
-   KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-   DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-   USE OR OTHER DEALINGS IN THE SOFTWARE.
+vibeSpot — AI-powered HubSpot CMS landing page builder
 
-For commercial licensing inquiries, contact Boris Michel.
+Change Date
+
+2031-04-26
+
+Change License
+
+Apache License, Version 2.0
+
+Terms and Conditions
+
+Licensor:             Boris Michel
+Licensed Work:        vibeSpot
+                      The Licensed Work is copyright 2024-2026 Boris Michel.
+Change Date:          2031-04-26
+Change License:       Apache License, Version 2.0
+
+For information about alternative licensing arrangements for the Licensed Work,
+please contact Boris Michel.
+
+Notice
+
+This license is not an Open Source license. However, the Licensed Work will
+eventually be made available under an Open Source license, as stated in this
+license.
+
+License text copyright 2023 MariaDB plc, All Rights Reserved.
+"Functional Source License" is a trademark of MariaDB plc.
+
+License Grant
+
+Subject to the terms and conditions of this license, Licensor hereby grants
+you a non-exclusive, worldwide, royalty-free, non-sublicensable, non-transferable
+license to use, copy, modify, create derivative works, publicly perform, publicly
+display, and redistribute the Licensed Work and any modified versions of the
+Licensed Work, subject to the conditions in the section below titled
+"Limitations."
+
+Limitations
+
+You may not make the Licensed Work available to third parties as a hosted or
+managed service, where the service provides users with access to any substantial
+set of the features or functionality of the Licensed Work.
+
+You may not move, change, disable, or circumvent the license key functionality
+in the Licensed Work, and you may not remove or obscure any functionality in the
+Licensed Work that is protected by the license key.
+
+You may not alter, remove, or obscure any licensing, copyright, or other notices
+of Licensor in the Licensed Work. Any use of Licensor's trademarks is subject
+to applicable law.
+
+Patents
+
+Licensor grants you a license, under any patent claims Licensor can license,
+or becomes able to license, to make, have made, use, sell, offer for sale,
+import and have imported the Licensed Work, in each case subject to the
+limitations and conditions in this license. This license does not cover any
+patent claims that you cause to be infringed by modifications or additions to
+the Licensed Work. If you or your company make any written claim that the
+Licensed Work (including any additions or modifications by anyone) infringes
+or contributes to infringement of any patent, your patent license for the
+Licensed Work granted under these terms ends immediately. If your company
+makes such a claim, your patent license ends immediately for work on behalf
+of your company.
+
+Change Date and Change License
+
+On the Change Date, or the fourth anniversary of the first publicly available
+distribution of a specific version of the Licensed Work under this license,
+whichever comes first, the Licensor hereby grants you rights under the terms
+of the Change License, and the rights granted in the sections above titled
+"License Grant" and "Patents" terminate.
+
+If there is no specified Change Date and the above condition regarding the
+fourth anniversary is not met, the Change License shall be deemed to be
+the Elastic License 2.0.
+
+Disclaimer
+
+THE LICENSED WORK IS PROVIDED "AS IS". LICENSOR HEREBY DISCLAIMS ALL
+WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+Limitation of Liability
+
+IN NO EVENT SHALL LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR
+IN CONNECTION WITH THE LICENSED WORK OR THE USE OR OTHER DEALINGS IN THE
+LICENSED WORK.

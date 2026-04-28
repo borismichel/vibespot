@@ -59,7 +59,7 @@
     "cli"
   ],
   "author": "Boris Michel",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "FSL-1.1-Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/borismichel/vibespot.git"
