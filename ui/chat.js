@@ -82,6 +82,7 @@ function handleWsMessage(msg) {
       messagesEl.innerHTML = "";
       document.getElementById("module-items").innerHTML = "";
       document.getElementById("module-count").textContent = "0";
+      hideChatSuggestions();
 
       if (msg.modules && msg.modules.length > 0) {
         updateModuleList(msg.modules);
@@ -607,6 +608,108 @@ function resetPipelineState() {
   pipelineModulesEl = null;
   pipelineEstimateEl = null;
   pipelineCurrentStep = null;
+
+  renderChatSuggestions();
+}
+
+// ---------------------------------------------------------------------------
+// Smart chat suggestions — contextual next-step chips after generation
+// ---------------------------------------------------------------------------
+
+let suggestionsVisible = false;
+
+function getCurrentModuleNames() {
+  return Array.from(document.querySelectorAll("#module-items .module-item"))
+    .map((el) => (el.dataset.module || "").toLowerCase());
+}
+
+function pickContextualSuggestions(moduleNames) {
+  const has = (kw) => moduleNames.some((n) => n.includes(kw));
+  const additive = [];
+
+  if (!has("testimonial") && !has("review") && !has("quote")) {
+    additive.push("Add a testimonials section");
+  }
+  if (!has("pricing") && !has("plan") && !has("tier")) {
+    additive.push("Add a pricing table");
+  }
+  if (!has("faq") && !has("question")) {
+    additive.push("Add an FAQ section");
+  }
+  if (!has("contact") && !has("form")) {
+    additive.push("Add a contact form");
+  }
+  if (!has("hero") && !has("banner")) {
+    additive.push("Add a hero section");
+  }
+  if (!has("feature") && !has("benefit")) {
+    additive.push("Add a features grid with icons");
+  }
+  if (!has("footer")) {
+    additive.push("Add a footer with social links");
+  }
+  if (!has("stat") && !has("metric") && !has("number")) {
+    additive.push("Add a stats section with key numbers");
+  }
+  if (!has("cta") && !has("call")) {
+    additive.push("Add a call-to-action section");
+  }
+
+  const refinements = [
+    has("hero") || has("banner")
+      ? "Make the hero CTA more prominent"
+      : "Strengthen the opening hook",
+    "Change the color scheme to something bolder",
+    "Refine the typography for a more modern feel",
+    "Add subtle animations to bring it to life",
+  ];
+
+  const out = [];
+  for (const s of additive) {
+    if (out.length >= 3) break;
+    out.push(s);
+  }
+  for (const r of refinements) {
+    if (out.length >= 3) break;
+    out.push(r);
+  }
+  return out;
+}
+
+function renderChatSuggestions() {
+  const container = document.getElementById("chat-suggestions");
+  if (!container) return;
+
+  if (isStreaming || (inputEl && inputEl.value && inputEl.value.length > 0)) {
+    hideChatSuggestions();
+    return;
+  }
+
+  const suggestions = pickContextualSuggestions(getCurrentModuleNames());
+  if (!suggestions.length) {
+    hideChatSuggestions();
+    return;
+  }
+
+  container.innerHTML = "";
+  for (const text of suggestions) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chat__suggestion-chip";
+    btn.dataset.suggestion = text;
+    btn.textContent = text;
+    container.appendChild(btn);
+  }
+  container.classList.remove("hidden");
+  suggestionsVisible = true;
+}
+
+function hideChatSuggestions() {
+  const container = document.getElementById("chat-suggestions");
+  if (!container) return;
+  container.classList.add("hidden");
+  container.innerHTML = "";
+  suggestionsVisible = false;
 }
 
 async function handleAgenticPrompt() {
@@ -922,6 +1025,9 @@ function startStreaming() {
   lastStreamStatus = "";
   sendBtn.disabled = true;
   streamStartTime = Date.now();
+
+  // Hide stale suggestion chips from the previous run
+  hideChatSuggestions();
 
   // Don't show generating preview here — agentic mode keeps the page visible.
   // For single-call mode, showGeneratingPreview() is called on first "stream" event.
@@ -1790,6 +1896,25 @@ inputEl.addEventListener("keydown", (e) => {
 inputEl.addEventListener("input", () => {
   inputEl.style.height = "auto";
   inputEl.style.height = Math.min(inputEl.scrollHeight, 150) + "px";
+
+  // Hide suggestion chips as soon as the user starts typing
+  if (suggestionsVisible && inputEl.value.length > 0) {
+    hideChatSuggestions();
+  }
+});
+
+// Suggestion chip click — pre-fill input and focus, do not auto-send so the
+// user can edit before pressing Enter.
+document.getElementById("chat-suggestions")?.addEventListener("click", (e) => {
+  const chip = e.target.closest(".chat__suggestion-chip");
+  if (!chip) return;
+  const text = chip.dataset.suggestion || chip.textContent || "";
+  inputEl.value = text;
+  inputEl.focus();
+  inputEl.setSelectionRange(text.length, text.length);
+  // Trigger the input event so the textarea resizes; this also collapses chips
+  inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+  hideChatSuggestions();
 });
 
 // Starter template buttons
