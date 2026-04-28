@@ -808,6 +808,9 @@ function startStreaming() {
   lastStreamStatus = "";
   sendBtn.disabled = true;
   streamStartTime = Date.now();
+  if (typeof window.setSelectModeDisabled === "function") {
+    window.setSelectModeDisabled(true);
+  }
 
   // Don't show generating preview here — agentic mode keeps the page visible.
   // For single-call mode, showGeneratingPreview() is called on first "stream" event.
@@ -950,6 +953,9 @@ function finishStreaming() {
   if (!isStreaming) return;
   isStreaming = false;
   sendBtn.disabled = false;
+  if (typeof window.setSelectModeDisabled === "function") {
+    window.setSelectModeDisabled(false);
+  }
 
   // Stop the timer and capture duration
   stopStreamTimer();
@@ -1655,6 +1661,19 @@ inputEl.addEventListener("input", () => {
   inputEl.style.height = "auto";
   inputEl.style.height = Math.min(inputEl.scrollHeight, 150) + "px";
 });
+
+// Pre-fill chat input from preview select-mode click
+window.prefillChatInput = function (text) {
+  if (!text) return;
+  const existing = inputEl.value;
+  const prefix = existing.trim() ? existing.replace(/\s+$/, "") + "\n\n" : "";
+  inputEl.value = prefix + text;
+  inputEl.style.height = "auto";
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 150) + "px";
+  inputEl.focus();
+  const end = inputEl.value.length;
+  inputEl.setSelectionRange(end, end);
+};
 
 // Starter template buttons
 document.getElementById("starter-templates").addEventListener("click", (e) => {

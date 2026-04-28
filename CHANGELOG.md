@@ -6,6 +6,15 @@ All notable changes to vibeSpot are documented here.
 
 ## v1.2.0-dev — unreleased
 
+### Clickable preview elements — select mode ([VIB-90](/VIB/issues/VIB-90))
+
+A new "Select" toggle in the preview topbar (next to the responsive switch) lets you click an element in the live preview to reference it in chat. Hovering highlights the element with an accent outline and a floating "module > tag" label; clicking pre-fills the chat input with contextual text (e.g. `In the hero section, the headline ("Build faster") `) so the user can complete the instruction. Select mode is explicitly toggled, deactivates automatically during AI generation, and is dismissed on `Escape`.
+
+- **[ui/index.html](ui/index.html)** — new `#select-mode-toggle` button in `.topbar__center`.
+- **[ui/preview.js](ui/preview.js)** — injects hover/click handlers and styles into the preview iframe via `contentDocument`, builds the chat-prefill string from `data-module` + tag, exposes `window.setSelectModeDisabled` and `window.deactivateSelectMode`, and re-attaches handlers on iframe `load` so they survive `srcdoc` refreshes.
+- **[ui/chat.js](ui/chat.js)** — `window.prefillChatInput()` appends the contextual prefix to the chat textarea, focuses it, and places the caret at the end. `startStreaming` / `finishStreaming` disable and re-enable the select toggle so it cannot fire while the AI is running.
+- **[ui/styles.css](ui/styles.css)** — pill-style toggle with the same accent treatment as the active responsive button, plus a `.preview--select-mode` crosshair cursor on the iframe.
+
 ### HubSpot Marketplace publication path ([VIB-58](/VIB/issues/VIB-58))
 
 vibeSpot now ships a Marketplace check workflow that audits a generated theme against HubSpot's Marketplace submission requirements before you submit through the developer portal. Available from both the editor (storefront icon in the topbar) and the CLI (`vibespot marketplace check`).
