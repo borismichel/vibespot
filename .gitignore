@@ -5,7 +5,7 @@ dist/
 LPAGE.md
 CLAUDE.md
 .claude/
-test/
+test/validate.ts
 _validation_workspace/
 workspace/
 vibespot/
