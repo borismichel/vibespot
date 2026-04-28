@@ -2413,107 +2413,356 @@ body { display: flex; }
   flex-shrink: 0;
 }
 
-/* Agentic pipeline step progress */
-.pipeline-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 4px 0;
-}
-
-.pipeline-step {
+/* Agentic pipeline — horizontal stepper */
+.pipeline-stepper {
   display: flex;
   align-items: flex-start;
+  gap: 4px;
+  padding: 6px 2px 4px;
+}
+
+.pipeline-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 6px;
-  font-size: 13px;
+  flex: 0 0 auto;
+  min-width: 64px;
+  text-align: center;
+  position: relative;
+}
+
+.pipeline-stage__indicator {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-elevated, rgba(255,255,255,0.04));
+  border: 1.5px solid var(--border);
   color: var(--text-muted);
-  flex-wrap: wrap;
-  margin-top: 6px;
+  position: relative;
+  transition: background 220ms ease, border-color 220ms ease, color 220ms ease, transform 220ms ease, box-shadow 220ms ease;
 }
 
-/* Steps inside the steps container don't need extra margin (container has gap) */
-.pipeline-steps > .pipeline-step {
-  margin-top: 0;
+.pipeline-stage__icon,
+.pipeline-stage__check {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 220ms ease, transform 220ms ease;
 }
 
-.pipeline-step--active {
-  color: var(--accent);
+.pipeline-stage__icon svg,
+.pipeline-stage__check svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pipeline-stage__check {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.pipeline-stage__label {
+  font-size: 11.5px;
+  color: var(--text-dim);
   font-weight: 500;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+  transition: color 220ms ease;
 }
 
-.pipeline-step--active .pipeline-step__icon {
-  animation: spin 0.8s linear infinite;
-  display: inline-block;
+/* Connector between stages — fills as progress advances */
+.pipeline-stage__connector {
+  flex: 1 1 auto;
+  height: 2px;
+  margin-top: 15px; /* visually align with the indicator center (32px / 2 - 1) */
+  background: var(--border);
+  border-radius: 1px;
+  position: relative;
+  overflow: hidden;
+  min-width: 16px;
 }
 
-.pipeline-step--done {
+.pipeline-stage__connector::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 420ms ease;
+}
+
+.pipeline-stage__connector--filled::after {
+  transform: scaleX(1);
+}
+
+/* Active stage: pulsing accent ring + spinning icon */
+.pipeline-stage--active .pipeline-stage__indicator {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-tint, rgba(232,97,58,0.06));
+  box-shadow: 0 0 0 0 var(--accent-glow, rgba(232,97,58,0.3));
+  animation: pipelineStagePulse 1.6s ease-in-out infinite;
+}
+
+.pipeline-stage--active .pipeline-stage__icon {
+  animation: pipelineIconSpin 2.4s linear infinite;
+}
+
+.pipeline-stage--active .pipeline-stage__label {
+  color: var(--accent);
+}
+
+@keyframes pipelineStagePulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow, rgba(232,97,58,0.3)); }
+  50%      { box-shadow: 0 0 0 6px transparent; }
+}
+
+@keyframes pipelineIconSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Done stage: filled, swap icon for checkmark with a pop */
+.pipeline-stage--done .pipeline-stage__indicator {
+  background: var(--success, #4ade80);
+  border-color: var(--success, #4ade80);
+  color: var(--bg-panel-solid, #131110);
+  animation: pipelineStagePop 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pipeline-stage--done .pipeline-stage__icon {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.pipeline-stage--done .pipeline-stage__check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.pipeline-stage--done .pipeline-stage__label {
   color: var(--success, #4ade80);
 }
 
-.pipeline-step--done .pipeline-step__icon {
-  animation: none;
-  display: inline-block;
+@keyframes pipelineStagePop {
+  0%   { transform: scale(0.92); }
+  60%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
 }
 
-.pipeline-step--done .pipeline-step__icon::after {
-  content: "";
+/* Failed stage: red ring */
+.pipeline-stage--failed .pipeline-stage__indicator {
+  background: var(--error, #ef4444);
+  border-color: var(--error, #ef4444);
+  color: #fff;
 }
 
-.pipeline-step__decision {
-  width: 100%;
-  font-size: 11.5px;
+.pipeline-stage--failed .pipeline-stage__label {
+  color: var(--error, #ef4444);
+}
+
+/* Detail line — current sub-label / decision */
+.pipeline-detail {
+  font-size: 12px;
   color: var(--text-dim);
-  padding-left: 20px;
-  margin-top: 2px;
+  padding: 2px 0 0;
+  min-height: 1.4em;
   white-space: pre-line;
 }
 
-/* Module progress cards during parallel generation */
+.pipeline-detail--in {
+  animation: pipelineDetailIn 220ms ease;
+}
+
+@keyframes pipelineDetailIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pipeline-detail-summary {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  padding: 4px 0 0;
+}
+
+.pipeline-detail-summary > summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.pipeline-detail-summary__row {
+  padding: 3px 0 0 14px;
+  white-space: pre-line;
+}
+
+/* Module progress cards during parallel generation — skeleton variant */
 .pipeline-modules {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 0 2px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  padding: 8px 0 2px;
 }
 
 .pipeline-module-card {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: 4px;
+  position: relative;
+  padding: 8px 10px;
+  border-radius: 6px;
   font-size: 12px;
-  background: var(--surface-elevated, rgba(255,255,255,0.05));
+  background: var(--surface-elevated, rgba(255,255,255,0.04));
   border: 1px solid var(--border);
+  overflow: hidden;
+  transition: border-color 220ms ease, background 220ms ease;
 }
 
-.pipeline-module-card--generating {
+.pipeline-module-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.pipeline-module-card__name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pipeline-module-card__status {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+  flex: 0 0 auto;
+}
+
+/* Mini progress bar — indeterminate during work, full on complete */
+.pipeline-module-card__progress {
+  height: 2px;
+  margin-top: 8px;
+  background: var(--border);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.pipeline-module-card__progress-bar {
+  height: 100%;
+  width: 30%;
+  background: var(--accent);
+  border-radius: 1px;
+  transform: translateX(-100%);
+}
+
+/* Skeleton text rows — shown only while in flight */
+.pipeline-module-card__skeleton {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pipeline-module-card__skeleton-row {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--border) 0%,
+    var(--border-hover) 50%,
+    var(--border) 100%
+  );
+  background-size: 200% 100%;
+  animation: pipelineSkeletonShimmer 1.4s ease-in-out infinite;
+}
+
+.pipeline-module-card__skeleton-row--lg { width: 90%; }
+.pipeline-module-card__skeleton-row--md { width: 75%; }
+.pipeline-module-card__skeleton-row--sm { width: 50%; }
+
+@keyframes pipelineSkeletonShimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+.pipeline-module-card--queued .pipeline-module-card__skeleton-row {
+  animation-play-state: paused;
+  opacity: 0.5;
+}
+
+.pipeline-module-card--generating,
+.pipeline-module-card--validating {
   border-color: var(--accent);
-  color: var(--accent);
+}
+
+.pipeline-module-card--generating .pipeline-module-card__progress-bar,
+.pipeline-module-card--validating .pipeline-module-card__progress-bar,
+.pipeline-module-card--retrying .pipeline-module-card__progress-bar {
+  animation: pipelineProgressIndeterminate 1.6s ease-in-out infinite;
+}
+
+.pipeline-module-card--retrying {
+  border-color: var(--warning, #f59e0b);
+}
+
+.pipeline-module-card--retrying .pipeline-module-card__progress-bar {
+  background: var(--warning, #f59e0b);
 }
 
 .pipeline-module-card--complete {
   border-color: var(--success, #4ade80);
+}
+
+.pipeline-module-card--complete .pipeline-module-card__skeleton {
+  display: none;
+}
+
+.pipeline-module-card--complete .pipeline-module-card__progress {
+  background: transparent;
+}
+
+.pipeline-module-card--complete .pipeline-module-card__progress-bar {
+  width: 100%;
+  transform: translateX(0);
+  background: var(--success, #4ade80);
+}
+
+.pipeline-module-card--complete .pipeline-module-card__status {
   color: var(--success, #4ade80);
 }
 
 .pipeline-module-card--failed {
   border-color: var(--error, #ef4444);
+}
+
+.pipeline-module-card--failed .pipeline-module-card__skeleton {
+  display: none;
+}
+
+.pipeline-module-card--failed .pipeline-module-card__progress-bar {
+  width: 100%;
+  transform: translateX(0);
+  background: var(--error, #ef4444);
+}
+
+.pipeline-module-card--failed .pipeline-module-card__status {
   color: var(--error, #ef4444);
 }
 
-.pipeline-module-card--retrying {
-  border-color: var(--warning, #f59e0b);
-  color: var(--warning, #f59e0b);
+@keyframes pipelineProgressIndeterminate {
+  0%   { transform: translateX(-100%); width: 30%; }
+  50%  { width: 50%; }
+  100% { transform: translateX(330%); width: 30%; }
 }
 
-.pipeline-module-card__name {
-  font-weight: 500;
-}
-
-.pipeline-module-card__status {
-  font-size: 11px;
-  opacity: 0.8;
+/* Restored history view: hide skeleton + progress placeholders */
+.pipeline-modules--restored .pipeline-module-card__progress,
+.pipeline-modules--restored .pipeline-module-card__skeleton {
+  display: none;
 }
 
 .pipeline-answer {
@@ -2535,17 +2784,69 @@ body { display: flex; }
   color: var(--warning, #f59e0b);
 }
 
-.pipeline-timer {
+.pipeline-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0 0;
   font-size: 12px;
   color: var(--text-muted, #999);
-  padding: 6px 0 0;
+  font-variant-numeric: tabular-nums;
 }
 
-.pipeline-modules-restored {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 0;
+.pipeline-timer {
+  flex: 0 0 auto;
+}
+
+.pipeline-estimate {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+}
+
+/* Mobile / narrow chat panes — flex-wrap stepper, single-column module grid */
+@media (max-width: 520px) {
+  .pipeline-stepper {
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+  .pipeline-stage {
+    flex: 1 1 22%;
+    min-width: 0;
+  }
+  .pipeline-stage__label {
+    font-size: 10.5px;
+  }
+  .pipeline-stage__connector {
+    flex: 0 0 8px;
+    min-width: 8px;
+  }
+  .pipeline-modules {
+    grid-template-columns: 1fr;
+  }
+  .pipeline-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+}
+
+/* Reduced motion — disable spinners and shimmer */
+@media (prefers-reduced-motion: reduce) {
+  .pipeline-stage--active .pipeline-stage__indicator,
+  .pipeline-stage--active .pipeline-stage__icon,
+  .pipeline-module-card__skeleton-row,
+  .pipeline-module-card--generating .pipeline-module-card__progress-bar,
+  .pipeline-module-card--validating .pipeline-module-card__progress-bar,
+  .pipeline-module-card--retrying .pipeline-module-card__progress-bar,
+  .pipeline-stage--done .pipeline-stage__indicator {
+    animation: none !important;
+  }
+  .pipeline-stage__connector::after,
+  .pipeline-detail--in {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 .chat-msg__meta {
