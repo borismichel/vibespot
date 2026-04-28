@@ -22,7 +22,7 @@ import {
 import { commitThemeState, commitTemplateState, isGitAvailable } from "./project-git.js";
 import { buildPreviewHtml, buildModulePreviewHtml } from "./preview.js";
 import { handleGenerateStream, handleAgenticGenerate, handleFigmaImport, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine, handlePlanModeStream, isPlanModeActive } from "./ai-handler.js";
-import { handlePlanEditRoute, handlePlanDiscardRoute, savePlan, clearPlan } from "./routes/plan.js";
+import { handlePlanEditRoute, handlePlanDiscardRoute, handlePlanTemplatesRoute, handlePlanTemplateRoute, savePlan, clearPlan } from "./routes/plan.js";
 import { parsePlanResponse } from "./plan-parser.js";
 import { loadConfig, saveConfig, getHubSpotPak, getActiveHubSpotAccount } from "../utils/config.js";
 import { detectHubSpotAuth, detectDataCenter, detectHubSpotAuthFromConfig } from "../utils/detect.js";
@@ -486,6 +486,16 @@ function handleApiRoute(
 
     case "/api/plan/discard":
       if (method === "POST") handlePlanDiscardRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/plan/templates":
+      if (method === "GET") handlePlanTemplatesRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/plan/template":
+      if (method === "POST") handlePlanTemplateRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 

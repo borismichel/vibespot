@@ -4531,3 +4531,98 @@ body { display: flex; }
 }
 .plan-pane__discard:hover { opacity: 1; color: var(--danger, #d43); }
 .plan-pane__approve { font-weight: 600; }
+
+/* ---- Plan-mode template picker ---- */
+.plan-templates {
+  padding: 32px 24px 16px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.plan-templates__title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+.plan-templates__hint {
+  margin: 0 0 20px;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.plan-templates__error {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius-sm);
+  color: var(--error);
+  font-size: 12px;
+}
+.plan-templates--loading .plan-templates__hint {
+  text-align: center;
+  padding: 32px 0;
+}
+.plan-templates__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.plan-template {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+  color: var(--text);
+}
+.plan-template:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+.plan-template:active { transform: translateY(1px); }
+.plan-template.is-loading {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.plan-template__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.plan-template__icon svg {
+  width: 18px;
+  height: 18px;
+}
+.plan-template__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.plan-template__label {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+}
+.plan-template__desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+.plan-template--blank .plan-template__icon {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+}

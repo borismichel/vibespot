@@ -762,6 +762,9 @@ vibespot</code></pre>
     <li><strong>Refine.</strong> Subsequent messages tweak the plan. "Move the FAQ above the pricing." "Change the primary CTA to 'Book a demo'." The AI confirms what changed in chat and updates the plan in the pane. It only asks clarifying questions when your edit creates a new ambiguity.</li>
   </ol>
 
+  <h4>Plan-mode templates (skip Understand)</h4>
+  <p>For common page types, the cold-start <em>Understand</em> phase is unnecessary. When the Plan pane is empty, vibeSpot shows a picker of pre-canned templates &mdash; SaaS landing, e-commerce product, event registration, blog/content hub, portfolio, agency/services, restaurant. Picking one seeds <code>.vibespot/plan.md</code> with goal, audience, primary CTA, suggested kebab-case modules, brand/tone, and a tailored "Open questions" list. The next AI turn skips straight to those page-specific questions instead of asking generic ones. Pick <strong>Blank plan</strong> to keep the original free-form behavior.</p>
+
   <h3 id="plan-mode-pane">The Plan Pane &amp; Inline Editing</h3>
   <p>The <strong>Plan</strong> tab in the right pane (between Preview and Code) is the source of truth for the current plan. While plan mode is on, this tab auto-selects when you send a message so the latest plan is always visible.</p>
   <p>Two modes inside the pane:</p>

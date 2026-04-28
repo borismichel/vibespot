@@ -1,8 +1,10 @@
 /**
  * HTTP routes for plan mode (the deliberation phase before generation).
  *
- * - POST /api/plan/edit     — overwrite the plan markdown (inline editor)
- * - POST /api/plan/discard  — clear the plan and exit plan mode
+ * - POST /api/plan/edit       — overwrite the plan markdown (inline editor)
+ * - POST /api/plan/discard    — clear the plan and exit plan mode
+ * - GET  /api/plan/templates  — list available plan-mode templates
+ * - POST /api/plan/template   — apply a chosen template as the seed plan
  *
  * Approval-triggered generation happens via the existing WebSocket flow,
  * not as a separate endpoint — see server.ts where the chat handler
@@ -17,6 +19,7 @@ import { jsonResponse, readJsonBody } from "../route-helpers.js";
 import { getSession, saveSession } from "../session.js";
 import { saveConfig } from "../../utils/config.js";
 import { log } from "../log.js";
+import { listPlanTemplateMetadata, getPlanTemplate } from "../plan-templates.js";
 
 const PLAN_FILENAME = "plan.md";
 
@@ -100,5 +103,53 @@ export function handlePlanDiscardRoute(req: IncomingMessage, res: ServerResponse
     clearPlan();
     saveConfig({ planMode: false });
     jsonResponse(res, 200, { ok: true });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/plan/templates  — list available plan-mode templates
+// ---------------------------------------------------------------------------
+
+export function handlePlanTemplatesRoute(_req: IncomingMessage, res: ServerResponse): void {
+  jsonResponse(res, 200, { templates: listPlanTemplateMetadata() });
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/plan/template  — apply a template as the seed plan
+//
+// Body: { templateId: string }
+// Behavior: writes the template body to .vibespot/plan.md and the session,
+// flips plan mode on (so subsequent chat messages are routed to plan mode),
+// and returns the seeded plan markdown.
+// ---------------------------------------------------------------------------
+
+export function handlePlanTemplateRoute(req: IncomingMessage, res: ServerResponse): void {
+  readJsonBody<{ templateId?: string }>(req, res, (body) => {
+    const session = getSession();
+    if (!session) {
+      jsonResponse(res, 400, { error: "No active session" });
+      return;
+    }
+
+    const templateId = typeof body.templateId === "string" ? body.templateId.trim() : "";
+    if (!templateId) {
+      jsonResponse(res, 400, { error: "templateId is required" });
+      return;
+    }
+
+    const template = getPlanTemplate(templateId);
+    if (!template) {
+      jsonResponse(res, 404, { error: `Unknown plan template: ${templateId}` });
+      return;
+    }
+
+    savePlan(template.body);
+    saveConfig({ planMode: true });
+    jsonResponse(res, 200, {
+      ok: true,
+      templateId: template.id,
+      label: template.label,
+      plan: template.body,
+    });
   });
 }
