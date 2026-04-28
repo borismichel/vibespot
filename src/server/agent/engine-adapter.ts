@@ -534,23 +534,29 @@ async function callGemini(
  */
 function resolveCLIBinary(
   engine: AgentEngine,
+  model: string,
   opts?: AgentCallOptions,
 ): { bin: string; args: string[] } {
   switch (engine) {
     case "claude-code": {
-      const config = loadConfig();
       const args = ["--print"];
-      if (config.claudeCodeModel) args.push("--model", config.claudeCodeModel);
+      if (model) args.push("--model", model);
       // Web Search is exposed via Claude Code's tool allowlist. We add to
       // the existing default toolset rather than replacing it (using the
       // additive form `--allowedTools=WebSearch`).
       if (opts?.enableWebSearch) args.push("--allowedTools=WebSearch");
       return { bin: "claude", args };
     }
-    case "gemini-cli":
-      return { bin: "gemini", args: [] };
-    case "codex-cli":
-      return { bin: "codex", args: ["exec", "--full-auto"] };
+    case "gemini-cli": {
+      const args: string[] = [];
+      if (model) args.push("-m", model);
+      return { bin: "gemini", args };
+    }
+    case "codex-cli": {
+      const args = ["exec", "--full-auto"];
+      if (model) args.push("-m", model);
+      return { bin: "codex", args };
+    }
     default:
       throw new Error(`Not a CLI engine: ${engine}`);
   }
@@ -661,7 +667,7 @@ async function callAgentCLI(
   model: string,
   opts: AgentCallOptions,
 ): Promise<AgentCallResult> {
-  const { bin, args } = resolveCLIBinary(engine, opts);
+  const { bin, args } = resolveCLIBinary(engine, model, opts);
   const prompt = buildCLIPrompt(opts);
 
   // Claude Code: use stream-json so we get structured events (assistant

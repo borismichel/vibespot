@@ -4,6 +4,29 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.1.3 — 2026-04-28
+
+Hotfix: model selection now persists for Codex CLI, Gemini CLI, and Gemini API engines, and the chosen model is actually passed to the CLI subprocess.
+
+### The Bug
+Selecting any non-default model in the Codex CLI dropdown (or Gemini CLI / Gemini API) immediately reverted to the first option after save. Root cause spanned four layers:
+
+1. `VibeSpotConfig` had no fields for `codexCliModel` / `geminiCliModel` / `geminiApiModel`.
+2. `handleSettingsEngineRoute`'s switch had no cases for those engines, so `POST /api/settings/engine` saved `aiEngine` but silently dropped `model`.
+3. `handleSettingsStatusRoute` didn't return those fields on the status payload.
+4. `getCurrentModel(engine, config)` returned `null` for those engines, so the dropdown's "selected" option fell through to the HTML default — the first `<option>` in the list, which carried the "(default)" label.
+
+Even with persistence fixed, the runtime invocation in `engine-adapter.ts:resolveCLIBinary` didn't pass `-m` to `codex` or `gemini`, and `ai-handler.ts:resolveAgenticEngine` returned an empty model string for CLI engines. So a user picking a Codex model would have seen the dropdown stick but the subprocess still run with whatever `codex exec` defaults to.
+
+### The Fix
+- **[config.ts](src/utils/config.ts)** — Added `codexCliModel`, `geminiCliModel`, `geminiApiModel` to `VibeSpotConfig`.
+- **[routes/settings.ts](src/server/routes/settings.ts)** — Added the missing switch cases in `handleSettingsEngineRoute`. Status payload now includes the new fields.
+- **[ui/settings.js](ui/settings.js)** — `getCurrentModel` returns the persisted value (or a sensible default) for all engines instead of `null`.
+- **[engine-adapter.ts](src/server/agent/engine-adapter.ts)** — `resolveCLIBinary` now takes a `model` parameter and appends `--model`/`-m` to claude / codex / gemini CLI invocations when set.
+- **[ai-handler.ts](src/server/ai-handler.ts)** — `resolveAgenticEngine` populates `model` from the new config fields for CLI engines, so the value flows from settings → pipeline → CLI subprocess.
+
+---
+
 ## v1.1.2 — 2026-04-28
 
 Honest, current model dropdowns + a fix for the blank-on-open settings dialog.

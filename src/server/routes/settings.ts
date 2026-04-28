@@ -212,6 +212,9 @@ export function handleSettingsStatusRoute(res: ServerResponse): void {
     claudeCodeModel: config.claudeCodeModel || null,
     anthropicApiModel: config.anthropicApiModel || null,
     openaiApiModel: config.openaiApiModel || null,
+    codexCliModel: config.codexCliModel || null,
+    geminiCliModel: config.geminiCliModel || null,
+    geminiApiModel: config.geminiApiModel || null,
     hubspotUploadMode: config.hubspotUploadMode || "api",
     hubspotAccounts: (config.hubspotAccounts || []).map((a: HubSpotAccountConfig) => ({
       portalId: a.portalId,
@@ -280,6 +283,15 @@ export function handleSettingsEngineRoute(req: IncomingMessage, res: ServerRespo
             break;
           case "openai-api":
             configUpdate.openaiApiModel = model;
+            break;
+          case "codex-cli":
+            configUpdate.codexCliModel = model;
+            break;
+          case "gemini-cli":
+            configUpdate.geminiCliModel = model;
+            break;
+          case "gemini-api":
+            configUpdate.geminiApiModel = model;
             break;
         }
       }

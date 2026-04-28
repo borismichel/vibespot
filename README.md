@@ -180,6 +180,9 @@ Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, Figma, GitH
 
 ## What's New
 
+### v1.1.3
+- **Model selection persists for Codex CLI, Gemini CLI, and Gemini API** — picking a non-default model used to revert because the `/api/settings/engine` route had no cases for those engines, no config fields existed, and `getCurrentModel` returned `null` (so the dropdown reset to the first option). Added the config fields, route persistence, UI lookup, and runtime `--model`/`-m` flag plumbing into the CLI subprocess invocation.
+
 ### v1.1.2
 - **Honest model dropdowns** — replaced generic `opus`/`sonnet`/`haiku` aliases in the Claude Code dropdown with specific version IDs (Opus 4.7, Sonnet 4.6, Haiku 4.5, etc.) so picking a version actually pins it. Codex CLI dropdown now lists GPT-5.5, GPT-5.5 Pro, GPT-5.3 Codex, GPT-5.2 Codex, GPT-5.1 Codex Max/Mini, GPT-5.4 Mini/Nano, Codex Mini — no more outdated `o4-mini` / `o3` / `gpt-4o` only.
 - **Live model catalog covers Codex CLI** — when an OpenAI API key is configured, both OpenAI API and Codex CLI dropdowns get populated from `/v1/models` (cached 10 min). New OpenAI releases show up automatically.
