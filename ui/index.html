@@ -83,33 +83,70 @@
 
         <!-- Main action buttons -->
         <div class="setup__options" id="setup-options">
-          <div class="setup__actions">
-            <button class="setup__action-btn" data-action="starter">
-              <span class="setup__action-icon">&#9733;</span>
-              <span>Template</span>
+
+          <!-- Returning users: recent projects (auto-shown when projects exist) -->
+          <div class="setup__recent hidden" id="setup-recent">
+            <div class="setup__recent-header">
+              <span class="setup__recent-title">Continue where you left off</span>
+              <button type="button" class="setup__recent-all hidden" id="setup-recent-all">View all</button>
+            </div>
+            <div class="setup__recent-list" id="setup-recent-list"></div>
+          </div>
+
+          <!-- Primary path: describe-it prompt -->
+          <div class="setup__prompt-card" id="setup-prompt-card">
+            <textarea
+              class="setup__prompt-input"
+              id="setup-prompt-input"
+              rows="3"
+              placeholder="Describe the landing page you want to build..."
+            ></textarea>
+            <div class="setup__prompt-row">
+              <span class="setup__prompt-hint" id="setup-prompt-hint">Press &#8984;&#8629; or click Build to start</span>
+              <button class="btn btn--primary setup__prompt-submit" id="setup-prompt-submit" disabled>
+                <span class="setup__prompt-submit-icon">&#9650;</span>
+                <span>Build</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Secondary path: pick a template -->
+          <div class="setup__secondary">
+            <button class="setup__secondary-btn" data-action="starter">
+              <span class="setup__secondary-icon">&#9733;</span>
+              <span class="setup__secondary-label">Start from Template</span>
+              <span class="setup__secondary-meta">Browse pre-built starters</span>
             </button>
-            <button class="setup__action-btn" data-action="new">
-              <span class="setup__action-icon">&#43;</span>
-              <span>Blank Theme</span>
+          </div>
+
+          <!-- More ways to start: collapsible advanced options -->
+          <div class="setup__more">
+            <button type="button" class="setup__more-toggle" id="setup-more-toggle" aria-expanded="false" aria-controls="setup-more-panel">
+              <span>More ways to start</span>
+              <span class="setup__more-chevron" aria-hidden="true">&#9662;</span>
             </button>
-            <button class="setup__action-btn" data-action="continue">
-              <span class="setup__action-icon">&#9654;</span>
-              <span>Continue</span>
-            </button>
-            <button class="setup__action-btn" data-action="download">
-              <span class="setup__action-icon">&#8595;</span>
-              <span>From HubSpot</span>
-            </button>
-            <button class="setup__action-btn" data-action="figma">
-              <span class="setup__action-icon">&#9670;</span>
-              <span>From Figma</span>
-              <span class="setup__action-badge">Beta</span>
-            </button>
-            <button class="setup__action-btn" data-action="convert">
-              <span class="setup__action-icon">&#8634;</span>
-              <span>From React</span>
-              <span class="setup__action-badge">Beta</span>
-            </button>
+            <div class="setup__more-panel hidden" id="setup-more-panel">
+              <div class="setup__actions">
+                <button class="setup__action-btn" data-action="new">
+                  <span class="setup__action-icon">&#43;</span>
+                  <span>Blank Theme</span>
+                </button>
+                <button class="setup__action-btn" data-action="download">
+                  <span class="setup__action-icon">&#8595;</span>
+                  <span>From HubSpot</span>
+                </button>
+                <button class="setup__action-btn" data-action="figma">
+                  <span class="setup__action-icon">&#9670;</span>
+                  <span>From Figma</span>
+                  <span class="setup__action-badge">Beta</span>
+                </button>
+                <button class="setup__action-btn" data-action="convert">
+                  <span class="setup__action-icon">&#8634;</span>
+                  <span>From React</span>
+                  <span class="setup__action-badge">Beta</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Expandable panels (one visible at a time) -->
