@@ -4,10 +4,39 @@
 
 const previewFrame = document.getElementById("preview-frame");
 
+// Highlights to apply once the iframe finishes loading after the next refresh.
+let pendingChangedModules = null;
+let pendingNewModules = null;
+
+previewFrame.addEventListener("load", () => {
+  if (!pendingChangedModules && !pendingNewModules) return;
+  const changed = pendingChangedModules;
+  const fresh = pendingNewModules;
+  pendingChangedModules = null;
+  pendingNewModules = null;
+  try {
+    const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+    if (!doc || !doc.body) return;
+    ensureChangeHighlightStyles(doc);
+    if (fresh && fresh.length) animateNewModules(doc, fresh);
+    if (changed && changed.length) highlightChangedModules(doc, changed, fresh || []);
+  } catch {
+    // cross-origin — skip
+  }
+});
+
 /**
  * Refresh the preview iframe by reloading from /preview endpoint.
+ *
+ * @param {Object} [opts]
+ * @param {string[]} [opts.changedModules] Module names that were just regenerated.
+ * @param {string[]} [opts.newModules]     Subset of changedModules that are first-time additions.
  */
-function refreshPreview() {
+function refreshPreview(opts) {
+  if (opts && (opts.changedModules || opts.newModules)) {
+    pendingChangedModules = opts.changedModules || null;
+    pendingNewModules = opts.newModules || null;
+  }
   // Use srcdoc approach: fetch preview HTML and set as srcdoc
   // This avoids cache issues and allows the iframe to update smoothly
   fetch("/preview")
@@ -18,6 +47,79 @@ function refreshPreview() {
     .catch((err) => {
       console.error("Preview refresh failed:", err);
     });
+}
+
+// ---------------------------------------------------------------------------
+// Change highlighting — outline glow on regenerated modules and slide-in for
+// brand-new modules. Styles are injected into the sandboxed preview iframe.
+// ---------------------------------------------------------------------------
+
+function ensureChangeHighlightStyles(doc) {
+  if (doc.getElementById("vibespot-change-highlight-css")) return;
+  const style = doc.createElement("style");
+  style.id = "vibespot-change-highlight-css";
+  style.textContent = `
+    @keyframes vibespot-change-glow {
+      0%   { outline-color: rgba(232, 97, 58, 0.85); box-shadow: 0 0 0 6px rgba(232, 97, 58, 0.18); }
+      70%  { outline-color: rgba(232, 97, 58, 0.55); box-shadow: 0 0 0 4px rgba(232, 97, 58, 0.10); }
+      100% { outline-color: rgba(232, 97, 58, 0);    box-shadow: 0 0 0 0 rgba(232, 97, 58, 0);    }
+    }
+    .vibespot-module--changed {
+      outline: 2px solid rgba(232, 97, 58, 0.85);
+      outline-offset: 4px;
+      border-radius: 2px;
+      animation: vibespot-change-glow 2s ease-out forwards;
+    }
+    @keyframes vibespot-module-slide-in {
+      0%   { opacity: 0; transform: translateY(24px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    .vibespot-module--new {
+      animation: vibespot-module-slide-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .vibespot-module--changed,
+      .vibespot-module--new { animation: none; }
+      .vibespot-module--changed { outline-color: transparent; }
+    }
+  `;
+  doc.head.appendChild(style);
+}
+
+function highlightChangedModules(doc, moduleNames, newModuleNames) {
+  // Skip modules that are already getting the slide-in animation — the slide-in
+  // is a stronger signal on its own.
+  const newSet = new Set(newModuleNames);
+  for (const name of moduleNames) {
+    if (newSet.has(name)) continue;
+    const el = doc.querySelector(`[data-module="${cssEscape(name)}"]`);
+    if (!el) continue;
+    el.classList.remove("vibespot-module--changed");
+    // Force a reflow so the animation restarts if the class was just removed.
+    void el.offsetWidth;
+    el.classList.add("vibespot-module--changed");
+    setTimeout(() => {
+      el.classList.remove("vibespot-module--changed");
+    }, 2200);
+  }
+}
+
+function animateNewModules(doc, moduleNames) {
+  for (const name of moduleNames) {
+    const el = doc.querySelector(`[data-module="${cssEscape(name)}"]`);
+    if (!el) continue;
+    el.classList.add("vibespot-module--new");
+    setTimeout(() => {
+      el.classList.remove("vibespot-module--new");
+    }, 700);
+  }
+}
+
+function cssEscape(value) {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return CSS.escape(value);
+  }
+  return String(value).replace(/["\\]/g, "\\$&");
 }
 
 /**
