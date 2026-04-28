@@ -5,7 +5,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { jsonResponse } from "../route-helpers.js";
-import { getSession, writeModulesToDisk } from "../session.js";
+import { getSession, saveSession, writeModulesToDisk } from "../session.js";
 import {
   analyzeTheme,
   applyTokensToSharedCss,
@@ -48,6 +48,7 @@ export function handleInverseApplyTokensRoute(_req: IncomingMessage, res: Server
   if (!session.sharedCss || session.sharedCss.trim().length === 0) {
     session.sharedCss = rootBlock;
     session.updatedAt = Date.now();
+    saveSession();
     jsonResponse(res, 200, { applied: true, written: "session.sharedCss", rootBlock });
     return;
   }
