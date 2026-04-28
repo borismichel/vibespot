@@ -18,6 +18,17 @@ let currentTemplateId = "";
 let renderScheduled = false;
 let scrollScheduled = false;
 
+// Change tracking for the in-flight generation. `modulesBeforeRun` snapshots
+// the module list when the user submits a prompt so we can tell which modules
+// are brand new when the run finishes. `changedModulesInRun` accumulates names
+// from per-module `module_progress` events. The flag is set on
+// `generation_complete` so the *next* `modules_updated` (the post-run one)
+// triggers the highlight pass instead of a plain refresh.
+let modulesBeforeRun = null;
+let changedModulesInRun = new Set();
+let highlightOnNextModulesUpdated = false;
+let changedListClearTimer = null;
+
 const messagesEl = document.getElementById("chat-messages");
 const inputEl = document.getElementById("chat-input");
 const sendBtn = document.getElementById("chat-send");
@@ -131,13 +142,21 @@ function handleWsMessage(msg) {
     case "generation_complete":
       clearStreamStatus();
       finishStreaming();
+      // The next `modules_updated` is the terminal one for this run — let it
+      // fire the change-highlight pass on the preview iframe.
+      highlightOnNextModulesUpdated = true;
       break;
 
     case "modules_updated":
       if (msg.modules) {
         updateModuleList(msg.modules);
       }
-      refreshPreview();
+      if (highlightOnNextModulesUpdated) {
+        highlightOnNextModulesUpdated = false;
+        flushChangeHighlights(msg.modules || []);
+      } else {
+        refreshPreview();
+      }
       break;
 
     case "version_created":
@@ -473,6 +492,11 @@ function handleModuleProgress(msg) {
   }
 
   updatePipelineEstimate();
+
+  if (msg.status === "complete" && msg.module) {
+    changedModulesInRun.add(msg.module);
+  }
+
   scrollToBottom();
 }
 
@@ -870,6 +894,15 @@ async function sendMessage(text) {
 
   // Show user message with file chips
   appendUserMessage(text, null, uploadedFiles);
+
+  // Snapshot the current module list so we can detect new vs. modified modules
+  // when the generation finishes. Clears stale change-indicator dots from any
+  // previous run so the user only sees indicators for the run they just kicked.
+  modulesBeforeRun = new Set(
+    Array.from(document.querySelectorAll(".module-item")).map((el) => el.dataset.module),
+  );
+  changedModulesInRun = new Set();
+  clearModuleListChanged();
 
   // Start streaming indicator
   startStreaming();
@@ -1425,14 +1458,23 @@ function updateModuleList(moduleNames) {
 
   if (barCountEl) barCountEl.textContent = moduleNames.length;
   if (slideoutCountEl) slideoutCountEl.textContent = moduleNames.length;
+
+  // Preserve which items were marked as recently changed across re-renders so
+  // the dots survive the per-module `modules_updated` events that happen
+  // mid-run.
+  const previouslyChanged = new Set(
+    Array.from(itemsEl.querySelectorAll(".module-item--changed")).map((el) => el.dataset.module),
+  );
   itemsEl.innerHTML = "";
 
   for (const name of moduleNames) {
     const item = document.createElement("div");
     item.className = "module-item";
+    if (previouslyChanged.has(name)) item.classList.add("module-item--changed");
     item.dataset.module = name;
     item.innerHTML = `
       <span class="module-item__drag">⠿</span>
+      <span class="module-item__changed-dot" aria-hidden="true"></span>
       <span class="module-item__name">${escapeHtml(name)}</span>
       <span class="module-item__edit" title="Edit fields">⚙</span>
       <span class="module-item__delete" title="Delete section">&times;</span>
@@ -1458,6 +1500,72 @@ function updateModuleList(moduleNames) {
 function highlightModuleItem(name) {
   document.querySelectorAll(".module-item").forEach((el) => {
     el.classList.toggle("active", el.dataset.module === name);
+  });
+}
+
+/**
+ * Flush change highlights at the end of a generation run: refresh the preview
+ * with the changed/new module sets, mark the sidebar items, and schedule the
+ * 30-second auto-clear of the dots.
+ */
+function flushChangeHighlights(latestModules) {
+  const changed = Array.from(changedModulesInRun);
+  const before = modulesBeforeRun;
+  changedModulesInRun = new Set();
+  modulesBeforeRun = null;
+
+  let newModules = [];
+  if (before) {
+    if (changed.length > 0) {
+      // Agentic pipeline: we know exactly which modules ran. New = ran AND
+      // not in the pre-run snapshot.
+      newModules = changed.filter((m) => !before.has(m));
+    } else if (Array.isArray(latestModules)) {
+      // Single-call mode emits no per-module events. Fall back to "names that
+      // appeared since the run started" — we can't know which existing
+      // modules were rewritten without server-side support.
+      newModules = latestModules.filter((m) => !before.has(m));
+    }
+  }
+
+  refreshPreview({
+    changedModules: changed.length > 0 ? changed : newModules,
+    newModules,
+  });
+
+  // Sidebar dots only fire when we have explicit per-module change info; the
+  // single-call fallback above only knows about new modules, which already
+  // get the slide-in animation in the preview.
+  if (changed.length > 0) {
+    markModuleListChanged(changed);
+  } else if (newModules.length > 0) {
+    markModuleListChanged(newModules);
+  }
+}
+
+/** Apply the change indicator dot to each named module in the sidebar. */
+function markModuleListChanged(names) {
+  if (!names || names.length === 0) return;
+  const itemsEl = document.getElementById("module-items");
+  if (!itemsEl) return;
+  const set = new Set(names);
+  itemsEl.querySelectorAll(".module-item").forEach((el) => {
+    if (set.has(el.dataset.module)) el.classList.add("module-item--changed");
+  });
+
+  // Auto-clear after 30s per spec; next generation also clears via sendMessage.
+  if (changedListClearTimer) clearTimeout(changedListClearTimer);
+  changedListClearTimer = setTimeout(clearModuleListChanged, 30000);
+}
+
+/** Remove all change indicator dots from the sidebar. */
+function clearModuleListChanged() {
+  if (changedListClearTimer) {
+    clearTimeout(changedListClearTimer);
+    changedListClearTimer = null;
+  }
+  document.querySelectorAll(".module-item--changed").forEach((el) => {
+    el.classList.remove("module-item--changed");
   });
 }
 

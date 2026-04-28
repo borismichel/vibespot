@@ -2049,6 +2049,25 @@ body { display: flex; }
 
 .module-item__name { flex: 1; }
 
+/* Change indicator dot — shown next to modules edited in the last generation.
+   Hidden by default; revealed via .module-item--changed (set by chat.js). */
+.module-item__changed-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  flex-shrink: 0;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+.module-item--changed .module-item__changed-dot {
+  opacity: 1;
+  transform: scale(1);
+}
+
 .module-item__edit {
   opacity: 0;
   color: var(--accent);
