@@ -26,7 +26,7 @@ async function openFieldEditor(moduleName) {
     const data = await res.json();
     const mod = data.modules.find((m) => m.moduleName === moduleName);
     if (!mod) {
-      editorContent.innerHTML = "<p>Module not found</p>";
+      editorContent.innerHTML = "<p>Section not found</p>";
       return;
     }
 
