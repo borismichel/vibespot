@@ -671,6 +671,12 @@ async function createTheme() {
 let _startersCache = null;
 let _selectedStarterId = null;
 
+function escHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
 async function loadStarterGrid() {
   const grid = document.getElementById("starter-grid");
   if (!grid) return;
@@ -701,9 +707,9 @@ function renderStarterGrid(starters) {
   }
 
   grid.innerHTML = starters.map((s) => `
-    <div class="starter-card${_selectedStarterId === s.id ? " selected" : ""}" data-starter-id="${s.id}">
-      <span class="starter-card__name">${s.name}</span>
-      <span class="starter-card__desc">${s.description}</span>
+    <div class="starter-card${_selectedStarterId === s.id ? " selected" : ""}" data-starter-id="${escHtml(s.id)}">
+      <span class="starter-card__name">${escHtml(s.name)}</span>
+      <span class="starter-card__desc">${escHtml(s.description)}</span>
       <span class="starter-card__meta">${s.moduleCount} modules</span>
     </div>
   `).join("");

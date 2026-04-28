@@ -116,6 +116,11 @@ export function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse
         rmSync(themePath, { recursive: true, force: true });
       }
 
+      if (starterId && typeof starterId === "string" && !getStarter(starterId)) {
+        jsonResponse(res, 400, { error: `Starter template "${starterId}" not found` });
+        return;
+      }
+
       createThemeScaffold(themePath, themeName);
       createSession(themePath, themeName);
 
