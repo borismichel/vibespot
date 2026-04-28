@@ -167,6 +167,15 @@ function phaseInstructions(turnCount: number, hasPlan: boolean): string {
     return `**Phase 1: UNDERSTAND.** This is the user's first message in plan mode. Acknowledge what they said, then ask 2–3 high-leverage questions to surface gaps. The plan block should be a skeleton with TBDs and an **Open questions** section. Do NOT propose specific sections or content yet — you don't know enough.`;
   }
 
+  if (turnCount === 0 && hasPlan) {
+    return `**Phase 1-T: TEMPLATED START.** The user picked a plan-mode template, so a structured plan already exists. Your job on this turn is to:
+- Briefly acknowledge the template and that you'll work from this structure (1–2 sentences in chat).
+- Pick 2–3 of the highest-leverage items from the plan's **Open questions** section and ask the user about them. Prefer questions about: product/page name + one-line pitch, primary CTA, and target audience. Save tone/visual questions for later turns.
+- Do NOT propose new sections or rewrite the existing structure on this turn — the user explicitly chose this scaffold. Keep the plan block VERBATIM (same headings, same sections, same open-questions list) and only re-emit it.
+- If the user's first message already supplies content (e.g. "It's for Acme, a fintech startup, primary CTA is book a demo"), thread that into the plan's TBDs and check those items off the **Open questions** list before asking your follow-ups.
+- Use \`vibespot-choices\` chips when one of your questions is multiple-choice (e.g. "Primary CTA?", "Cuisine?").`;
+  }
+
   if (turnCount <= 2 && !hasPlan) {
     return `**Phase 2: RESEARCH & DRAFT.** Take what the user has shared and produce a real first draft of the plan: goal, audience, primary CTA, and a proposed module list with brief descriptions. Reference existing modules/styleguide where applicable. Ask 1–2 narrow follow-ups to fill remaining gaps. Don't be exhaustive — a directionally-correct draft is better than asking 10 more questions.`;
   }

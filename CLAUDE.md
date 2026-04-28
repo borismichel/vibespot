@@ -45,7 +45,7 @@ The default command (no subcommand) runs the vibe coding web UI. Subcommands: `w
 - `src/utils/` — Shell execution (`execSync` wrappers), tool detection, file helpers, `~/.vibespot/config.json` persistence
 - `src/prompts/` — `@clack/prompts` wrapper with themed styling and cancel handling
 - `ui/` — Static frontend assets (HTML, JS, CSS) for the vibe coding web interface
-- `assets/` — Bundled guides: `conversion-guide.md`, `design-guide.md`, `content-guide.md`, `hubspot-rules.md`, `humanify-guide.md`
+- `assets/` — Bundled guides: `conversion-guide.md`, `design-guide.md`, `content-guide.md`, `hubspot-rules.md`, `humanify-guide.md`. Also `assets/plan-templates/*.md` — pre-canned plan-mode templates loaded by `src/server/plan-templates.ts`.
 
 ### Agentic Pipeline (`src/server/agent/`)
 

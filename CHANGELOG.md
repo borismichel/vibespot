@@ -4,6 +4,21 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.2.0-dev — unreleased
+
+### Plan-mode templates ([VIB-57](/VIB/issues/VIB-57))
+
+When the Plan view is empty, vibeSpot now offers a picker of pre-canned plan structures for common page types: SaaS landing, e-commerce product, event registration, blog/content hub, portfolio, agency/services, restaurant. Picking a template seeds `.vibespot/plan.md` with a structured brief (goal, audience, primary CTA, suggested kebab-case modules, brand/tone, and page-type-specific open questions) and flips plan mode on. The plan-mode system prompt has a new "Phase 1-T: TEMPLATED START" branch that recognizes a fresh template-seeded plan and skips straight to the page-specific elicitation in **Open questions**, instead of asking generic understand-phase questions.
+
+- **[assets/plan-templates/](assets/plan-templates/)** — seven shipped templates as markdown files with YAML frontmatter (`id`, `label`, `description`, `icon`, `order`).
+- **[src/server/plan-templates.ts](src/server/plan-templates.ts)** — frontmatter parser, directory scanner, cached `listPlanTemplates()` / `getPlanTemplate(id)` / `listPlanTemplateMetadata()`.
+- **[src/server/routes/plan.ts](src/server/routes/plan.ts)** — adds `GET /api/plan/templates` (list) and `POST /api/plan/template` (apply by id; auto-enables plan mode and seeds `.vibespot/plan.md`).
+- **[src/server/agent/prompts/plan-mode.ts](src/server/agent/prompts/plan-mode.ts)** — adds "Phase 1-T: TEMPLATED START" phase guidance for `turnCount === 0 && hasPlan`.
+- **[ui/plan.js](ui/plan.js), [ui/styles.css](ui/styles.css), [ui/index.html](ui/index.html)** — template picker rendered in the Plan pane whenever the plan is empty. Includes a "Blank plan" fallback that enables plan mode without a seed (preserves the existing free-form behavior).
+- **[test/plan-templates.test.ts](test/plan-templates.test.ts)** — 13 new tests covering frontmatter parsing, sort order, required fields, and structural invariants of every shipped template.
+
+---
+
 ## v1.1.3 — 2026-04-28
 
 Hotfix: model selection now persists for Codex CLI, Gemini CLI, and Gemini API engines, and the chosen model is actually passed to the CLI subprocess.
