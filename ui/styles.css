@@ -318,7 +318,7 @@ body { display: flex; }
 }
 .setup__recent-card:hover {
   border-color: var(--accent);
-  background: var(--bg-card);
+  background: var(--bg-hover);
 }
 .setup__recent-card:active { transform: translateY(1px); }
 .setup__recent-card-bubble {
@@ -503,7 +503,7 @@ body { display: flex; }
 }
 .setup__action-btn:hover {
   border-color: var(--accent);
-  background: var(--bg-card);
+  background: var(--bg-hover);
 }
 .setup__action-btn.active {
   border-color: var(--accent);
@@ -574,7 +574,7 @@ body { display: flex; }
 }
 .setup__pill:hover {
   border-color: var(--accent);
-  background: var(--bg-card);
+  background: var(--bg-hover);
 }
 .setup__pill__meta {
   font-size: 11px;
@@ -671,7 +671,7 @@ body { display: flex; }
 .figma-summary__section-tag {
   font-size: 11px;
   padding: 2px 8px;
-  background: var(--bg-card);
+  background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--text-muted);
@@ -2423,7 +2423,7 @@ body { display: flex; }
 }
 .starter-card:hover {
   border-color: var(--accent);
-  background: var(--bg-card);
+  background: var(--bg-hover);
 }
 .starter-card.selected {
   border-color: var(--accent);

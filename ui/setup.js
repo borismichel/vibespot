@@ -1323,6 +1323,8 @@ if (promptInputEl && promptSubmitEl) {
     if (!promptSubmitEl.disabled) startFromPrompt();
   });
   syncSubmitState();
+  const shortcutEl = document.getElementById("setup-prompt-shortcut");
+  if (shortcutEl && !/Mac|iPhone|iPad/.test(navigator.platform)) shortcutEl.textContent = "Ctrl+↩";
 }
 
 // Starter templates
