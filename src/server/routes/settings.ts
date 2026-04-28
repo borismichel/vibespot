@@ -25,16 +25,83 @@ const MODEL_CACHE_TTL = 10 * 60 * 1000;
 
 const STATIC_MODELS: Record<string, ModelEntry[]> = {
   "claude-code": [
-    { id: "sonnet", label: "Claude Sonnet (default)" },
-    { id: "opus", label: "Claude Opus" },
-    { id: "haiku", label: "Claude Haiku" },
+    { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
+    { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
+    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
+    { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+    { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
   ],
   "codex-cli": [
-    { id: "o4-mini", label: "o4 Mini (default)" },
-    { id: "o3", label: "o3" },
-    { id: "gpt-4o", label: "GPT-4o" },
+    { id: "gpt-5.5", label: "GPT-5.5 (default)" },
+    { id: "gpt-5.5-pro", label: "GPT-5.5 Pro" },
+    { id: "gpt-5.3-codex", label: "GPT-5.3 Codex" },
+    { id: "gpt-5.2-codex", label: "GPT-5.2 Codex" },
+    { id: "gpt-5.1-codex-max", label: "GPT-5.1 Codex Max" },
+    { id: "gpt-5.1-codex-mini", label: "GPT-5.1 Codex Mini" },
+    { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+    { id: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
+    { id: "codex-mini-latest", label: "Codex Mini (latest)" },
+  ],
+  "anthropic-api": [
+    { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
+    { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
+    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
+    { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+    { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+  ],
+  "claude-oauth": [
+    { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
+    { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
+    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
+    { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+    { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+  ],
+  "openai-api": [
+    { id: "gpt-5.5", label: "GPT-5.5 (default)" },
+    { id: "gpt-5.5-pro", label: "GPT-5.5 Pro" },
+    { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+    { id: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
+    { id: "gpt-5.3-codex", label: "GPT-5.3 Codex" },
+  ],
+  "gemini-api": [
+    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (default)" },
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+    { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  ],
+  "gemini-cli": [
+    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (default)" },
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+    { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
   ],
 };
+
+// Models we want to surface for OpenAI API + Codex CLI dropdowns.
+// Inclusive of current reasoning/coding families; matches `id` exactly.
+// Supports decimal-versioned variants like gpt-5.5, gpt-4.1.
+const OPENAI_MODEL_REGEX =
+  /^(gpt-[45](\.\d+)?(-[a-z0-9-]+)?|o[1-4](-(mini|pro|nano)(-high)?)?|codex(-[a-z0-9-]+)?)$/;
+
+const CODEX_MODEL_REGEX = OPENAI_MODEL_REGEX;
+
+function labelForOpenAIModel(id: string): string {
+  // gpt-X[.Y] or gpt-X[.Y]-suffix → "GPT-X[.Y] Suffix"
+  const gptMatch = id.match(/^gpt-(\d+(?:\.\d+)?)(?:-(.+))?$/);
+  if (gptMatch) {
+    const version = gptMatch[1];
+    const suffix = gptMatch[2];
+    if (!suffix) return `GPT-${version}`;
+    const pretty = suffix.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    return `GPT-${version} ${pretty}`;
+  }
+  // codex-* → "Codex *"
+  if (id.startsWith("codex-")) {
+    const suffix = id.slice(6).replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    return `Codex ${suffix}`;
+  }
+  // o-series: keep as-is, just spaces
+  if (/^o\d/.test(id)) return id.replace(/-/g, " ");
+  return id;
+}
 
 async function fetchAnthropicModels(apiKey: string): Promise<ModelEntry[]> {
   const resp = await fetch("https://api.anthropic.com/v1/models", {
@@ -47,17 +114,20 @@ async function fetchAnthropicModels(apiKey: string): Promise<ModelEntry[]> {
     .map((m) => ({ id: m.id, label: m.display_name }));
 }
 
-async function fetchOpenAIModels(apiKey: string): Promise<ModelEntry[]> {
+async function fetchOpenAIModelIds(apiKey: string): Promise<string[]> {
   const resp = await fetch("https://api.openai.com/v1/models", {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!resp.ok) return [];
   const data = await resp.json() as { data: { id: string }[] };
-  const keep = /^(gpt-4o|gpt-4o-mini|o[1-4](-mini)?|o[1-4]-pro)$/;
-  return data.data
-    .filter((m) => keep.test(m.id))
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .map((m) => ({ id: m.id, label: m.id }));
+  return data.data.map((m) => m.id);
+}
+
+function filterAndLabel(ids: string[], regex: RegExp): ModelEntry[] {
+  return ids
+    .filter((id) => regex.test(id))
+    .sort((a, b) => a.localeCompare(b))
+    .map((id) => ({ id, label: labelForOpenAIModel(id) }));
 }
 
 async function fetchGeminiModels(apiKey: string): Promise<ModelEntry[]> {
@@ -98,8 +168,16 @@ async function getModelCatalog(): Promise<Record<string, ModelEntry[]>> {
   const openaiKey = getApiKeyForEngine("openai-api", config);
   if (openaiKey) {
     jobs.push(
-      fetchOpenAIModels(openaiKey)
-        .then((models) => { if (models.length) catalog["openai-api"] = models; })
+      fetchOpenAIModelIds(openaiKey)
+        .then((ids) => {
+          if (!ids.length) return;
+          const openaiModels = filterAndLabel(ids, OPENAI_MODEL_REGEX);
+          if (openaiModels.length) catalog["openai-api"] = openaiModels;
+          // Codex CLI talks to the OpenAI API — reuse the same account's
+          // model list, filtered to families codex actually supports.
+          const codexModels = filterAndLabel(ids, CODEX_MODEL_REGEX);
+          if (codexModels.length) catalog["codex-cli"] = codexModels;
+        })
         .catch(() => {}),
     );
   }
