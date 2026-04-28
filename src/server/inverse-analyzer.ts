@@ -463,12 +463,8 @@ export function buildModuleGraph(themePath: string): ModuleGraph {
       if (!stat.isFile()) continue;
       let content: string;
       try { content = readFile(filePath); } catch { continue; }
-      const moduleRe = /dnd_module\s+path=["']\.\.\/modules\/([^."']+)\.module["']/g;
-      const found: string[] = [];
-      let m: RegExpExecArray | null;
-      while ((m = moduleRe.exec(content)) !== null) {
-        const name = m[1];
-        found.push(name);
+      const found = extractLocalModuleRefsFromTemplate(content);
+      for (const name of found) {
         const templates = moduleToTemplates.get(name) ?? new Set<string>();
         templates.add(filename);
         moduleToTemplates.set(name, templates);
@@ -487,6 +483,23 @@ export function buildModuleGraph(themePath: string): ModuleGraph {
   const orphanModules = moduleNodes.filter((m) => m.templates.length === 0).map((m) => m.name);
 
   return { templates: templateNodes, modules: moduleNodes, orphanModules };
+}
+
+export function extractLocalModuleRefsFromTemplate(content: string): string[] {
+  const refs: string[] = [];
+  const tagRe = /{%\s*dnd_module\b[\s\S]*?%}/g;
+  let tag: RegExpExecArray | null;
+
+  while ((tag = tagRe.exec(content)) !== null) {
+    const pathMatch = tag[0].match(/\bpath\s*=\s*["']([^"']+)["']/);
+    if (!pathMatch) continue;
+    const localModuleMatch = pathMatch[1].match(/(?:^|\/)modules\/(.+)$/);
+    if (!localModuleMatch) continue;
+    const moduleName = localModuleMatch[1].replace(/\.module$/, "");
+    if (moduleName) refs.push(moduleName);
+  }
+
+  return refs;
 }
 
 // ---------------------------------------------------------------------------

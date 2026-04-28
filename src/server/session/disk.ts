@@ -10,7 +10,7 @@ import { getSession } from "./store.js";
 import { getOrderedModules, syncFlatFieldsFromTemplate, syncFlatFieldsToTemplate, loadChatFromTheme } from "./state.js";
 import { getActiveTemplate, migrateSession } from "./templates.js";
 import { ensureGitRepo } from "../project-git.js";
-import { extractDesignTokens, buildRootCssFromTokens } from "../inverse-analyzer.js";
+import { extractDesignTokens, buildRootCssFromTokens, extractLocalModuleRefsFromTemplate } from "../inverse-analyzer.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,13 +80,9 @@ function parseTemplateFile(filePath: string, filename: string): ParsedTemplate |
     label = labelMatch[1].trim();
   }
 
-  // Extract module references from dnd_module tags
-  const moduleRe = /dnd_module\s+path=["']\.\.\/modules\/(.+?)\.module["']/g;
-  const moduleNames: string[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = moduleRe.exec(content)) !== null) {
-    moduleNames.push(match[1]);
-  }
+  // Extract module references from dnd_module tags, including tags with
+  // instance names before the path attribute.
+  const moduleNames = extractLocalModuleRefsFromTemplate(content);
 
   return { id, label, pageType, moduleNames, templateContent: content, filename };
 }

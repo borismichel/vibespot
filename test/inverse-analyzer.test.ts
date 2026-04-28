@@ -180,6 +180,20 @@ describe("buildModuleGraph", () => {
     expect(graph.orphanModules).toEqual(["orphan-card"]);
   });
 
+  it("recognizes dnd_module tags with instance names before path", () => {
+    mkdirSync(join(theme, "modules", "hero.module"), { recursive: true });
+    writeText(
+      join(theme, "templates", "lp-main.html"),
+      `{% dnd_module "hero_1" path="../modules/hero.module", label="Hero" %}{% end_dnd_module %}`,
+    );
+
+    const graph = buildModuleGraph(theme);
+
+    expect(graph.templates[0].modules).toEqual(["hero"]);
+    expect(graph.modules.find((m) => m.name === "hero")?.templates).toEqual(["lp-main.html"]);
+    expect(graph.orphanModules).toEqual([]);
+  });
+
   it("flags modules that ship custom JS", () => {
     mkdirSync(join(theme, "modules", "carousel.module"), { recursive: true });
     writeText(join(theme, "modules", "carousel.module", "module.js"), `console.log('carousel');`);
