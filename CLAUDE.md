@@ -44,6 +44,7 @@ The default command (no subcommand) runs the vibe coding web UI. Subcommands: `w
 - `src/cli/` — Commander setup, ASCII banner, chalk color theme (respects `NO_COLOR`)
 - `src/utils/` — Shell execution (`execSync` wrappers), tool detection, file helpers, `~/.vibespot/config.json` persistence
 - `src/prompts/` — `@clack/prompts` wrapper with themed styling and cancel handling
+- `starters/` — Bundled starter template JSON files (SaaS landing, portfolio, restaurant, event, coming soon). Each is a self-contained bundle with modules, shared CSS/JS, and module order. Loaded by `src/server/starters.ts`
 - `ui/` — Static frontend assets (HTML, JS, CSS) for the vibe coding web interface
 - `assets/` — Bundled guides: `conversion-guide.md`, `design-guide.md`, `content-guide.md`, `hubspot-rules.md`, `humanify-guide.md`. Also `assets/plan-templates/*.md` — pre-canned plan-mode templates loaded by `src/server/plan-templates.ts`.
 
@@ -104,7 +105,8 @@ The agentic pipeline uses `AgentEngine` type and `callAgent()` from `src/server/
 ### Vibe Coding Mode
 
 The default command (`vibespot` or `npx vibespot`) starts a local HTTP server and opens the browser. The web UI has:
-- Setup screen with sidebar project list (create/fetch/open/resume theme)
+- Setup screen with sidebar project list (create/fetch/open/resume theme) and starter template picker
+- Starter templates: 5 pre-built page bundles (SaaS, portfolio, restaurant, event, coming soon) that bootstrap a new theme with modules and shared CSS/JS — instant preview with no AI wait. `GET /api/starters` lists them; `POST /api/setup/create` with `starterId` bootstraps from one.
 - Project deletion with confirmation dialog and optional local file removal
 - Chat panel with pipeline progress UI (stages, module cards, quality check)
 - Live preview via HubL subset renderer with incremental module rendering
@@ -167,7 +169,7 @@ Key behaviors:
 - **Pure ESM** — `"type": "module"` in package.json. No CommonJS `require()`. All internal imports use `.js` extensions.
 - **Single-file bundle** — tsup bundles everything into `dist/index.js`. The `resolveAsset()` function in `src/utils/fs.ts` searches multiple relative paths to find `assets/` from the built output.
 - **`import.meta.dirname`** — Used in `resolveAsset()`. tsup's `shims: true` handles this for Node 18 (native support requires Node 21+).
-- **`files` in package.json** includes `dist/`, `bin/`, `assets/`, and `ui/` for npm publishing.
+- **`files` in package.json** includes `dist/`, `bin/`, `assets/`, `ui/`, and `starters/` for npm publishing.
 - **No CDN imports** — All CSS/JS must be self-contained. The system prompt and auto-fix strip external font imports.
 - **Module names** — Always kebab-case (e.g., `hero`, `trust-bar`). The pipeline enforces this via `spec.name`; `updateModules()` uses case-insensitive matching as a safety net.
 

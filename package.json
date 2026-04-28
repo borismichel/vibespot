@@ -11,7 +11,8 @@
     "dist",
     "bin",
     "assets",
-    "ui"
+    "ui",
+    "starters"
   ],
   "scripts": {
     "dev": "tsx src/index.ts",

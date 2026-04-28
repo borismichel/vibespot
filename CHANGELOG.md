@@ -6,6 +6,15 @@ All notable changes to vibeSpot are documented here.
 
 ## v1.2.0-dev — unreleased
 
+### Starter templates ([VIB-56](/VIB/issues/VIB-56))
+
+The setup screen now has a "Template" button that lets users create a new theme pre-populated with vetted, ready-to-preview modules. Five starter templates ship out of the box: SaaS Landing Page, Portfolio, Restaurant, Event / Conference, and Coming Soon.
+
+- **[starters/](starters/)** — five JSON bundles, each containing all modules (fields.json, meta.json, module.html, module.css), shared CSS/JS, and module order. Included in the npm package via the `files` field.
+- **[src/server/starters.ts](src/server/starters.ts)** — `resolveStartersDir()`, `listStarters()`, `getStarter(id)` with `StarterTemplate` / `StarterMeta` types.
+- **[src/server/routes/setup.ts](src/server/routes/setup.ts)** — `POST /api/setup/create` now accepts optional `starterId`; new `GET /api/starters` endpoint; `bootstrapFromStarter()` writes modules + shared CSS/JS to disk and populates the session.
+- **[ui/index.html](ui/index.html), [ui/setup.js](ui/setup.js), [ui/styles.css](ui/styles.css)** — starter template grid in the setup panel, card selection, and "Create from template" flow.
+
 ### Plan-mode templates ([VIB-57](/VIB/issues/VIB-57))
 
 When the Plan view is empty, vibeSpot now offers a picker of pre-canned plan structures for common page types: SaaS landing, e-commerce product, event registration, blog/content hub, portfolio, agency/services, restaurant. Picking a template seeds `.vibespot/plan.md` with a structured brief (goal, audience, primary CTA, suggested kebab-case modules, brand/tone, and page-type-specific open questions) and flips plan mode on. The plan-mode system prompt has a new "Phase 1-T: TEMPLATED START" branch that recognizes a fresh template-seeded plan and skips straight to the page-specific elicitation in **Open questions**, instead of asking generic understand-phase questions.

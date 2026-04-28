@@ -664,6 +664,106 @@ async function createTheme() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Starter templates
+// ---------------------------------------------------------------------------
+
+let _startersCache = null;
+let _selectedStarterId = null;
+
+function escHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function loadStarterGrid() {
+  const grid = document.getElementById("starter-grid");
+  if (!grid) return;
+
+  if (_startersCache) {
+    renderStarterGrid(_startersCache);
+    return;
+  }
+
+  grid.innerHTML = '<p class="setup__hint">Loading templates...</p>';
+  try {
+    const res = await fetch("/api/starters");
+    const data = await res.json();
+    _startersCache = data.starters || [];
+    renderStarterGrid(_startersCache);
+  } catch {
+    grid.innerHTML = '<p class="setup__hint">Failed to load templates.</p>';
+  }
+}
+
+function renderStarterGrid(starters) {
+  const grid = document.getElementById("starter-grid");
+  if (!grid) return;
+
+  if (starters.length === 0) {
+    grid.innerHTML = '<p class="setup__hint">No starter templates available.</p>';
+    return;
+  }
+
+  grid.innerHTML = starters.map((s) => `
+    <div class="starter-card${_selectedStarterId === s.id ? " selected" : ""}" data-starter-id="${escHtml(s.id)}">
+      <span class="starter-card__name">${escHtml(s.name)}</span>
+      <span class="starter-card__desc">${escHtml(s.description)}</span>
+      <span class="starter-card__meta">${s.moduleCount} modules</span>
+    </div>
+  `).join("");
+
+  grid.querySelectorAll(".starter-card").forEach((card) => {
+    card.addEventListener("click", () => selectStarter(card.dataset.starterId));
+  });
+}
+
+function selectStarter(id) {
+  _selectedStarterId = id;
+  const starter = (_startersCache || []).find((s) => s.id === id);
+  if (!starter) return;
+
+  document.querySelectorAll(".starter-card").forEach((c) => c.classList.toggle("selected", c.dataset.starterId === id));
+
+  const createSection = document.getElementById("starter-create");
+  const label = document.getElementById("starter-create-label");
+  if (createSection && label) {
+    label.textContent = `Create theme from "${starter.name}":`;
+    createSection.classList.remove("hidden");
+    setTimeout(() => document.getElementById("starter-theme-name")?.focus(), 50);
+  }
+}
+
+async function createFromStarter() {
+  if (!_selectedStarterId) return;
+  const name = document.getElementById("starter-theme-name").value.trim();
+  if (!name) {
+    showError("Please enter a name for your theme.");
+    return;
+  }
+
+  showLoading("Creating theme from template...");
+
+  try {
+    const res = await fetch("/api/setup/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, starterId: _selectedStarterId }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      showError(data.error);
+      return;
+    }
+
+    showApp(data.themeName);
+  } catch (err) {
+    showError("Failed to create theme: " + err.message);
+  }
+}
+
 async function fetchTheme() {
   const name = document.getElementById("fetch-theme-name").value.trim();
   if (!name) {
@@ -884,7 +984,7 @@ function togglePanel(action) {
   panels.forEach((p) => p.classList.add("hidden"));
   buttons.forEach((b) => b.classList.remove("active"));
 
-  const panelMap = { new: "panel-new", continue: "panel-continue", download: "panel-download", figma: "panel-figma", convert: "panel-convert" };
+  const panelMap = { starter: "panel-starter", new: "panel-new", continue: "panel-continue", download: "panel-download", figma: "panel-figma", convert: "panel-convert" };
   const panel = document.getElementById(panelMap[action]);
   if (panel) {
     panel.classList.remove("hidden");
@@ -896,6 +996,7 @@ function togglePanel(action) {
   if (btn) btn.classList.add("active");
 
   // Focus input if applicable
+  if (action === "starter") loadStarterGrid();
   if (action === "new") setTimeout(() => document.getElementById("new-theme-name")?.focus(), 50);
   if (action === "convert") setTimeout(() => document.getElementById("import-url")?.focus(), 50);
   if (action === "figma") initFigmaPanel();
@@ -1054,6 +1155,12 @@ async function downloadThemeByName() {
 // Action buttons
 document.querySelectorAll(".setup__action-btn").forEach((btn) => {
   btn.addEventListener("click", () => togglePanel(btn.dataset.action));
+});
+
+// Starter templates
+document.getElementById("btn-create-from-starter").addEventListener("click", createFromStarter);
+document.getElementById("starter-theme-name").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); createFromStarter(); }
 });
 
 // New theme

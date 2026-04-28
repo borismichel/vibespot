@@ -3,7 +3,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
@@ -27,6 +27,7 @@ import { isGenerating } from "../ai-handler.js";
 import { detectEnvironment } from "../../utils/detect.js";
 import { saveConfig } from "../../utils/config.js";
 import { ensureDir } from "../../utils/fs.js";
+import { listStarters, getStarter } from "../starters.js";
 
 export const WORKSPACE_DIR = join(homedir(), "vibespot-themes");
 
@@ -96,7 +97,7 @@ export function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse
   readBody(req, (body) => {
     try {
       if (isGenerating()) { jsonResponse(res, 409, { error: "Cannot switch projects while AI is generating.", generating: true }); return; }
-      const { name } = JSON.parse(body);
+      const { name, starterId } = JSON.parse(body);
       if (!name || typeof name !== "string") {
         jsonResponse(res, 400, { error: "Theme name is required" });
         return;
@@ -115,21 +116,92 @@ export function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse
         rmSync(themePath, { recursive: true, force: true });
       }
 
-      // Create theme scaffold locally (no CLI dependency)
-      createThemeScaffold(themePath, themeName);
+      if (starterId && typeof starterId === "string" && !getStarter(starterId)) {
+        jsonResponse(res, 400, { error: `Starter template "${starterId}" not found` });
+        return;
+      }
 
+      createThemeScaffold(themePath, themeName);
       createSession(themePath, themeName);
+
+      if (starterId && typeof starterId === "string") {
+        bootstrapFromStarter(themePath, themeName, starterId);
+      }
+
       saveSession();
 
       jsonResponse(res, 200, {
         ok: true,
         themeName,
         themePath,
+        starterId: starterId || undefined,
       });
     } catch (err) {
       jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
     }
   });
+}
+
+function bootstrapFromStarter(themePath: string, themeName: string, starterId: string): void {
+  const starter = getStarter(starterId);
+  if (!starter) return;
+
+  const session = getSession();
+  if (!session) return;
+
+  const modules = starter.modules.map((m) => ({ ...m }));
+  const moduleOrder = [...starter.moduleOrder];
+  const templateId = `lp-${themeName}`;
+
+  const entry: import("../session/types.js").TemplateEntry = {
+    id: templateId,
+    label: `${starter.name}`,
+    pageType: "landing_page",
+    templateFile: `templates/${templateId}.html`,
+    modules,
+    moduleOrder,
+    sharedCss: starter.sharedCss,
+    sharedJs: starter.sharedJs,
+    template: "",
+    messages: [],
+  };
+
+  session.templates = [entry];
+  session.activeTemplateId = templateId;
+
+  session.modules = modules;
+  session.moduleOrder = moduleOrder;
+  session.sharedCss = starter.sharedCss;
+  session.sharedJs = starter.sharedJs;
+
+  const modulesDir = join(themePath, "modules");
+  mkdirSync(modulesDir, { recursive: true });
+
+  for (const mod of starter.modules) {
+    const modDir = join(modulesDir, `${mod.moduleName}.module`);
+    mkdirSync(modDir, { recursive: true });
+    writeFileSync(join(modDir, "fields.json"), mod.fieldsJson, "utf-8");
+    writeFileSync(join(modDir, "meta.json"), mod.metaJson, "utf-8");
+    writeFileSync(join(modDir, "module.html"), mod.moduleHtml, "utf-8");
+    writeFileSync(join(modDir, "module.css"), mod.moduleCss, "utf-8");
+    if (mod.moduleJs) writeFileSync(join(modDir, "module.js"), mod.moduleJs, "utf-8");
+  }
+
+  if (starter.sharedCss) {
+    const cssDir = join(themePath, "css");
+    mkdirSync(cssDir, { recursive: true });
+    writeFileSync(join(cssDir, `${themeName}-theme.css`), starter.sharedCss, "utf-8");
+  }
+
+  if (starter.sharedJs) {
+    const jsDir = join(themePath, "js");
+    mkdirSync(jsDir, { recursive: true });
+    writeFileSync(join(jsDir, `${themeName}-animations.js`), starter.sharedJs, "utf-8");
+  }
+}
+
+export function handleStartersListRoute(res: ServerResponse): void {
+  jsonResponse(res, 200, { starters: listStarters() });
 }
 
 export function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse): void {
