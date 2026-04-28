@@ -126,6 +126,16 @@ function handleWsMessage(msg) {
         historyBtn.style.display = msg.gitAvailable ? "" : "none";
       }
 
+      // Initialize history timeline (compact strip above chat input)
+      historyGitAvailable = !!msg.gitAvailable;
+      if (historyGitAvailable) {
+        historyTimelineCursor = 0;
+        refreshHistoryTimeline();
+      } else {
+        const tl = document.getElementById("history-timeline");
+        if (tl) tl.classList.add("hidden");
+      }
+
       // Hydrate plan-mode state (toggle + Plan pane content)
       if (window.planController) {
         window.planController.setInitialState(msg);
@@ -162,6 +172,9 @@ function handleWsMessage(msg) {
 
     case "version_created":
       if (historyPanelOpen) refreshHistoryPanel();
+      // New generation: reset timeline cursor to head and refresh.
+      historyTimelineCursor = 0;
+      refreshHistoryTimeline();
       break;
 
     case "parse_warning":
@@ -1062,8 +1075,8 @@ function startStreaming() {
     window.setSelectModeDisabled(true);
   }
 
-  // Hide stale suggestion chips from the previous run
   hideChatSuggestions();
+  if (typeof updateHistoryTimelineNavState === "function") updateHistoryTimelineNavState();
 
   // Don't show generating preview here — agentic mode keeps the page visible.
   // For single-call mode, showGeneratingPreview() is called on first "stream" event.
@@ -1209,6 +1222,7 @@ function finishStreaming() {
   if (typeof window.setSelectModeDisabled === "function") {
     window.setSelectModeDisabled(false);
   }
+  if (typeof updateHistoryTimelineNavState === "function") updateHistoryTimelineNavState();
 
   // Stop the timer and capture duration
   stopStreamTimer();
@@ -1558,6 +1572,290 @@ function timeAgoShort(timestamp) {
   const days = Math.floor(hours / 24);
   return days + "d";
 }
+
+// ---------------------------------------------------------------------------
+// History timeline — compact strip above chat input with undo/redo support
+// ---------------------------------------------------------------------------
+
+let historyGitAvailable = false;
+// Index into historyTimelineEntries (filtered list, newest first) representing
+// the version the user is currently viewing. 0 = head, N = N steps back.
+let historyTimelineCursor = 0;
+let historyTimelineEntries = [];
+let historyTimelineRestoring = false;
+
+function shortenCommitMessage(msg) {
+  if (!msg) return "Update";
+  let s = msg;
+  // Strip [templateId] prefix
+  const prefix = s.match(/^\[[^\]]+\]\s*/);
+  if (prefix) s = s.slice(prefix[0].length);
+  // Strip leading "Rollback to: "
+  s = s.replace(/^Rollback to:\s*/i, "");
+  if (s.length > 32) s = s.slice(0, 31) + "…";
+  return s;
+}
+
+function stripCommitPrefix(msg) {
+  return (msg || "").replace(/^\[[^\]]+\]\s*/, "");
+}
+
+// Compute which timeline entry represents the *currently visible* version.
+// HEAD may be a "Rollback to: <original>" commit (an internal marker we filter
+// out of the visible timeline); in that case, we map back to the original
+// entry by message. Otherwise the cursor sits at HEAD itself.
+function computeCursorFromHead(commits, entries) {
+  if (!commits.length || !entries.length) return 0;
+  const headMsg = stripCommitPrefix(commits[0].message);
+  if (/^rollback to:\s*/i.test(headMsg)) {
+    const orig = headMsg.replace(/^rollback to:\s*/i, "").trim().replace(/\.{3}$/, "");
+    for (let i = 0; i < entries.length; i++) {
+      const em = stripCommitPrefix(entries[i].message);
+      if (em === orig || em.startsWith(orig)) return i;
+    }
+    return 0;
+  }
+  for (let i = 0; i < entries.length; i++) {
+    if (entries[i].fullHash === commits[0].fullHash) return i;
+  }
+  return 0;
+}
+
+async function refreshHistoryTimeline() {
+  const tl = document.getElementById("history-timeline");
+  const track = document.getElementById("history-timeline-track");
+  if (!tl || !track) return;
+
+  if (!historyGitAvailable) {
+    tl.classList.add("hidden");
+    return;
+  }
+
+  try {
+    const useFilter = currentTemplateId;
+    const url = useFilter
+      ? `/api/history?templateId=${encodeURIComponent(currentTemplateId)}`
+      : "/api/history";
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.available) {
+      tl.classList.add("hidden");
+      return;
+    }
+
+    const allCommits = data.commits || [];
+    // Filter out automatic "Rollback to:" commits — they're internal markers.
+    // The user navigates the conceptual history of generation events.
+    const entries = allCommits.filter((c) => {
+      return !/^rollback to:\s*/i.test(stripCommitPrefix(c.message));
+    });
+    historyTimelineEntries = entries;
+
+    if (entries.length === 0) {
+      tl.classList.add("hidden");
+      return;
+    }
+
+    historyTimelineCursor = computeCursorFromHead(allCommits, entries);
+
+    tl.classList.remove("hidden");
+    track.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    entries.forEach((commit, idx) => {
+      const isInitial = (commit.message || "").startsWith("Initial ");
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "history-timeline__entry"
+        + (idx === historyTimelineCursor ? " history-timeline__entry--current" : "")
+        + (isInitial ? " history-timeline__entry--initial" : "");
+      item.dataset.hash = commit.fullHash;
+      item.dataset.index = String(idx);
+      item.innerHTML = `<span class="history-timeline__entry-dot"></span>`
+        + `<span class="history-timeline__entry-label"></span>`;
+      item.querySelector(".history-timeline__entry-label").textContent = shortenCommitMessage(commit.message);
+      item.title = ""; // we use a custom tooltip
+      frag.appendChild(item);
+    });
+    track.appendChild(frag);
+
+    updateHistoryTimelineNavState();
+
+    // Scroll the current entry into view
+    requestAnimationFrame(() => {
+      const cur = track.querySelector(".history-timeline__entry--current");
+      if (cur && typeof cur.scrollIntoView === "function") {
+        cur.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
+    });
+  } catch {
+    tl.classList.add("hidden");
+  }
+}
+
+function updateHistoryTimelineNavState() {
+  const undoBtn = document.getElementById("history-timeline-undo");
+  const redoBtn = document.getElementById("history-timeline-redo");
+  const max = historyTimelineEntries.length - 1;
+  const busy = historyTimelineRestoring || (typeof isStreaming !== "undefined" && isStreaming);
+  if (undoBtn) undoBtn.disabled = busy || historyTimelineCursor >= max;
+  if (redoBtn) redoBtn.disabled = busy || historyTimelineCursor <= 0;
+}
+
+async function restoreToTimelineIndex(idx) {
+  if (historyTimelineRestoring) return;
+  if (idx < 0 || idx >= historyTimelineEntries.length) return;
+  if (typeof isStreaming !== "undefined" && isStreaming) return;
+  const target = historyTimelineEntries[idx];
+  if (!target) return;
+
+  historyTimelineRestoring = true;
+  updateHistoryTimelineNavState();
+  setStatus("Restoring…");
+
+  try {
+    const payload = { hash: target.fullHash };
+    if (currentTemplateId) payload.templateId = currentTemplateId;
+    const res = await fetch("/api/rollback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.error) {
+      await vibeAlert(data.error, "Restore failed");
+      setStatus("Ready");
+      return;
+    }
+    if (data.modules) updateModuleList(data.modules);
+    refreshPreview();
+    // Refresh from server — the new HEAD is a "Rollback to:" commit pointing
+    // at the entry we just restored; computeCursorFromHead resolves it back.
+    await refreshHistoryTimeline();
+    if (historyPanelOpen) refreshHistoryPanel();
+    setStatus("Ready");
+  } catch (err) {
+    await vibeAlert(err.message || "Restore failed", "Restore failed");
+    setStatus("Ready");
+  } finally {
+    historyTimelineRestoring = false;
+    updateHistoryTimelineNavState();
+  }
+}
+
+function timelineUndo() {
+  restoreToTimelineIndex(historyTimelineCursor + 1);
+}
+
+function timelineRedo() {
+  restoreToTimelineIndex(historyTimelineCursor - 1);
+}
+
+// ---- Tooltip on hover ------------------------------------------------------
+
+function showTimelineTooltip(entryEl) {
+  const tooltip = document.getElementById("history-timeline-tooltip");
+  const tl = document.getElementById("history-timeline");
+  if (!tooltip || !tl || !entryEl) return;
+  const idx = parseInt(entryEl.dataset.index || "-1", 10);
+  const commit = historyTimelineEntries[idx];
+  if (!commit) return;
+
+  const modules = (commit.changedModules || []).slice(0, 5);
+  const more = (commit.changedModules || []).length - modules.length;
+  const modulesLine = modules.length
+    ? modules.join(", ") + (more > 0 ? ` +${more} more` : "")
+    : "No section changes";
+
+  // Strip [templateId] prefix for display; keep "Rollback to:" prefix because
+  // that case is filtered out earlier and won't reach here.
+  let displayMsg = commit.message || "";
+  const prefix = displayMsg.match(/^\[[^\]]+\]\s*/);
+  if (prefix) displayMsg = displayMsg.slice(prefix[0].length);
+
+  tooltip.innerHTML = `
+    <div class="history-timeline__tooltip-title"></div>
+    <div class="history-timeline__tooltip-meta"></div>
+    <div class="history-timeline__tooltip-modules"></div>
+  `;
+  tooltip.querySelector(".history-timeline__tooltip-title").textContent = displayMsg || "Update";
+  tooltip.querySelector(".history-timeline__tooltip-meta").textContent =
+    `${commit.hash} · ${timeAgoShort(commit.timestamp)} ago`;
+  tooltip.querySelector(".history-timeline__tooltip-modules").textContent = modulesLine;
+
+  // Position above the entry, clamped within the timeline strip.
+  tooltip.classList.remove("hidden");
+  const tlRect = tl.getBoundingClientRect();
+  const entryRect = entryEl.getBoundingClientRect();
+  const left = Math.max(8, entryRect.left - tlRect.left);
+  const tooltipW = tooltip.offsetWidth;
+  const maxLeft = Math.max(8, tl.clientWidth - tooltipW - 8);
+  tooltip.style.left = Math.min(left, maxLeft) + "px";
+}
+
+function hideTimelineTooltip() {
+  const tooltip = document.getElementById("history-timeline-tooltip");
+  if (tooltip) tooltip.classList.add("hidden");
+}
+
+// ---- Wire up DOM events ----------------------------------------------------
+
+(function wireHistoryTimeline() {
+  const track = document.getElementById("history-timeline-track");
+  const undoBtn = document.getElementById("history-timeline-undo");
+  const redoBtn = document.getElementById("history-timeline-redo");
+
+  if (track) {
+    track.addEventListener("click", (e) => {
+      const entry = e.target.closest(".history-timeline__entry");
+      if (!entry) return;
+      const idx = parseInt(entry.dataset.index || "-1", 10);
+      if (idx >= 0) restoreToTimelineIndex(idx);
+    });
+
+    let hoverTimer = null;
+    track.addEventListener("mouseover", (e) => {
+      const entry = e.target.closest(".history-timeline__entry");
+      if (!entry) return;
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => showTimelineTooltip(entry), 200);
+    });
+    track.addEventListener("mouseout", (e) => {
+      const entry = e.target.closest(".history-timeline__entry");
+      if (!entry) return;
+      clearTimeout(hoverTimer);
+      hideTimelineTooltip();
+    });
+  }
+
+  if (undoBtn) undoBtn.addEventListener("click", timelineUndo);
+  if (redoBtn) redoBtn.addEventListener("click", timelineRedo);
+
+  // Global Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z keyboard shortcuts. Skip when the
+  // user is editing text so we never hijack native undo in inputs/editors.
+  document.addEventListener("keydown", (e) => {
+    const meta = e.metaKey || e.ctrlKey;
+    if (!meta) return;
+    const key = e.key.toLowerCase();
+    if (key !== "z" && key !== "y") return;
+
+    const active = document.activeElement;
+    if (active) {
+      const tag = (active.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (active.isContentEditable) return;
+    }
+
+    if (!historyGitAvailable) return;
+
+    if (key === "z" && !e.shiftKey) {
+      e.preventDefault();
+      timelineUndo();
+    } else if ((key === "z" && e.shiftKey) || key === "y") {
+      e.preventDefault();
+      timelineRedo();
+    }
+  });
+})();
 
 // ---------------------------------------------------------------------------
 // Module list

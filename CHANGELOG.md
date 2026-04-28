@@ -6,31 +6,30 @@ All notable changes to vibeSpot are documented here.
 
 ## v1.2.0-dev — unreleased
 
+### Undo/redo with Ctrl+Z and visual history timeline ([VIB-91](/VIB/issues/VIB-91))
+
+A compact horizontal version-history strip now sits above the chat input, with each entry showing a one-line description of a generation step. Hovering an entry reveals a tooltip with the commit hash, age, and the section names changed in that step. Clicking an entry restores that version. Ctrl+Z / Cmd+Z step backwards through history; Ctrl+Y / Ctrl+Shift+Z / Cmd+Shift+Z step forwards. Shortcuts respect text fields — they only fire when the chat input or another text editor is not focused — and are suppressed during AI generation.
+
+- **[src/server/project-git.ts](src/server/project-git.ts)** — `getHistory` / `getTemplateHistory` now run a single `git log --name-only` and populate `changedFiles` + extracted `changedModules` per commit, so the timeline tooltip renders without an extra round-trip.
+- **[ui/index.html](ui/index.html)** — new `#history-timeline` strip with prev/next buttons, scrollable entry track, and a tooltip element.
+- **[ui/chat.js](ui/chat.js)** — `refreshHistoryTimeline()`, cursor tracking, click-to-restore, hover tooltip, and a global `keydown` listener for Ctrl+Z / Ctrl+Y.
+- **[ui/styles.css](ui/styles.css)** — themed styles for the timeline strip, entries, current-version highlight, and tooltip.
+
 ### Clickable preview elements — select mode ([VIB-90](/VIB/issues/VIB-90))
 
-A new "Select" toggle in the preview topbar (next to the responsive switch) lets you click an element in the live preview to reference it in chat. Hovering highlights the element with an accent outline and a floating "module > tag" label; clicking pre-fills the chat input with contextual text (e.g. `In the hero section, the headline ("Build faster") `) so the user can complete the instruction. Select mode is explicitly toggled, deactivates automatically during AI generation, and is dismissed on `Escape`.
+A new "Select" toggle in the preview topbar lets you click an element in the live preview to reference it in chat.
 
-- **[ui/index.html](ui/index.html)** — new `#select-mode-toggle` button in `.topbar__center`.
-- **[ui/preview.js](ui/preview.js)** — injects hover/click handlers and styles into the preview iframe via `contentDocument`, builds the chat-prefill string from `data-module` + tag, exposes `window.setSelectModeDisabled` and `window.deactivateSelectMode`, and re-attaches handlers on iframe `load` so they survive `srcdoc` refreshes.
-- **[ui/chat.js](ui/chat.js)** — `window.prefillChatInput()` appends the contextual prefix to the chat textarea, focuses it, and places the caret at the end. `startStreaming` / `finishStreaming` disable and re-enable the select toggle so it cannot fire while the AI is running.
-- **[ui/styles.css](ui/styles.css)** — pill-style toggle with the same accent treatment as the active responsive button, plus a `.preview--select-mode` crosshair cursor on the iframe.
+- **[ui/preview.js](ui/preview.js)** — hover/click handlers, chat-prefill string, auto-deactivation during generation.
+- **[ui/chat.js](ui/chat.js)** — `window.prefillChatInput()` for contextual pre-fill.
+- **[ui/styles.css](ui/styles.css)** — pill toggle and crosshair cursor.
 
 ### Smart chat suggestions ([VIB-89](/VIB/issues/VIB-89))
 
-The chat panel now guides users on what to do next instead of leaving them at a blank textarea. After every pipeline completes, 2-3 contextual suggestion chips appear below the chat input.
-
-- **[ui/chat.js](ui/chat.js)** — `pickContextualSuggestions()` and `renderChatSuggestions()` build the chip set from the current module list.
-- **[ui/index.html](ui/index.html)** — `#chat-suggestions` container; starter buttons restructured into rich cards.
-- **[ui/styles.css](ui/styles.css)** — chip pill style and rich starter button style.
+Contextual suggestion chips after pipeline completion. Filtered by existing modules.
 
 ### Inverse pipeline — HubSpot → vibeSpot ([VIB-59](/VIB/issues/VIB-59))
 
-When you import an existing HubSpot theme, vibeSpot now reverse-engineers the design system, module/template graph, field schemas, and round-trip risks so the AI can iterate on the theme coherently instead of treating it as a bag of files.
-
-- **[src/server/inverse-analyzer.ts](src/server/inverse-analyzer.ts)** — deterministic, rule-based analyzer mirroring the marketplace validator pattern.
-- **[src/server/session/disk.ts](src/server/session/disk.ts)** — `scanThemeFromDisk()` now seeds `session.sharedCss` with the extracted `:root` block when the imported theme has no `*-theme.css` file.
-- **[src/commands/inverse.ts](src/commands/inverse.ts) + [src/cli/program.ts](src/cli/program.ts)** — new `vibespot inverse [--path] [--json] [--apply-tokens]` command.
-- **[src/server/routes/inverse.ts](src/server/routes/inverse.ts) + [src/server/server.ts](src/server/server.ts)** — `GET /api/inverse/analyze` and `POST /api/inverse/apply-tokens` routes.
+Reverse-engineers imported HubSpot themes: design tokens, module graph, field schemas, round-trip risks.
 
 ### HubSpot Marketplace publication path ([VIB-58](/VIB/issues/VIB-58))
 

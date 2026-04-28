@@ -1061,7 +1061,8 @@ vibespot</code></pre>
   <p>Each time the AI pipeline generates or modifies modules, vibeSpot creates a git commit in the theme's local repository. The commit message describes what changed (e.g., "Generated hero, features, pricing, footer" or "Modified hero: updated headline and background color"). No manual saving is required.</p>
 
   <h3 id="browsing-history">Browsing Versions</h3>
-  <p>Click the clock icon in the topbar to open the version history panel. You will see a timeline of all versions with:</p>
+  <p>The compact <strong>history timeline</strong> sits above the chat input — each pill is one generation step, labeled with the user message that produced it. The currently active version is highlighted. Hover any pill to see the commit hash, age, and the section names changed in that step.</p>
+  <p>For the deeper view, click the clock icon in the topbar to open the full version history panel with:</p>
   <ul>
     <li>Timestamp for each version</li>
     <li>Description of what changed</li>
@@ -1069,11 +1070,14 @@ vibespot</code></pre>
   </ul>
 
   <h3 id="rolling-back">Rolling Back</h3>
-  <p>Click any version in the timeline to restore the theme to that point. This is a non-destructive operation: vibeSpot creates a new commit that reverts to the selected state, so you never lose the intermediate history. You can always go forward again to a newer version.</p>
+  <p>Click any pill in the timeline (or any entry in the history panel) to restore the theme to that point. This is a non-destructive operation: vibeSpot creates a new commit that reverts to the selected state, so you never lose the intermediate history. You can always go forward again to a newer version.</p>
+
+  <h3 id="undo-redo-shortcuts">Keyboard Shortcuts</h3>
+  <p>Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> (<kbd>Cmd</kbd>+<kbd>Z</kbd> on macOS) to step back one version, or <kbd>Ctrl</kbd>+<kbd>Y</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> to step forward. Shortcuts are ignored while the chat input or any other text field is focused, and while the AI is generating.</p>
 
   <div class="doc-callout doc-callout--tip">
     <div class="doc-callout__label">&#10024; Tip</div>
-    <p>Use version history as an undo system. If an AI generation goes in the wrong direction, roll back to the previous version and try a different prompt.</p>
+    <p>Use the timeline as a fast undo. If an AI generation goes in the wrong direction, hit Ctrl+Z to revert and try a different prompt.</p>
   </div>
 </div>
 

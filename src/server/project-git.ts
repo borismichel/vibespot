@@ -14,6 +14,8 @@ export interface GitCommitInfo {
   message: string;    // first line of commit message
   timestamp: number;  // unix epoch ms
   date: string;       // ISO string for display
+  changedFiles?: string[];   // file paths changed in this commit (relative to themePath)
+  changedModules?: string[]; // unique module names extracted from changedFiles
 }
 
 // ---------------------------------------------------------------------------
@@ -167,32 +169,63 @@ export function commitTemplateState(
 // ---------------------------------------------------------------------------
 
 /**
- * Get commit history (most recent first).
+ * Parse `git log --name-only` output (with our pipe-delimited header line per commit)
+ * into commit info entries with changedFiles + extracted module names.
+ */
+function parseLogWithNames(stdout: string): GitCommitInfo[] {
+  const commits: GitCommitInfo[] = [];
+  let current: GitCommitInfo | null = null;
+
+  for (const rawLine of stdout.split("\n")) {
+    const line = rawLine.trimEnd();
+    if (line.startsWith("COMMIT|")) {
+      if (current) commits.push(current);
+      const parts = line.slice("COMMIT|".length).split("|");
+      if (parts.length < 4) { current = null; continue; }
+      const timestamp = parseInt(parts[3], 10) * 1000;
+      current = {
+        hash: parts[0],
+        fullHash: parts[1],
+        message: parts[2],
+        timestamp,
+        date: new Date(timestamp).toISOString(),
+        changedFiles: [],
+        changedModules: [],
+      };
+    } else if (line && current) {
+      current.changedFiles!.push(line);
+    }
+  }
+  if (current) commits.push(current);
+
+  // Derive unique changedModules from changedFiles (paths like modules/<name>.module/...).
+  for (const c of commits) {
+    if (!c.changedFiles) continue;
+    const seen = new Set<string>();
+    for (const fp of c.changedFiles) {
+      const m = fp.match(/^modules\/([^/]+)\.module(?:\/|$)/);
+      if (m) seen.add(m[1]);
+    }
+    c.changedModules = [...seen];
+  }
+  return commits;
+}
+
+/**
+ * Get commit history (most recent first), including the list of files changed
+ * in each commit so the UI can show "what changed" without an extra round-trip.
  */
 export function getHistory(themePath: string, limit: number = 50): GitCommitInfo[] {
   if (!isGitAvailable()) return [];
   if (!existsSync(join(themePath, ".git"))) return [];
 
   const result = run(
-    `git log --pretty=format:"%h|%H|%s|%at" -n ${limit}`,
+    `git log --name-only --pretty=format:"COMMIT|%h|%H|%s|%at" -n ${limit}`,
     { cwd: themePath }
   );
   if (!result.success || !result.stdout.trim()) return [];
 
-  const commits: GitCommitInfo[] = [];
-  for (const line of result.stdout.split("\n")) {
-    const parts = line.split("|");
-    if (parts.length < 4) continue;
-    const timestamp = parseInt(parts[3], 10) * 1000;
-    commits.push({
-      hash: parts[0],
-      fullHash: parts[1],
-      message: parts[2],
-      timestamp,
-      date: new Date(timestamp).toISOString(),
-    });
-  }
-  return commits;
+  return parseLogWithNames(result.stdout);
 }
 
 /**
@@ -208,25 +241,12 @@ export function getTemplateHistory(
 
   const escapedId = templateId.replace(/[[\]\\]/g, "\\$&");
   const result = run(
-    `git log --grep="\\[${escapedId}\\]" --pretty=format:"%h|%H|%s|%at" -n ${limit}`,
+    `git log --grep="\\[${escapedId}\\]" --name-only --pretty=format:"COMMIT|%h|%H|%s|%at" -n ${limit}`,
     { cwd: themePath }
   );
   if (!result.success || !result.stdout.trim()) return [];
 
-  const commits: GitCommitInfo[] = [];
-  for (const line of result.stdout.split("\n")) {
-    const parts = line.split("|");
-    if (parts.length < 4) continue;
-    const timestamp = parseInt(parts[3], 10) * 1000;
-    commits.push({
-      hash: parts[0],
-      fullHash: parts[1],
-      message: parts[2],
-      timestamp,
-      date: new Date(timestamp).toISOString(),
-    });
-  }
-  return commits;
+  return parseLogWithNames(result.stdout);
 }
 
 // ---------------------------------------------------------------------------
