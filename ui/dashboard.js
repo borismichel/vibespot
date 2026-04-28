@@ -120,18 +120,17 @@ async function refreshInverseAnalysis() {
   const applyBtn = document.getElementById("btn-inverse-apply-tokens");
   if (!section || !summaryEl) return;
 
-  section.classList.remove("hidden");
-  summaryEl.innerHTML = `<p class="dashboard__empty-state">Analyzing imported theme...</p>`;
-  if (status) status.textContent = "Analyzing theme...";
-  if (applyBtn) applyBtn.classList.add("hidden");
+  const capturedSessionId = currentDashboardSessionId;
 
   try {
     const res = await fetch("/api/inverse/analyze");
+    if (currentDashboardSessionId !== capturedSessionId) return;
     const data = await res.json();
     if (!res.ok || data.error) {
       section.classList.add("hidden");
       return;
     }
+    section.classList.remove("hidden");
     renderInverseAnalysis(data.report);
   } catch (err) {
     console.warn("Import analysis failed:", err);
@@ -166,8 +165,8 @@ function renderInverseAnalysis(report) {
   }
 
   const stats = [
-    ["Modules", counts.moduleCount || 0],
-    ["Templates", counts.templateCount || 0],
+    ["Modules (disk)", counts.moduleCount || 0],
+    ["Templates (disk)", counts.templateCount || 0],
     ["Orphans", counts.orphanCount || 0],
     ["Palette", counts.paletteSize || 0],
     ["CSS Vars", counts.cssVarCount || 0],
@@ -211,14 +210,17 @@ function renderInverseFindings(findings) {
     return `<div class="inverse-findings inverse-findings--empty">No findings. This imported theme looks straightforward to edit.</div>`;
   }
 
-  const visible = findings.slice(0, 5);
+  const severityOrder = { error: 0, warning: 1, info: 2 };
+  const sorted = [...findings].sort((a, b) => (severityOrder[a.severity] ?? 2) - (severityOrder[b.severity] ?? 2));
+  const visible = sorted.slice(0, 5);
   let html = `<div class="inverse-findings">`;
   for (const finding of visible) {
     const severity = ["error", "warning", "info"].includes(finding.severity) ? finding.severity : "info";
+    const fixAttr = finding.fix ? ` title="${inverseEscAttr(finding.fix)}"` : "";
     html += `
       <div class="inverse-finding inverse-finding--${severity}">
         <span class="inverse-finding__severity">${esc(severity)}</span>
-        <span class="inverse-finding__message">${esc(finding.message)}</span>
+        <span class="inverse-finding__message"${fixAttr}>${esc(finding.message)}</span>
       </div>
     `;
   }
