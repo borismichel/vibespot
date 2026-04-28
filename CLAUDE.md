@@ -171,6 +171,17 @@ Key behaviors:
 - **No CDN imports** — All CSS/JS must be self-contained. The system prompt and auto-fix strip external font imports.
 - **Module names** — Always kebab-case (e.g., `hero`, `trust-bar`). The pipeline enforces this via `spec.name`; `updateModules()` uses case-insensitive matching as a safety net.
 
+## Documentation Update Checklist
+
+When a feature or fix ships, update the relevant docs before merging:
+
+| Doc | When to update |
+|-----|---------------|
+| `CHANGELOG.md` | **Always** — add a version entry |
+| `README.md` | User-facing feature or setup change |
+| `ui/docs/index.html` | Affects documented features or workflows |
+| `CLAUDE.md` | Architecture, constraints, or key behaviors change |
+
 ## Related Projects
 
 - **MPMX-2026** (`../MPMX-2026/`) — HubSpot CMS theme where conversion patterns were developed

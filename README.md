@@ -231,4 +231,4 @@ See [CHANGELOG.md](CHANGELOG.md) for the full history.
 
 ## License
 
-Personal use only — see [LICENSE](LICENSE) for details. Commercial licensing available on request.
+FSL-1.1-Apache-2.0 — see [LICENSE](LICENSE) for details.
