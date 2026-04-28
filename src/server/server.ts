@@ -100,6 +100,10 @@ import {
   handleMarketplaceFixRoute,
   handleMarketplaceListingRoute,
 } from "./routes/marketplace.js";
+import {
+  handleInverseAnalyzeRoute,
+  handleInverseApplyTokensRoute,
+} from "./routes/inverse.js";
 
 // ---------------------------------------------------------------------------
 // MIME types for static serving
@@ -522,6 +526,16 @@ function handleApiRoute(
 
     case "/api/marketplace/listing":
       handleMarketplaceListingRoute(method, req, res);
+      break;
+
+    case "/api/inverse/analyze":
+      if (method === "GET") handleInverseAnalyzeRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/inverse/apply-tokens":
+      if (method === "POST") handleInverseApplyTokensRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
     default:

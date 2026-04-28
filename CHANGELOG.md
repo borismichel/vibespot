@@ -6,6 +6,18 @@ All notable changes to vibeSpot are documented here.
 
 ## v1.2.0-dev — unreleased
 
+### Inverse pipeline — HubSpot → vibeSpot ([VIB-59](/VIB/issues/VIB-59))
+
+When you import an existing HubSpot theme, vibeSpot now reverse-engineers the design system, module/template graph, field schemas, and round-trip risks so the AI can iterate on the theme coherently instead of treating it as a bag of files.
+
+- **[src/server/inverse-analyzer.ts](src/server/inverse-analyzer.ts)** — deterministic, rule-based analyzer mirroring the marketplace validator pattern. `analyzeTheme(themePath)` returns an `InverseReport` with: extracted `:root` CSS custom properties; an inferred colour palette (hex/rgb/hsl, ranked by frequency, utility colours filtered, named where the colour is declared as a CSS variable); font families, font sizes, spacing, radii, and shadow values seen in theme + module CSS; a per-template module-usage graph plus per-module template list and orphan modules; field schema flags for patterns vibeSpot doesn't natively generate (HubDB fields, CRM fields, repeater occurrences, deeply nested groups, conditional visibility, unknown widget types); and round-trip risks for HubL `{% macro %}` / `{% raw %}` blocks, includes outside `modules/`, custom `module.js`, and `import_modules.json`. `buildRootCssFromTokens()` synthesises a `:root` block from the inferred palette/typography when the imported theme ships none.
+- **[src/server/session/disk.ts](src/server/session/disk.ts)** — `scanThemeFromDisk()` now seeds `session.sharedCss` with the extracted `:root` block when the imported theme has no `*-theme.css` file, so the AI generates additions that stay consistent with the theme's existing tokens.
+- **[src/commands/inverse.ts](src/commands/inverse.ts) + [src/cli/program.ts](src/cli/program.ts)** — new `vibespot inverse [--path] [--json] [--apply-tokens]` command. Prints palette, typography, template→modules, orphans, and findings; `--apply-tokens` writes the inferred `:root` block into `css/<theme>-theme.css` when missing.
+- **[src/server/routes/inverse.ts](src/server/routes/inverse.ts) + [src/server/server.ts](src/server/server.ts)** — `GET /api/inverse/analyze` returns the report for the active session, `POST /api/inverse/apply-tokens` seeds `session.sharedCss` (or writes the file when no shared CSS exists yet).
+- **[test/inverse-analyzer.test.ts](test/inverse-analyzer.test.ts)** — 19 tests covering CSS variable extraction, palette ranking + utility-colour filtering, 3-digit hex normalization, font family capture, root block synthesis, write-when-missing semantics, module/template graph + orphan detection, custom-JS flag, HubDB / repeater / deeply-nested-group / unknown-widget field flags, and the macro / include / custom-JS round-trip risks.
+
+Out of scope for this iteration: AI-driven brand/tone extraction (already exists at `src/ai/design-extractor.ts` and `src/server/agent/stages/brandvoice-extractor.ts`; will be wired into the import flow in a follow-up), the import wizard UI (connect → analyze → confirm flow), and round-trip diffing against the originally-imported snapshot.
+
 ### HubSpot Marketplace publication path ([VIB-58](/VIB/issues/VIB-58))
 
 vibeSpot now ships a Marketplace check workflow that audits a generated theme against HubSpot's Marketplace submission requirements before you submit through the developer portal. Available from both the editor (storefront icon in the topbar) and the CLI (`vibespot marketplace check`).

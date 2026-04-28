@@ -10,6 +10,7 @@ import { getSession } from "./store.js";
 import { getOrderedModules, syncFlatFieldsFromTemplate, syncFlatFieldsToTemplate, loadChatFromTheme } from "./state.js";
 import { getActiveTemplate, migrateSession } from "./templates.js";
 import { ensureGitRepo } from "../project-git.js";
+import { extractDesignTokens, buildRootCssFromTokens } from "../inverse-analyzer.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -212,6 +213,20 @@ export function scanThemeFromDisk(themePath: string): void {
     if (jsFiles.length > 0) {
       sharedJs = safeRead(join(jsDir, jsFiles[0]));
       activeSession.sharedJs = sharedJs;
+    }
+  }
+
+  // Imported themes often ship CSS scoped to module files with no shared
+  // theme stylesheet. Without a `:root` token block, the AI generates new
+  // modules with arbitrary colours and fonts that diverge from the import.
+  // Seed sharedCss with extracted design tokens so generated additions stay
+  // consistent with what the user already has on disk.
+  if (!sharedCss && activeSession.modules.length > 0) {
+    const tokens = extractDesignTokens(themePath);
+    const rootBlock = buildRootCssFromTokens(tokens);
+    if (rootBlock) {
+      activeSession.sharedCss = rootBlock;
+      sharedCss = rootBlock;
     }
   }
 
