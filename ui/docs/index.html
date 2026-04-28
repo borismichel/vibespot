@@ -21,7 +21,7 @@
   </a>
   <div class="doc-topbar__search">
     <span class="doc-topbar__search-icon">&#128269;</span>
-    <input type="text" id="doc-search-input" placeholder="Search docs..." autocomplete="off">
+    <input type="text" id="doc-search-input" placeholder="Search docs..." autocomplete="off" aria-label="Search documentation">
     <span class="doc-topbar__shortcut">/</span>
   </div>
   <a href="/" class="doc-topbar__back">&larr; Back to App</a>
@@ -97,6 +97,7 @@
     <a class="doc-nav__link" href="#deploying">Deploying to HubSpot</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#auto-fix">Auto-Fix</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#creating-page-hubspot">Creating a Page</a>
+    <a class="doc-nav__link" href="#zip-download">ZIP Download</a>
     <a class="doc-nav__link" href="#version-history">Version History</a>
   </div>
 
@@ -105,6 +106,7 @@
     <a class="doc-nav__link" href="#settings">Settings</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#settings-ai">AI Tab</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#settings-hubspot">HubSpot Tab</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#settings-figma">Figma Tab</a>
     <a class="doc-nav__link" href="#cli-commands">CLI Commands</a>
     <a class="doc-nav__link" href="#shortcuts">Shortcuts</a>
     <a class="doc-nav__link" href="#troubleshooting">Troubleshooting</a>
@@ -205,7 +207,7 @@ vibespot</code></pre>
       <tr><td>Claude Code</td><td>CLI</td><td>Install <code>claude</code> CLI, authenticate</td><td>Included in Claude subscription</td><td>Subscribers who want zero API costs</td></tr>
       <tr><td>Anthropic API</td><td>API</td><td>Add <code>ANTHROPIC_API_KEY</code></td><td>Pay-per-token</td><td>Fastest structured output, reliable</td></tr>
       <tr><td>Claude OAuth</td><td>API</td><td>Run <code>claude setup-token</code>, paste token</td><td>Included in Claude subscription</td><td>Subscribers without API budget</td></tr>
-      <tr><td>OpenAI API</td><td>API</td><td>Add <code>OPENAI_API_KEY</code></td><td>Pay-per-token</td><td>GPT-4o users, existing OpenAI budget</td></tr>
+      <tr><td>OpenAI API</td><td>API</td><td>Add <code>OPENAI_API_KEY</code></td><td>Pay-per-token</td><td>GPT-5.5 users, existing OpenAI budget</td></tr>
       <tr><td>Gemini API</td><td>API</td><td>Add <code>GEMINI_API_KEY</code></td><td>Free tier available</td><td>Cost-conscious users, free quota</td></tr>
       <tr><td>Gemini CLI</td><td>CLI</td><td>Install <code>gemini</code> CLI, authenticate</td><td>Free (with Google account)</td><td>Free option without API keys</td></tr>
       <tr><td>Codex CLI</td><td>CLI</td><td>Install <code>codex</code> CLI, authenticate</td><td>Included in OpenAI subscription</td><td>OpenAI subscribers</td></tr>
@@ -251,7 +253,7 @@ vibespot</code></pre>
       </div>
     </div>
     <div class="doc-tabs__panel" id="tab-openai">
-      <p>Use OpenAI's GPT-4o or any compatible model through the OpenAI API.</p>
+      <p>Use OpenAI's GPT-5.5 or any compatible model through the OpenAI API.</p>
       <ol class="doc-steps">
         <li>Get an API key from <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>.</li>
         <li>Paste the key in Settings &rarr; AI tab &rarr; OpenAI API Key, or set <code>export OPENAI_API_KEY=sk-...</code></li>
@@ -313,7 +315,7 @@ vibespot</code></pre>
       <tr><td><code>geminiApiKey</code></td><td>string</td><td>Google AI / Gemini API key</td></tr>
       <tr><td><code>claudeCodeModel</code></td><td>string</td><td>Model override for Claude Code CLI</td></tr>
       <tr><td><code>anthropicApiModel</code></td><td>string</td><td>Anthropic API model (default: <code>claude-sonnet-4-20250514</code>)</td></tr>
-      <tr><td><code>openaiApiModel</code></td><td>string</td><td>OpenAI API model (default: <code>gpt-4o</code>)</td></tr>
+      <tr><td><code>openaiApiModel</code></td><td>string</td><td>OpenAI API model (default: <code>gpt-5.5</code>)</td></tr>
       <tr><td><code>hubspotAccounts</code></td><td>array</td><td>List of HubSpot accounts with PAK, portal ID, and data center</td></tr>
       <tr><td><code>activeHubSpotAccount</code></td><td>string</td><td>Portal ID of the currently active HubSpot account</td></tr>
       <tr><td><code>hubspotUploadMode</code></td><td>string</td><td><code>"api"</code> (default) or <code>"cli"</code></td></tr>
@@ -424,7 +426,7 @@ vibespot</code></pre>
       <div class="mock-editor__resize" title="Drag to resize panels"></div>
       <div class="mock-editor__right">
         <div class="mock-preview">
-          <div class="mock-preview__tabs"><span class="mock-preview__tab active">Preview</span><span class="mock-preview__tab">Code</span></div>
+          <div class="mock-preview__tabs"><span class="mock-preview__tab active">Preview</span><span class="mock-preview__tab">Plan</span><span class="mock-preview__tab">Code</span></div>
           <div class="mock-preview__chrome">
             <div class="mock-preview__dots"><span class="mock-preview__dot"></span><span class="mock-preview__dot"></span><span class="mock-preview__dot"></span></div>
             <div class="mock-preview__url">my-startup.vibespot.app</div>
@@ -500,7 +502,7 @@ vibespot</code></pre>
     <li><code>fields.json</code> &mdash; Field definitions for the HubSpot content editor</li>
   </ul>
   <p>At the theme level, you also have access to <code>shared.css</code> (design system utilities) and <code>shared.js</code> (scroll animations, shared behaviors).</p>
-  <p>The editor uses CodeMirror 6 with syntax highlighting for HTML, CSS, JavaScript, and JSON. Save your changes with <kbd>Cmd</kbd>+<kbd>S</kbd> (or <kbd>Ctrl</kbd>+<kbd>S</kbd> on Windows/Linux) to write to disk and refresh the preview.</p>
+  <p>The editor uses CodeMirror 6 with syntax highlighting for HTML, CSS, JavaScript, and JSON. Save your changes with <kbd>Cmd</kbd>+<kbd>S</kbd> (or <kbd>Ctrl</kbd>+<kbd>S</kbd> on Windows/Linux) or click the <strong>Save</strong> button to write to disk and refresh the preview.</p>
 
   <h3 id="module-sidebar">Module Sidebar</h3>
   <p>The module sidebar is a <strong>toggleable slideout</strong> panel. Click the <strong>Modules</strong> button (grid icon + count badge) at the top of the left panel to open it. The slideout slides in from the left over the chat area. Click the <strong>&times;</strong> button or the Modules button again to close it.</p>
@@ -991,6 +993,19 @@ vibespot</code></pre>
 </div>
 
 <!-- ============================================================
+     Section: ZIP Download
+     ============================================================ -->
+<div class="doc-section" id="zip-download">
+  <h2 id="zip-download-heading">ZIP Download <a href="#zip-download" class="doc-anchor">#</a></h2>
+  <p>Export your theme as a ZIP archive for offline use, sharing, or manual upload to HubSpot.</p>
+  <p>Click the <strong>Download ZIP</strong> button on the dashboard toolbar (next to the theme name) to generate and download a <code>.zip</code> file containing all theme files: modules, templates, shared CSS/JS, and assets. The ZIP file is named after the theme (e.g., <code>my-saas-landing.zip</code>).</p>
+  <div class="doc-callout doc-callout--tip">
+    <div class="doc-callout__label">&#10024; When to use ZIP download</div>
+    <p>ZIP download is useful when you want to share the theme with a colleague who does not have vibeSpot, back up the theme independently of git, or upload manually through HubSpot's Design Manager.</p>
+  </div>
+</div>
+
+<!-- ============================================================
      Section 8: Version History
      ============================================================ -->
 <div class="doc-section" id="version-history">
@@ -1022,7 +1037,7 @@ vibespot</code></pre>
      ============================================================ -->
 <div class="doc-section" id="settings">
   <h2 id="settings-heading">Settings Reference <a href="#settings" class="doc-anchor">#</a></h2>
-  <p>Open the Settings panel by clicking the gear icon in the topbar. Settings are organized into four tabs.</p>
+  <p>Open the Settings panel by clicking the gear icon in the topbar. Settings are organized into five tabs.</p>
 
   <h3 id="settings-ai">AI Tab</h3>
 
@@ -1032,6 +1047,7 @@ vibespot</code></pre>
       <div class="mock-settings__tabs">
         <span class="mock-settings__tab active">AI</span>
         <span class="mock-settings__tab">HubSpot</span>
+        <span class="mock-settings__tab">Figma</span>
         <span class="mock-settings__tab">GitHub</span>
         <span class="mock-settings__tab">vibeSpot</span>
       </div>
@@ -1138,6 +1154,18 @@ vibespot</code></pre>
     <li><strong>Add account</strong> &mdash; Paste a Personal Access Key to connect a new portal. vibeSpot validates the key and detects the portal metadata.</li>
     <li><strong>Switch/remove</strong> &mdash; Click an account to make it active. Click the remove button to disconnect it.</li>
   </ul>
+
+  <h3 id="settings-figma">Figma Tab</h3>
+  <p>The Figma tab manages authentication for the <a href="#figma-import">Figma Import</a> feature.</p>
+  <ul>
+    <li><strong>Figma Personal Access Token</strong> &mdash; Paste a token generated from your Figma account settings (Account Settings &rarr; Personal access tokens). The token needs <strong>File content (read-only)</strong> scope.</li>
+    <li><strong>Test Connection</strong> &mdash; Validates the token against the Figma API to confirm it is working.</li>
+    <li><strong>Token storage</strong> &mdash; The token is saved locally in <code>~/.vibespot/config.json</code> as <code>figmaToken</code> and is only sent to the Figma API.</li>
+  </ul>
+  <div class="doc-callout doc-callout--tip">
+    <div class="doc-callout__label">&#10024; One-off tokens</div>
+    <p>You can also enter a Figma token directly in the import dialog without saving it globally. This is useful for one-time imports or when using a shared machine.</p>
+  </div>
 
   <h3 id="settings-github">GitHub Tab</h3>
   <p>The GitHub tab configures authentication for source imports (used by the "From React" flow).</p>
