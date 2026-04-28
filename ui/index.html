@@ -84,9 +84,13 @@
         <!-- Main action buttons -->
         <div class="setup__options" id="setup-options">
           <div class="setup__actions">
+            <button class="setup__action-btn" data-action="starter">
+              <span class="setup__action-icon">&#9733;</span>
+              <span>Template</span>
+            </button>
             <button class="setup__action-btn" data-action="new">
               <span class="setup__action-icon">&#43;</span>
-              <span>New Theme</span>
+              <span>Blank Theme</span>
             </button>
             <button class="setup__action-btn" data-action="continue">
               <span class="setup__action-icon">&#9654;</span>
@@ -109,6 +113,17 @@
           </div>
 
           <!-- Expandable panels (one visible at a time) -->
+          <div class="setup__panel hidden" id="panel-starter">
+            <div class="starter-grid" id="starter-grid"></div>
+            <div class="starter-create hidden" id="starter-create">
+              <p class="starter-create__label" id="starter-create-label"></p>
+              <div class="setup__row">
+                <input type="text" class="setup__input setup__input--wide" id="starter-theme-name" placeholder="my-landing-page" />
+                <button class="btn btn--primary" id="btn-create-from-starter">Create</button>
+              </div>
+            </div>
+          </div>
+
           <div class="setup__panel hidden" id="panel-new">
             <div class="setup__row">
               <input type="text" class="setup__input setup__input--wide" id="new-theme-name" placeholder="my-landing-page" />

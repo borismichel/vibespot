@@ -41,6 +41,7 @@ import {
   handleSetupResumeRoute,
   handleSetupApiKeyRoute,
   handleSetupRemoteThemesRoute,
+  handleStartersListRoute,
 } from "./routes/setup.js";
 import {
   handleSettingsStatusRoute,
@@ -299,6 +300,11 @@ function handleApiRoute(
 
     case "/api/setup/remote-themes":
       if (method === "GET") handleSetupRemoteThemesRoute(res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/starters":
+      if (method === "GET") handleStartersListRoute(res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 

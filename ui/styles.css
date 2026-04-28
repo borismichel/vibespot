@@ -273,7 +273,7 @@ body { display: flex; }
 /* Action buttons grid */
 .setup__actions {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -1990,6 +1990,57 @@ body { display: flex; }
   max-width: 320px;
   margin: 0 auto 20px;
   line-height: 1.5;
+}
+
+/* Starter template grid (setup panel) */
+.starter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.starter-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.starter-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-card);
+}
+.starter-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-bg, rgba(232, 97, 58, 0.08));
+}
+.starter-card__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.starter-card__desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.starter-card__meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+.starter-create {
+  margin-top: 12px;
+  animation: panelSlideIn 0.15s ease-out;
+}
+.starter-create__label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 8px;
 }
 
 .chat__starters {
