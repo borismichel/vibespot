@@ -6,6 +6,7 @@ import { uploadCommand } from "../commands/upload.js";
 import { doctorCommand } from "../commands/doctor.js";
 import { vibeCommand } from "../commands/vibe.js";
 import { marketplaceCheckCommand, marketplaceEditCommand } from "../commands/marketplace.js";
+import { inverseCommand } from "../commands/inverse.js";
 import { getVersion } from "../utils/fs.js";
 
 export function buildProgram(): Command {
@@ -61,6 +62,15 @@ export function buildProgram(): Command {
     .description("Edit Marketplace listing metadata (marketplace.json)")
     .option("-p, --path <path>", "Path to the theme directory")
     .action((opts) => marketplaceEditCommand(opts));
+
+  program
+    .command("inverse")
+    .description("Analyze an imported HubSpot theme: design tokens, module graph, field flags, round-trip risks")
+    .option("-p, --path <path>", "Path to the theme directory")
+    .option("--json", "Emit machine-readable JSON instead of formatted output")
+    .option("--apply-tokens", "Seed css/<theme>-theme.css with the inferred :root block when missing")
+    .option("--snapshot", "Capture the current theme as the imported round-trip baseline before analysis")
+    .action((opts) => inverseCommand(opts));
 
   return program;
 }

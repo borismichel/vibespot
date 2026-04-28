@@ -24,7 +24,7 @@ export function handleThemesRoute(method: string, req: IncomingMessage, res: Ser
 
     jsonResponse(res, 200, {
       activeTheme: session
-        ? { id: session.id, themeName: session.themeName }
+        ? { id: session.id, themeName: session.themeName, isImported: !!session.isImported }
         : null,
       sessions,
     });

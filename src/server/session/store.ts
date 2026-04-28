@@ -50,6 +50,7 @@ function rebuildIndex(): SessionIndexEntry[] {
         updatedAt: data.updatedAt,
         moduleCount: templates.reduce((n: number, t: any) => n + (t.modules?.length || 0), 0),
         templateCount: templates.length,
+        isImported: !!data.isImported,
       });
     } catch { /* skip corrupt files */ }
   }
@@ -67,6 +68,7 @@ function upsertIndex(session: VibeSession): void {
     updatedAt: session.updatedAt,
     moduleCount: templates.reduce((n, t) => n + (t.modules?.length || 0), 0),
     templateCount: templates.length,
+    isImported: !!session.isImported,
   };
   const idx = entries.findIndex((e) => e.id === session.id);
   if (idx >= 0) entries[idx] = entry;
@@ -94,11 +96,12 @@ function generateId(): string {
   return `vibe-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function createSession(themePath: string, themeName: string): VibeSession {
+export function createSession(themePath: string, themeName: string, opts: { isImported?: boolean } = {}): VibeSession {
   const session: VibeSession = {
     id: generateId(),
     themePath,
     themeName,
+    isImported: !!opts.isImported,
     templates: [],
     activeTemplateId: "",
     messages: [],
@@ -150,7 +153,7 @@ export function loadSession(sessionId: string): VibeSession | null {
   }
 }
 
-export function listSessions(): Array<{ id: string; themeName: string; updatedAt: number; moduleCount: number; templateCount: number }> {
+export function listSessions(): SessionIndexEntry[] {
   if (!existsSync(SESSIONS_DIR)) return [];
   return readIndex();
 }

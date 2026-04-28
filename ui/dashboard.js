@@ -26,6 +26,7 @@ const PAGE_TYPE_FULL_LABELS = {
 
 let currentDashboardTheme = "";
 let currentDashboardSessionId = "";
+let currentDashboardIsImported = false;
 
 async function showDashboard(themeName) {
   currentDashboardTheme = themeName;
@@ -46,7 +47,11 @@ async function showDashboard(themeName) {
     const themesRes = await fetch("/api/themes");
     const themesData = await themesRes.json();
     currentDashboardSessionId = themesData.activeTheme?.id || "";
-  } catch { currentDashboardSessionId = ""; }
+    currentDashboardIsImported = !!themesData.activeTheme?.isImported;
+  } catch {
+    currentDashboardSessionId = "";
+    currentDashboardIsImported = false;
+  }
 
   // Update URL
   const target = "#/dashboard/" + encodeURIComponent(themeName);
@@ -61,6 +66,7 @@ async function showDashboard(themeName) {
 function hideDashboard() {
   dashboardScreen.classList.add("hidden");
   currentDashboardTheme = "";
+  currentDashboardIsImported = false;
   closeModulePreview();
 }
 
@@ -82,10 +88,186 @@ async function refreshDashboard() {
     if (data.themePath) {
       document.getElementById("dashboard-theme-path-text").textContent = data.themePath;
     }
+    if (currentDashboardIsImported) {
+      await refreshInverseAnalysis();
+    } else {
+      hideInverseAnalysis();
+    }
   } catch (err) {
     console.error("Failed to load dashboard:", err);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Import analysis
+// ---------------------------------------------------------------------------
+
+function hideInverseAnalysis() {
+  const section = document.getElementById("dashboard-inverse-section");
+  const summaryEl = document.getElementById("inverse-summary");
+  const status = document.getElementById("inverse-status");
+  const applyBtn = document.getElementById("btn-inverse-apply-tokens");
+  section?.classList.add("hidden");
+  if (summaryEl) summaryEl.innerHTML = "";
+  if (status) status.textContent = "Analyzing theme...";
+  if (applyBtn) applyBtn.classList.add("hidden");
+}
+
+async function refreshInverseAnalysis() {
+  const section = document.getElementById("dashboard-inverse-section");
+  const status = document.getElementById("inverse-status");
+  const summaryEl = document.getElementById("inverse-summary");
+  const applyBtn = document.getElementById("btn-inverse-apply-tokens");
+  if (!section || !summaryEl) return;
+
+  const capturedSessionId = currentDashboardSessionId;
+
+  try {
+    const res = await fetch("/api/inverse/analyze");
+    if (currentDashboardSessionId !== capturedSessionId) return;
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      section.classList.add("hidden");
+      return;
+    }
+    section.classList.remove("hidden");
+    renderInverseAnalysis(data.report);
+  } catch (err) {
+    console.warn("Import analysis failed:", err);
+    section.classList.add("hidden");
+  }
+}
+
+function renderInverseAnalysis(report) {
+  const status = document.getElementById("inverse-status");
+  const summaryEl = document.getElementById("inverse-summary");
+  const applyBtn = document.getElementById("btn-inverse-apply-tokens");
+  if (!report || !summaryEl) return;
+
+  const counts = report.summary || {};
+  const tokens = report.designTokens || {};
+  const findings = report.findings || [];
+  const warnings = findings.filter((f) => f.severity === "warning").length;
+  const errors = findings.filter((f) => f.severity === "error").length;
+  const hasInferredTokens = (tokens.palette || []).length > 0;
+  const hasCssVars = (counts.cssVarCount || 0) > 0;
+
+  if (status) {
+    if (errors > 0) status.textContent = `${errors} issue${errors === 1 ? "" : "s"} need attention`;
+    else if (warnings > 0) status.textContent = `${warnings} warning${warnings === 1 ? "" : "s"}`;
+    else status.textContent = "No blocking risks found";
+  }
+
+  if (applyBtn) {
+    applyBtn.classList.toggle("hidden", hasCssVars || !hasInferredTokens);
+    applyBtn.disabled = false;
+    applyBtn.textContent = "Apply Tokens";
+  }
+
+  const stats = [
+    ["Modules (disk)", counts.moduleCount || 0],
+    ["Templates (disk)", counts.templateCount || 0],
+    ["Orphans", counts.orphanCount || 0],
+    ["Palette", counts.paletteSize || 0],
+    ["CSS Vars", counts.cssVarCount || 0],
+    ["Macros", counts.customMacroCount || 0],
+  ];
+
+  let html = `<div class="inverse-summary__stats">`;
+  for (const [label, value] of stats) {
+    html += `
+      <div class="inverse-stat">
+        <span class="inverse-stat__value">${esc(String(value))}</span>
+        <span class="inverse-stat__label">${esc(label)}</span>
+      </div>
+    `;
+  }
+  html += `</div>`;
+
+  if ((tokens.palette || []).length > 0) {
+    html += `<div class="inverse-block"><div class="inverse-block__label">Palette</div><div class="inverse-swatches">`;
+    for (const color of tokens.palette.slice(0, 8)) {
+      const label = color.varName ? `${color.value} (${color.varName})` : color.value;
+      html += `<span class="inverse-swatch" style="background:${inverseCssColor(color.value)}" title="${inverseEscAttr(label)}"></span>`;
+    }
+    html += `</div></div>`;
+  }
+
+  if ((tokens.fontFamilies || []).length > 0) {
+    html += `<div class="inverse-block"><div class="inverse-block__label">Typography</div><div class="inverse-tags">`;
+    for (const font of tokens.fontFamilies.slice(0, 4)) {
+      html += `<span class="inverse-tag">${esc(font)}</span>`;
+    }
+    html += `</div></div>`;
+  }
+
+  html += renderInverseFindings(findings);
+  summaryEl.innerHTML = html;
+}
+
+function renderInverseFindings(findings) {
+  if (!findings || findings.length === 0) {
+    return `<div class="inverse-findings inverse-findings--empty">No findings. This imported theme looks straightforward to edit.</div>`;
+  }
+
+  const severityOrder = { error: 0, warning: 1, info: 2 };
+  const sorted = [...findings].sort((a, b) => (severityOrder[a.severity] ?? 2) - (severityOrder[b.severity] ?? 2));
+  const visible = sorted.slice(0, 5);
+  let html = `<div class="inverse-findings">`;
+  for (const finding of visible) {
+    const severity = ["error", "warning", "info"].includes(finding.severity) ? finding.severity : "info";
+    const fixAttr = finding.fix ? ` title="${inverseEscAttr(finding.fix)}"` : "";
+    html += `
+      <div class="inverse-finding inverse-finding--${severity}">
+        <span class="inverse-finding__severity">${esc(severity)}</span>
+        <span class="inverse-finding__message"${fixAttr}>${esc(finding.message)}</span>
+      </div>
+    `;
+  }
+  if (findings.length > visible.length) {
+    html += `<div class="inverse-findings__more">${findings.length - visible.length} more finding${findings.length - visible.length === 1 ? "" : "s"} available in the CLI report.</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function inverseEscAttr(value) {
+  return esc(String(value)).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function inverseCssColor(value) {
+  const color = String(value || "").trim();
+  if (/^#[0-9a-fA-F]{3,8}$/.test(color)) return color;
+  if (/^rgba?\([0-9.,%\s]+\)$/.test(color)) return color;
+  if (/^hsla?\([0-9.,%\sdegturnrad+-]+\)$/.test(color)) return color;
+  return "transparent";
+}
+
+document.getElementById("btn-inverse-apply-tokens")?.addEventListener("click", async () => {
+  const btn = document.getElementById("btn-inverse-apply-tokens");
+  if (!btn) return;
+
+  btn.disabled = true;
+  btn.textContent = "Applying...";
+  try {
+    const res = await fetch("/api/inverse/apply-tokens", { method: "POST" });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      await vibeAlert(data.error || "Failed to apply tokens.", "Error");
+      btn.disabled = false;
+      btn.textContent = "Apply Tokens";
+      return;
+    }
+    if (!data.applied) {
+      await vibeAlert(data.reason || "No tokens were applied.", "Info");
+    }
+    await refreshInverseAnalysis();
+  } catch (err) {
+    await vibeAlert("Failed to apply tokens: " + err.message, "Error");
+    btn.disabled = false;
+    btn.textContent = "Apply Tokens";
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Template list

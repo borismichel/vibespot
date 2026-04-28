@@ -28,6 +28,7 @@ import { detectEnvironment } from "../../utils/detect.js";
 import { saveConfig } from "../../utils/config.js";
 import { ensureDir } from "../../utils/fs.js";
 import { listStarters, getStarter } from "../starters.js";
+import { enrichImportedThemeBrandAssets } from "../brand-enrichment.js";
 
 export const WORKSPACE_DIR = join(homedir(), "vibespot-themes");
 
@@ -83,6 +84,7 @@ export function handleSetupInfoRoute(res: ServerResponse): void {
       id: session.id,
       themeName: session.themeName,
       moduleCount: session.modules.length,
+      isImported: !!session.isImported,
     } : null,
     hsInstalled,
     aiAvailable: env.availableEngines.length > 0,
@@ -233,35 +235,37 @@ export function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse)
 
       if (config.hubspotUploadMode === "cli" || !pak) {
         // CLI fallback
-        execFileSync("hs", ["cms", "fetch", name, themePath], {
-          encoding: "utf-8",
-          stdio: "pipe",
-          ..._shellOpt,
-        });
+        (async () => {
+          execFileSync("hs", ["cms", "fetch", name, themePath], {
+            encoding: "utf-8",
+            stdio: "pipe",
+            ..._shellOpt,
+          });
 
-        createSession(themePath, safeDirName);
-        scanThemeFromDisk(themePath);
-        saveSession();
-
-        jsonResponse(res, 200, {
-          ok: true,
-          themeName: safeDirName,
-          themePath,
-          moduleCount: getSession()?.modules.length || 0,
+          const result = await finalizeFetchedTheme(themePath, safeDirName);
+          jsonResponse(res, 200, {
+            ok: true,
+            themeName: safeDirName,
+            themePath,
+            moduleCount: result.moduleCount,
+            brandEnrichment: result.brandEnrichment,
+          });
+        })().catch((err) => {
+          jsonResponse(res, 500, {
+            error: err instanceof Error ? err.message : String(err),
+          });
         });
       } else {
         // API mode (default) — use original name for API, safe name for local
         fetchTheme(pak, name, themePath)
-          .then(() => {
-            createSession(themePath, safeDirName);
-            scanThemeFromDisk(themePath);
-            saveSession();
-
+          .then(async () => {
+            const result = await finalizeFetchedTheme(themePath, safeDirName);
             jsonResponse(res, 200, {
               ok: true,
               themeName: safeDirName,
               themePath,
-              moduleCount: getSession()?.modules.length || 0,
+              moduleCount: result.moduleCount,
+              brandEnrichment: result.brandEnrichment,
             });
           })
           .catch((err) => {
@@ -276,6 +280,33 @@ export function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse)
       });
     }
   });
+}
+
+async function finalizeFetchedTheme(themePath: string, themeName: string): Promise<{
+  moduleCount: number;
+  brandEnrichment: Awaited<ReturnType<typeof enrichImportedThemeBrandAssets>>;
+}> {
+  createSession(themePath, themeName, { isImported: true });
+  scanThemeFromDisk(themePath);
+  saveSession();
+
+  const session = getSession();
+  let brandEnrichment: Awaited<ReturnType<typeof enrichImportedThemeBrandAssets>> = {
+    attempted: [],
+    extracted: [],
+    skipped: [],
+    errors: [],
+  };
+
+  if (session) {
+    brandEnrichment = await enrichImportedThemeBrandAssets(session);
+    saveSession();
+  }
+
+  return {
+    moduleCount: session?.modules.length || 0,
+    brandEnrichment,
+  };
 }
 
 export function handleSetupOpenRoute(req: IncomingMessage, res: ServerResponse): void {

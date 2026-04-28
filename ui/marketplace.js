@@ -57,6 +57,8 @@ async function openMarketplacePanel() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Fix failed");
       renderReport(body, data.report, data.fix);
+      const stillFixable = (data.report.findings || []).some((f) => f.autoFixable);
+      fixBtn.disabled = !stillFixable;
     } catch (err) {
       await vibeAlert(err.message, "Fix failed");
     }

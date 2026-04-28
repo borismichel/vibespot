@@ -52,6 +52,7 @@ export interface VibeSession {
   id: string;
   themePath: string;
   themeName: string;
+  isImported?: boolean;
 
   // Multi-template support
   templates: TemplateEntry[];
@@ -82,6 +83,7 @@ export interface SessionIndexEntry {
   updatedAt: number;
   moduleCount: number;
   templateCount: number;
+  isImported?: boolean;
 }
 
 export interface SessionSnapshot {

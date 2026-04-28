@@ -10,6 +10,12 @@ import { getSession } from "./store.js";
 import { getOrderedModules, syncFlatFieldsFromTemplate, syncFlatFieldsToTemplate, loadChatFromTheme } from "./state.js";
 import { getActiveTemplate, migrateSession } from "./templates.js";
 import { ensureGitRepo } from "../project-git.js";
+import {
+  extractDesignTokens,
+  buildRootCssFromTokens,
+  extractLocalModuleRefsFromTemplate,
+  ensureImportedThemeSnapshot,
+} from "../inverse-analyzer.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -79,13 +85,9 @@ function parseTemplateFile(filePath: string, filename: string): ParsedTemplate |
     label = labelMatch[1].trim();
   }
 
-  // Extract module references from dnd_module tags
-  const moduleRe = /dnd_module\s+path=["']\.\.\/modules\/(.+?)\.module["']/g;
-  const moduleNames: string[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = moduleRe.exec(content)) !== null) {
-    moduleNames.push(match[1]);
-  }
+  // Extract module references from dnd_module tags, including tags with
+  // instance names before the path attribute.
+  const moduleNames = extractLocalModuleRefsFromTemplate(content);
 
   return { id, label, pageType, moduleNames, templateContent: content, filename };
 }
@@ -162,6 +164,7 @@ export function scanThemeFromDisk(themePath: string): void {
 
   // Ensure git repo exists (handles themes created before this feature)
   ensureGitRepo(themePath);
+  ensureImportedThemeSnapshot(themePath);
 
   const modulesDir = join(themePath, "modules");
   if (!existsSync(modulesDir)) return;
@@ -212,6 +215,20 @@ export function scanThemeFromDisk(themePath: string): void {
     if (jsFiles.length > 0) {
       sharedJs = safeRead(join(jsDir, jsFiles[0]));
       activeSession.sharedJs = sharedJs;
+    }
+  }
+
+  // Imported themes often ship CSS scoped to module files with no shared
+  // theme stylesheet. Without a `:root` token block, the AI generates new
+  // modules with arbitrary colours and fonts that diverge from the import.
+  // Seed sharedCss with extracted design tokens so generated additions stay
+  // consistent with what the user already has on disk.
+  if (!sharedCss && activeSession.modules.length > 0) {
+    const tokens = extractDesignTokens(themePath);
+    const rootBlock = buildRootCssFromTokens(tokens);
+    if (rootBlock) {
+      activeSession.sharedCss = rootBlock;
+      sharedCss = rootBlock;
     }
   }
 
