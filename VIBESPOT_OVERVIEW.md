@@ -1,7 +1,7 @@
 # vibeSpot — System Overview
 
 > A planning-committee briefing on what vibeSpot is, what it does, and how it works.
-> Current version: **1.0.10** · Codebase: ~84 TypeScript modules (`src/`) + 10 UI scripts (`ui/`)
+> Current version: **1.1.3** · Codebase: ~84 TypeScript modules (`src/`) + 10 UI scripts (`ui/`)
 
 ---
 
@@ -235,6 +235,8 @@ Seven AI engines, all unified behind a single `callAgent()` interface:
 | `codex-cli` | local CLI subprocess | yes | prompt-extracted JSON | not exposed |
 
 Engine choice is per-user via Settings; auto-detection picks the first available. CLI engines need only the binary on `PATH` (no API key).
+
+**Per-engine model selection** *(v1.1.2 / v1.1.3)*. Each engine has its own model dropdown backed by a per-engine config field (`claudeCodeModel`, `anthropicApiModel`, `openaiApiModel`, `codexCliModel`, `geminiCliModel`, `geminiApiModel`). Anthropic, OpenAI, and Gemini API engines populate the dropdown from a **live model catalog** — fetched from each provider's `/v1/models` endpoint when an API key is configured, cached 10 minutes. The OpenAI fetch also feeds the Codex CLI dropdown (Codex talks to the OpenAI API). When no key is configured, a static fallback list ships with the build. The selected model flows through the pipeline (`callAgent`) into the request body for API engines and as a `--model`/`-m` flag for CLI subprocess engines (`claude`, `codex`, `gemini`). A "Custom…" option in every dropdown accepts any model identifier — useful for newly released models that haven't been added to the static fallback yet.
 
 **Claude Code uses `stream-json`** rather than plain text output. The CLI emits a line-delimited stream of typed events (assistant text deltas, tool calls, final result) which the helper `spawnClaudeCodeStreamJSON` parses. Tool calls (`Read`, `Edit`, `Bash`, `WebSearch`, `WebFetch`, `Grep`, `Glob`) are surfaced as live status lines in the pipeline UI ("Reading hero/module.html", "Searching: 'pricing best practices'", etc.) — the user sees real agent activity instead of opaque "thinking…" placeholders.
 
@@ -481,16 +483,22 @@ Used for endpoints that don't need bidirectional streaming but need progress upd
 
 ---
 
-## 11. Current State (as of v1.0.10)
+## 11. Current State (as of v1.1.3)
 
 ### Quantitative
 - **84** TypeScript modules in `src/`
 - **10** UI scripts in `ui/`
-- **4** agentic pipeline stages
-- **4** plan/prompt files (intent-analyzer, page-architect, module-developer, plan-mode)
-- **7** supported AI engines
-- **~4,200** lines of CSS in a single file
-- **~300KB** built bundle (single file)
+- **4** agentic pipeline stages (+ 2 background extractors: context, brand voice)
+- **4** prompt files (intent-analyzer, page-architect, module-developer, plan-mode)
+- **7** supported AI engines, each with its own persisted model selection
+- **~4,500** lines of CSS in a single file
+- **~310KB** built bundle (single file)
+
+### Recent additions (v1.1 series)
+- **v1.1.0** — Plan mode (deliberation phase before generation), streamlined Figma import (translation pipeline that preserves design tokens deterministically), Anthropic SDK 0.91 upgrade (extended thinking + improved prompt caching), AI Capabilities settings panel.
+- **v1.1.1** — Hotfix: stop the agentic pipeline from creating duplicate modules on style-change/modify intents (Module Planner now always receives existing module names so it regenerates rather than re-inventing).
+- **v1.1.2** — Specific version IDs in Claude Code / Codex CLI dropdowns (no more generic `opus`/`sonnet`/`haiku` aliases that hide which version is actually pinned), live model catalog populates Codex CLI from the OpenAI account's `/v1/models`, settings dialog open-to-AI-tab fix.
+- **v1.1.3** — Model selection now persists for Codex CLI / Gemini CLI / Gemini API engines (they were missing config fields, route cases, status-payload entries, and UI lookup branches), and the chosen model is threaded into the CLI subprocess invocation via `-m`/`--model`.
 
 ### What works well
 - **End-to-end generation** from chat to deployed HubSpot theme (validated by an internal end-to-end test that creates a theme, generates modules with Claude Code, validates files, uploads to HubSpot, verifies, cleans up — runs in 3-5 min).
