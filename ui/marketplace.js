@@ -164,8 +164,8 @@ function openListingEditor(existing, categories) {
           <label>Description
             <textarea name="description" rows="3" placeholder="A 1–2 sentence summary for the Marketplace listing.">${esc(meta.description || "")}</textarea>
           </label>
-          <label>Features (comma-separated)
-            <input name="features" value="${esc((meta.features || []).join(", "))}" />
+          <label>Features (comma-separated, 2–5 items)
+            <input name="features" value="${esc((meta.features || []).join(", "))}" placeholder="Hero, Pricing, Testimonials, Footer" />
           </label>
           <label>Support URL
             <input type="url" name="supportUrl" value="${esc(meta.supportUrl || "")}" placeholder="https://example.com/support" />

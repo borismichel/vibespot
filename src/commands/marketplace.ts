@@ -93,9 +93,15 @@ export async function marketplaceEditCommand(opts: MarketplaceEditOpts = {}): Pr
   });
 
   const featuresRaw = await ui.text({
-    message: "Key features (comma-separated, 3–6 items)",
+    message: "Key features (comma-separated, 2–5 items)",
     placeholder: "Hero, Pricing, Testimonials, Footer",
     defaultValue: (existing.features ?? []).join(", "),
+    validate: (v) => {
+      const count = v.split(",").map((s) => s.trim()).filter(Boolean).length;
+      if (count < 2) return "Provide at least 2 features.";
+      if (count > 5) return "Provide at most 5 features.";
+      return undefined;
+    },
   });
   const features = featuresRaw
     .split(",")

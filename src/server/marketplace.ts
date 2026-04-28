@@ -74,9 +74,23 @@ export const MARKETPLACE_CATEGORIES = [
   "Other",
 ];
 
-// Required and recommended top-level theme.json fields.
-const THEME_JSON_REQUIRED: string[] = ["label", "preview_path", "screenshot_path", "version"];
-const THEME_JSON_RECOMMENDED: string[] = ["documentation_url", "license"];
+// HubSpot Marketplace requires the following top-level theme.json fields. See
+// https://developers.hubspot.com/docs/cms/marketplace/theme-requirements#theme-configuration-themejson
+const THEME_JSON_REQUIRED: string[] = [
+  "label",
+  "preview_path",
+  "screenshot_path",
+  "version",
+  "documentation_url",
+  "license",
+  "example_url",
+];
+
+// Boolean fields that must be declared (presence is required even if false).
+const THEME_JSON_REQUIRED_BOOLEANS: string[] = [
+  "enable_domain_stylesheets",
+  "is_available_for_new_content",
+];
 
 // ---------------------------------------------------------------------------
 // Listing metadata (marketplace.json)
@@ -169,6 +183,11 @@ function validateThemeJson(
   theme: Record<string, unknown>,
   findings: MarketplaceFinding[],
 ): void {
+  const requiredHints: Record<string, string> = {
+    documentation_url: 'Add a "documentation_url" entry pointing to public docs for the theme.',
+    license: 'Add a "license" entry — an SPDX identifier or URL (e.g. "MIT").',
+    example_url: 'Add an "example_url" entry pointing to a public live preview of the theme.',
+  };
   for (const field of THEME_JSON_REQUIRED) {
     if (!hasNonEmpty(theme, field)) {
       findings.push({
@@ -176,54 +195,58 @@ function validateThemeJson(
         rule: `theme.json.${field}.missing`,
         file: "theme.json",
         message: `theme.json is missing required field "${field}"`,
-        fix: `Add a "${field}" entry to theme.json.`,
+        fix: requiredHints[field] ?? `Add a "${field}" entry to theme.json.`,
       });
     }
   }
 
-  const recommendedHints: Record<string, string> = {
-    documentation_url: "Public URL to user-facing docs for the theme.",
-    license: 'A SPDX license identifier or URL (e.g. "MIT").',
-  };
-  for (const field of THEME_JSON_RECOMMENDED) {
-    if (!hasNonEmpty(theme, field)) {
-      const hint = recommendedHints[field] ?? `Add a "${field}" entry to theme.json.`;
+  for (const field of THEME_JSON_REQUIRED_BOOLEANS) {
+    if (!(field in theme) || typeof theme[field] !== "boolean") {
       findings.push({
-        severity: "warning",
+        severity: "error",
         rule: `theme.json.${field}.missing`,
         file: "theme.json",
-        message: `theme.json should include "${field}" for Marketplace listings`,
-        fix: hint,
+        message: `theme.json must declare boolean "${field}"`,
+        fix: `Add "${field}": true (or false) to theme.json.`,
       });
     }
   }
 
-  // author block: HubSpot expects an author with name+url for marketplace themes.
+  // author block: HubSpot Marketplace requires author with name, email, and url.
   const author = theme.author as Record<string, unknown> | undefined;
   if (!author || typeof author !== "object") {
     findings.push({
-      severity: "warning",
+      severity: "error",
       rule: "theme.json.author.missing",
       file: "theme.json",
-      message: "theme.json should declare an author block",
-      fix: 'Add { "author": { "name": "...", "url": "..." } } to theme.json.',
+      message: 'theme.json is missing required "author" block',
+      fix: 'Add { "author": { "name": "...", "email": "...", "url": "..." } } to theme.json.',
     });
   } else {
     if (!hasNonEmpty(author, "name")) {
       findings.push({
-        severity: "warning",
+        severity: "error",
         rule: "theme.json.author.name.missing",
         file: "theme.json",
-        message: "theme.json author.name is empty",
+        message: "theme.json author.name is missing",
         fix: "Provide a publisher name in theme.json author.name.",
+      });
+    }
+    if (!hasNonEmpty(author, "email")) {
+      findings.push({
+        severity: "error",
+        rule: "theme.json.author.email.missing",
+        file: "theme.json",
+        message: "theme.json author.email is missing",
+        fix: "Provide a contact email in theme.json author.email.",
       });
     }
     if (!hasNonEmpty(author, "url")) {
       findings.push({
-        severity: "info",
+        severity: "error",
         rule: "theme.json.author.url.missing",
         file: "theme.json",
-        message: "theme.json author.url is empty",
+        message: "theme.json author.url is missing",
         fix: "Add a public URL for the publisher (homepage or support page).",
       });
     }
@@ -620,13 +643,24 @@ function validateListingMetadata(
       fix: "Add a public support URL where buyers can reach the publisher.",
     });
   }
-  if (!meta.features || meta.features.length === 0) {
+  // HubSpot listing requirements: minimum 2, maximum 5 features.
+  // https://developers.hubspot.com/docs/cms/marketplace/general-requirements#theme-module-details
+  const featureCount = meta.features?.length ?? 0;
+  if (featureCount < 2) {
     findings.push({
-      severity: "info",
-      rule: "marketplace.json.features.missing",
+      severity: "warning",
+      rule: "marketplace.json.features.too_few",
       file: METADATA_FILENAME,
-      message: "marketplace.json has no features list",
-      fix: "Add 3–6 short bullet points highlighting what the theme does well.",
+      message: `marketplace.json needs at least 2 features (has ${featureCount})`,
+      fix: "Add 2–5 short bullet points highlighting what the theme does well.",
+    });
+  } else if (featureCount > 5) {
+    findings.push({
+      severity: "warning",
+      rule: "marketplace.json.features.too_many",
+      file: METADATA_FILENAME,
+      message: `marketplace.json has ${featureCount} features but HubSpot allows at most 5`,
+      fix: "Trim the features list to 5 or fewer entries.",
     });
   }
 }
@@ -644,57 +678,110 @@ export interface ApplyFixResult {
  * Apply the auto-fixable subset of findings:
  *   - Missing module label → fall back to the .module directory name.
  *   - Missing field label → fall back to the field's `name` attribute.
- *
- * CDN-import fixes are already handled by the upload auto-fix path; we
- * intentionally skip them here so the user keeps a single auto-fix story
- * (the upload flow strips CDN imports right before it ships).
+ *   - External CDN @import / <link> / <script> references → strip them.
  */
 export function applyMarketplaceAutoFixes(themePath: string): ApplyFixResult {
   const applied: string[] = [];
   const skipped: string[] = [];
 
   const modulesDir = join(themePath, "modules");
-  if (!fileExists(modulesDir)) return { applied, skipped };
+  if (fileExists(modulesDir)) {
+    for (const entry of readdirSafe(modulesDir)) {
+      if (!entry.endsWith(".module")) continue;
+      const modulePath = join(modulesDir, entry);
+      const moduleSlug = entry.replace(/\.module$/, "");
 
-  for (const entry of readdirSafe(modulesDir)) {
-    if (!entry.endsWith(".module")) continue;
-    const modulePath = join(modulesDir, entry);
-    const moduleSlug = entry.replace(/\.module$/, "");
-
-    // meta.json — fill in label.
-    const metaPath = join(modulePath, "meta.json");
-    if (fileExists(metaPath)) {
-      try {
-        const meta = JSON.parse(readFile(metaPath)) as Record<string, unknown>;
-        if (!hasNonEmpty(meta, "label")) {
-          meta.label = humanize(moduleSlug);
-          writeFile(metaPath, JSON.stringify(meta, null, 2) + "\n");
-          applied.push(`${entry}: filled meta.label = "${meta.label}"`);
-        }
-      } catch {
-        skipped.push(`${entry}: meta.json could not be parsed`);
-      }
-    }
-
-    // fields.json — fill in field labels.
-    const fieldsPath = join(modulePath, "fields.json");
-    if (fileExists(fieldsPath)) {
-      try {
-        const fields = JSON.parse(readFile(fieldsPath));
-        if (Array.isArray(fields)) {
-          const result = autoFillFieldLabels(fields);
-          if (result > 0) {
-            writeFile(fieldsPath, JSON.stringify(fields, null, 2) + "\n");
-            applied.push(`${entry}: filled ${result} missing field label(s)`);
+      // meta.json — fill in label.
+      const metaPath = join(modulePath, "meta.json");
+      if (fileExists(metaPath)) {
+        try {
+          const meta = JSON.parse(readFile(metaPath)) as Record<string, unknown>;
+          if (!hasNonEmpty(meta, "label")) {
+            meta.label = humanize(moduleSlug);
+            writeFile(metaPath, JSON.stringify(meta, null, 2) + "\n");
+            applied.push(`${entry}: filled meta.label = "${meta.label}"`);
           }
+        } catch {
+          skipped.push(`${entry}: meta.json could not be parsed`);
         }
-      } catch {
-        skipped.push(`${entry}: fields.json could not be parsed`);
+      }
+
+      // fields.json — fill in field labels.
+      const fieldsPath = join(modulePath, "fields.json");
+      if (fileExists(fieldsPath)) {
+        try {
+          const fields = JSON.parse(readFile(fieldsPath));
+          if (Array.isArray(fields)) {
+            const result = autoFillFieldLabels(fields);
+            if (result > 0) {
+              writeFile(fieldsPath, JSON.stringify(fields, null, 2) + "\n");
+              applied.push(`${entry}: filled ${result} missing field label(s)`);
+            }
+          }
+        } catch {
+          skipped.push(`${entry}: fields.json could not be parsed`);
+        }
       }
     }
   }
 
+  // Strip CDN imports across shared CSS and module CSS/HTML so the same finding
+  // the validator surfaces gets cleaned up here. We mirror the cleanup that the
+  // upload auto-fix path performs but run it on demand from `marketplace check`.
+  const cdnFiles = stripCdnReferencesAcrossTheme(themePath);
+  for (const file of cdnFiles) {
+    applied.push(`${file}: stripped external CDN reference(s)`);
+  }
+
   return { applied, skipped };
+}
+
+function stripCdnReferencesAcrossTheme(themePath: string): string[] {
+  const fixed: string[] = [];
+
+  const importRe = /@import\s+url\(['"]?https?:\/\/[^)]+['"]?\)\s*;?/gi;
+  const linkRe = /<link[^>]+href=['"]https?:\/\/[^'"]+['"][^>]*>/gi;
+  const scriptRe = /<script[^>]+src=['"]https?:\/\/[^'"]+['"][^>]*><\/script>/gi;
+  const scriptSelfClosingRe = /<script[^>]+src=['"]https?:\/\/[^'"]+['"][^>]*\/>/gi;
+
+  function rewriteCss(file: string): void {
+    let content: string;
+    try { content = readFile(file); } catch { return; }
+    const cleaned = content.replace(importRe, "");
+    if (cleaned !== content) {
+      writeFile(file, cleaned);
+      fixed.push(relativeToTheme(themePath, file));
+    }
+  }
+
+  function rewriteHtml(file: string): void {
+    let content: string;
+    try { content = readFile(file); } catch { return; }
+    let cleaned = content.replace(linkRe, "");
+    cleaned = cleaned.replace(scriptRe, "");
+    cleaned = cleaned.replace(scriptSelfClosingRe, "");
+    cleaned = cleaned.replace(importRe, "");
+    if (cleaned !== content) {
+      writeFile(file, cleaned);
+      fixed.push(relativeToTheme(themePath, file));
+    }
+  }
+
+  scanDirShallow(join(themePath, "css"), ".css").forEach(rewriteCss);
+
+  const modulesDir = join(themePath, "modules");
+  if (fileExists(modulesDir)) {
+    for (const entry of readdirSafe(modulesDir)) {
+      if (!entry.endsWith(".module")) continue;
+      const modulePath = join(modulesDir, entry);
+      const cssFile = join(modulePath, "module.css");
+      const htmlFile = join(modulePath, "module.html");
+      if (fileExists(cssFile)) rewriteCss(cssFile);
+      if (fileExists(htmlFile)) rewriteHtml(htmlFile);
+    }
+  }
+
+  return fixed;
 }
 
 function autoFillFieldLabels(fields: unknown[]): number {

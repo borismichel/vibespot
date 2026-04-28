@@ -1021,7 +1021,7 @@ vibespot</code></pre>
 
   <h3 id="marketplace-validator">What gets validated</h3>
   <ul>
-    <li><strong>theme.json</strong> — required fields (<code>label</code>, <code>preview_path</code>, <code>screenshot_path</code>, <code>version</code>) and recommended fields (<code>documentation_url</code>, <code>license</code>, <code>author</code>).</li>
+    <li><strong>theme.json</strong> — HubSpot's required fields (<code>label</code>, <code>preview_path</code>, <code>screenshot_path</code>, <code>version</code>, <code>documentation_url</code>, <code>license</code>, <code>example_url</code>, <code>enable_domain_stylesheets</code>, <code>is_available_for_new_content</code>) and the <code>author</code> block (<code>name</code>, <code>email</code>, <code>url</code>).</li>
     <li><strong>Modules</strong> — every <code>meta.json</code> needs a <code>label</code>; every field needs a <code>label</code>; <code>help_text</code> is recommended.</li>
     <li><strong>Screenshot</strong> — the path declared in <code>theme.json</code> must point to an existing PNG/JPG.</li>
     <li><strong>No CDN imports</strong> — <code>@import url(https://…)</code>, <code>&lt;link href="https://…"&gt;</code>, <code>&lt;script src="https://…"&gt;</code> are flagged.</li>
@@ -1031,7 +1031,7 @@ vibespot</code></pre>
   </ul>
 
   <h3 id="marketplace-fixes">Auto-fixable findings</h3>
-  <p>A subset of findings can be patched without user input — primarily missing module labels and missing field labels (vibeSpot fills in human-readable defaults derived from the slug or field name). Click <strong>Apply fixes</strong> in the panel, or run <code>vibespot marketplace check --fix</code>.</p>
+  <p>A subset of findings can be patched without user input — missing module labels and missing field labels (vibeSpot fills in human-readable defaults derived from the slug or field name), and external CDN <code>@import</code>/<code>&lt;link&gt;</code>/<code>&lt;script&gt;</code> references (stripped from CSS and module HTML). Click <strong>Apply fixes</strong> in the panel, or run <code>vibespot marketplace check --fix</code>.</p>
 
   <h3 id="marketplace-listing">Listing metadata editor</h3>
   <p>Click <strong>Edit listing</strong> in the panel (or run <code>vibespot marketplace edit</code>) to fill in the values that go on the Marketplace listing page: category, description, features, support URL, documentation URL, pricing tier. The values are written to a <code>marketplace.json</code> sidecar at the theme root and are picked up by the validator.</p>
