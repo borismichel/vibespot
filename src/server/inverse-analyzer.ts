@@ -21,7 +21,8 @@
  * Findings can later feed an AI brand-asset extractor for richer context.
  */
 
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join, relative } from "node:path";
 import { readFile, writeFile, fileExists } from "../utils/fs.js";
 
@@ -97,12 +98,50 @@ export interface RoundTripRisk {
   detail: string;
 }
 
+export interface ImportedThemeSnapshotFile {
+  path: string;
+  sha256: string;
+  size: number;
+  /** Text content for human-editable theme files; omitted for binary assets. */
+  text?: string;
+}
+
+export interface ImportedThemeSnapshot {
+  version: 1;
+  createdAt: string;
+  files: ImportedThemeSnapshotFile[];
+}
+
+export type RoundTripDiffStatus = "added" | "modified" | "deleted";
+
+export interface RoundTripFileDiff {
+  file: string;
+  status: RoundTripDiffStatus;
+  beforeSha256?: string;
+  afterSha256?: string;
+  beforeSize?: number;
+  afterSize?: number;
+  beforeLines?: number;
+  afterLines?: number;
+}
+
+export interface RoundTripDiff {
+  hasSnapshot: boolean;
+  snapshotPath?: string;
+  filesChanged: number;
+  added: number;
+  modified: number;
+  deleted: number;
+  files: RoundTripFileDiff[];
+}
+
 export interface InverseReport {
   themePath: string;
   designTokens: DesignTokens;
   graph: ModuleGraph;
   fieldFlags: FieldFlag[];
   roundTripRisks: RoundTripRisk[];
+  roundTripDiff: RoundTripDiff;
   findings: InverseFinding[];
   summary: {
     moduleCount: number;
@@ -111,6 +150,7 @@ export interface InverseReport {
     paletteSize: number;
     cssVarCount: number;
     customMacroCount: number;
+    roundTripChangedCount: number;
   };
 }
 
@@ -135,6 +175,7 @@ export function analyzeTheme(themePath: string): InverseReport {
   const graph = buildModuleGraph(themePath);
   const fieldFlags = collectFieldFlags(themePath);
   const roundTripRisks = collectRoundTripRisks(themePath);
+  const roundTripDiff = diffImportedThemeSnapshot(themePath);
 
   if (Object.keys(designTokens.cssVariables).length === 0) {
     findings.push({
@@ -185,6 +226,14 @@ export function analyzeTheme(themePath: string): InverseReport {
       fix: "vibeSpot avoids modifying this. Don't ask the AI to refactor it.",
     });
   }
+  if (roundTripDiff.hasSnapshot && roundTripDiff.filesChanged > 0) {
+    findings.push({
+      severity: "info",
+      rule: "roundtrip.snapshot.diff",
+      message: `${roundTripDiff.filesChanged} file(s) differ from the imported theme snapshot.`,
+      fix: "Review report.roundTripDiff before re-uploading if you need to preserve imported files exactly.",
+    });
+  }
 
   const customMacroCount = roundTripRisks.filter((r) => r.pattern === "hubl.macro").length;
 
@@ -194,6 +243,7 @@ export function analyzeTheme(themePath: string): InverseReport {
     graph,
     fieldFlags,
     roundTripRisks,
+    roundTripDiff,
     findings,
     summary: {
       moduleCount: graph.modules.length,
@@ -202,6 +252,7 @@ export function analyzeTheme(themePath: string): InverseReport {
       paletteSize: designTokens.palette.length,
       cssVarCount: Object.keys(designTokens.cssVariables).length,
       customMacroCount,
+      roundTripChangedCount: roundTripDiff.filesChanged,
     },
   };
 }
@@ -258,6 +309,132 @@ export function applyTokensToSharedCss(themePath: string, themeName: string): st
   // Best-effort mkdir via writeFile helper — relies on existing fs util.
   writeFile(target, rootBlock);
   return target;
+}
+
+// ---------------------------------------------------------------------------
+// Imported snapshot diff
+// ---------------------------------------------------------------------------
+
+const IMPORT_SNAPSHOT_RELATIVE_PATH = ".vibespot/import-snapshot.json";
+const TEXT_SNAPSHOT_EXTENSIONS = new Set([
+  ".css",
+  ".html",
+  ".htm",
+  ".js",
+  ".json",
+  ".md",
+  ".txt",
+  ".svg",
+  ".yml",
+  ".yaml",
+]);
+
+export function importedThemeSnapshotPath(themePath: string): string {
+  return join(themePath, IMPORT_SNAPSHOT_RELATIVE_PATH);
+}
+
+export function createImportedThemeSnapshot(themePath: string, createdAt = new Date().toISOString()): ImportedThemeSnapshot {
+  return {
+    version: 1,
+    createdAt,
+    files: collectSnapshotFiles(themePath),
+  };
+}
+
+export function writeImportedThemeSnapshot(themePath: string, createdAt?: string): string {
+  const snapshot = createImportedThemeSnapshot(themePath, createdAt);
+  const target = importedThemeSnapshotPath(themePath);
+  writeFile(target, JSON.stringify(snapshot, null, 2) + "\n");
+  return target;
+}
+
+export function ensureImportedThemeSnapshot(themePath: string): string | null {
+  const target = importedThemeSnapshotPath(themePath);
+  if (fileExists(target)) return null;
+  return writeImportedThemeSnapshot(themePath);
+}
+
+export function readImportedThemeSnapshot(themePath: string): ImportedThemeSnapshot | null {
+  const target = importedThemeSnapshotPath(themePath);
+  if (!fileExists(target)) return null;
+  try {
+    const parsed = JSON.parse(readFile(target));
+    if (!isImportedThemeSnapshot(parsed)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function diffImportedThemeSnapshot(themePath: string): RoundTripDiff {
+  const snapshotPath = importedThemeSnapshotPath(themePath);
+  const snapshot = readImportedThemeSnapshot(themePath);
+  if (!snapshot) {
+    return {
+      hasSnapshot: false,
+      snapshotPath,
+      filesChanged: 0,
+      added: 0,
+      modified: 0,
+      deleted: 0,
+      files: [],
+    };
+  }
+
+  const before = new Map(snapshot.files.map((f) => [f.path, f]));
+  const afterFiles = collectSnapshotFiles(themePath);
+  const after = new Map(afterFiles.map((f) => [f.path, f]));
+  const files: RoundTripFileDiff[] = [];
+
+  for (const file of snapshot.files) {
+    const current = after.get(file.path);
+    if (!current) {
+      files.push({
+        file: file.path,
+        status: "deleted",
+        beforeSha256: file.sha256,
+        beforeSize: file.size,
+        beforeLines: countLines(file.text),
+      });
+    } else if (current.sha256 !== file.sha256) {
+      files.push({
+        file: file.path,
+        status: "modified",
+        beforeSha256: file.sha256,
+        afterSha256: current.sha256,
+        beforeSize: file.size,
+        afterSize: current.size,
+        beforeLines: countLines(file.text),
+        afterLines: countLines(current.text),
+      });
+    }
+  }
+
+  for (const file of afterFiles) {
+    if (before.has(file.path)) continue;
+    files.push({
+      file: file.path,
+      status: "added",
+      afterSha256: file.sha256,
+      afterSize: file.size,
+      afterLines: countLines(file.text),
+    });
+  }
+
+  files.sort((a, b) => a.file.localeCompare(b.file));
+  const added = files.filter((f) => f.status === "added").length;
+  const modified = files.filter((f) => f.status === "modified").length;
+  const deleted = files.filter((f) => f.status === "deleted").length;
+
+  return {
+    hasSnapshot: true,
+    snapshotPath,
+    filesChanged: files.length,
+    added,
+    modified,
+    deleted,
+    files,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -682,6 +859,16 @@ function scanHublRisks(file: string, themePath: string, slug: string, out: Round
 // ---------------------------------------------------------------------------
 
 function emptyReport(themePath: string, findings: InverseFinding[]): InverseReport {
+  const roundTripDiff: RoundTripDiff = {
+    hasSnapshot: false,
+    snapshotPath: importedThemeSnapshotPath(themePath),
+    filesChanged: 0,
+    added: 0,
+    modified: 0,
+    deleted: 0,
+    files: [],
+  };
+
   return {
     themePath,
     designTokens: {
@@ -696,6 +883,7 @@ function emptyReport(themePath: string, findings: InverseFinding[]): InverseRepo
     graph: { templates: [], modules: [], orphanModules: [] },
     fieldFlags: [],
     roundTripRisks: [],
+    roundTripDiff,
     findings,
     summary: {
       moduleCount: 0,
@@ -704,8 +892,70 @@ function emptyReport(themePath: string, findings: InverseFinding[]): InverseRepo
       paletteSize: 0,
       cssVarCount: 0,
       customMacroCount: 0,
+      roundTripChangedCount: 0,
     },
   };
+}
+
+function collectSnapshotFiles(themePath: string): ImportedThemeSnapshotFile[] {
+  const out: ImportedThemeSnapshotFile[] = [];
+
+  function walk(dir: string): void {
+    for (const entry of readdirSafe(dir)) {
+      if (entry === ".git" || entry === ".vibespot" || entry === "node_modules") continue;
+      const fullPath = join(dir, entry);
+      let stat;
+      try { stat = statSync(fullPath); } catch { continue; }
+      if (stat.isDirectory()) {
+        walk(fullPath);
+        continue;
+      }
+      if (!stat.isFile()) continue;
+
+      const rel = relativeToTheme(themePath, fullPath);
+      const bytes = readFileSync(fullPath);
+      const file: ImportedThemeSnapshotFile = {
+        path: rel,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        size: bytes.length,
+      };
+      if (isTextSnapshotFile(rel)) {
+        file.text = bytes.toString("utf8");
+      }
+      out.push(file);
+    }
+  }
+
+  walk(themePath);
+  return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function isTextSnapshotFile(path: string): boolean {
+  const dot = path.lastIndexOf(".");
+  if (dot < 0) return false;
+  return TEXT_SNAPSHOT_EXTENSIONS.has(path.slice(dot).toLowerCase());
+}
+
+function isImportedThemeSnapshot(value: unknown): value is ImportedThemeSnapshot {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Record<string, unknown>;
+  if (data.version !== 1 || typeof data.createdAt !== "string" || !Array.isArray(data.files)) return false;
+  return data.files.every((file) => {
+    if (typeof file !== "object" || file === null) return false;
+    const f = file as Record<string, unknown>;
+    return (
+      typeof f.path === "string" &&
+      typeof f.sha256 === "string" &&
+      typeof f.size === "number" &&
+      (f.text === undefined || typeof f.text === "string")
+    );
+  });
+}
+
+function countLines(value?: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (value.length === 0) return 0;
+  return value.split(/\r\n|\r|\n/).length;
 }
 
 function readdirSafe(dir: string): string[] {

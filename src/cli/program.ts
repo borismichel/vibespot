@@ -69,6 +69,7 @@ export function buildProgram(): Command {
     .option("-p, --path <path>", "Path to the theme directory")
     .option("--json", "Emit machine-readable JSON instead of formatted output")
     .option("--apply-tokens", "Seed css/<theme>-theme.css with the inferred :root block when missing")
+    .option("--snapshot", "Capture the current theme as the imported round-trip baseline before analysis")
     .action((opts) => inverseCommand(opts));
 
   return program;

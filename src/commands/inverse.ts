@@ -8,6 +8,7 @@ import { loadConfig } from "../utils/config.js";
 import {
   analyzeTheme,
   applyTokensToSharedCss,
+  writeImportedThemeSnapshot,
   type InverseFinding,
 } from "../server/inverse-analyzer.js";
 
@@ -15,6 +16,7 @@ interface InverseOpts {
   path?: string;
   json?: boolean;
   applyTokens?: boolean;
+  snapshot?: boolean;
 }
 
 export async function inverseCommand(opts: InverseOpts = {}): Promise<void> {
@@ -25,6 +27,11 @@ export async function inverseCommand(opts: InverseOpts = {}): Promise<void> {
     const target = applyTokensToSharedCss(themePath, themeName);
     if (target) ui.logSuccess(`Wrote design tokens to ${target}`);
     else ui.log(theme.muted("Skipped: theme already has shared CSS or no tokens were inferred."));
+  }
+
+  if (opts.snapshot) {
+    const target = writeImportedThemeSnapshot(themePath);
+    if (!opts.json) ui.logSuccess(`Wrote imported theme snapshot to ${target}`);
   }
 
   const report = analyzeTheme(themePath);
@@ -68,6 +75,22 @@ export async function inverseCommand(opts: InverseOpts = {}): Promise<void> {
     ui.log("");
     ui.log(theme.heading("Orphan modules"));
     for (const m of report.graph.orphanModules) ui.log(`  ${m}`);
+  }
+  if (report.roundTripDiff.hasSnapshot) {
+    ui.log("");
+    ui.log(theme.heading("Round-trip diff"));
+    const d = report.roundTripDiff;
+    if (d.filesChanged === 0) {
+      ui.log(`  ${theme.muted("No changes from imported snapshot.")}`);
+    } else {
+      ui.log(`  ${d.filesChanged} changed file(s): ${d.added} added, ${d.modified} modified, ${d.deleted} deleted`);
+      for (const file of d.files.slice(0, 12)) {
+        ui.log(`  ${file.status.padEnd(8)} ${file.file}`);
+      }
+      if (d.files.length > 12) {
+        ui.log(`  ${theme.muted(`...and ${d.files.length - 12} more`)}`);
+      }
+    }
   }
 
   printFindings("Errors", report.findings.filter((f) => f.severity === "error"));

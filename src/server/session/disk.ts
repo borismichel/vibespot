@@ -10,7 +10,12 @@ import { getSession } from "./store.js";
 import { getOrderedModules, syncFlatFieldsFromTemplate, syncFlatFieldsToTemplate, loadChatFromTheme } from "./state.js";
 import { getActiveTemplate, migrateSession } from "./templates.js";
 import { ensureGitRepo } from "../project-git.js";
-import { extractDesignTokens, buildRootCssFromTokens, extractLocalModuleRefsFromTemplate } from "../inverse-analyzer.js";
+import {
+  extractDesignTokens,
+  buildRootCssFromTokens,
+  extractLocalModuleRefsFromTemplate,
+  ensureImportedThemeSnapshot,
+} from "../inverse-analyzer.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -159,6 +164,7 @@ export function scanThemeFromDisk(themePath: string): void {
 
   // Ensure git repo exists (handles themes created before this feature)
   ensureGitRepo(themePath);
+  ensureImportedThemeSnapshot(themePath);
 
   const modulesDir = join(themePath, "modules");
   if (!existsSync(modulesDir)) return;

@@ -10,6 +10,9 @@ import {
   buildModuleGraph,
   collectFieldFlags,
   collectRoundTripRisks,
+  diffImportedThemeSnapshot,
+  ensureImportedThemeSnapshot,
+  writeImportedThemeSnapshot,
 } from "../src/server/inverse-analyzer.js";
 
 let theme: string;
@@ -265,6 +268,40 @@ describe("collectRoundTripRisks", () => {
   });
 });
 
+describe("imported theme snapshot diff", () => {
+  it("reports added, modified, and deleted files against the imported snapshot", () => {
+    writeText(join(theme, "modules", "hero.module", "module.html"), `<section>Original</section>\n`);
+    writeText(join(theme, "modules", "hero.module", "module.css"), `.hero { color: #112233; }\n`);
+    writeImportedThemeSnapshot(theme, "2026-04-28T00:00:00.000Z");
+
+    writeText(join(theme, "modules", "hero.module", "module.html"), `<section>Changed</section>\n`);
+    rmSync(join(theme, "modules", "hero.module", "module.css"));
+    writeText(join(theme, "modules", "hero.module", "module.js"), `console.log("new");\n`);
+
+    const diff = diffImportedThemeSnapshot(theme);
+
+    expect(diff.hasSnapshot).toBe(true);
+    expect(diff.filesChanged).toBe(3);
+    expect(diff.modified).toBe(1);
+    expect(diff.deleted).toBe(1);
+    expect(diff.added).toBe(1);
+    expect(diff.files.find((f) => f.file === "modules/hero.module/module.html")?.status).toBe("modified");
+    expect(diff.files.find((f) => f.file === "modules/hero.module/module.css")?.status).toBe("deleted");
+    expect(diff.files.find((f) => f.file === "modules/hero.module/module.js")?.status).toBe("added");
+  });
+
+  it("keeps .vibespot metadata out of imported snapshots", () => {
+    writeText(join(theme, "modules", "hero.module", "module.html"), `<section>Hero</section>`);
+    const target = ensureImportedThemeSnapshot(theme);
+    expect(target).not.toBeNull();
+
+    writeText(join(theme, ".vibespot", "chat.json"), `{ "messages": [] }`);
+
+    const diff = diffImportedThemeSnapshot(theme);
+    expect(diff.filesChanged).toBe(0);
+  });
+});
+
 describe("analyzeTheme — end to end", () => {
   it("returns a structured report with summary counts", () => {
     mkdirSync(join(theme, "modules", "hero.module"), { recursive: true });
@@ -290,5 +327,20 @@ describe("analyzeTheme — end to end", () => {
     const missing = join(theme, "does-not-exist");
     const report = analyzeTheme(missing);
     expect(report.findings.find((f) => f.rule === "theme.path.missing")).toBeDefined();
+  });
+
+  it("includes round-trip diff details when an imported snapshot exists", () => {
+    writeText(join(theme, "modules", "hero.module", "module.html"), `<section>Original</section>`);
+    writeJson(join(theme, "modules", "hero.module", "fields.json"), [
+      { type: "text", name: "headline", label: "Headline" },
+    ]);
+    writeImportedThemeSnapshot(theme, "2026-04-28T00:00:00.000Z");
+    writeText(join(theme, "modules", "hero.module", "module.html"), `<section>Updated</section>`);
+
+    const report = analyzeTheme(theme);
+
+    expect(report.roundTripDiff.filesChanged).toBe(1);
+    expect(report.summary.roundTripChangedCount).toBe(1);
+    expect(report.findings.find((f) => f.rule === "roundtrip.snapshot.diff")).toBeDefined();
   });
 });
