@@ -161,6 +161,8 @@ vibespot wizard       # Classic CLI wizard
 vibespot init         # Check and install required tools
 vibespot convert      # Convert a React project (no upload)
 vibespot upload       # Upload theme to HubSpot
+vibespot marketplace check [--fix] [--json]   # Audit theme for HubSpot Marketplace submission
+vibespot marketplace edit                     # Edit Marketplace listing metadata (marketplace.json)
 vibespot doctor       # Diagnose environment issues
 ```
 

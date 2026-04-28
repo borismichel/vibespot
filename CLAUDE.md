@@ -31,7 +31,7 @@ There is no unit test suite or linting configured.
 ### Entry Flow
 `bin/vibespot.mjs` → `dist/index.js` → `src/index.ts` → `src/cli/program.ts` (Commander)
 
-The default command (no subcommand) runs the vibe coding web UI. Subcommands: `wizard`, `init`, `convert`, `upload`, `doctor`.
+The default command (no subcommand) runs the vibe coding web UI. Subcommands: `wizard`, `init`, `convert`, `upload`, `marketplace check|edit`, `doctor`.
 
 ### Key Directories
 - `src/commands/` — One file per CLI command, each exports a single action function
@@ -45,6 +45,7 @@ The default command (no subcommand) runs the vibe coding web UI. Subcommands: `w
 - `src/utils/` — Shell execution (`execSync` wrappers), tool detection, file helpers, `~/.vibespot/config.json` persistence
 - `src/prompts/` — `@clack/prompts` wrapper with themed styling and cancel handling
 - `starters/` — Bundled starter template JSON files (SaaS landing, portfolio, restaurant, event, coming soon). Each is a self-contained bundle with modules, shared CSS/JS, and module order. Loaded by `src/server/starters.ts`
+- `src/server/marketplace.ts` — Rule-based HubSpot Marketplace publication validator. `validateMarketplace(themePath)` returns a structured `MarketplaceReport`; `applyMarketplaceAutoFixes()` patches the small set of findings we can resolve without intent (missing module/field labels). Read/write a `marketplace.json` listing sidecar via `readMarketplaceMeta` / `writeMarketplaceMeta`. Exposed via `vibespot marketplace check|edit` (CLI), the topbar storefront button (UI), and `/api/marketplace/check|fix|listing` routes.
 - `ui/` — Static frontend assets (HTML, JS, CSS) for the vibe coding web interface
 - `assets/` — Bundled guides: `conversion-guide.md`, `design-guide.md`, `content-guide.md`, `hubspot-rules.md`, `humanify-guide.md`. Also `assets/plan-templates/*.md` — pre-canned plan-mode templates loaded by `src/server/plan-templates.ts`.
 

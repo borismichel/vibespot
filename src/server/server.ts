@@ -95,6 +95,11 @@ import {
 } from "./routes/modules.js";
 import { handleFileUploadRoute } from "./routes/upload-files.js";
 import { handleFigmaTestTokenRoute, handleFigmaExtractRoute, handleFigmaGenerateRoute } from "./routes/figma.js";
+import {
+  handleMarketplaceCheckRoute,
+  handleMarketplaceFixRoute,
+  handleMarketplaceListingRoute,
+} from "./routes/marketplace.js";
 
 // ---------------------------------------------------------------------------
 // MIME types for static serving
@@ -503,6 +508,20 @@ function handleApiRoute(
     case "/api/plan/template":
       if (method === "POST") handlePlanTemplateRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/marketplace/check":
+      if (method === "GET") handleMarketplaceCheckRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/marketplace/fix":
+      if (method === "POST") handleMarketplaceFixRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/marketplace/listing":
+      handleMarketplaceListingRoute(method, req, res);
       break;
 
     default:

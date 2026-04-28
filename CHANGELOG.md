@@ -6,6 +6,18 @@ All notable changes to vibeSpot are documented here.
 
 ## v1.2.0-dev — unreleased
 
+### HubSpot Marketplace publication path ([VIB-58](/VIB/issues/VIB-58))
+
+vibeSpot now ships a Marketplace check workflow that audits a generated theme against HubSpot's Marketplace submission requirements before you submit through the developer portal. Available from both the editor (storefront icon in the topbar) and the CLI (`vibespot marketplace check`).
+
+- **[src/server/marketplace.ts](src/server/marketplace.ts)** — rule-based validator with structured `MarketplaceReport`. Checks required `theme.json` fields, module/field labels, screenshot existence, CDN imports, hardcoded portal-bound URLs, and an accessibility baseline (`<img alt>`, semantic landmarks). Reads/writes a `marketplace.json` sidecar with listing metadata (category, description, features, support URL, pricing tier). Includes `applyMarketplaceAutoFixes()` for findings we can resolve without intent (missing module/field labels).
+- **[src/commands/marketplace.ts](src/commands/marketplace.ts) + [src/cli/program.ts](src/cli/program.ts)** — new `vibespot marketplace check [--path] [--json] [--fix]` and `vibespot marketplace edit` subcommands.
+- **[src/server/routes/marketplace.ts](src/server/routes/marketplace.ts) + [src/server/server.ts](src/server/server.ts)** — `GET /api/marketplace/check`, `POST /api/marketplace/fix`, and `GET|POST /api/marketplace/listing` routes scoped to the active session theme.
+- **[ui/marketplace.js](ui/marketplace.js), [ui/index.html](ui/index.html), [ui/styles.css](ui/styles.css)** — Marketplace panel with grouped findings (errors / warnings / notes), per-finding fix suggestions, an "Apply fixes" button, a re-check button, and an inline listing metadata editor.
+- **[ui/docs/index.html](ui/docs/index.html)** — new "HubSpot Marketplace" section under "Deploy & History" plus CLI reference rows.
+
+Out of scope for this iteration: automated submission (requires HubSpot Partner API access), automated screenshot capture (the validator only checks that the file exists at `screenshot_path`), and theme monetization. These remain manual for now.
+
 ### Starter templates ([VIB-56](/VIB/issues/VIB-56))
 
 The setup screen now has a "Template" button that lets users create a new theme pre-populated with vetted, ready-to-preview modules. Five starter templates ship out of the box: SaaS Landing Page, Portfolio, Restaurant, Event / Conference, and Coming Soon.

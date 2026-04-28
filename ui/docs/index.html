@@ -98,6 +98,7 @@
     <a class="doc-nav__link doc-nav__link--sub" href="#auto-fix">Auto-Fix</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#creating-page-hubspot">Creating a Page</a>
     <a class="doc-nav__link" href="#zip-download">ZIP Download</a>
+    <a class="doc-nav__link" href="#marketplace">Marketplace</a>
     <a class="doc-nav__link" href="#version-history">Version History</a>
   </div>
 
@@ -1009,6 +1010,47 @@ vibespot</code></pre>
 </div>
 
 <!-- ============================================================
+     Section: HubSpot Marketplace publication path
+     ============================================================ -->
+<div class="doc-section" id="marketplace">
+  <h2 id="marketplace-heading">HubSpot Marketplace <a href="#marketplace" class="doc-anchor">#</a></h2>
+  <p>The HubSpot Marketplace has stricter requirements than a private theme upload. vibeSpot ships a Marketplace publication path that audits a generated theme and helps you collect the listing metadata you'll paste into HubSpot's submission form.</p>
+
+  <h3 id="marketplace-button">Where to find it</h3>
+  <p>In the editor topbar, click the storefront icon (next to the version history clock) to open the Marketplace panel. From the CLI, run <code>vibespot marketplace check</code>.</p>
+
+  <h3 id="marketplace-validator">What gets validated</h3>
+  <ul>
+    <li><strong>theme.json</strong> — required fields (<code>label</code>, <code>preview_path</code>, <code>screenshot_path</code>, <code>version</code>) and recommended fields (<code>documentation_url</code>, <code>license</code>, <code>author</code>).</li>
+    <li><strong>Modules</strong> — every <code>meta.json</code> needs a <code>label</code>; every field needs a <code>label</code>; <code>help_text</code> is recommended.</li>
+    <li><strong>Screenshot</strong> — the path declared in <code>theme.json</code> must point to an existing PNG/JPG.</li>
+    <li><strong>No CDN imports</strong> — <code>@import url(https://…)</code>, <code>&lt;link href="https://…"&gt;</code>, <code>&lt;script src="https://…"&gt;</code> are flagged.</li>
+    <li><strong>No portal-specific URLs</strong> — hard-coded <code>hubfs</code>, <code>hubspotusercontent</code>, or portal preview URLs are flagged.</li>
+    <li><strong>Accessibility baseline</strong> — <code>&lt;img&gt;</code> tags need <code>alt</code>, modules should use semantic tags.</li>
+    <li><strong>Listing metadata</strong> — a <code>marketplace.json</code> sidecar with category, description, features, support URL.</li>
+  </ul>
+
+  <h3 id="marketplace-fixes">Auto-fixable findings</h3>
+  <p>A subset of findings can be patched without user input — primarily missing module labels and missing field labels (vibeSpot fills in human-readable defaults derived from the slug or field name). Click <strong>Apply fixes</strong> in the panel, or run <code>vibespot marketplace check --fix</code>.</p>
+
+  <h3 id="marketplace-listing">Listing metadata editor</h3>
+  <p>Click <strong>Edit listing</strong> in the panel (or run <code>vibespot marketplace edit</code>) to fill in the values that go on the Marketplace listing page: category, description, features, support URL, documentation URL, pricing tier. The values are written to a <code>marketplace.json</code> sidecar at the theme root and are picked up by the validator.</p>
+
+  <h3 id="marketplace-submission">Submitting to HubSpot</h3>
+  <p>vibeSpot does <strong>not</strong> submit the theme for you — that requires HubSpot Partner API access and a manual review process. Instead:</p>
+  <ol>
+    <li>Run the Marketplace check until it passes.</li>
+    <li>Upload the theme to your developer portal with <strong>Deploy</strong> (or <code>vibespot upload</code>).</li>
+    <li>In your HubSpot developer portal, open <em>Marketplace listings → Submit new listing</em> and paste the values from <code>marketplace.json</code>.</li>
+    <li>HubSpot reviews the listing and the theme on their side; address any feedback they send back.</li>
+  </ol>
+  <div class="doc-callout doc-callout--tip">
+    <div class="doc-callout__label">&#10024; Screenshots</div>
+    <p>HubSpot expects a 1500&times;1000 PNG at <code>screenshot_path</code> plus additional listing images uploaded directly through the portal. vibeSpot validates that the file exists; capturing it is up to you for now.</p>
+  </div>
+</div>
+
+<!-- ============================================================
      Section 8: Version History
      ============================================================ -->
 <div class="doc-section" id="version-history">
@@ -1201,6 +1243,8 @@ vibespot</code></pre>
       <tr><td><code>vibespot init</code></td><td>Environment check &amp; setup</td></tr>
       <tr><td><code>vibespot convert</code></td><td>React-to-HubSpot conversion</td></tr>
       <tr><td><code>vibespot upload</code></td><td>Upload theme to HubSpot</td></tr>
+      <tr><td><code>vibespot marketplace check</code></td><td>Audit a theme against HubSpot Marketplace requirements</td></tr>
+      <tr><td><code>vibespot marketplace edit</code></td><td>Edit Marketplace listing metadata (<code>marketplace.json</code>)</td></tr>
       <tr><td><code>vibespot doctor</code></td><td>Diagnostics &amp; health check</td></tr>
     </tbody>
   </table>
