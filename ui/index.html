@@ -477,11 +477,23 @@
               <p>Describe what you want or pick a template to get started.</p>
 
               <div class="chat__section-label">Templates</div>
-              <div class="chat__starters" id="starter-templates">
-                <button class="starter-btn" data-prompt="Create a modern SaaS landing page with a hero section featuring a gradient background, a features grid with icons, a testimonials carousel, a pricing table with 3 tiers, and a CTA section.">SaaS Landing Page</button>
-                <button class="starter-btn" data-prompt="Create a portfolio landing page with a hero section, a project gallery grid, an about/bio section, a skills section, and a contact form section.">Portfolio</button>
-                <button class="starter-btn" data-prompt="Create a restaurant landing page with a hero section featuring a food image background, a menu section with categories, a reservations section, a reviews section, and a location/hours section.">Restaurant</button>
-                <button class="starter-btn" data-prompt="Create an event landing page with a countdown hero, a speakers section with photos and bios, a schedule/agenda section, a sponsors section with logos, and a registration CTA section.">Event / Conference</button>
+              <div class="chat__starters chat__starters--rich" id="starter-templates">
+                <button class="starter-btn starter-btn--rich" data-prompt="Create a modern SaaS landing page with a hero section featuring a gradient background, a features grid with icons, a testimonials carousel, a pricing table with 3 tiers, and a CTA section.">
+                  <span class="starter-btn__label">SaaS Landing Page</span>
+                  <span class="starter-btn__desc">Hero, features, testimonials, pricing &amp; CTA</span>
+                </button>
+                <button class="starter-btn starter-btn--rich" data-prompt="Create a portfolio landing page with a hero section, a project gallery grid, an about/bio section, a skills section, and a contact form section.">
+                  <span class="starter-btn__label">Portfolio</span>
+                  <span class="starter-btn__desc">Hero, project gallery, about, skills &amp; contact</span>
+                </button>
+                <button class="starter-btn starter-btn--rich" data-prompt="Create a restaurant landing page with a hero section featuring a food image background, a menu section with categories, a reservations section, a reviews section, and a location/hours section.">
+                  <span class="starter-btn__label">Restaurant</span>
+                  <span class="starter-btn__desc">Hero, menu, reservations, reviews &amp; hours</span>
+                </button>
+                <button class="starter-btn starter-btn--rich" data-prompt="Create an event landing page with a countdown hero, a speakers section with photos and bios, a schedule/agenda section, a sponsors section with logos, and a registration CTA section.">
+                  <span class="starter-btn__label">Event / Conference</span>
+                  <span class="starter-btn__desc">Countdown hero, speakers, schedule &amp; sponsors</span>
+                </button>
               </div>
             </div>
           </div>
@@ -495,6 +507,7 @@
                 <span class="plan-toggle__state">Off</span>
               </button>
             </div>
+            <div class="chat__suggestions hidden" id="chat-suggestions" aria-label="Suggested next steps"></div>
             <div class="chat__file-chips" id="file-chips"></div>
             <div class="chat__input-wrapper">
               <textarea class="chat__input" id="chat-input" placeholder="Describe your landing page..." rows="1"></textarea>

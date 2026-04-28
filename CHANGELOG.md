@@ -6,6 +6,18 @@ All notable changes to vibeSpot are documented here.
 
 ## v1.2.0-dev — unreleased
 
+### Smart chat suggestions ([VIB-89](/VIB/issues/VIB-89))
+
+The chat panel now guides users on what to do next instead of leaving them at a blank textarea. After every pipeline completes, 2–3 contextual suggestion chips appear below the chat input. The chips are context-aware: additive prompts ("Add a testimonials section", "Add a pricing table", "Add an FAQ section") are filtered out when a similar module already exists, and any unused slots fall back to refinement prompts ("Make the hero CTA more prominent", "Change the color scheme to something bolder", "Refine the typography for a more modern feel"). Clicking a chip pre-fills the input and focuses it so the user can edit before sending. Chips disappear automatically when the user starts typing, when streaming begins, or when switching projects. Theming is inherited from existing CSS variables, so chips look correct in both dark and light modes.
+
+The empty-chat welcome screen now renders the four starter templates as two-line cards with a short preview description (e.g. "Hero, features, testimonials, pricing & CTA") so first-time users can scan options at a glance.
+
+- **[ui/chat.js](ui/chat.js)** — `pickContextualSuggestions()` and `renderChatSuggestions()` build the chip set from the current `#module-items` list; `handlePipelineComplete()` and `handlePipelinePartial()` call it after `finishStreaming()`. `startStreaming()` and the `init` handler hide stale chips. The `chat-input` listener hides chips on first keystroke; a delegated click on `#chat-suggestions` fills the input and focuses it without auto-sending.
+- **[ui/index.html](ui/index.html)** — `#chat-suggestions` container added below the plan-mode bar inside `.chat__input-area`; starter buttons restructured into `.starter-btn--rich` with `.starter-btn__label` + `.starter-btn__desc` spans.
+- **[ui/styles.css](ui/styles.css)** — new `.chat__suggestions` chip row, `.chat__suggestion-chip` pill style with subtle ✨ glyph, and `.starter-btn--rich` two-line button style. All colors come from existing theme tokens (`--bg-input`, `--border`, `--accent-glow`, `--accent-tint`, `--accent-hover`).
+
+Out of scope for this iteration: server-side AI-generated suggestions (the spec marks this as a stretch goal). The current suggestion pool is hardcoded and chosen client-side from the module list.
+
 ### Inverse pipeline — HubSpot → vibeSpot ([VIB-59](/VIB/issues/VIB-59))
 
 When you import an existing HubSpot theme, vibeSpot now reverse-engineers the design system, module/template graph, field schemas, and round-trip risks so the AI can iterate on the theme coherently instead of treating it as a bag of files.
