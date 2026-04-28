@@ -1411,16 +1411,11 @@ function getModelsForEngine(engine) {
       ];
     case "openai-api":
       return [
-        { id: "gpt-5.5", label: "GPT-5.5" },
-        { id: "gpt-5", label: "GPT-5 (default)" },
-        { id: "gpt-5-mini", label: "GPT-5 Mini" },
-        { id: "gpt-5-pro", label: "GPT-5 Pro" },
-        { id: "gpt-4o", label: "GPT-4o" },
-        { id: "gpt-4o-mini", label: "GPT-4o Mini" },
-        { id: "gpt-4.1", label: "GPT-4.1" },
-        { id: "o4-mini", label: "o4 Mini" },
-        { id: "o3", label: "o3" },
-        { id: "o3-pro", label: "o3 Pro" },
+        { id: "gpt-5.5", label: "GPT-5.5 (default)" },
+        { id: "gpt-5.5-pro", label: "GPT-5.5 Pro" },
+        { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+        { id: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
+        { id: "gpt-5.3-codex", label: "GPT-5.3 Codex" },
       ];
     case "gemini-cli":
     case "gemini-api":
@@ -1431,18 +1426,15 @@ function getModelsForEngine(engine) {
       ];
     case "codex-cli":
       return [
-        { id: "gpt-5.5-codex", label: "GPT-5.5 Codex" },
-        { id: "gpt-5-codex", label: "GPT-5 Codex (default)" },
-        { id: "gpt-5.5", label: "GPT-5.5" },
-        { id: "gpt-5", label: "GPT-5" },
-        { id: "gpt-5-mini", label: "GPT-5 Mini" },
-        { id: "gpt-5-pro", label: "GPT-5 Pro" },
-        { id: "o4-mini-high", label: "o4 Mini High" },
-        { id: "o4-mini", label: "o4 Mini" },
-        { id: "o3-pro", label: "o3 Pro" },
-        { id: "o3", label: "o3" },
-        { id: "o3-mini", label: "o3 Mini" },
-        { id: "gpt-4o", label: "GPT-4o" },
+        { id: "gpt-5.5", label: "GPT-5.5 (default)" },
+        { id: "gpt-5.5-pro", label: "GPT-5.5 Pro" },
+        { id: "gpt-5.3-codex", label: "GPT-5.3 Codex" },
+        { id: "gpt-5.2-codex", label: "GPT-5.2 Codex" },
+        { id: "gpt-5.1-codex-max", label: "GPT-5.1 Codex Max" },
+        { id: "gpt-5.1-codex-mini", label: "GPT-5.1 Codex Mini" },
+        { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+        { id: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
+        { id: "codex-mini-latest", label: "Codex Mini (latest)" },
       ];
     default:
       return [];
@@ -1454,7 +1446,7 @@ function getCurrentModel(engine, config) {
     case "claude-code": return config.claudeCodeModel || "claude-sonnet-4-6";
     case "anthropic-api":
     case "claude-oauth": return config.anthropicApiModel || "claude-sonnet-4-6";
-    case "openai-api": return config.openaiApiModel || "gpt-5";
+    case "openai-api": return config.openaiApiModel || "gpt-5.5";
     default: return null;
   }
 }

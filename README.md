@@ -181,7 +181,7 @@ Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, Figma, GitH
 ## What's New
 
 ### v1.1.2
-- **Honest model dropdowns** — replaced generic `opus`/`sonnet`/`haiku` aliases in the Claude Code dropdown with specific version IDs (Opus 4.7, Sonnet 4.6, Haiku 4.5, etc.) so picking a version actually pins it. Codex CLI dropdown now lists GPT-5.5 Codex, GPT-5 Codex, GPT-5.5, o4 Mini High, o3 Pro, etc. — no more outdated `o4-mini` / `o3` / `gpt-4o` only.
+- **Honest model dropdowns** — replaced generic `opus`/`sonnet`/`haiku` aliases in the Claude Code dropdown with specific version IDs (Opus 4.7, Sonnet 4.6, Haiku 4.5, etc.) so picking a version actually pins it. Codex CLI dropdown now lists GPT-5.5, GPT-5.5 Pro, GPT-5.3 Codex, GPT-5.2 Codex, GPT-5.1 Codex Max/Mini, GPT-5.4 Mini/Nano, Codex Mini — no more outdated `o4-mini` / `o3` / `gpt-4o` only.
 - **Live model catalog covers Codex CLI** — when an OpenAI API key is configured, both OpenAI API and Codex CLI dropdowns get populated from `/v1/models` (cached 10 min). New OpenAI releases show up automatically.
 - **Settings dialog opens to AI tab** — fixed a click-handler bug that left the dialog blank on open.
 
