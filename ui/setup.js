@@ -107,6 +107,10 @@ async function initSetup() {
     // Reset panel state
     remoteThemesLoaded = false;
 
+    // Auto-expand the starter template panel so templates are visible by default
+    activePanel = null;
+    togglePanel("starter");
+
   } catch (err) {
     showError("Could not connect to server. Is vibeSpot running?");
   }

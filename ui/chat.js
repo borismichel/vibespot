@@ -35,6 +35,21 @@ const sendBtn = document.getElementById("chat-send");
 const statusText = document.getElementById("status-text");
 const statusEngine = document.getElementById("status-engine");
 
+// Snapshot the welcome section before any init can destroy it
+const _welcomeHtml = document.getElementById("chat-welcome")?.outerHTML || "";
+
+function restoreWelcome() {
+  if (!_welcomeHtml || messagesEl.querySelector(".chat__welcome")) return;
+  messagesEl.insertAdjacentHTML("afterbegin", _welcomeHtml);
+  const el = messagesEl.querySelector("#starter-templates");
+  if (el) {
+    el.addEventListener("click", (e) => {
+      const btn = e.target.closest(".starter-btn");
+      if (btn) sendMessage(btn.dataset.prompt);
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // WebSocket connection
 // ---------------------------------------------------------------------------
@@ -118,6 +133,8 @@ function handleWsMessage(msg) {
           }
         }
         scrollToBottom();
+      } else {
+        restoreWelcome();
       }
 
       // Show/hide version history button
@@ -2362,7 +2379,11 @@ document.getElementById("starter-templates").addEventListener("click", (e) => {
 
 // Templates icon in input area — toggle welcome section visibility
 document.getElementById("btn-starter-templates")?.addEventListener("click", () => {
-  const welcome = document.getElementById("chat-welcome");
+  let welcome = document.getElementById("chat-welcome");
+  if (!welcome) {
+    restoreWelcome();
+    welcome = document.getElementById("chat-welcome");
+  }
   if (welcome) welcome.classList.toggle("hidden");
 });
 
