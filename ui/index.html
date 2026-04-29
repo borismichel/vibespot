@@ -150,8 +150,21 @@
           </div>
 
           <!-- Expandable panels (one visible at a time) -->
-          <div class="setup__panel hidden" id="panel-starter">
-            <div class="starter-grid" id="starter-grid"></div>
+          <div class="setup__panel" id="panel-starter">
+            <div class="starter-grid" id="starter-grid"><p class="setup__hint">Loading templates...</p></div>
+            <script>
+              fetch("/api/starters").then(r=>r.json()).then(d=>{
+                const g=document.getElementById("starter-grid");
+                const s=d.starters||[];
+                if(!s.length){g.innerHTML='<p class="setup__hint">No starter templates available.</p>';return}
+                g.innerHTML=s.map(t=>'<div class="starter-card" data-starter-id="'+t.id+'"><span class="starter-card__name">'+t.name+'</span><span class="starter-card__desc">'+t.description+'</span><span class="starter-card__meta">'+t.moduleCount+' modules</span></div>').join("");
+                if(typeof _startersCache!=="undefined")window._startersCache=s;
+                g.querySelectorAll(".starter-card").forEach(c=>{c.addEventListener("click",()=>{if(typeof selectStarter==="function")selectStarter(c.dataset.starterId)})});
+              }).catch(()=>{
+                const g=document.getElementById("starter-grid");
+                if(g)g.innerHTML='<p class="setup__hint">Failed to load templates.</p>';
+              });
+            </script>
             <div class="starter-create hidden" id="starter-create">
               <p class="starter-create__label" id="starter-create-label"></p>
               <div class="setup__row">
