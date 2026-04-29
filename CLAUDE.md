@@ -190,3 +190,37 @@ When a feature or fix ships, update the relevant docs before merging:
 
 - **MPMX-2026** (`../MPMX-2026/`) — HubSpot CMS theme where conversion patterns were developed
 - **lovable-to-hubspot** (`github.com/borismichel/lovable-to-hubspot`) — Documentation-only repo with the conversion guide
+
+## Parallel Development Rules
+
+These rules prevent code loss when multiple features are developed concurrently in worktrees or branches.
+
+### Branch Lifecycle (Mandatory)
+
+1. **Every feature branch MUST be merged to `main` via PR before the issue is marked done.** A feature is not "done" until its code is on `main`. Marking an issue done while the branch is unmerged is a defect.
+
+2. **Rebase before merge.** When a feature branch has diverged from `main`, create a `-rebased` branch from current `main`, cherry-pick or rebase the work onto it, then open the PR from the rebased branch. Never merge a stale worktree branch directly.
+
+3. **Verify the merge landed.** After merging a PR, confirm the feature's key identifiers (function names, CSS classes, HTML IDs, route paths) exist on `main`. A 30-second grep is cheaper than discovering lost code later.
+
+### Worktree Hygiene
+
+4. **One worktree per feature, short-lived.** Worktrees are for active development only. Once the rebased branch is merged, remove the worktree and delete the local branch.
+
+5. **Never leave orphan worktrees.** Before closing a milestone, run `git worktree list` and verify every worktree either has a merged PR or an open PR. Orphan worktrees with unmerged work are the primary source of code loss.
+
+### Merge Order & Conflict Resolution
+
+6. **Merge features sequentially to `main`.** When N features are ready in parallel, merge them one at a time. Each subsequent feature rebases onto the updated `main` before its PR. This ensures each merge resolves conflicts against the true current state.
+
+7. **After resolving conflicts, re-run the validation test.** `npm run build && npx tsx test/validate.ts` — a conflict resolution that compiles is not necessarily correct.
+
+### Pre-Milestone Checklist
+
+Before tagging a release or declaring a milestone complete:
+
+- [ ] `git branch --no-merged main` returns no feature branches with unshipped work
+- [ ] `git worktree list` shows only the main worktree (or worktrees for active in-progress issues)
+- [ ] All issues marked `done` have their code on `main` (spot-check: grep for 2-3 key identifiers per feature)
+- [ ] CHANGELOG.md lists every shipped feature
+- [ ] `npm run build` succeeds on `main`
