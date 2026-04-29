@@ -254,6 +254,11 @@ export function scanThemeFromDisk(themePath: string): void {
     activeSession.templates = parsedTemplates;
     activeSession.activeTemplateId = parsedTemplates[0].id;
 
+    // Migrate theme-level plan to the first template
+    if (activeSession.brandAssets?.plan && !parsedTemplates[0].plan) {
+      parsedTemplates[0].plan = activeSession.brandAssets.plan;
+    }
+
     // Reorder flat modules to match the first template's order
     const firstOrder = parsedTemplates[0].moduleOrder;
     if (firstOrder.length > 0) {

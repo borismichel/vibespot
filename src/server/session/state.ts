@@ -28,6 +28,8 @@ export function syncFlatFieldsFromTemplate(tpl: TemplateEntry): void {
   activeSession.sharedJs = tpl.sharedJs;
   activeSession.template = tpl.template;
   activeSession.messages = tpl.messages;
+  if (!activeSession.brandAssets) activeSession.brandAssets = {};
+  activeSession.brandAssets.plan = tpl.plan;
 }
 
 /**
@@ -45,6 +47,7 @@ export function syncFlatFieldsToTemplate(): void {
   tpl.sharedJs = activeSession.sharedJs;
   tpl.template = activeSession.template;
   tpl.messages = activeSession.messages;
+  tpl.plan = activeSession.brandAssets?.plan;
 }
 
 // ---------------------------------------------------------------------------
