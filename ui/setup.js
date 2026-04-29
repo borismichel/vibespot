@@ -107,6 +107,9 @@ async function initSetup() {
     // Reset panel state
     remoteThemesLoaded = false;
 
+    // Reset starter cache so each visit re-fetches from server
+    _startersCache = null;
+
     // Auto-expand the starter template panel so templates are visible by default
     activePanel = null;
     togglePanel("starter");
@@ -802,7 +805,7 @@ async function loadStarterGrid() {
   const grid = document.getElementById("starter-grid");
   if (!grid) return;
 
-  if (_startersCache) {
+  if (_startersCache !== null) {
     renderStarterGrid(_startersCache);
     return;
   }

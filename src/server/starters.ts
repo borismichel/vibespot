@@ -39,7 +39,7 @@ function resolveStartersDir(): string | null {
 }
 
 function loadAll(): StarterTemplate[] {
-  if (_cache) return _cache;
+  if (_cache !== null) return _cache;
 
   const dir = resolveStartersDir();
   if (!dir) { _cache = []; return _cache; }
