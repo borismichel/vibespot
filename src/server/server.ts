@@ -6,7 +6,6 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { join, extname } from "node:path";
-import { createHash } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import {
   getSession,
@@ -1306,7 +1305,6 @@ function serveThemeAsset(filename: string, res: ServerResponse): void {
 // Static file serving
 // ---------------------------------------------------------------------------
 
-const staticCache = new Map<string, { buffer: Buffer; etag: string; contentType: string }>();
 
 function serveStatic(pathname: string, uiDir: string, req: IncomingMessage, res: ServerResponse): void {
   // Default to index.html
@@ -1334,20 +1332,9 @@ function serveStatic(pathname: string, uiDir: string, req: IncomingMessage, res:
   try {
     // Always re-read from disk to pick up changes during development
     const buffer = readFileSync(fullPath);
-    const etag = '"' + createHash("md5").update(buffer).digest("hex").slice(0, 16) + '"';
-
-    // Check If-None-Match for 304
-    const clientEtag = req.headers["if-none-match"];
-    if (clientEtag === etag) {
-      res.writeHead(304);
-      res.end();
-      return;
-    }
-
     res.writeHead(200, {
       "Content-Type": contentType,
-      "Cache-Control": "no-cache",
-      "ETag": etag,
+      "Cache-Control": "no-store",
     });
     res.end(buffer);
   } catch {
