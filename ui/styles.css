@@ -2685,6 +2685,7 @@ body { display: flex; }
   font-size: 13.5px;
   line-height: 1.6;
   word-wrap: break-word;
+  overflow: hidden;
 }
 
 
@@ -2752,6 +2753,7 @@ body { display: flex; }
   align-items: flex-start;
   gap: 4px;
   padding: 6px 2px 4px;
+  max-width: 100%;
 }
 
 .pipeline-stage {
@@ -2759,8 +2761,8 @@ body { display: flex; }
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  flex: 0 0 auto;
-  min-width: 64px;
+  flex: 1 1 0;
+  min-width: 0;
   text-align: center;
   position: relative;
 }
@@ -2807,18 +2809,21 @@ body { display: flex; }
   white-space: nowrap;
   letter-spacing: 0.01em;
   transition: color 220ms ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* Connector between stages — fills as progress advances */
 .pipeline-stage__connector {
-  flex: 1 1 auto;
+  flex: 0 1 16px;
   height: 2px;
   margin-top: 15px; /* visually align with the indicator center (32px / 2 - 1) */
   background: var(--border);
   border-radius: 1px;
   position: relative;
   overflow: hidden;
-  min-width: 16px;
+  min-width: 4px;
 }
 
 .pipeline-stage__connector::after {
