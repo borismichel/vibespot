@@ -4,8 +4,11 @@
  * All setup happens in the web UI — zero CLI prompts.
  */
 
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+const __owndir = dirname(fileURLToPath(import.meta.url));
 import { execFileSync } from "node:child_process";
 import chalk from "chalk";
 import { startServer } from "../server/server.js";
@@ -68,8 +71,8 @@ export async function vibeCommand(): Promise<void> {
 
 function resolveUiDir(): string | null {
   const candidates = [
-    join(import.meta.dirname, "../../ui"),
-    join(import.meta.dirname, "../ui"),
+    join(__owndir, "../../ui"),
+    join(__owndir, "../ui"),
     join(process.cwd(), "ui"),
   ];
 

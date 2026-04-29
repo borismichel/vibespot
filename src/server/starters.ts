@@ -1,5 +1,8 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __owndir = dirname(fileURLToPath(import.meta.url));
 import type { ModuleFiles } from "../ai/engine.js";
 
 export interface StarterTemplate {
@@ -25,8 +28,8 @@ let _cache: StarterTemplate[] | null = null;
 
 function resolveStartersDir(): string | null {
   const candidates = [
-    join(import.meta.dirname, "../../starters"),
-    join(import.meta.dirname, "../starters"),
+    join(__owndir, "../../starters"),
+    join(__owndir, "../starters"),
     join(process.cwd(), "starters"),
   ];
   for (const p of candidates) {
