@@ -810,14 +810,17 @@ async function loadStarterGrid() {
     return;
   }
 
-  grid.innerHTML = '<p class="setup__hint">Loading templates...</p>';
   try {
     const res = await fetch("/api/starters");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     _startersCache = data.starters || [];
     renderStarterGrid(_startersCache);
   } catch {
-    grid.innerHTML = '<p class="setup__hint">Failed to load templates.</p>';
+    // API unavailable — attach click listeners to any hardcoded static cards
+    grid.querySelectorAll(".starter-card").forEach((card) => {
+      card.addEventListener("click", () => selectStarter(card.dataset.starterId));
+    });
   }
 }
 
