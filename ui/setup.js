@@ -1281,9 +1281,10 @@ document.querySelectorAll(".setup__action-btn").forEach((btn) => {
   btn.addEventListener("click", () => togglePanel(btn.dataset.action));
 });
 
-// Secondary "Start from Template" button
+// Secondary "Start from Template" button — always opens, never toggles closed
 document.querySelectorAll(".setup__secondary-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
+    activePanel = null;
     togglePanel(btn.dataset.action);
     setTimeout(() => {
       document.getElementById("panel-starter")?.scrollIntoView({ behavior: "smooth", block: "nearest" });

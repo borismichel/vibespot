@@ -151,20 +151,33 @@
 
           <!-- Expandable panels (one visible at a time) -->
           <div class="setup__panel" id="panel-starter">
-            <div class="starter-grid" id="starter-grid"><p class="setup__hint">Loading templates...</p></div>
-            <script>
-              fetch("/api/starters").then(r=>r.json()).then(d=>{
-                const g=document.getElementById("starter-grid");
-                const s=d.starters||[];
-                if(!s.length){g.innerHTML='<p class="setup__hint">No starter templates available.</p>';return}
-                g.innerHTML=s.map(t=>'<div class="starter-card" data-starter-id="'+t.id+'"><span class="starter-card__name">'+t.name+'</span><span class="starter-card__desc">'+t.description+'</span><span class="starter-card__meta">'+t.moduleCount+' modules</span></div>').join("");
-                if(typeof _startersCache!=="undefined")window._startersCache=s;
-                g.querySelectorAll(".starter-card").forEach(c=>{c.addEventListener("click",()=>{if(typeof selectStarter==="function")selectStarter(c.dataset.starterId)})});
-              }).catch(()=>{
-                const g=document.getElementById("starter-grid");
-                if(g)g.innerHTML='<p class="setup__hint">Failed to load templates.</p>';
-              });
-            </script>
+            <div class="starter-grid" id="starter-grid">
+              <div class="starter-card" data-starter-id="saas-landing">
+                <span class="starter-card__name">SaaS Landing Page</span>
+                <span class="starter-card__desc">Modern SaaS landing page with hero, features, pricing, and CTA</span>
+                <span class="starter-card__meta">4 modules</span>
+              </div>
+              <div class="starter-card" data-starter-id="portfolio">
+                <span class="starter-card__name">Portfolio</span>
+                <span class="starter-card__desc">Creative portfolio with project gallery, about section, and contact form</span>
+                <span class="starter-card__meta">4 modules</span>
+              </div>
+              <div class="starter-card" data-starter-id="restaurant">
+                <span class="starter-card__name">Restaurant</span>
+                <span class="starter-card__desc">Restaurant landing page with menu, reservations, and location info</span>
+                <span class="starter-card__meta">4 modules</span>
+              </div>
+              <div class="starter-card" data-starter-id="event">
+                <span class="starter-card__name">Event / Conference</span>
+                <span class="starter-card__desc">Event landing page with speakers, schedule, and registration</span>
+                <span class="starter-card__meta">4 modules</span>
+              </div>
+              <div class="starter-card" data-starter-id="coming-soon">
+                <span class="starter-card__name">Coming Soon</span>
+                <span class="starter-card__desc">Pre-launch page with signup form and feature preview</span>
+                <span class="starter-card__meta">3 modules</span>
+              </div>
+            </div>
             <div class="starter-create hidden" id="starter-create">
               <p class="starter-create__label" id="starter-create-label"></p>
               <div class="setup__row">
