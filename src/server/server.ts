@@ -21,7 +21,7 @@ import {
 } from "./session.js";
 import { commitThemeState, commitTemplateState, isGitAvailable } from "./project-git.js";
 import { buildPreviewHtml, buildModulePreviewHtml } from "./preview.js";
-import { handleGenerateStream, handleAgenticGenerate, handleFigmaImport, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine, handlePlanModeStream, isPlanModeActive } from "./ai-handler.js";
+import { handleGenerateStream, handleAgenticGenerate, handleFigmaImport, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine, handlePlanModeStream, isPlanModeActive, isGenerating } from "./ai-handler.js";
 import { handlePlanEditRoute, handlePlanDiscardRoute, handlePlanTemplatesRoute, handlePlanTemplateRoute, savePlan, clearPlan } from "./routes/plan.js";
 import { parsePlanResponse } from "./plan-parser.js";
 import { loadConfig, saveConfig, getHubSpotPak, getActiveHubSpotAccount } from "../utils/config.js";
@@ -123,6 +123,83 @@ const MIME_TYPES: Record<string, string> = {
   ".ico": "image/x-icon",
   ".woff2": "font/woff2",
 };
+
+// ---------------------------------------------------------------------------
+// Live WebSocket tracking — allows reconnecting clients to catch up on
+// an in-flight pipeline that started on a previous connection.
+// ---------------------------------------------------------------------------
+
+let activeClientWs: WebSocket | null = null;
+let pipelineEventLog: object[] = [];
+
+function sendToClient(data: object): void {
+  if (activeClientWs && activeClientWs.readyState === WebSocket.OPEN) {
+    activeClientWs.send(JSON.stringify(data));
+  }
+}
+
+function logAndSend(data: object): void {
+  pipelineEventLog.push(data);
+  sendToClient(data);
+}
+
+function clearPipelineEventLog(): void {
+  pipelineEventLog = [];
+}
+
+// ---------------------------------------------------------------------------
+// Shared pipeline event handler — builds the onEvent callback used by all
+// three generation entry points (chat, figma import, plan approval).
+// ---------------------------------------------------------------------------
+
+function buildPipelineOnEvent(
+  pipelineSteps: { step: string; label: string; decisions?: string[] }[],
+  pipelineModules: { name: string; status: "complete" | "failed" }[],
+): (event: import("./agent/types.js").PipelineEvent) => void {
+  return (event) => {
+    if (event.type === "module_progress" && event.moduleFiles) {
+      const { moduleFiles, ...wsEvent } = event;
+      logAndSend(wsEvent);
+    } else {
+      logAndSend(event);
+    }
+
+    if (event.type === "agent_step") {
+      pipelineSteps.push({ step: event.step, label: event.label });
+    } else if (event.type === "agent_decision") {
+      const last = pipelineSteps[pipelineSteps.length - 1];
+      if (last) {
+        if (!last.decisions) last.decisions = [];
+        last.decisions.push(event.decision);
+      }
+    } else if (event.type === "design_system_ready") {
+      updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
+    } else if (event.type === "blueprint_ready") {
+      updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
+      reorderModules(event.moduleOrder);
+      logAndSend({
+        type: "modules_updated",
+        modules: getOrderedModules().map((m) => m.moduleName),
+      });
+    } else if (event.type === "module_progress" && event.status === "complete" && event.moduleFiles) {
+      updateModules({ modules: [{
+        moduleName: event.module,
+        fieldsJson: event.moduleFiles.fieldsJson,
+        metaJson: event.moduleFiles.metaJson,
+        moduleHtml: event.moduleFiles.moduleHtml,
+        moduleCss: event.moduleFiles.moduleCss,
+        moduleJs: event.moduleFiles.moduleJs,
+      }] });
+      logAndSend({
+        type: "modules_updated",
+        modules: getOrderedModules().map((m) => m.moduleName),
+      });
+      pipelineModules.push({ name: event.module, status: "complete" });
+    } else if (event.type === "module_progress" && event.status === "failed") {
+      pipelineModules.push({ name: event.module, status: "failed" });
+    }
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -643,64 +720,16 @@ function handleWsConnection(ws: WebSocket): void {
         try {
           if (agenticCheck.useAgentic) {
             // --- Agentic pipeline mode ---
-            // Collect pipeline events for metadata persistence
+            clearPipelineEventLog();
             const pipelineSteps: { step: string; label: string; decisions?: string[] }[] = [];
             const pipelineModules: { name: string; status: "complete" | "failed" }[] = [];
 
             const result = await handleAgenticGenerate(
               userMessage,
-              (event) => {
-                // Don't send moduleFiles over WebSocket (too large)
-                if (event.type === "module_progress" && event.moduleFiles) {
-                  const { moduleFiles, ...wsEvent } = event;
-                  ws.send(JSON.stringify(wsEvent));
-                } else {
-                  ws.send(JSON.stringify(event));
-                }
-
-                // Collect events for metadata + incremental preview
-                if (event.type === "agent_step") {
-                  pipelineSteps.push({ step: event.step, label: event.label });
-                } else if (event.type === "agent_decision") {
-                  const last = pipelineSteps[pipelineSteps.length - 1];
-                  if (last) {
-                    if (!last.decisions) last.decisions = [];
-                    last.decisions.push(event.decision);
-                  }
-                } else if (event.type === "design_system_ready") {
-                  // Design system created — push CSS to session for themed placeholders
-                  updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
-                } else if (event.type === "blueprint_ready") {
-                  // Module plan ready — set order for incremental preview placeholders
-                  updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
-                  reorderModules(event.moduleOrder);
-                  ws.send(JSON.stringify({
-                    type: "modules_updated",
-                    modules: getOrderedModules().map((m) => m.moduleName),
-                  }));
-                } else if (event.type === "module_progress" && event.status === "complete" && event.moduleFiles) {
-                  // Push completed module to session immediately for incremental preview
-                  updateModules({ modules: [{
-                    moduleName: event.module,
-                    fieldsJson: event.moduleFiles.fieldsJson,
-                    metaJson: event.moduleFiles.metaJson,
-                    moduleHtml: event.moduleFiles.moduleHtml,
-                    moduleCss: event.moduleFiles.moduleCss,
-                    moduleJs: event.moduleFiles.moduleJs,
-                  }] });
-                  ws.send(JSON.stringify({
-                    type: "modules_updated",
-                    modules: getOrderedModules().map((m) => m.moduleName),
-                  }));
-                  pipelineModules.push({ name: event.module, status: "complete" });
-                } else if (event.type === "module_progress" && event.status === "failed") {
-                  pipelineModules.push({ name: event.module, status: "failed" });
-                }
-              },
+              buildPipelineOnEvent(pipelineSteps, pipelineModules),
               fileIds,
             );
 
-            // Apply result to session with pipeline metadata
             applyPipelineResult(result, {
               steps: pipelineSteps,
               modules: pipelineModules,
@@ -710,16 +739,16 @@ function handleWsConnection(ws: WebSocket): void {
           } else {
             // --- Single-call mode (existing behavior) ---
             setParseWarningCallback((warning) => {
-              ws.send(JSON.stringify({ type: "parse_warning", message: warning }));
+              sendToClient({ type: "parse_warning", message: warning });
             });
 
             await handleGenerateStream(
               userMessage,
               (chunk) => {
-                ws.send(JSON.stringify({ type: "stream", content: chunk }));
+                sendToClient({ type: "stream", content: chunk });
               },
               (status) => {
-                ws.send(JSON.stringify({ type: "stream_status", content: status }));
+                sendToClient({ type: "stream_status", content: status });
               },
               fileIds
             );
@@ -741,29 +770,31 @@ function handleWsConnection(ws: WebSocket): void {
               commitHash = commitThemeState(currentSession.themePath, userMessage);
             }
             if (commitHash) {
-              ws.send(JSON.stringify({ type: "version_created", hash: commitHash }));
+              sendToClient({ type: "version_created", hash: commitHash });
             }
           }
 
           // After generation, send updated preview
-          ws.send(JSON.stringify({ type: "generation_complete" }));
-          ws.send(JSON.stringify({
+          sendToClient({ type: "generation_complete" });
+          sendToClient({
             type: "modules_updated",
             modules: getOrderedModules().map((m) => m.moduleName),
-          }));
+          });
+          clearPipelineEventLog();
 
           // Suggest brand asset extraction if none exist yet
           {
             const sess = getSession();
             if (sess && agenticCheck.useAgentic && !sess.brandAssets?.styleguide && !sess.brandAssets?.brandvoice && !sess.brandAssets?.themeContext) {
-              ws.send(JSON.stringify({ type: "suggest_brand_extraction" }));
+              sendToClient({ type: "suggest_brand_extraction" });
             }
           }
         } catch (err) {
-          ws.send(JSON.stringify({
+          clearPipelineEventLog();
+          sendToClient({
             type: "error",
             message: err instanceof Error ? err.message : String(err),
-          }));
+          });
         }
         break;
       }
@@ -807,58 +838,16 @@ function handleWsConnection(ws: WebSocket): void {
             saveSession();
           }
 
-          ws.send(JSON.stringify({ type: "figma_import_started", fileName: extraction.fileName }));
+          sendToClient({ type: "figma_import_started", fileName: extraction.fileName });
 
-          // Run pipeline — identical event handling to chat agentic mode
+          clearPipelineEventLog();
           const pipelineSteps: { step: string; label: string; decisions?: string[] }[] = [];
           const pipelineModules: { name: string; status: "complete" | "failed" }[] = [];
 
           const result = await handleFigmaImport(
             extraction,
             themeName,
-            (event) => {
-              if (event.type === "module_progress" && event.moduleFiles) {
-                const { moduleFiles, ...wsEvent } = event;
-                ws.send(JSON.stringify(wsEvent));
-              } else {
-                ws.send(JSON.stringify(event));
-              }
-
-              if (event.type === "agent_step") {
-                pipelineSteps.push({ step: event.step, label: event.label });
-              } else if (event.type === "agent_decision") {
-                const last = pipelineSteps[pipelineSteps.length - 1];
-                if (last) {
-                  if (!last.decisions) last.decisions = [];
-                  last.decisions.push(event.decision);
-                }
-              } else if (event.type === "design_system_ready") {
-                updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
-              } else if (event.type === "blueprint_ready") {
-                updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
-                reorderModules(event.moduleOrder);
-                ws.send(JSON.stringify({
-                  type: "modules_updated",
-                  modules: getOrderedModules().map((m) => m.moduleName),
-                }));
-              } else if (event.type === "module_progress" && event.status === "complete" && event.moduleFiles) {
-                updateModules({ modules: [{
-                  moduleName: event.module,
-                  fieldsJson: event.moduleFiles.fieldsJson,
-                  metaJson: event.moduleFiles.metaJson,
-                  moduleHtml: event.moduleFiles.moduleHtml,
-                  moduleCss: event.moduleFiles.moduleCss,
-                  moduleJs: event.moduleFiles.moduleJs,
-                }] });
-                ws.send(JSON.stringify({
-                  type: "modules_updated",
-                  modules: getOrderedModules().map((m) => m.moduleName),
-                }));
-                pipelineModules.push({ name: event.module, status: "complete" });
-              } else if (event.type === "module_progress" && event.status === "failed") {
-                pipelineModules.push({ name: event.module, status: "failed" });
-              }
-            },
+            buildPipelineOnEvent(pipelineSteps, pipelineModules),
           );
 
           applyPipelineResult(result, {
@@ -867,20 +856,21 @@ function handleWsConnection(ws: WebSocket): void {
             stats: result.stats,
           });
 
-          // Write to disk and commit
           writeModulesToDisk();
           commitThemeState(getSession()!.themePath, `Figma import: ${extraction.fileName}`);
 
-          ws.send(JSON.stringify({ type: "generation_complete" }));
-          ws.send(JSON.stringify({
+          sendToClient({ type: "generation_complete" });
+          sendToClient({
             type: "modules_updated",
             modules: getOrderedModules().map((m) => m.moduleName),
-          }));
+          });
+          clearPipelineEventLog();
         } catch (err) {
-          ws.send(JSON.stringify({
+          clearPipelineEventLog();
+          sendToClient({
             type: "error",
             message: err instanceof Error ? err.message : String(err),
-          }));
+          });
         }
         break;
       }
@@ -1165,54 +1155,13 @@ ${errorContext}`;
         saveSession();
 
         try {
+          clearPipelineEventLog();
           const pipelineSteps: { step: string; label: string; decisions?: string[] }[] = [];
           const pipelineModules: { name: string; status: "complete" | "failed" }[] = [];
 
           const result = await handleAgenticGenerate(
             approvalMessage,
-            (event) => {
-              if (event.type === "module_progress" && event.moduleFiles) {
-                const { moduleFiles, ...wsEvent } = event;
-                ws.send(JSON.stringify(wsEvent));
-              } else {
-                ws.send(JSON.stringify(event));
-              }
-
-              if (event.type === "agent_step") {
-                pipelineSteps.push({ step: event.step, label: event.label });
-              } else if (event.type === "agent_decision") {
-                const last = pipelineSteps[pipelineSteps.length - 1];
-                if (last) {
-                  if (!last.decisions) last.decisions = [];
-                  last.decisions.push(event.decision);
-                }
-              } else if (event.type === "design_system_ready") {
-                updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
-              } else if (event.type === "blueprint_ready") {
-                updateModules({ sharedCss: event.sharedCss, sharedJs: event.sharedJs });
-                reorderModules(event.moduleOrder);
-                ws.send(JSON.stringify({
-                  type: "modules_updated",
-                  modules: getOrderedModules().map((m) => m.moduleName),
-                }));
-              } else if (event.type === "module_progress" && event.status === "complete" && event.moduleFiles) {
-                updateModules({ modules: [{
-                  moduleName: event.module,
-                  fieldsJson: event.moduleFiles.fieldsJson,
-                  metaJson: event.moduleFiles.metaJson,
-                  moduleHtml: event.moduleFiles.moduleHtml,
-                  moduleCss: event.moduleFiles.moduleCss,
-                  moduleJs: event.moduleFiles.moduleJs,
-                }] });
-                ws.send(JSON.stringify({
-                  type: "modules_updated",
-                  modules: getOrderedModules().map((m) => m.moduleName),
-                }));
-                pipelineModules.push({ name: event.module, status: "complete" });
-              } else if (event.type === "module_progress" && event.status === "failed") {
-                pipelineModules.push({ name: event.module, status: "failed" });
-              }
-            },
+            buildPipelineOnEvent(pipelineSteps, pipelineModules),
           );
 
           applyPipelineResult(result, {
@@ -1236,20 +1185,22 @@ ${errorContext}`;
               commitHash = commitThemeState(currentSession.themePath, "Approved plan: implementation");
             }
             if (commitHash) {
-              ws.send(JSON.stringify({ type: "version_created", hash: commitHash }));
+              sendToClient({ type: "version_created", hash: commitHash });
             }
           }
 
-          ws.send(JSON.stringify({ type: "generation_complete" }));
-          ws.send(JSON.stringify({
+          sendToClient({ type: "generation_complete" });
+          sendToClient({
             type: "modules_updated",
             modules: getOrderedModules().map((m) => m.moduleName),
-          }));
+          });
+          clearPipelineEventLog();
         } catch (err) {
-          ws.send(JSON.stringify({
+          clearPipelineEventLog();
+          sendToClient({
             type: "error",
             message: err instanceof Error ? err.message : String(err),
-          }));
+          });
         }
         break;
       }
@@ -1269,6 +1220,9 @@ ${errorContext}`;
     }
   });
 
+  // Track this as the active client so in-flight pipelines send to it
+  activeClientWs = ws;
+
   // Send initial state
   const session = getSession();
   if (session) {
@@ -1283,6 +1237,7 @@ ${errorContext}`;
       "codex-cli": "Codex CLI",
       "api": "Anthropic API",
     };
+    const generating = isGenerating();
     const activeTpl = getActiveTemplate();
     ws.send(JSON.stringify({
       type: "init",
@@ -1305,7 +1260,16 @@ ${errorContext}`;
       // Plan-mode state
       planMode: !!cfg.planMode,
       plan: session.brandAssets?.plan || "",
+      // Active generation state for reconnecting clients
+      isGenerating: generating,
     }));
+
+    // Replay accumulated pipeline events so reconnecting clients catch up
+    if (generating && pipelineEventLog.length > 0) {
+      for (const event of pipelineEventLog) {
+        ws.send(JSON.stringify(event));
+      }
+    }
   } else {
     ws.send(JSON.stringify({ type: "needs_setup" }));
   }
