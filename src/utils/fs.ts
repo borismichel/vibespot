@@ -1,5 +1,8 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __owndir = dirname(fileURLToPath(import.meta.url));
 
 export function readFile(path: string): string {
   return readFileSync(path, "utf-8");
@@ -22,8 +25,8 @@ export function resolveAsset(name: string): string {
   // In built package, assets/ is at the package root
   // During dev, it's relative to the project root
   const paths = [
-    join(import.meta.dirname, "../../assets", name),
-    join(import.meta.dirname, "../assets", name),
+    join(__owndir, "../../assets", name),
+    join(__owndir, "../assets", name),
     join(process.cwd(), "assets", name),
   ];
 
@@ -39,8 +42,8 @@ let _version = "";
 export function getVersion(): string {
   if (_version) return _version;
   const candidates = [
-    join(import.meta.dirname, "../../package.json"),
-    join(import.meta.dirname, "../package.json"),
+    join(__owndir, "../../package.json"),
+    join(__owndir, "../package.json"),
     join(process.cwd(), "package.json"),
   ];
   for (const p of candidates) {
@@ -63,8 +66,8 @@ let _changelog = "";
 export function getChangelog(): string {
   if (_changelog) return _changelog;
   const candidates = [
-    join(import.meta.dirname, "../../CHANGELOG.md"),
-    join(import.meta.dirname, "../CHANGELOG.md"),
+    join(__owndir, "../../CHANGELOG.md"),
+    join(__owndir, "../CHANGELOG.md"),
     join(process.cwd(), "CHANGELOG.md"),
   ];
   for (const p of candidates) {

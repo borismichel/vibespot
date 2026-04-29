@@ -11,7 +11,10 @@
  */
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __owndir = dirname(fileURLToPath(import.meta.url));
 
 export interface PlanTemplateMetadata {
   id: string;
@@ -78,8 +81,8 @@ function templatesDir(): string | null {
   // null if no directory exists rather than throwing, so the rest of the
   // app keeps working.
   const candidates = [
-    join(import.meta.dirname, "../../assets/plan-templates"),
-    join(import.meta.dirname, "../assets/plan-templates"),
+    join(__owndir, "../../assets/plan-templates"),
+    join(__owndir, "../assets/plan-templates"),
     join(process.cwd(), "assets/plan-templates"),
   ];
   for (const dir of candidates) {
