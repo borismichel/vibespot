@@ -140,6 +140,18 @@ function handleWsMessage(msg) {
       if (window.planController) {
         window.planController.setInitialState(msg);
       }
+
+      // If setup handed us an initial prompt (describe-it path), send it now
+      // that the session is live. Skip if the project already has history
+      // (e.g. resumed session) to avoid double-submitting.
+      if (window.__pendingInitialPrompt) {
+        const pendingPrompt = window.__pendingInitialPrompt;
+        window.__pendingInitialPrompt = null;
+        const hasHistory = msg.messages && msg.messages.length > 0;
+        if (!hasHistory) {
+          setTimeout(() => sendMessage(pendingPrompt), 50);
+        }
+      }
       break;
 
     case "stream":

@@ -27,6 +27,15 @@ A new "Select" toggle in the preview topbar lets you click an element in the liv
 
 Contextual suggestion chips after pipeline completion. Filtered by existing modules.
 
+### Simplified setup / onboarding flow ([VIB-85](/VIB/issues/VIB-85))
+
+The setup screen no longer leads with a 6-button grid. Returning users land on a "Continue where you left off" rail of recent projects; new users see a chat-style "Describe the landing page you want to build…" prompt as the primary path, with "Start from Template" as a single secondary action and the niche import flows tucked behind a "More ways to start" disclosure. Submitting the prompt creates a fresh theme, jumps directly into chat, and auto-sends the prompt as the first message — collapsing 6 cold-start choices to 2.
+
+- **[ui/index.html](ui/index.html)** — restructured `#setup-options`: new `#setup-recent`, `#setup-prompt-card`, `#setup-secondary`, and a collapsible `#setup-more-panel` that wraps the legacy Blank Theme / From HubSpot / From Figma / From React buttons. The existing setup panels (`panel-starter`, `panel-new`, `panel-continue`, `panel-download`, `panel-figma`, `panel-convert`) are kept verbatim so all existing functionality stays accessible.
+- **[ui/setup.js](ui/setup.js)** — adds `populateRecentProjects(info)` (called from `initSetup`), `startFromPrompt()` + `generateThemeNameFromPrompt()` for the describe-it path, an `expandMoreOptions()` disclosure toggle, and a "View all" handler that delegates back to the existing `togglePanel("continue")` flow.
+- **[ui/chat.js](ui/chat.js)** — on the next websocket `init`, consumes `window.__pendingInitialPrompt` and forwards it to `sendMessage()` so the user's setup-screen prompt becomes the first chat turn (skipped if the session already has history, e.g. resumed projects).
+- **[ui/styles.css](ui/styles.css)** — new `.setup__recent*`, `.setup__prompt-*`, `.setup__secondary*`, `.setup__more*` rules using the existing CSS variable palette so dark/light parity is preserved. The walkthrough flow for first-run users with no AI engine configured is untouched.
+
 ### Inverse pipeline — HubSpot → vibeSpot ([VIB-59](/VIB/issues/VIB-59))
 
 Reverse-engineers imported HubSpot themes: design tokens, module graph, field schemas, round-trip risks.

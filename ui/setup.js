@@ -52,6 +52,9 @@ async function initSetup() {
     // Populate the project rail with all projects
     populateProjectRail(info);
 
+    // Show "Continue where you left off" cards above the create options
+    populateRecentProjects(info);
+
     // Auto-select engine if available but not yet chosen
     if (info.availableEngines && info.availableEngines.length > 0 && !info.activeEngine) {
       const engine = info.availableEngines[0];
@@ -179,6 +182,62 @@ function deduplicateProjects(info) {
   }
 
   return projects;
+}
+
+// ---------------------------------------------------------------------------
+// "Continue where you left off" — recent projects above the create options
+// ---------------------------------------------------------------------------
+
+const RECENT_PROJECTS_LIMIT = 4;
+
+function populateRecentProjects(info) {
+  const section = document.getElementById("setup-recent");
+  const list = document.getElementById("setup-recent-list");
+  const viewAll = document.getElementById("setup-recent-all");
+  if (!section || !list) return;
+
+  const projects = deduplicateProjects(info);
+  if (projects.length === 0) {
+    section.classList.add("hidden");
+    list.innerHTML = "";
+    return;
+  }
+
+  // Most recently updated first; locals (no updatedAt) follow
+  const withTime = projects.filter((p) => p.updatedAt).sort((a, b) => b.updatedAt - a.updatedAt);
+  const withoutTime = projects.filter((p) => !p.updatedAt);
+  const ordered = [...withTime, ...withoutTime];
+  const top = ordered.slice(0, RECENT_PROJECTS_LIMIT);
+
+  list.innerHTML = "";
+  for (const p of top) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "setup__recent-card";
+
+    const initial = p.name.charAt(0).toUpperCase();
+    const meta = p.updatedAt ? timeAgo(p.updatedAt) : "on disk";
+
+    card.innerHTML =
+      `<span class="setup__recent-card-bubble">${esc(initial)}</span>` +
+      `<span class="setup__recent-card-text">` +
+      `<span class="setup__recent-card-name">${esc(p.name)}</span>` +
+      `<span class="setup__recent-card-meta">${esc(meta)}</span>` +
+      `</span>`;
+
+    card.addEventListener("click", () => {
+      if (typeof isStreaming !== "undefined" && isStreaming) {
+        showError("Cannot switch projects while AI is generating.");
+        return;
+      }
+      if (p.sessionId) resumeSession(p.sessionId);
+      else openTheme(p.name);
+    });
+    list.appendChild(card);
+  }
+
+  if (viewAll) viewAll.classList.toggle("hidden", projects.length <= top.length);
+  section.classList.remove("hidden");
 }
 
 // ---------------------------------------------------------------------------
@@ -661,6 +720,64 @@ async function createTheme() {
     showApp(data.themeName);
   } catch (err) {
     showError("Failed to create theme: " + err.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Primary path: "Describe the landing page you want to build..."
+// Creates a fresh theme and forwards the prompt to the chat once it connects.
+// ---------------------------------------------------------------------------
+
+function generateThemeNameFromPrompt(prompt) {
+  const slug = prompt
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 5)
+    .join("-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+
+  if (slug) return slug;
+  return "page-" + Date.now().toString(36);
+}
+
+async function startFromPrompt() {
+  const input = document.getElementById("setup-prompt-input");
+  const submitBtn = document.getElementById("setup-prompt-submit");
+  const prompt = (input?.value || "").trim();
+  if (!prompt) {
+    input?.focus();
+    return;
+  }
+
+  if (submitBtn) submitBtn.disabled = true;
+  const themeName = generateThemeNameFromPrompt(prompt);
+  showLoading("Creating theme...");
+
+  try {
+    const res = await fetch("/api/setup/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: themeName }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      showError(data.error);
+      if (submitBtn) submitBtn.disabled = false;
+      return;
+    }
+
+    // chat.js will pick this up on the next ws "init" message
+    window.__pendingInitialPrompt = prompt;
+    if (input) input.value = "";
+    showAppDirect(data.themeName);
+  } catch (err) {
+    showError("Failed to create theme: " + err.message);
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
@@ -1152,10 +1269,63 @@ async function downloadThemeByName() {
 // Event listeners
 // ---------------------------------------------------------------------------
 
-// Action buttons
+// Action buttons (advanced "More ways to start" panel)
 document.querySelectorAll(".setup__action-btn").forEach((btn) => {
   btn.addEventListener("click", () => togglePanel(btn.dataset.action));
 });
+
+// Secondary "Start from Template" button
+document.querySelectorAll(".setup__secondary-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    togglePanel(btn.dataset.action);
+    setTimeout(() => {
+      document.getElementById("panel-starter")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 60);
+  });
+});
+
+// "More ways to start" toggle
+function expandMoreOptions(expand) {
+  const toggle = document.getElementById("setup-more-toggle");
+  const panel = document.getElementById("setup-more-panel");
+  if (!toggle || !panel) return;
+  const willExpand = expand ?? panel.classList.contains("hidden");
+  panel.classList.toggle("hidden", !willExpand);
+  toggle.setAttribute("aria-expanded", willExpand ? "true" : "false");
+  toggle.classList.toggle("setup__more-toggle--open", willExpand);
+}
+document.getElementById("setup-more-toggle")?.addEventListener("click", () => expandMoreOptions());
+
+// "View all" link in recent projects → open the full Continue panel
+document.getElementById("setup-recent-all")?.addEventListener("click", () => {
+  togglePanel("continue");
+  setTimeout(() => {
+    document.getElementById("panel-continue")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, 60);
+});
+
+// Primary "describe-it" prompt
+const promptInputEl = document.getElementById("setup-prompt-input");
+const promptSubmitEl = document.getElementById("setup-prompt-submit");
+if (promptInputEl && promptSubmitEl) {
+  const syncSubmitState = () => {
+    promptSubmitEl.disabled = promptInputEl.value.trim().length === 0;
+  };
+  promptInputEl.addEventListener("input", syncSubmitState);
+  promptInputEl.addEventListener("keydown", (e) => {
+    // ⌘/Ctrl + Enter submits; plain Enter inserts newline like a normal textarea.
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      if (!promptSubmitEl.disabled) startFromPrompt();
+    }
+  });
+  promptSubmitEl.addEventListener("click", () => {
+    if (!promptSubmitEl.disabled) startFromPrompt();
+  });
+  syncSubmitState();
+  const shortcutEl = document.getElementById("setup-prompt-shortcut");
+  if (shortcutEl && !/Mac|iPhone|iPad/.test(navigator.platform)) shortcutEl.textContent = "Ctrl+↩";
+}
 
 // Starter templates
 document.getElementById("btn-create-from-starter").addEventListener("click", createFromStarter);
