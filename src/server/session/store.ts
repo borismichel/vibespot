@@ -146,6 +146,14 @@ export function loadSession(sessionId: string): VibeSession | null {
     // Migrate flat fields into templates if needed
     migrateSession(data);
 
+    // Migrate theme-level plan to active template (plan-scoping fix)
+    if (data.brandAssets?.plan && data.templates?.length > 0) {
+      const activeTpl = data.templates.find((t: any) => t.id === data.activeTemplateId) || data.templates[0];
+      if (!activeTpl.plan) {
+        activeTpl.plan = data.brandAssets.plan;
+      }
+    }
+
     activeSession = data;
     return data;
   } catch {

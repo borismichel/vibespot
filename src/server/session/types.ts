@@ -34,6 +34,7 @@ export interface TemplateEntry {
   sharedJs: string;
   template: string;              // HubL template content
   messages: ChatMessage[];       // per-template chat history
+  plan?: string;                 // per-template plan markdown
 }
 
 export interface SessionAsset {

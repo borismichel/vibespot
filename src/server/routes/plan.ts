@@ -17,6 +17,7 @@ import { existsSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { jsonResponse, readJsonBody } from "../route-helpers.js";
 import { getSession, saveSession } from "../session.js";
+import { getActiveTemplate } from "../session/templates.js";
 import { saveConfig } from "../../utils/config.js";
 import { log } from "../log.js";
 import { listPlanTemplateMetadata, getPlanTemplate } from "../plan-templates.js";
@@ -37,6 +38,9 @@ export function savePlan(markdown: string): string | null {
 
   if (!session.brandAssets) session.brandAssets = {};
   session.brandAssets.plan = markdown;
+
+  const tpl = getActiveTemplate();
+  if (tpl) tpl.plan = markdown;
 
   try {
     const dir = join(session.themePath, ".vibespot");
@@ -60,6 +64,9 @@ export function clearPlan(): void {
   if (session.brandAssets) {
     delete session.brandAssets.plan;
   }
+
+  const tpl = getActiveTemplate();
+  if (tpl) delete tpl.plan;
 
   try {
     const path = planFilePath(session.themePath);

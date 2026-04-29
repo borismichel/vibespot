@@ -136,6 +136,7 @@ export function cloneTemplate(templateId: string, newLabel?: string): TemplateEn
     sharedJs: source.sharedJs,
     template: source.template,
     messages: [], // start fresh chat for clone
+    plan: source.plan,
   };
 
   activeSession.templates.push(entry);
