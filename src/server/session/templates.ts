@@ -221,6 +221,16 @@ export function removeTemplate(templateId: string, deleteModules = false): boole
       activeSession.sharedJs = "";
       activeSession.template = "";
       activeSession.messages = [];
+      if (activeSession.brandAssets) delete activeSession.brandAssets.plan;
+    }
+  }
+
+  // Clean up plan.md from disk if no remaining template carries a plan
+  if (removed.plan && activeSession.themePath) {
+    const anyPlanLeft = activeSession.templates.some((t) => !!t.plan);
+    if (!anyPlanLeft) {
+      const planPath = join(activeSession.themePath, ".vibespot", "plan.md");
+      if (existsSync(planPath)) rmSync(planPath, { force: true });
     }
   }
 
