@@ -109,6 +109,10 @@ function handleWsMessage(msg) {
       document.getElementById("module-items").innerHTML = "";
       document.getElementById("module-count").textContent = "0";
       hideChatSuggestions();
+      // Reset pipeline state — DOM nodes were detached by innerHTML clear
+      resetPipelineState();
+      stopPipelineTimer();
+      streamingMsgEl = null;
 
       if (msg.modules && msg.modules.length > 0) {
         updateModuleList(msg.modules);
@@ -156,6 +160,18 @@ function handleWsMessage(msg) {
       // Hydrate plan-mode state (toggle + Plan pane content)
       if (window.planController) {
         window.planController.setInitialState(msg);
+      }
+
+      // If a pipeline is actively running (reconnect scenario), lock the
+      // input so the user can't double-submit. Replayed pipeline events
+      // that follow this init message will rebuild the progress UI.
+      if (msg.isGenerating) {
+        isStreaming = true;
+        sendBtn.disabled = true;
+        streamStartTime = Date.now();
+        if (typeof window.setSelectModeDisabled === "function") {
+          window.setSelectModeDisabled(true);
+        }
       }
 
       // If setup handed us an initial prompt (describe-it path), send it now
