@@ -23,10 +23,13 @@ export interface ChatMessage {
 
 export type PageType = "landing_page" | "blog_post" | "website_page" | "module_only";
 
+export type ContentMode = "page" | "email";
+
 export interface TemplateEntry {
   id: string;                    // e.g. "lp-main", "blog-post"
   label: string;                 // "Main Landing Page"
   pageType: PageType;
+  contentMode?: ContentMode;     // "page" (default) or "email" — persisted so modify requests use email prompts
   templateFile: string;          // "templates/lp-main.html"
   modules: ModuleFiles[];
   moduleOrder: string[];
@@ -95,6 +98,7 @@ export interface SessionSnapshot {
   messages: ReadonlyArray<Readonly<ChatMessage>>;
   themeName: string;
   themePath: string;
+  contentMode?: ContentMode;
   brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string; plan?: string };
 }
 

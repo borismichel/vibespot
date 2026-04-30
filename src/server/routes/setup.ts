@@ -162,6 +162,7 @@ function bootstrapFromStarter(themePath: string, themeName: string, starterId: s
     id: templateId,
     label: `${starter.name}`,
     pageType: isEmail ? "module_only" : "landing_page",
+    contentMode: isEmail ? "email" : undefined,
     templateFile: isEmail ? `templates/email.html` : `templates/${templateId}.html`,
     modules,
     moduleOrder,

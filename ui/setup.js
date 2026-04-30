@@ -20,6 +20,7 @@ function toggleTheme() {
 
 const setupScreen = document.getElementById("setup-screen");
 const appScreen = document.getElementById("app-screen");
+let _serverContentMode = "page";
 
 // ---------------------------------------------------------------------------
 // Load setup info on page load
@@ -103,6 +104,9 @@ async function initSetup() {
       showWalkthrough();
       return;
     }
+
+    // Track server content mode (email vs page)
+    _serverContentMode = info.contentMode || "page";
 
     // Reset panel state
     remoteThemesLoaded = false;
@@ -830,13 +834,38 @@ function renderStarterGrid(starters) {
     return;
   }
 
-  grid.innerHTML = starters.map((s) => `
+  const pageStarters = starters.filter((s) => s.contentType !== "email");
+  const emailStarters = starters.filter((s) => s.contentType === "email");
+
+  const renderCards = (list) => list.map((s) => `
     <div class="starter-card${_selectedStarterId === s.id ? " selected" : ""}" data-starter-id="${escHtml(s.id)}">
       <span class="starter-card__name">${escHtml(s.name)}</span>
       <span class="starter-card__desc">${escHtml(s.description)}</span>
       <span class="starter-card__meta">${s.moduleCount} modules</span>
     </div>
   `).join("");
+
+  let html = "";
+  if (_serverContentMode === "email") {
+    if (emailStarters.length > 0) {
+      html += `<h4 class="starter-grid__heading">Email Templates</h4>`;
+      html += `<div class="starter-grid__section">${renderCards(emailStarters)}</div>`;
+    }
+    if (pageStarters.length > 0) {
+      html += `<h4 class="starter-grid__heading">Page Templates</h4>`;
+      html += `<div class="starter-grid__section">${renderCards(pageStarters)}</div>`;
+    }
+  } else {
+    if (pageStarters.length > 0) {
+      html += `<h4 class="starter-grid__heading">Page Templates</h4>`;
+      html += `<div class="starter-grid__section">${renderCards(pageStarters)}</div>`;
+    }
+    if (emailStarters.length > 0) {
+      html += `<h4 class="starter-grid__heading">Email Templates</h4>`;
+      html += `<div class="starter-grid__section">${renderCards(emailStarters)}</div>`;
+    }
+  }
+  grid.innerHTML = html;
 
   grid.querySelectorAll(".starter-card").forEach((card) => {
     card.addEventListener("click", () => selectStarter(card.dataset.starterId));
