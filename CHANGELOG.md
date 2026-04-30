@@ -4,6 +4,25 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.3.0 — 2026-04-30
+
+### Email template generation — Phase 1 ([VIB-158](/VIB/issues/VIB-158))
+
+Full email template generation built on the VIB-154 spike. vibeSpot can now create, iterate, and upload HubSpot email templates alongside landing pages.
+
+- **`vibespot email` CLI command** — launches email mode with email-specific setup flow
+- **Email tab in web UI** — new content mode toggle in setup screen for email projects
+- **3 email starter templates** — Welcome, Announcement, Newsletter bundles in `starters/`
+- **5 email plan templates** — Welcome, Announcement, Newsletter, Event Invite, Re-engagement in `assets/plan-templates/`
+- **Pipeline email routing** — all 4 stages (Intent Analyzer, Page Architect, Module Developer, Validator) route through `contentType: "email"` for email-safe generation
+- **Email-specific Page Architect** — dedicated `email-architect.ts` prompt with table-based layout planning, inline CSS design tokens, MSO conditional structure
+- **Email validator auto-fix** — skips CSS prefix and CDN import fixes for email; sets `host_template_types: ["EMAIL"]` in meta.json
+- **Intent analyzer email detection** — `contentType` field in structured output schema for LLM-level email content classification
+- **Email template scaffold** — `addEmailTemplateToTheme()` creates `templates/email.html` with MSO/VML namespaces and `templateType: email`
+- **Email preview** — email-realistic preview rendering with table layout support
+
+---
+
 ## v1.2.0 — 2026-04-30
 
 ### Undo/redo with Ctrl+Z and visual history timeline ([VIB-91](/VIB/issues/VIB-91))
