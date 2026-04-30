@@ -1,5 +1,6 @@
 /**
  * Preview builder — assembles rendered HubL modules into a full HTML page.
+ * Supports both page and email preview modes.
  */
 
 import {
@@ -9,6 +10,24 @@ import {
   type FieldDef,
 } from "../hubl/renderer.js";
 import { getSession, getOrderedModules } from "./session.js";
+import { getServerContentMode } from "./server.js";
+
+/**
+ * Detect if the current session contains email modules.
+ * Checks both server contentMode and module meta.json for host_template_types.
+ */
+function isEmailMode(modules: { metaJson: string }[]): boolean {
+  if (getServerContentMode() === "email") return true;
+  for (const mod of modules) {
+    try {
+      const meta = JSON.parse(mod.metaJson);
+      if (Array.isArray(meta.host_template_types) && meta.host_template_types.includes("EMAIL")) {
+        return true;
+      }
+    } catch { /* ignore */ }
+  }
+  return false;
+}
 
 /**
  * Extract CSS custom property values from shared CSS.
@@ -61,6 +80,11 @@ export function buildPreviewHtml(): string {
   // Nothing to show yet — no modules and no pending order
   if (modules.length === 0 && moduleOrder.length === 0) {
     return welcomePreview();
+  }
+
+  // Email mode: use email-client-like preview
+  if (isEmailMode(modules)) {
+    return buildEmailPreviewHtml(modules, moduleOrder);
   }
 
   const renderedModules: string[] = [];
@@ -220,6 +244,89 @@ export function buildModulePreviewHtml(moduleName: string): string {
     sharedJs: session.sharedJs,
     moduleJsArray: mod.moduleJs ? [mod.moduleJs] : [],
   });
+}
+
+/**
+ * Build an email-client-like preview: gray background, centered 600px content area,
+ * table-based layout rendered with HubL. No shared CSS or JS — all inline.
+ */
+function buildEmailPreviewHtml(
+  modules: import("../ai/engine.js").ModuleFiles[],
+  moduleOrder: string[],
+): string {
+  const renderedModules: string[] = [];
+  const renderedNames = new Set<string>();
+
+  for (const mod of modules) {
+    let context: { module: Record<string, unknown> };
+    try {
+      const fields: FieldDef[] = JSON.parse(mod.fieldsJson);
+      context = { module: buildContextFromFields(fields) };
+    } catch {
+      context = { module: {} };
+    }
+
+    const rendered = renderHubL(mod.moduleHtml, context);
+    const anchorId = mod.moduleName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    renderedModules.push(
+      `<div class="vibespot-module" id="${anchorId}" data-module="${mod.moduleName}">${rendered}</div>`
+    );
+    renderedNames.add(mod.moduleName);
+  }
+
+  for (const name of moduleOrder) {
+    if (!renderedNames.has(name)) {
+      const anchorId = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      renderedModules.push(
+        `<div class="vibespot-module vibespot-module--pending" id="${anchorId}" data-module="${name}">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;">
+            <tr><td style="padding:40px 30px;text-align:center;background-color:#ffffff;border:1px dashed #ddd;">
+              <p style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#999;">${name}</p>
+            </td></tr>
+          </table>
+        </div>`
+      );
+    }
+  }
+
+  const body = renderedModules.join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Email Preview</title>
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    background-color: #e8e8e8;
+    font-family: Arial, Helvetica, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .vibespot-email-wrapper {
+    padding: 30px 20px;
+    background-color: #e8e8e8;
+    min-height: 100vh;
+  }
+  .vibespot-module { margin: 0 auto; max-width: 600px; }
+  .vibespot-module--pending table { opacity: 0.6; }
+  html { scroll-behavior: smooth; }
+</style>
+</head>
+<body>
+<div class="vibespot-email-wrapper">
+${body}
+</div>
+<script>
+document.addEventListener('click', function(e) {
+  var a = e.target.closest('a[href^="#"]');
+  if (a) { e.preventDefault(); var t = document.querySelector(a.getAttribute('href')); if (t) t.scrollIntoView({ behavior: 'smooth' }); }
+});
+</script>
+</body>
+</html>`;
 }
 
 // Note: The generating screen (spinner + rotating messages) is now
