@@ -8,6 +8,24 @@
  */
 
 import type { SystemPromptBlock } from "../engine-adapter.js";
+import type { BrandKit } from "../../session/types.js";
+
+function formatBrandKitConstraints(kit?: BrandKit): string {
+  if (!kit) return "";
+  const lines: string[] = [];
+  if (kit.colors) {
+    if (kit.colors.primary) lines.push(`- Primary color: ${kit.colors.primary}`);
+    if (kit.colors.secondary) lines.push(`- Secondary color: ${kit.colors.secondary}`);
+    if (kit.colors.accent) lines.push(`- Accent color: ${kit.colors.accent}`);
+  }
+  if (kit.fonts) {
+    if (kit.fonts.heading) lines.push(`- Heading font: ${kit.fonts.heading}`);
+    if (kit.fonts.body) lines.push(`- Body font: ${kit.fonts.body}`);
+  }
+  if (kit.logoUrl) lines.push(`- Logo URL: ${kit.logoUrl}`);
+  if (lines.length === 0) return "";
+  return `\n\n## Brand Kit — MANDATORY Design Constraints\nThe following brand identity values MUST be used. Do NOT substitute or override them:\n${lines.join("\n")}`;
+}
 
 // ---------------------------------------------------------------------------
 // Stage 2a: Email Design Tokens
@@ -15,7 +33,7 @@ import type { SystemPromptBlock } from "../engine-adapter.js";
 
 export function buildEmailDesignSystemPrompt(
   themeName: string,
-  brandAssets?: { styleguide?: string; brandvoice?: string; themeContext?: string },
+  brandAssets?: { styleguide?: string; brandvoice?: string; themeContext?: string; brandKit?: BrandKit },
 ): string {
   const parts: string[] = [];
 
@@ -116,12 +134,15 @@ Do NOT use: system-ui, -apple-system, Segoe UI, Inter, or any Google Fonts.
     parts.push(`\n\n## Product Context\n${brandAssets.themeContext}`);
   }
 
+  const kitBlock = formatBrandKitConstraints(brandAssets?.brandKit);
+  if (kitBlock) parts.push(kitBlock);
+
   return parts.join("");
 }
 
 export function buildEmailDesignSystemPromptBlocks(
   themeName: string,
-  brandAssets?: { styleguide?: string; brandvoice?: string; themeContext?: string },
+  brandAssets?: { styleguide?: string; brandvoice?: string; themeContext?: string; brandKit?: BrandKit },
 ): SystemPromptBlock[] {
   const full = buildEmailDesignSystemPrompt(themeName);
   const marker = "\n\n## Email Design Guide\n";
@@ -142,6 +163,8 @@ export function buildEmailDesignSystemPromptBlocks(
   const dynamicParts: string[] = [];
   if (brandAssets?.styleguide) dynamicParts.push(`## Brand Style Guide\n${brandAssets.styleguide}`);
   if (brandAssets?.themeContext) dynamicParts.push(`## Product Context\n${brandAssets.themeContext}`);
+  const kitBlock = formatBrandKitConstraints(brandAssets?.brandKit);
+  if (kitBlock) dynamicParts.push(kitBlock);
   if (dynamicParts.length > 0) {
     blocks.push({ type: "text", text: dynamicParts.join("\n\n") });
   }
@@ -179,7 +202,7 @@ export const EMAIL_DESIGN_SYSTEM_SCHEMA = {
 export function buildEmailModulePlannerPrompt(
   themeName: string,
   designTokens: Record<string, string>,
-  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string },
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string; brandKit?: BrandKit },
   guidesNeeded?: string[],
 ): string {
   const parts: string[] = [];
@@ -258,6 +281,9 @@ One sentence describing the email's purpose and flow`);
   if (brandAssets?.humanify !== false && guidesNeeded?.includes("humanify")) {
     parts.push(`\n\n## Anti-AI Copy Rules\n${getEmailHumanifySummary()}`);
   }
+
+  const kitBlock2 = formatBrandKitConstraints(brandAssets?.brandKit);
+  if (kitBlock2) parts.push(kitBlock2);
 
   return parts.join("");
 }

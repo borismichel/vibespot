@@ -254,6 +254,7 @@ export async function runAgentPipeline(
       snapshot.themeName,
       onEvent,
       plan.contentType,
+      snapshot.brandAssets?.brandKit,
     );
 
     // Replace generated modules with validated/auto-fixed versions
@@ -506,6 +507,7 @@ async function runMultiPageFlow(
       snapshot.themeName,
       onEvent,
       plan.contentType,
+      snapshot.brandAssets?.brandKit,
     );
     validatedModules = validationResults.map((r) => r.module);
     validationIssues = validationResults.flatMap((r) => r.issues);

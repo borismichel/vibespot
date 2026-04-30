@@ -54,6 +54,8 @@ export function handleDashboardRoute(res: ServerResponse): void {
       hasBrandvoice: !!session.brandAssets?.brandvoice,
       hasThemeContext: !!session.brandAssets?.themeContext,
       humanify: session.brandAssets?.humanify !== false,
+      hasBrandKit: !!session.brandAssets?.brandKit && Object.keys(session.brandAssets.brandKit).length > 0,
+      brandKit: session.brandAssets?.brandKit || null,
     },
   });
 }
@@ -390,6 +392,86 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
         jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
       }
     });
+    return;
+  }
+
+  jsonResponse(res, 405, { error: "Method not allowed" });
+}
+
+// ---------------------------------------------------------------------------
+// Brand kit CRUD
+// ---------------------------------------------------------------------------
+
+const VALID_HEX = /^#[0-9a-fA-F]{6}$/;
+
+export function handleBrandKitRoute(method: string, req: IncomingMessage, res: ServerResponse): void {
+  const session = getSession();
+  if (!session) {
+    jsonResponse(res, 404, { error: "No active session" });
+    return;
+  }
+
+  if (method === "GET") {
+    jsonResponse(res, 200, session.brandAssets?.brandKit || {});
+    return;
+  }
+
+  if (method === "POST") {
+    readBody(req, (body) => {
+      try {
+        const kit = JSON.parse(body);
+        if (!session.brandAssets) session.brandAssets = {};
+
+        const cleaned: Record<string, unknown> = {};
+        if (kit.colors && typeof kit.colors === "object") {
+          const c: Record<string, string> = {};
+          for (const k of ["primary", "secondary", "accent"] as const) {
+            if (typeof kit.colors[k] === "string" && VALID_HEX.test(kit.colors[k])) {
+              c[k] = kit.colors[k];
+            }
+          }
+          if (Object.keys(c).length > 0) cleaned.colors = c;
+        }
+        if (kit.fonts && typeof kit.fonts === "object") {
+          const f: Record<string, string> = {};
+          for (const k of ["heading", "body"] as const) {
+            if (typeof kit.fonts[k] === "string" && kit.fonts[k].trim()) {
+              f[k] = kit.fonts[k].trim();
+            }
+          }
+          if (Object.keys(f).length > 0) cleaned.fonts = f;
+        }
+        if (typeof kit.logoUrl === "string" && kit.logoUrl.trim()) {
+          cleaned.logoUrl = kit.logoUrl.trim();
+        }
+
+        session.brandAssets.brandKit = cleaned as import("../session/types.js").BrandKit;
+        session.updatedAt = Date.now();
+
+        const assetDir = join(session.themePath, ".vibespot");
+        ensureDir(assetDir);
+        writeFile(join(assetDir, "brand-kit.json"), JSON.stringify(cleaned, null, 2));
+
+        saveSession();
+        jsonResponse(res, 200, { ok: true, brandKit: cleaned });
+      } catch (err) {
+        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
+    });
+    return;
+  }
+
+  if (method === "DELETE") {
+    if (session.brandAssets) {
+      delete session.brandAssets.brandKit;
+    }
+    session.updatedAt = Date.now();
+
+    const filePath = join(session.themePath, ".vibespot", "brand-kit.json");
+    if (existsSync(filePath)) rmSync(filePath);
+
+    saveSession();
+    jsonResponse(res, 200, { ok: true });
     return;
   }
 

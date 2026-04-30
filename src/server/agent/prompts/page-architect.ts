@@ -10,6 +10,7 @@
  */
 
 import type { SystemPromptBlock } from "../engine-adapter.js";
+import type { BrandKit } from "../../session/types.js";
 
 // ---------------------------------------------------------------------------
 // Stage 2a: Design System
@@ -17,7 +18,7 @@ import type { SystemPromptBlock } from "../engine-adapter.js";
 
 export function buildDesignSystemPrompt(
   themeName: string,
-  brandAssets?: { styleguide?: string; brandvoice?: string; themeContext?: string },
+  brandAssets?: { styleguide?: string; brandvoice?: string; themeContext?: string; brandKit?: BrandKit },
 ): string {
   const parts: string[] = [];
 
@@ -116,6 +117,20 @@ Good system font stacks by style:
     parts.push(`\n\n## Product Context\n${brandAssets.themeContext}`);
   }
 
+  if (brandAssets?.brandKit) {
+    const kitLines: string[] = [];
+    const bk = brandAssets.brandKit;
+    if (bk.colors?.primary) kitLines.push(`- Primary color: ${bk.colors.primary}`);
+    if (bk.colors?.secondary) kitLines.push(`- Secondary color: ${bk.colors.secondary}`);
+    if (bk.colors?.accent) kitLines.push(`- Accent color: ${bk.colors.accent}`);
+    if (bk.fonts?.heading) kitLines.push(`- Heading font: ${bk.fonts.heading}`);
+    if (bk.fonts?.body) kitLines.push(`- Body font: ${bk.fonts.body}`);
+    if (bk.logoUrl) kitLines.push(`- Logo URL: ${bk.logoUrl}`);
+    if (kitLines.length > 0) {
+      parts.push(`\n\n## Brand Kit — MANDATORY Design Constraints\nThe following brand identity values MUST be used. Do NOT substitute or override them:\n${kitLines.join("\n")}`);
+    }
+  }
+
   return parts.join("");
 }
 
@@ -125,7 +140,7 @@ Good system font stacks by style:
  */
 export function buildDesignSystemPromptBlocks(
   themeName: string,
-  brandAssets?: { styleguide?: string; brandvoice?: string; themeContext?: string },
+  brandAssets?: { styleguide?: string; brandvoice?: string; themeContext?: string; brandKit?: BrandKit },
 ): SystemPromptBlock[] {
   // Build core prompt without the design guide (pass empty brandAssets to skip dynamic parts)
   const full = buildDesignSystemPrompt(themeName);
@@ -150,6 +165,19 @@ export function buildDesignSystemPromptBlocks(
   const dynamicParts: string[] = [];
   if (brandAssets?.styleguide) dynamicParts.push(`## Brand Style Guide\n${brandAssets.styleguide}`);
   if (brandAssets?.themeContext) dynamicParts.push(`## Product Context\n${brandAssets.themeContext}`);
+  if (brandAssets?.brandKit) {
+    const kitLines: string[] = [];
+    const bk = brandAssets.brandKit;
+    if (bk.colors?.primary) kitLines.push(`- Primary color: ${bk.colors.primary}`);
+    if (bk.colors?.secondary) kitLines.push(`- Secondary color: ${bk.colors.secondary}`);
+    if (bk.colors?.accent) kitLines.push(`- Accent color: ${bk.colors.accent}`);
+    if (bk.fonts?.heading) kitLines.push(`- Heading font: ${bk.fonts.heading}`);
+    if (bk.fonts?.body) kitLines.push(`- Body font: ${bk.fonts.body}`);
+    if (bk.logoUrl) kitLines.push(`- Logo URL: ${bk.logoUrl}`);
+    if (kitLines.length > 0) {
+      dynamicParts.push(`## Brand Kit — MANDATORY Design Constraints\nThe following brand identity values MUST be used. Do NOT substitute or override them:\n${kitLines.join("\n")}`);
+    }
+  }
   if (dynamicParts.length > 0) {
     blocks.push({ type: "text", text: dynamicParts.join("\n\n") });
   }
@@ -216,7 +244,7 @@ function summarizeCss(css: string): string {
 export function buildModulePlannerPrompt(
   themeName: string,
   sharedCss: string,
-  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string },
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string; brandKit?: BrandKit },
   guidesNeeded?: string[],
 ): string {
   const parts: string[] = [];

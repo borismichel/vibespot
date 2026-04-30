@@ -6,7 +6,7 @@
 
 import type { ModuleFiles } from "../../../ai/engine.js";
 import type { PipelineEvent } from "../types.js";
-import type { ContentType } from "../../session/types.js";
+import type { ContentType, BrandKit } from "../../session/types.js";
 import { tryParseJSON } from "../../ai-parser.js";
 import { log } from "../../log.js";
 
@@ -31,6 +31,7 @@ export function validateModules(
   themeName: string,
   onEvent: (event: PipelineEvent) => void,
   contentType?: ContentType,
+  brandKit?: BrandKit,
 ): ValidationResult[] {
   onEvent({
     type: "agent_step",
@@ -112,6 +113,11 @@ export function validateModules(
       issues,
       isEmail,
     );
+
+    // --- Brand kit compliance (warnings only) ---
+    if (brandKit) {
+      checkBrandKitCompliance(fixedModule, brandKit, issues);
+    }
 
     const valid = issues.every((i) => i.autoFixed);
 
@@ -532,4 +538,75 @@ export function validateNavLinks(
   }
 
   return issues;
+}
+
+// ---------------------------------------------------------------------------
+// Brand kit compliance check
+// ---------------------------------------------------------------------------
+
+const HEX_COLOR_RE = /#[0-9a-fA-F]{6}\b/g;
+
+function checkBrandKitCompliance(
+  mod: ModuleFiles,
+  kit: BrandKit,
+  issues: ValidationIssue[],
+): void {
+  const brandColors = new Set<string>();
+  if (kit.colors?.primary) brandColors.add(kit.colors.primary.toLowerCase());
+  if (kit.colors?.secondary) brandColors.add(kit.colors.secondary.toLowerCase());
+  if (kit.colors?.accent) brandColors.add(kit.colors.accent.toLowerCase());
+
+  if (brandColors.size === 0 && !kit.fonts?.heading && !kit.fonts?.body) return;
+
+  const htmlAndCss = (mod.moduleHtml || "") + (mod.moduleCss || "");
+
+  // Check for off-brand colors
+  if (brandColors.size > 0) {
+    const usedColors = new Set<string>();
+    for (const match of htmlAndCss.matchAll(HEX_COLOR_RE)) {
+      usedColors.add(match[0].toLowerCase());
+    }
+
+    // Common neutral colors that don't need brand enforcement
+    const neutrals = new Set([
+      "#ffffff", "#000000", "#f4f4f4", "#f5f5f5", "#fafafa", "#eeeeee",
+      "#e0e0e0", "#dddddd", "#cccccc", "#999999", "#666666", "#333333",
+      "#1a1a1a", "#111111", "#222222", "#444444", "#555555", "#777777",
+      "#888888", "#aaaaaa", "#bbbbbb",
+    ]);
+
+    for (const color of usedColors) {
+      if (neutrals.has(color)) continue;
+      if (!brandColors.has(color)) {
+        issues.push({
+          module: mod.moduleName,
+          field: "moduleHtml",
+          message: `Off-brand color ${color} (brand colors: ${[...brandColors].join(", ")})`,
+          autoFixed: false,
+        });
+        break;
+      }
+    }
+  }
+
+  // Check for off-brand fonts
+  if (kit.fonts?.heading || kit.fonts?.body) {
+    const brandFonts: string[] = [];
+    if (kit.fonts.heading) brandFonts.push(kit.fonts.heading.toLowerCase());
+    if (kit.fonts.body) brandFonts.push(kit.fonts.body.toLowerCase());
+
+    const fontFamilyRe = /font-family:\s*([^;}"]+)/gi;
+    for (const match of htmlAndCss.matchAll(fontFamilyRe)) {
+      const fontValue = match[1].toLowerCase().trim();
+      if (!brandFonts.some((bf) => fontValue.includes(bf))) {
+        issues.push({
+          module: mod.moduleName,
+          field: "moduleHtml",
+          message: `Off-brand font "${match[1].trim()}" (brand fonts: ${brandFonts.join(", ")})`,
+          autoFixed: false,
+        });
+        break;
+      }
+    }
+  }
 }

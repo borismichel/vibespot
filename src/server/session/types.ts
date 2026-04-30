@@ -8,6 +8,19 @@ import type { ModuleFiles } from "../../ai/engine.js";
 // Types
 // ---------------------------------------------------------------------------
 
+export interface BrandKit {
+  colors?: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+  };
+  fonts?: {
+    heading?: string;
+    body?: string;
+  };
+  logoUrl?: string;
+}
+
 export interface PipelineMetadata {
   steps: { step: string; label: string; decisions?: string[] }[];
   modules: { name: string; status: "complete" | "failed" }[];
@@ -68,6 +81,7 @@ export interface VibeSession {
     humanify?: boolean;
     themeContext?: string;
     plan?: string;
+    brandKit?: BrandKit;
   };
   assets?: SessionAsset[];
 
@@ -100,7 +114,7 @@ export interface SessionSnapshot {
   themeName: string;
   themePath: string;
   contentMode?: ContentMode;
-  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string; plan?: string };
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string; plan?: string; brandKit?: BrandKit };
   activePageLabel?: string;
   sitePages?: ReadonlyArray<{ id: string; label: string; pageType: PageType; moduleCount: number }>;
 }

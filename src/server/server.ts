@@ -78,6 +78,7 @@ import {
   handleModuleLibraryRoute,
   handleAddModuleToTemplateRoute,
   handleBrandAssetsRoute,
+  handleBrandKitRoute,
   handleDesignExtractRoute,
   handleReferenceImportRoute,
 } from "./routes/templates.js";
@@ -103,6 +104,10 @@ import {
   handleInverseAnalyzeRoute,
   handleInverseApplyTokensRoute,
 } from "./routes/inverse.js";
+import {
+  handleEmailPreviewClientsRoute,
+  handleEmailPreviewRenderRoute,
+} from "./routes/email-preview.js";
 
 // ---------------------------------------------------------------------------
 // MIME types for static serving
@@ -548,6 +553,10 @@ function handleApiRoute(
       handleBrandAssetsRoute(method, req, res);
       break;
 
+    case "/api/brand-kit":
+      handleBrandKitRoute(method, req, res);
+      break;
+
     case "/api/brand-assets/extract":
       if (method === "POST") handleDesignExtractRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
@@ -619,6 +628,16 @@ function handleApiRoute(
 
     case "/api/inverse/apply-tokens":
       if (method === "POST") handleInverseApplyTokensRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/email-preview/clients":
+      if (method === "GET") handleEmailPreviewClientsRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/email-preview/render":
+      if (method === "POST") handleEmailPreviewRenderRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
