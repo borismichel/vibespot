@@ -12,7 +12,7 @@ import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 const _shellOpt: ExecFileSyncOptions = process.platform === "win32" ? { shell: true } : {};
 import { jsonResponse, readBody } from "../route-helpers.js";
 import { loadConfig, getHubSpotPak } from "../../utils/config.js";
-import { createThemeScaffold } from "../../hubspot/theme-scaffold.js";
+import { createThemeScaffold, addEmailTemplateToTheme } from "../../hubspot/theme-scaffold.js";
 import { fetchTheme } from "../../hubspot/fetcher.js";
 import { getMetadata, listRootFolders } from "../../hubspot/api.js";
 import {
@@ -153,15 +153,16 @@ function bootstrapFromStarter(themePath: string, themeName: string, starterId: s
   const session = getSession();
   if (!session) return;
 
+  const isEmail = starter.contentType === "email";
   const modules = starter.modules.map((m) => ({ ...m }));
   const moduleOrder = [...starter.moduleOrder];
-  const templateId = `lp-${themeName}`;
+  const templateId = isEmail ? `email-${themeName}` : `lp-${themeName}`;
 
   const entry: import("../session/types.js").TemplateEntry = {
     id: templateId,
     label: `${starter.name}`,
-    pageType: "landing_page",
-    templateFile: `templates/${templateId}.html`,
+    pageType: isEmail ? "module_only" : "landing_page",
+    templateFile: isEmail ? `templates/email.html` : `templates/${templateId}.html`,
     modules,
     moduleOrder,
     sharedCss: starter.sharedCss,
@@ -169,6 +170,10 @@ function bootstrapFromStarter(themePath: string, themeName: string, starterId: s
     template: "",
     messages: [],
   };
+
+  if (isEmail) {
+    addEmailTemplateToTheme(themePath, themeName);
+  }
 
   session.templates = [entry];
   session.activeTemplateId = templateId;
