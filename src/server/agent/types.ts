@@ -3,7 +3,7 @@
  */
 
 import type { ModuleFiles } from "../../ai/engine.js";
-import type { SessionSnapshot } from "../session/types.js";
+import type { SessionSnapshot, PageType } from "../session/types.js";
 
 // ---------------------------------------------------------------------------
 // Stage 1 output: Intent Analyzer
@@ -138,6 +138,48 @@ export interface PipelineResult {
   stats: {
     modulesGenerated: number;
     modulesUnchanged: number;
+    modulesFailed: number;
+    durationMs: number;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Multi-page pipeline types (VIB-159)
+// ---------------------------------------------------------------------------
+
+export interface SitePagePlan {
+  pageId: string;
+  label: string;
+  slug: string;
+  description: string;
+}
+
+export interface SiteBlueprint {
+  pages: {
+    pageId: string;
+    modules: { name: string; description: string; contentBrief: string; layoutNotes: string }[];
+    moduleOrder: string[];
+  }[];
+  sharedModules: { name: string; description: string; contentBrief: string; layoutNotes: string }[];
+  narrative: string;
+}
+
+export interface MultiPagePipelineResult {
+  pages: {
+    pageId: string;
+    templateId: string;
+    label: string;
+    pageType: PageType;
+    modules: ModuleFiles[];
+    moduleOrder: string[];
+  }[];
+  sharedModules: ModuleFiles[];
+  sharedCss: string;
+  sharedJs: string;
+  assistantMessage: string;
+  stats: {
+    pagesGenerated: number;
+    modulesGenerated: number;
     modulesFailed: number;
     durationMs: number;
   };
