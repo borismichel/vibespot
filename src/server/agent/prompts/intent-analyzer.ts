@@ -8,6 +8,7 @@ export function buildIntentAnalyzerPrompt(
   moduleNames: string[],
   libraryModuleNames: { name: string; usedIn: string[] }[],
   themeContext?: string,
+  siteContext?: { activePageLabel?: string; pages?: { id: string; label: string; moduleCount: number }[] },
 ): string {
   const moduleList =
     moduleNames.length > 0
@@ -23,13 +24,17 @@ export function buildIntentAnalyzerPrompt(
     ? `\n\n## Product Context\n${themeContext}`
     : "";
 
+  const siteSection = siteContext?.pages && siteContext.pages.length > 1
+    ? `\n\n## Multi-Page Site Context\nThis is a multi-page site. Currently editing: **${siteContext.activePageLabel || "unknown"}**\nAll pages:\n${siteContext.pages.map((p) => `- ${p.label} (${p.id}, ${p.moduleCount} modules)`).join("\n")}\n\nThe user's message applies to the current page unless they reference another page by name or say "all pages" / "every page" / "the whole site".`
+    : "";
+
   return `You are the Intent Analyzer for vibeSpot, a HubSpot CMS page builder.
 
 Your job: classify the user's request and plan which modules need work. You do NOT generate module code — you only plan.
 
 ## Theme: "${themeName}"
 
-${moduleList}${libraryList}${contextSection}
+${moduleList}${libraryList}${contextSection}${siteSection}
 
 ## Classification Rules
 
