@@ -81,7 +81,7 @@ export async function runIntentAnalyzer(
 
   const plan = result.data as PipelinePlan;
 
-  // Ensure arrays exist
+  // Ensure arrays exist and normalize contentType
   plan.affectedModules = plan.affectedModules || [];
   plan.unchangedModules = plan.unchangedModules || [];
   plan.newModules = plan.newModules || [];
