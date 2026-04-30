@@ -545,6 +545,8 @@ async function runMultiPageFlow(
     .map((s) => modulesByName.get(s.name))
     .filter((m): m is ModuleFiles => !!m);
 
+  const planPageMap = new Map(pages.map((p) => [p.id, p]));
+
   const multiPagePages = siteBlueprint.pages.map((page) => {
     const pageModules = page.modules
       .map((m) => modulesByName.get(m.name))
@@ -558,9 +560,13 @@ async function runMultiPageFlow(
     );
     const fullOrder = [...headerModules, ...page.moduleOrder, ...footerModules];
 
+    const planPage = planPageMap.get(page.pageId);
+
     return {
       pageId: page.pageId,
       templateId: page.pageId,
+      label: planPage?.label || page.pageId,
+      pageType: planPage?.pageType || ("website_page" as const),
       modules: [...sharedModules, ...pageModules],
       moduleOrder: fullOrder,
     };

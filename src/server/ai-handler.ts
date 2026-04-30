@@ -388,13 +388,11 @@ export function applyPipelineResult(result: PipelineResult, pipelineMeta?: Pipel
   const multiPage = (result as PipelineResult & { multiPage?: MultiPagePipelineResult }).multiPage;
 
   if (multiPage && multiPage.pages.length > 0) {
-    // Multi-page result: create/update templates for each page
     const pageLabels = new Map<string, { label: string; pageType: import("./session/types.js").PageType }>();
-    // Extract page labels from the pipeline result's pages
     for (const page of multiPage.pages) {
       pageLabels.set(page.pageId, {
-        label: page.pageId.replace(/^wp-/, "").replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        pageType: "website_page",
+        label: page.label || page.pageId,
+        pageType: page.pageType || "website_page",
       });
     }
 
@@ -413,6 +411,14 @@ export function applyPipelineResult(result: PipelineResult, pipelineMeta?: Pipel
       sharedJs: result.sharedJs,
     });
     reorderModules(result.moduleOrder);
+
+    const ct = (result as PipelineResult & { contentType?: string }).contentType;
+    if (ct === "email") {
+      const tpl = getActiveTemplate();
+      if (tpl && !tpl.contentMode) {
+        tpl.contentMode = "email";
+      }
+    }
   }
 
   // Add assistant message to chat history with pipeline metadata
