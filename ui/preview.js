@@ -553,6 +553,7 @@ function detachSelectHandlers() {
 
 function activateSelectMode() {
   if (selectModeActive) return;
+  if (typeof deactivateEditMode === "function") deactivateEditMode();
   selectModeActive = true;
   if (selectModeBtn) selectModeBtn.setAttribute("aria-pressed", "true");
   if (previewContainer) previewContainer.classList.add("preview--select-mode");

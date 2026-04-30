@@ -172,6 +172,9 @@ function handleWsMessage(msg) {
         if (typeof window.setSelectModeDisabled === "function") {
           window.setSelectModeDisabled(true);
         }
+        if (typeof window.setEditModeDisabled === "function") {
+          window.setEditModeDisabled(true);
+        }
       }
 
       // If setup handed us an initial prompt (describe-it path), send it now
@@ -1119,6 +1122,9 @@ function startStreaming() {
   if (typeof window.setSelectModeDisabled === "function") {
     window.setSelectModeDisabled(true);
   }
+  if (typeof window.setEditModeDisabled === "function") {
+    window.setEditModeDisabled(true);
+  }
 
   hideChatSuggestions();
   if (typeof updateHistoryTimelineNavState === "function") updateHistoryTimelineNavState();
@@ -1266,6 +1272,9 @@ function finishStreaming() {
   sendBtn.disabled = false;
   if (typeof window.setSelectModeDisabled === "function") {
     window.setSelectModeDisabled(false);
+  }
+  if (typeof window.setEditModeDisabled === "function") {
+    window.setEditModeDisabled(false);
   }
   if (typeof updateHistoryTimelineNavState === "function") updateHistoryTimelineNavState();
 

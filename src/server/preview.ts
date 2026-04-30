@@ -64,6 +64,48 @@ function extractThemeColors(sharedCss: string | undefined): {
 }
 
 /**
+ * Annotate a module template with data-vs-field / data-vs-type attributes
+ * so the inline editor can map clicks back to field paths.
+ */
+function annotateFieldRefs(template: string, fields: FieldDef[]): string {
+  const typeMap = new Map<string, string>();
+  for (const f of fields) typeMap.set(f.name, f.type);
+
+  let result = template;
+
+  // Pattern 1: Text content — <tag ...>{{ module.field_name }}</tag>
+  result = result.replace(
+    /(<([a-zA-Z]\w*)(\s[^>]*)?>)\s*(\{\{\s*module\.(\w+)(?:\.\w+)*(?:\|[^}]*)?\s*\}\})\s*(<\/\2>)/g,
+    (match, openFull, _tagName, _attrs, expr, rootField, closeFull) => {
+      if (openFull.includes("data-vs-field")) return match;
+      const type = typeMap.get(rootField) || "text";
+      const newOpen = openFull.replace(/>$/, ` data-vs-field="${rootField}" data-vs-type="${type}">`);
+      return `${newOpen}${expr}${closeFull}`;
+    }
+  );
+
+  // Pattern 2: Image src — <img ... src="{{ module.field.src }}" ...>
+  result = result.replace(
+    /(<img\b)([^>]*?)\bsrc\s*=\s*["']\{\{\s*module\.(\w+)\.src\s*\}\}["']([^>]*?>)/g,
+    (match, _imgTag, _before, rootField) => {
+      if (match.includes("data-vs-field")) return match;
+      return match.replace("<img", `<img data-vs-field="${rootField}" data-vs-type="image"`);
+    }
+  );
+
+  // Pattern 3: Link href — <a ... href="{{ module.field.url.href }}" ...>
+  result = result.replace(
+    /(<a\b)([^>]*?)\bhref\s*=\s*["']\{\{\s*module\.(\w+)\.url\.href\s*\}\}["']([^>]*?>)/g,
+    (match, _aTag, _before, rootField) => {
+      if (match.includes("data-vs-link")) return match;
+      return match.replace("<a", `<a data-vs-link="${rootField}"`);
+    }
+  );
+
+  return result;
+}
+
+/**
  * Build a full preview HTML page from the current session state.
  * Each module's HubL template is rendered with its fields.json defaults,
  * then assembled with shared CSS/JS into a complete page.
@@ -100,15 +142,17 @@ export function buildPreviewHtml(): string {
 
     // Build context from fields.json defaults
     let context: { module: Record<string, unknown> };
+    let fields: FieldDef[] = [];
     try {
-      const fields: FieldDef[] = JSON.parse(mod.fieldsJson);
+      fields = JSON.parse(mod.fieldsJson);
       context = { module: buildContextFromFields(fields) };
     } catch {
       context = { module: {} };
     }
 
-    // Render HubL template with context
-    const rendered = renderHubL(mod.moduleHtml, context);
+    // Annotate template with field refs, then render HubL
+    const annotated = annotateFieldRefs(mod.moduleHtml, fields);
+    const rendered = renderHubL(annotated, context);
 
     // Wrap each module in a container with id + data attribute for anchor links
     const anchorId = mod.moduleName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -226,14 +270,16 @@ export function buildModulePreviewHtml(moduleName: string): string {
   if (!mod) return "";
 
   let context: { module: Record<string, unknown> };
+  let fields: FieldDef[] = [];
   try {
-    const fields: FieldDef[] = JSON.parse(mod.fieldsJson);
+    fields = JSON.parse(mod.fieldsJson);
     context = { module: buildContextFromFields(fields) };
   } catch {
     context = { module: {} };
   }
 
-  const rendered = renderHubL(mod.moduleHtml, context);
+  const annotated = annotateFieldRefs(mod.moduleHtml, fields);
+  const rendered = renderHubL(annotated, context);
 
   return assemblePreview({
     renderedModules: [
@@ -259,14 +305,16 @@ function buildEmailPreviewHtml(
 
   for (const mod of modules) {
     let context: { module: Record<string, unknown> };
+    let fields: FieldDef[] = [];
     try {
-      const fields: FieldDef[] = JSON.parse(mod.fieldsJson);
+      fields = JSON.parse(mod.fieldsJson);
       context = { module: buildContextFromFields(fields) };
     } catch {
       context = { module: {} };
     }
 
-    const rendered = renderHubL(mod.moduleHtml, context);
+    const annotated = annotateFieldRefs(mod.moduleHtml, fields);
+    const rendered = renderHubL(annotated, context);
     const anchorId = mod.moduleName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     renderedModules.push(
       `<div class="vibespot-module" id="${anchorId}" data-module="${mod.moduleName}">${rendered}</div>`
