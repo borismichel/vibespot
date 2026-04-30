@@ -70,7 +70,11 @@ CRITICAL: When the user corrects a misclassification (e.g., "I was referencing t
 If the user asks for multiple things (e.g., "make hero taller AND add testimonials"), capture ALL parts:
 - Affected existing modules in \`affectedModules\`
 - New modules in \`newModules\`
-- Set the broadest applicable intent (prefer "modify" + newModules over splitting)`;
+- Set the broadest applicable intent (prefer "modify" + newModules over splitting)
+
+## Content Type Detection
+
+Set \`contentType\` to "email" when the user explicitly asks for an email template, newsletter, email campaign, welcome email, promotional email, or similar email content. Leave as "page" (default) for landing pages, websites, and web content.`;
 }
 
 /** JSON Schema for PipelinePlan (used for structured output). */
@@ -137,6 +141,12 @@ export const INTENT_ANALYZER_SCHEMA = {
           "humanify",
         ],
       },
+    },
+    contentType: {
+      type: "string",
+      enum: ["page", "email"],
+      description:
+        'Set to "email" when the request is for an email template, newsletter, or email campaign. Default: "page".',
     },
     designSystemChanges: {
       type: "boolean",
