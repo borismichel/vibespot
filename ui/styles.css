@@ -2039,6 +2039,97 @@ body { display: flex; }
 }
 
 /* ================================================================
+   PAGE TABS (multi-page template switcher)
+   ================================================================ */
+.page-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.page-tabs::-webkit-scrollbar { display: none; }
+.page-tabs.hidden { display: none; }
+
+.page-tabs__list {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.page-tabs__list::-webkit-scrollbar { display: none; }
+
+.page-tabs__tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  min-width: 0;
+}
+.page-tabs__tab:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.page-tabs__tab--active {
+  background: var(--bg-active);
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+.page-tabs__tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+.page-tabs__tab-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 0 4px;
+  background: var(--bg-active);
+  border-radius: var(--radius-pill);
+  line-height: 16px;
+}
+.page-tabs__tab--active .page-tabs__tab-count {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.page-tabs__add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.page-tabs__add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+
+/* ================================================================
    MODULE BAR (button at top of left panel)
    ================================================================ */
 .module-bar {
