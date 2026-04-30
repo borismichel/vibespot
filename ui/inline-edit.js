@@ -39,23 +39,6 @@ function ensureEditModeStyles(doc) {
       box-shadow: 0 2px 6px rgba(0,0,0,0.2);
       white-space: nowrap;
     }
-    .vibespot-image-edit-overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,0.5);
-      z-index: 9999;
-      cursor: pointer;
-    }
-    .vibespot-image-edit-overlay span {
-      font: 500 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
-      color: #fff;
-      background: #3b82f6;
-      padding: 6px 14px;
-      border-radius: 6px;
-    }
     .vibespot-image-edit-input {
       position: fixed;
       z-index: 2147483647;
@@ -118,6 +101,18 @@ function getEditableInfo(el) {
   if (!el) return null;
   const tag = (el.tagName || "").toLowerCase();
 
+  // Prefer explicit field annotations from the renderer
+  const annotated = el.closest("[data-vs-field]");
+  if (annotated) {
+    const vsType = annotated.getAttribute("data-vs-type");
+    if (vsType === "image") return { type: "image", el: annotated };
+    if (vsType === "link") return { type: "link", el: annotated };
+    return { type: "text", el: annotated };
+  }
+  const linkAnnotated = el.closest("[data-vs-link]");
+  if (linkAnnotated) return { type: "link", el: linkAnnotated };
+
+  // Fallback: heuristic detection for un-annotated elements
   if (tag === "img") return { type: "image", el };
   if (tag === "a" || (el.closest && el.closest("a"))) {
     const anchor = tag === "a" ? el : el.closest("a");
@@ -134,17 +129,6 @@ function getEditableInfo(el) {
   if (tag === "button") return { type: "text", el };
 
   return null;
-}
-
-function findFieldPath(el, moduleEl) {
-  if (!moduleEl) return null;
-  const moduleName = moduleEl.getAttribute("data-module");
-  if (!moduleName) return null;
-
-  const text = (el.textContent || "").trim();
-  const tag = (el.tagName || "").toLowerCase();
-
-  return { moduleName, text, tag };
 }
 
 function attachEditHandlers() {
@@ -234,6 +218,7 @@ function attachEditHandlers() {
 
   function startTextEdit(doc, el, moduleName) {
     const originalText = el.textContent;
+    el.setAttribute("data-original-text", originalText.trim());
     el.setAttribute("contenteditable", "true");
     el.classList.add("vibespot-editing");
     el.focus();
@@ -312,25 +297,46 @@ function attachEditHandlers() {
   }
 
   function startLinkEdit(doc, anchorEl, moduleName) {
+    const origText = (anchorEl.textContent || "").trim();
+    const origHref = anchorEl.href || "";
     const rect = anchorEl.getBoundingClientRect();
+
     const popup = doc.createElement("div");
     popup.className = "vibespot-link-edit-popup";
     popup.style.top = (rect.bottom + 6) + "px";
     popup.style.left = Math.max(4, rect.left) + "px";
-    popup.innerHTML = `
-      <label>Link text</label>
-      <input type="text" class="vibespot-link-text" value="${(anchorEl.textContent || "").trim().replace(/"/g, "&quot;")}">
-      <label>URL</label>
-      <input type="text" class="vibespot-link-url" value="${(anchorEl.href || "").replace(/"/g, "&quot;")}">
-      <div class="vibespot-link-edit-actions">
-        <button class="vibespot-btn-cancel">Cancel</button>
-        <button class="vibespot-btn-save">Save</button>
-      </div>
-    `;
-    doc.body.appendChild(popup);
 
-    const textInput = popup.querySelector(".vibespot-link-text");
-    const urlInput = popup.querySelector(".vibespot-link-url");
+    const textLabel = doc.createElement("label");
+    textLabel.textContent = "Link text";
+    const textInput = doc.createElement("input");
+    textInput.type = "text";
+    textInput.className = "vibespot-link-text";
+    textInput.value = origText;
+
+    const urlLabel = doc.createElement("label");
+    urlLabel.textContent = "URL";
+    const urlInput = doc.createElement("input");
+    urlInput.type = "text";
+    urlInput.className = "vibespot-link-url";
+    urlInput.value = origHref;
+
+    const actions = doc.createElement("div");
+    actions.className = "vibespot-link-edit-actions";
+    const cancelBtn = doc.createElement("button");
+    cancelBtn.className = "vibespot-btn-cancel";
+    cancelBtn.textContent = "Cancel";
+    const saveBtn = doc.createElement("button");
+    saveBtn.className = "vibespot-btn-save";
+    saveBtn.textContent = "Save";
+    actions.appendChild(cancelBtn);
+    actions.appendChild(saveBtn);
+
+    popup.appendChild(textLabel);
+    popup.appendChild(textInput);
+    popup.appendChild(urlLabel);
+    popup.appendChild(urlInput);
+    popup.appendChild(actions);
+    doc.body.appendChild(popup);
     textInput.focus();
 
     const close = () => {
@@ -338,13 +344,13 @@ function attachEditHandlers() {
       activeEditor = null;
     };
 
-    popup.querySelector(".vibespot-btn-cancel").addEventListener("click", close);
-    popup.querySelector(".vibespot-btn-save").addEventListener("click", () => {
+    cancelBtn.addEventListener("click", close);
+    saveBtn.addEventListener("click", () => {
       const newText = textInput.value.trim();
       const newUrl = urlInput.value.trim();
       if (newText) anchorEl.textContent = newText;
       if (newUrl) anchorEl.href = newUrl;
-      if (newText !== anchorEl.textContent || newUrl !== anchorEl.href) {
+      if (newText !== origText || newUrl !== origHref) {
         saveLinkChange(moduleName, anchorEl, newText, newUrl);
       }
       close();
@@ -354,7 +360,7 @@ function attachEditHandlers() {
       if (e.key === "Escape") close();
       if (e.key === "Enter") {
         e.preventDefault();
-        popup.querySelector(".vibespot-btn-save").click();
+        saveBtn.click();
       }
     });
 
@@ -495,6 +501,18 @@ function findLinkField(fields, href, prefix = "") {
 }
 
 async function saveTextChange(moduleName, el, newText) {
+  const fieldPath = el.getAttribute("data-vs-field");
+  if (fieldPath) {
+    await fetch("/api/field", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ moduleName, fieldPath, value: newText }),
+    });
+    refreshPreview();
+    return;
+  }
+
+  // Fallback: text-content matching for un-annotated elements
   const data = await findModuleFields(moduleName);
   if (!data) { refreshPreview(); return; }
 
@@ -502,17 +520,32 @@ async function saveTextChange(moduleName, el, newText) {
   const match = findFieldByText(data.fields, originalText, el.tagName.toLowerCase());
 
   if (match) {
-    const value = match.isHtml ? newText : newText;
     await fetch("/api/field", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ moduleName, fieldPath: match.path, value }),
+      body: JSON.stringify({ moduleName, fieldPath: match.path, value: newText }),
     });
   }
   refreshPreview();
 }
 
 async function saveImageChange(moduleName, imgEl, newSrc) {
+  const fieldPath = imgEl.getAttribute("data-vs-field");
+  if (fieldPath) {
+    await fetch("/api/field", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        moduleName,
+        fieldPath,
+        value: { src: newSrc, alt: imgEl.getAttribute("alt") || "" },
+      }),
+    });
+    refreshPreview();
+    return;
+  }
+
+  // Fallback: heuristic matching
   const data = await findModuleFields(moduleName);
   if (!data) { refreshPreview(); return; }
 
@@ -532,6 +565,33 @@ async function saveImageChange(moduleName, imgEl, newSrc) {
 }
 
 async function saveLinkChange(moduleName, anchorEl, newText, newUrl) {
+  const linkField = anchorEl.getAttribute("data-vs-link");
+  const textField = anchorEl.getAttribute("data-vs-field");
+
+  if (linkField || textField) {
+    if (linkField && newUrl) {
+      await fetch("/api/field", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          moduleName,
+          fieldPath: linkField,
+          value: { url: { href: newUrl, type: "EXTERNAL" }, open_in_new_tab: false, no_follow: false },
+        }),
+      });
+    }
+    if (textField && newText) {
+      await fetch("/api/field", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ moduleName, fieldPath: textField, value: newText }),
+      });
+    }
+    refreshPreview();
+    return;
+  }
+
+  // Fallback: heuristic matching
   const data = await findModuleFields(moduleName);
   if (!data) { refreshPreview(); return; }
 
