@@ -4,7 +4,7 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
-## v1.2.0-dev — unreleased
+## v1.2.0 — 2026-04-30
 
 ### Undo/redo with Ctrl+Z and visual history timeline ([VIB-91](/VIB/issues/VIB-91))
 
