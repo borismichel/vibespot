@@ -6,6 +6,7 @@
 
 import type { ModuleFiles } from "../../../ai/engine.js";
 import type { PipelineEvent } from "../types.js";
+import type { ContentType } from "../../session/types.js";
 import { tryParseJSON } from "../../ai-parser.js";
 import { log } from "../../log.js";
 
@@ -29,6 +30,7 @@ export function validateModules(
   modules: ModuleFiles[],
   themeName: string,
   onEvent: (event: PipelineEvent) => void,
+  contentType?: ContentType,
 ): ValidationResult[] {
   onEvent({
     type: "agent_step",

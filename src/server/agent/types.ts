@@ -34,6 +34,7 @@ export interface PipelinePlan {
     | "humanify"
   )[];
   designSystemChanges: boolean;
+  contentType?: "page" | "email";
   answer?: string; // For "question" intent — short-circuits the pipeline
 }
 
