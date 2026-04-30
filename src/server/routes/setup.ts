@@ -28,6 +28,7 @@ import { detectEnvironment } from "../../utils/detect.js";
 import { saveConfig } from "../../utils/config.js";
 import { ensureDir } from "../../utils/fs.js";
 import { listStarters, getStarter } from "../starters.js";
+import { getServerContentMode } from "../server.js";
 import { enrichImportedThemeBrandAssets } from "../brand-enrichment.js";
 
 export const WORKSPACE_DIR = join(homedir(), "vibespot-themes");
@@ -92,6 +93,7 @@ export function handleSetupInfoRoute(res: ServerResponse): void {
     activeEngine: env.activeEngine,
     sessions,
     localThemes,
+    contentMode: getServerContentMode(),
   });
 }
 

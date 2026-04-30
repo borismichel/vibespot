@@ -1,0 +1,60 @@
+{
+  "id": "email-welcome",
+  "name": "Welcome Email",
+  "description": "Onboarding email with getting-started steps and primary CTA",
+  "category": "Email",
+  "contentType": "email",
+  "modules": [
+    {
+      "moduleName": "preheader",
+      "fieldsJson": "[{\"name\":\"preview_text\",\"label\":\"Preview Text\",\"type\":\"text\",\"default\":\"Welcome aboard. Here's how to get started in under 5 minutes.\"}]",
+      "metaJson": "{\"label\":\"Preheader\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if !mso]><!-->\n<div style=\"display:none;font-size:1px;color:#f4f4f4;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;\">\n  {{ module.preview_text }}\n  &zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;\n</div>\n<!--<![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "header",
+      "fieldsJson": "[{\"name\":\"logo_image\",\"label\":\"Logo Image\",\"type\":\"image\",\"default\":{\"src\":\"https://placehold.co/180x40/333333/ffffff?text=YourLogo\",\"alt\":\"Company Logo\",\"width\":180,\"height\":40}},{\"name\":\"logo_link\",\"label\":\"Logo Link\",\"type\":\"link\",\"default\":{\"url\":{\"href\":\"https://example.com\",\"type\":\"EXTERNAL\"},\"open_in_new_tab\":false}}]",
+      "metaJson": "{\"label\":\"Header\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:24px 30px;text-align:center;background-color:#ffffff;\">\n      <a href=\"{{ module.logo_link.url.href }}\" style=\"text-decoration:none;\">\n        <img src=\"{{ module.logo_image.src }}\" alt=\"{{ module.logo_image.alt }}\" width=\"{{ module.logo_image.width }}\" height=\"{{ module.logo_image.height }}\" style=\"display:block;margin:0 auto;border:0;outline:none;text-decoration:none;max-width:100%;height:auto;\" />\n      </a>\n    </td>\n  </tr>\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "hero",
+      "fieldsJson": "[{\"name\":\"greeting\",\"label\":\"Greeting\",\"type\":\"text\",\"default\":\"Welcome to Acme\"},{\"name\":\"message\",\"label\":\"Message\",\"type\":\"text\",\"default\":\"You just made a great decision. Your account is ready, and getting started takes less than 5 minutes.\"}]",
+      "metaJson": "{\"label\":\"Hero\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:40px 30px 20px;background-color:#ffffff;\">\n      <h1 style=\"margin:0 0 16px;font-family:Georgia,'Times New Roman',Times,serif;font-size:28px;line-height:1.2;color:#1a1a1a;font-weight:700;\">{{ module.greeting }}</h1>\n      <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#555555;\">{{ module.message }}</p>\n    </td>\n  </tr>\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "getting-started",
+      "fieldsJson": "[{\"name\":\"section_title\",\"label\":\"Section Title\",\"type\":\"text\",\"default\":\"Get started in 3 steps\"},{\"name\":\"steps\",\"label\":\"Steps\",\"type\":\"group\",\"occurrence\":{\"min\":1,\"max\":5,\"default\":3},\"default\":[{\"step_number\":\"1\",\"step_title\":\"Complete your profile\",\"step_description\":\"Add your company details and preferences so we can personalize your experience.\"},{\"step_number\":\"2\",\"step_title\":\"Connect your tools\",\"step_description\":\"Link your existing accounts. It takes about 60 seconds per integration.\"},{\"step_number\":\"3\",\"step_title\":\"Send your first campaign\",\"step_description\":\"Pick a template, customize it, and hit send. Your audience is waiting.\"}],\"children\":[{\"name\":\"step_number\",\"label\":\"Step Number\",\"type\":\"text\",\"default\":\"1\"},{\"name\":\"step_title\",\"label\":\"Step Title\",\"type\":\"text\",\"default\":\"Step Title\"},{\"name\":\"step_description\",\"label\":\"Step Description\",\"type\":\"text\",\"default\":\"Step description here.\"}]}]",
+      "metaJson": "{\"label\":\"Getting Started Steps\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:20px 30px 10px;background-color:#ffffff;\">\n      <h2 style=\"margin:0 0 24px;font-family:Georgia,'Times New Roman',Times,serif;font-size:22px;line-height:1.3;color:#1a1a1a;font-weight:700;\">{{ module.section_title }}</h2>\n    </td>\n  </tr>\n  {% for step in module.steps %}\n  <tr>\n    <td style=\"padding:0 30px 24px;background-color:#ffffff;\">\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n        <tr>\n          <td width=\"48\" valign=\"top\" style=\"padding-right:16px;\">\n            <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n              <tr>\n                <td style=\"width:40px;height:40px;border-radius:20px;background-color:#e8613a;text-align:center;vertical-align:middle;font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:700;color:#ffffff;line-height:40px;\">\n                  {{ step.step_number }}\n                </td>\n              </tr>\n            </table>\n          </td>\n          <td valign=\"top\">\n            <h3 style=\"margin:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:17px;line-height:1.3;color:#1a1a1a;font-weight:600;\">{{ step.step_title }}</h3>\n            <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#666666;\">{{ step.step_description }}</p>\n          </td>\n        </tr>\n      </table>\n    </td>\n  </tr>\n  {% endfor %}\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "cta-block",
+      "fieldsJson": "[{\"name\":\"button_text\",\"label\":\"Button Text\",\"type\":\"text\",\"default\":\"Go to Your Dashboard\"},{\"name\":\"button_link\",\"label\":\"Button Link\",\"type\":\"link\",\"default\":{\"url\":{\"href\":\"https://example.com/dashboard\",\"type\":\"EXTERNAL\"},\"open_in_new_tab\":false}},{\"name\":\"button_color\",\"label\":\"Button Color\",\"type\":\"color\",\"default\":{\"color\":\"#e8613a\",\"opacity\":100}}]",
+      "metaJson": "{\"label\":\"CTA Block\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:10px 30px 40px;background-color:#ffffff;text-align:center;\">\n      <!--[if mso]>\n      <v:roundrect xmlns:v=\"urn:schemas-microsoft-com:vml\" xmlns:w=\"urn:schemas-microsoft-com:office:word\" href=\"{{ module.button_link.url.href }}\" style=\"height:48px;v-text-anchor:middle;width:220px;\" arcsize=\"10%\" strokecolor=\"{{ module.button_color.color }}\" fillcolor=\"{{ module.button_color.color }}\">\n        <w:anchorlock/>\n        <center style=\"color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;\">{{ module.button_text }}</center>\n      </v:roundrect>\n      <![endif]-->\n      <!--[if !mso]><!-->\n      <a href=\"{{ module.button_link.url.href }}\" style=\"display:inline-block;padding:14px 36px;background-color:{{ module.button_color.color }};color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;text-decoration:none;border-radius:6px;line-height:1.2;\">{{ module.button_text }}</a>\n      <!--<![endif]-->\n    </td>\n  </tr>\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "footer",
+      "fieldsJson": "[{\"name\":\"company_name\",\"label\":\"Company Name\",\"type\":\"text\",\"default\":\"Acme Inc.\"},{\"name\":\"address_line\",\"label\":\"Address\",\"type\":\"text\",\"default\":\"123 Main Street, Suite 100, San Francisco, CA 94105\"}]",
+      "metaJson": "{\"label\":\"Footer\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:30px;background-color:#f8f8f8;text-align:center;border-top:1px solid #e0e0e0;\">\n      <p style=\"margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#999999;\">{{ module.company_name }}</p>\n      <p style=\"margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#999999;\">{{ module.address_line }}</p>\n      <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#999999;\">\n        <a href=\"{{ unsubscribe_link }}\" style=\"color:#999999;text-decoration:underline;\">Unsubscribe</a>\n        &nbsp;&middot;&nbsp;\n        <a href=\"{{ unsubscribe_link_all }}\" style=\"color:#999999;text-decoration:underline;\">Manage Preferences</a>\n      </p>\n    </td>\n  </tr>\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    }
+  ],
+  "moduleOrder": ["preheader", "header", "hero", "getting-started", "cta-block", "footer"],
+  "sharedCss": "",
+  "sharedJs": ""
+}

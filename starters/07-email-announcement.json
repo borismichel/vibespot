@@ -1,0 +1,60 @@
+{
+  "id": "email-announcement",
+  "name": "Product Announcement",
+  "description": "Announce a new feature or product update with hero image and benefit highlights",
+  "category": "Email",
+  "contentType": "email",
+  "modules": [
+    {
+      "moduleName": "preheader",
+      "fieldsJson": "[{\"name\":\"preview_text\",\"label\":\"Preview Text\",\"type\":\"text\",\"default\":\"Big update: we just shipped the feature you asked for.\"}]",
+      "metaJson": "{\"label\":\"Preheader\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if !mso]><!-->\n<div style=\"display:none;font-size:1px;color:#f4f4f4;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;\">\n  {{ module.preview_text }}\n  &zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;\n</div>\n<!--<![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "header",
+      "fieldsJson": "[{\"name\":\"logo_image\",\"label\":\"Logo\",\"type\":\"image\",\"default\":{\"src\":\"https://placehold.co/180x40/333333/ffffff?text=YourLogo\",\"alt\":\"Company Logo\",\"width\":180,\"height\":40}},{\"name\":\"badge_text\",\"label\":\"Badge Text\",\"type\":\"text\",\"default\":\"What's New\"}]",
+      "metaJson": "{\"label\":\"Header\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:24px 30px;background-color:#ffffff;\">\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n        <tr>\n          <td style=\"text-align:left;\">\n            <img src=\"{{ module.logo_image.src }}\" alt=\"{{ module.logo_image.alt }}\" width=\"{{ module.logo_image.width }}\" height=\"{{ module.logo_image.height }}\" style=\"display:block;border:0;outline:none;text-decoration:none;max-width:100%;height:auto;\" />\n          </td>\n          <td style=\"text-align:right;vertical-align:middle;\">\n            <span style=\"display:inline-block;padding:4px 12px;background-color:#e8613a;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:700;border-radius:12px;letter-spacing:0.5px;\">{{ module.badge_text }}</span>\n          </td>\n        </tr>\n      </table>\n    </td>\n  </tr>\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "hero",
+      "fieldsJson": "[{\"name\":\"headline\",\"label\":\"Headline\",\"type\":\"text\",\"default\":\"Smart Scheduling is here\"},{\"name\":\"subheadline\",\"label\":\"Subheadline\",\"type\":\"text\",\"default\":\"No more back-and-forth. Let your calendar do the work.\"},{\"name\":\"hero_image\",\"label\":\"Hero Image\",\"type\":\"image\",\"default\":{\"src\":\"https://placehold.co/600x300/f0f0f0/333333?text=Product+Screenshot\",\"alt\":\"Product screenshot showing the new feature\",\"width\":600,\"height\":300}}]",
+      "metaJson": "{\"label\":\"Hero\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:30px 30px 20px;background-color:#ffffff;text-align:center;\">\n      <h1 style=\"margin:0 0 12px;font-family:Georgia,'Times New Roman',Times,serif;font-size:30px;line-height:1.2;color:#1a1a1a;font-weight:700;\">{{ module.headline }}</h1>\n      <p style=\"margin:0 0 24px;font-family:Arial,Helvetica,sans-serif;font-size:17px;line-height:1.5;color:#555555;\">{{ module.subheadline }}</p>\n    </td>\n  </tr>\n  <tr>\n    <td style=\"padding:0;background-color:#ffffff;\">\n      <img src=\"{{ module.hero_image.src }}\" alt=\"{{ module.hero_image.alt }}\" width=\"600\" style=\"display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;text-decoration:none;\" />\n    </td>\n  </tr>\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "benefits",
+      "fieldsJson": "[{\"name\":\"section_title\",\"label\":\"Section Title\",\"type\":\"text\",\"default\":\"What this means for you\"},{\"name\":\"benefit_items\",\"label\":\"Benefits\",\"type\":\"group\",\"occurrence\":{\"min\":1,\"max\":4,\"default\":3},\"default\":[{\"benefit_title\":\"Save 3 hours every week\",\"benefit_description\":\"Automated scheduling eliminates the email tennis. Clients pick a time that works for both of you.\"},{\"benefit_title\":\"Fewer no-shows\",\"benefit_description\":\"Automatic reminders go out 24 hours and 1 hour before. No-show rate drops by 40% on average.\"},{\"benefit_title\":\"Works with your calendar\",\"benefit_description\":\"Google Calendar, Outlook, and iCal sync both ways. Your availability is always current.\"}],\"children\":[{\"name\":\"benefit_title\",\"label\":\"Benefit Title\",\"type\":\"text\",\"default\":\"Benefit Title\"},{\"name\":\"benefit_description\",\"label\":\"Benefit Description\",\"type\":\"text\",\"default\":\"Benefit description here.\"}]}]",
+      "metaJson": "{\"label\":\"Benefits\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:30px 30px 10px;background-color:#ffffff;\">\n      <h2 style=\"margin:0 0 20px;font-family:Georgia,'Times New Roman',Times,serif;font-size:22px;line-height:1.3;color:#1a1a1a;font-weight:700;\">{{ module.section_title }}</h2>\n    </td>\n  </tr>\n  {% for item in module.benefit_items %}\n  <tr>\n    <td style=\"padding:0 30px 20px;background-color:#ffffff;\">\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"background-color:#f9f9f9;border-radius:8px;\">\n        <tr>\n          <td style=\"padding:20px;\">\n            <h3 style=\"margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:17px;line-height:1.3;color:#1a1a1a;font-weight:600;\">{{ item.benefit_title }}</h3>\n            <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#666666;\">{{ item.benefit_description }}</p>\n          </td>\n        </tr>\n      </table>\n    </td>\n  </tr>\n  {% endfor %}\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "cta-block",
+      "fieldsJson": "[{\"name\":\"button_text\",\"label\":\"Button Text\",\"type\":\"text\",\"default\":\"Try Smart Scheduling\"},{\"name\":\"button_link\",\"label\":\"Button Link\",\"type\":\"link\",\"default\":{\"url\":{\"href\":\"https://example.com/features/scheduling\",\"type\":\"EXTERNAL\"},\"open_in_new_tab\":false}},{\"name\":\"button_color\",\"label\":\"Button Color\",\"type\":\"color\",\"default\":{\"color\":\"#e8613a\",\"opacity\":100}}]",
+      "metaJson": "{\"label\":\"CTA Block\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:10px 30px 40px;background-color:#ffffff;text-align:center;\">\n      <!--[if mso]>\n      <v:roundrect xmlns:v=\"urn:schemas-microsoft-com:vml\" xmlns:w=\"urn:schemas-microsoft-com:office:word\" href=\"{{ module.button_link.url.href }}\" style=\"height:48px;v-text-anchor:middle;width:240px;\" arcsize=\"10%\" strokecolor=\"{{ module.button_color.color }}\" fillcolor=\"{{ module.button_color.color }}\">\n        <w:anchorlock/>\n        <center style=\"color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;\">{{ module.button_text }}</center>\n      </v:roundrect>\n      <![endif]-->\n      <!--[if !mso]><!-->\n      <a href=\"{{ module.button_link.url.href }}\" style=\"display:inline-block;padding:14px 40px;background-color:{{ module.button_color.color }};color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;text-decoration:none;border-radius:6px;line-height:1.2;\">{{ module.button_text }}</a>\n      <!--<![endif]-->\n    </td>\n  </tr>\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "footer",
+      "fieldsJson": "[{\"name\":\"company_name\",\"label\":\"Company Name\",\"type\":\"text\",\"default\":\"Acme Inc.\"},{\"name\":\"address_line\",\"label\":\"Address\",\"type\":\"text\",\"default\":\"123 Main Street, Suite 100, San Francisco, CA 94105\"}]",
+      "metaJson": "{\"label\":\"Footer\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:30px;background-color:#f8f8f8;text-align:center;border-top:1px solid #e0e0e0;\">\n      <p style=\"margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#999999;\">{{ module.company_name }}</p>\n      <p style=\"margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#999999;\">{{ module.address_line }}</p>\n      <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#999999;\">\n        <a href=\"{{ unsubscribe_link }}\" style=\"color:#999999;text-decoration:underline;\">Unsubscribe</a>\n        &nbsp;&middot;&nbsp;\n        <a href=\"{{ unsubscribe_link_all }}\" style=\"color:#999999;text-decoration:underline;\">Manage Preferences</a>\n      </p>\n    </td>\n  </tr>\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    }
+  ],
+  "moduleOrder": ["preheader", "header", "hero", "benefits", "cta-block", "footer"],
+  "sharedCss": "",
+  "sharedJs": ""
+}
