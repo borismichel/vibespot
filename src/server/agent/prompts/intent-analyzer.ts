@@ -23,23 +23,47 @@ export function buildIntentAnalyzerPrompt(
     ? `\n\n## Product Context\n${themeContext}`
     : "";
 
-  return `You are the Intent Analyzer for vibeSpot, a HubSpot CMS page builder.
+  return `You are the Intent Analyzer for vibeSpot, a HubSpot CMS builder that generates pages, email templates, and blog templates.
 
-Your job: classify the user's request and plan which modules need work. You do NOT generate module code — you only plan.
+Your job: classify the user's request, determine the content type (page, email, or blog), and plan which modules need work. You do NOT generate module code — you only plan.
 
 ## Theme: "${themeName}"
 
 ${moduleList}${libraryList}${contextSection}
 
+## Content Type Detection
+
+Set \`contentType\` based on the user's request:
+- **"page"** (default) — Landing pages, website pages, any page-type content
+- **"email"** — Email templates, newsletters, email campaigns, transactional emails
+- **"blog"** — Blog listing pages, blog post templates, content hubs, article layouts
+
+Trigger words for email: "email", "email template", "newsletter", "email campaign", "welcome email", "announcement email", "drip", "email sequence", "email blast", "transactional email".
+
+Trigger words for blog: "blog", "blog post", "blog listing", "blog template", "article", "content hub", "blog page", "blog layout", "editorial", "publication", "magazine layout", "posts page".
+
+If ambiguous, default to "page". The content type affects downstream pipeline behavior (email uses table-based layout; blog uses HubSpot blog variables and reading-optimized design).
+
 ## Classification Rules
 
-1. **create** — User wants a new page from scratch (e.g., "build me a landing page for...")
-2. **modify** — User wants to change existing modules (e.g., "make the hero button red", "update the pricing")
-3. **add** — User wants new modules added to the existing page (e.g., "add a testimonials section")
-4. **remove** — User wants modules removed (e.g., "remove the footer")
-5. **rearrange** — User wants to reorder modules (e.g., "move pricing above features")
-6. **style_change** — User wants design system changes that affect shared CSS/multiple modules (e.g., "change the color scheme to blue")
-7. **question** — User is asking a question, not requesting changes (e.g., "what modules do I have?"). Provide the answer directly.
+1. **create** — User wants a new single page/email/blog from scratch (e.g., "build me a landing page for...", "create a welcome email", "build a blog for my company")
+2. **create_site** — User wants a multi-page website (e.g., "build me a 3-page site", "create home, about, and contact pages", "make a website with multiple pages"). Detect when the user mentions multiple pages, a site map, or navigation between pages. Output \`pages\` array with each page's label, purpose, pageType, and slug, plus \`sharedModules\` listing shared module names (e.g., "site-header", "site-footer").
+3. **modify** — User wants to change existing modules (e.g., "make the hero button red", "update the pricing")
+4. **add** — User wants new modules added to the existing page/email (e.g., "add a testimonials section")
+5. **remove** — User wants modules removed (e.g., "remove the footer")
+6. **rearrange** — User wants to reorder modules (e.g., "move pricing above features")
+7. **style_change** — User wants design system changes that affect shared CSS/multiple modules (e.g., "change the color scheme to blue")
+8. **question** — User is asking a question, not requesting changes (e.g., "what modules do I have?"). Provide the answer directly.
+
+## Multi-Page Site Rules (create_site only)
+
+When classifying as \`create_site\`:
+- List every page the user wants in the \`pages\` array
+- Each page needs: \`label\` (display name), \`purpose\` (what the page is for), \`pageType\` (usually "website_page"), and \`slug\` (URL-friendly path segment)
+- Always include \`sharedModules\`: ["site-header", "site-footer"] unless the user explicitly says otherwise
+- Set \`designSystemChanges: true\` (site creation always needs a design system)
+- If the user says "website" or "site" without specifying pages, infer reasonable pages (e.g., Home, About, Contact)
+- All guides are needed for site creation: design, content, conversion, hubspot_rules, humanify
 
 ## Key Rules
 
@@ -81,6 +105,7 @@ export const INTENT_ANALYZER_SCHEMA = {
       type: "string",
       enum: [
         "create",
+        "create_site",
         "modify",
         "add",
         "remove",
@@ -88,6 +113,11 @@ export const INTENT_ANALYZER_SCHEMA = {
         "style_change",
         "question",
       ],
+    },
+    contentType: {
+      type: "string",
+      enum: ["page", "email", "blog"],
+      description: 'Content type: "page" (default), "email" for email templates, or "blog" for blog templates',
     },
     affectedModules: {
       type: "array",
@@ -146,6 +176,29 @@ export const INTENT_ANALYZER_SCHEMA = {
       type: "string",
       description:
         'For "question" intent only — the answer to return directly',
+    },
+    pages: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "Template ID, e.g. wp-home, wp-about" },
+          label: { type: "string", description: "Display name, e.g. Home, About" },
+          pageType: {
+            type: "string",
+            enum: ["landing_page", "website_page", "blog_post"],
+          },
+          purpose: { type: "string", description: "What this page is for" },
+          slug: { type: "string", description: "URL slug, e.g. home, about, contact" },
+        },
+        required: ["id", "label", "pageType", "purpose", "slug"],
+      },
+      description: 'For "create_site" intent — list of pages to create',
+    },
+    sharedModules: {
+      type: "array",
+      items: { type: "string" },
+      description: 'For "create_site" intent — module names shared across all pages (e.g., site-header, site-footer)',
     },
   },
   required: [

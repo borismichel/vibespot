@@ -5,7 +5,7 @@
  */
 
 import type { ModuleFiles } from "../../../ai/engine.js";
-import type { PipelineEvent } from "../types.js";
+import type { ContentType, PipelineEvent } from "../types.js";
 import { tryParseJSON } from "../../ai-parser.js";
 import { log } from "../../log.js";
 
@@ -29,11 +29,14 @@ export function validateModules(
   modules: ModuleFiles[],
   themeName: string,
   onEvent: (event: PipelineEvent) => void,
+  contentType?: ContentType,
 ): ValidationResult[] {
+  const isEmail = contentType === "email";
+  const isBlog = contentType === "blog";
   onEvent({
     type: "agent_step",
     step: "quality_check",
-    label: "Quality check...",
+    label: isEmail ? "Email quality check..." : isBlog ? "Blog quality check..." : "Quality check...",
   });
 
   return modules.map((mod) => {
@@ -52,6 +55,8 @@ export function validateModules(
       fixedModule.moduleName,
       "metaJson",
       issues,
+      isEmail,
+      isBlog,
     );
 
     // --- Reserved field names ---
@@ -68,27 +73,37 @@ export function validateModules(
       issues,
     );
 
-    // --- CDN import stripping ---
-    fixedModule.moduleCss = stripCdnImports(
-      fixedModule.moduleCss,
-      fixedModule.moduleName,
-      "moduleCss",
-      issues,
-    );
+    if (isEmail) {
+      // --- Email-specific validation + auto-fix ---
+      fixedModule = validateEmailModule(fixedModule, issues);
+    } else {
+      // --- CDN import stripping ---
+      fixedModule.moduleCss = stripCdnImports(
+        fixedModule.moduleCss,
+        fixedModule.moduleName,
+        "moduleCss",
+        issues,
+      );
 
-    // --- CSS prefix auto-fix ---
-    fixedModule.moduleCss = fixCssPrefix(
-      fixedModule.moduleCss,
-      fixedModule.moduleName,
-      themeName,
-      issues,
-    );
-    fixedModule.moduleHtml = fixHtmlClassPrefix(
-      fixedModule.moduleHtml,
-      fixedModule.moduleName,
-      themeName,
-      issues,
-    );
+      // --- CSS prefix auto-fix ---
+      fixedModule.moduleCss = fixCssPrefix(
+        fixedModule.moduleCss,
+        fixedModule.moduleName,
+        themeName,
+        issues,
+      );
+      fixedModule.moduleHtml = fixHtmlClassPrefix(
+        fixedModule.moduleHtml,
+        fixedModule.moduleName,
+        themeName,
+        issues,
+      );
+
+      if (isBlog) {
+        // --- Blog-specific validation + auto-fix ---
+        fixedModule = validateBlogModule(fixedModule, issues);
+      }
+    }
 
     // --- HubL basic checks + auto-fix ---
     fixedModule.moduleHtml = fixHublSyntax(
@@ -102,6 +117,8 @@ export function validateModules(
       fixedModule.metaJson,
       fixedModule.moduleName,
       issues,
+      isEmail,
+      isBlog,
     );
 
     const valid = issues.every((i) => i.autoFixed);
@@ -126,17 +143,20 @@ function validateAndFixJson(
   moduleName: string,
   field: string,
   issues: ValidationIssue[],
+  isEmail = false,
+  isBlog = false,
 ): string {
   if (!jsonStr || jsonStr.trim() === "") {
     issues.push({
       module: moduleName,
       field,
       message: `Empty ${field}`,
-      autoFixed: field === "metaJson", // metaJson can be auto-generated
+      autoFixed: field === "metaJson",
     });
     if (field === "metaJson") {
+      const defaultType = isEmail ? "EMAIL" : isBlog ? "BLOG_POST" : "PAGE";
       return JSON.stringify({
-        host_template_types: ["PAGE"],
+        host_template_types: [defaultType],
         is_available_for_new_content: true,
       });
     }
@@ -447,6 +467,8 @@ function ensureMetaFields(
   metaJson: string,
   moduleName: string,
   issues: ValidationIssue[],
+  isEmail = false,
+  isBlog = false,
 ): string {
   const parsed = tryParseJSON(metaJson);
   if (!parsed || typeof parsed !== "object") return metaJson;
@@ -455,9 +477,36 @@ function ensureMetaFields(
   let changed = false;
 
   if (!obj.host_template_types) {
-    obj.host_template_types = ["PAGE"];
+    const defaultType = isEmail ? "EMAIL" : isBlog ? "BLOG_POST" : "PAGE";
+    obj.host_template_types = [defaultType];
     changed = true;
+  } else if (isEmail) {
+    const types = obj.host_template_types as string[];
+    if (!types.includes("EMAIL")) {
+      obj.host_template_types = ["EMAIL"];
+      changed = true;
+      issues.push({
+        module: moduleName,
+        field: "metaJson",
+        message: 'Fixed host_template_types to ["EMAIL"] for email module',
+        autoFixed: true,
+      });
+    }
+  } else if (isBlog) {
+    const types = obj.host_template_types as string[];
+    const hasBlogType = types.includes("BLOG_POST") || types.includes("BLOG_LISTING");
+    if (!hasBlogType) {
+      obj.host_template_types = ["BLOG_POST"];
+      changed = true;
+      issues.push({
+        module: moduleName,
+        field: "metaJson",
+        message: 'Fixed host_template_types to include blog type for blog module',
+        autoFixed: true,
+      });
+    }
   }
+
   if (obj.is_available_for_new_content === undefined) {
     obj.is_available_for_new_content = true;
     changed = true;
@@ -474,4 +523,211 @@ function ensureMetaFields(
   }
 
   return metaJson;
+}
+
+/**
+ * Email-specific validation and auto-fix.
+ * Catches common email rendering issues and fixes what can be fixed automatically.
+ */
+function validateEmailModule(
+  mod: ModuleFiles,
+  issues: ValidationIssue[],
+): ModuleFiles {
+  const fixedModule = { ...mod };
+  let html = fixedModule.moduleHtml;
+
+  // Force empty CSS and no JS for email
+  if (fixedModule.moduleCss && fixedModule.moduleCss.trim()) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleCss",
+      message: "Cleared moduleCss — email modules must use inline styles only",
+      autoFixed: true,
+    });
+    fixedModule.moduleCss = "";
+  }
+
+  if (fixedModule.moduleJs && fixedModule.moduleJs.trim()) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleJs",
+      message: "Cleared moduleJs — email clients do not support JavaScript",
+      autoFixed: true,
+    });
+    fixedModule.moduleJs = undefined;
+  }
+
+  // Strip <style> blocks from HTML (Gmail strips them anyway)
+  if (/<style[\s>]/i.test(html)) {
+    html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Removed <style> blocks — email clients strip them",
+      autoFixed: true,
+    });
+  }
+
+  // Warn on flexbox/grid (cannot auto-fix — layout must be rewritten)
+  if (/display\s*:\s*flex/i.test(html)) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Contains display:flex — not supported in email clients",
+      autoFixed: false,
+    });
+  }
+
+  if (/display\s*:\s*grid/i.test(html)) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Contains display:grid — not supported in email clients",
+      autoFixed: false,
+    });
+  }
+
+  // Warn on CSS custom properties
+  if (/var\s*\(/i.test(html)) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Contains var() — CSS custom properties not supported in email",
+      autoFixed: false,
+    });
+  }
+
+  // Strip banned HubL functions for email
+  const bannedHublRe = /\{[{%].*?(?:require_css|require_js|scope_css|get_asset_url)\s*\(.*?\}[}%]/g;
+  if (bannedHublRe.test(html)) {
+    html = html.replace(bannedHublRe, "");
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Removed banned HubL functions for email (require_css, require_js, scope_css, get_asset_url)",
+      autoFixed: true,
+    });
+  }
+
+  // Strip CDN link tags from HTML
+  const linkTagRe = /<link[^>]*href="https?:\/\/[^"]*(?:fonts\.googleapis|cdnjs|unpkg|jsdelivr)[^"]*"[^>]*\/?>/gi;
+  if (linkTagRe.test(html)) {
+    html = html.replace(linkTagRe, "");
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Removed CDN <link> tags — external resources not supported in email",
+      autoFixed: true,
+    });
+  }
+
+  fixedModule.moduleHtml = html;
+  return fixedModule;
+}
+
+/**
+ * Blog-specific validation and auto-fix.
+ * Ensures blog modules use correct HubL variables and patterns.
+ */
+function validateBlogModule(
+  mod: ModuleFiles,
+  issues: ValidationIssue[],
+): ModuleFiles {
+  const fixedModule = { ...mod };
+  let html = fixedModule.moduleHtml;
+
+  // Fix common blog variable mistakes
+  // content.body → content.post_body
+  if (/\{\{[\s]*content\.body[\s]*\}\}/g.test(html)) {
+    html = html.replace(
+      /\{\{[\s]*content\.body[\s]*\}\}/g,
+      "{{ content.post_body }}",
+    );
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Fixed content.body → content.post_body (correct blog variable)",
+      autoFixed: true,
+    });
+  }
+
+  // content.title → content.name
+  if (/\{\{[\s]*content\.title[\s]*\}\}/g.test(html)) {
+    html = html.replace(
+      /\{\{[\s]*content\.title[\s]*\}\}/g,
+      "{{ content.name }}",
+    );
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Fixed content.title → content.name (correct blog variable)",
+      autoFixed: true,
+    });
+  }
+
+  // content.author_name → content.blog_post_author
+  if (/\{\{[\s]*content\.author_name[\s]*\}\}/g.test(html)) {
+    html = html.replace(
+      /\{\{[\s]*content\.author_name[\s]*\}\}/g,
+      "{{ content.blog_post_author }}",
+    );
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Fixed content.author_name → content.blog_post_author",
+      autoFixed: true,
+    });
+  }
+
+  // content.date → content.publish_date
+  if (/\{\{[\s]*content\.date[\s]*\}\}/g.test(html)) {
+    html = html.replace(
+      /\{\{[\s]*content\.date[\s]*\}\}/g,
+      "{{ content.publish_date }}",
+    );
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Fixed content.date → content.publish_date",
+      autoFixed: true,
+    });
+  }
+
+  // content.image → content.featured_image
+  if (/\{\{[\s]*content\.image[\s]*\}\}/g.test(html)) {
+    html = html.replace(
+      /\{\{[\s]*content\.image[\s]*\}\}/g,
+      "{{ content.featured_image }}",
+    );
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Fixed content.image → content.featured_image",
+      autoFixed: true,
+    });
+  }
+
+  // Warn if using dnd_area in blog templates (not typical for blog templates)
+  if (/\{%.*dnd_area.*%\}/g.test(html)) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Contains dnd_area — blog templates typically use fixed module positions",
+      autoFixed: false,
+    });
+  }
+
+  // Warn on publish_date without datetimeformat filter
+  const rawDateRe = /\{\{[\s]*content\.publish_date[\s]*\}\}/g;
+  if (rawDateRe.test(html)) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "publish_date used without |datetimeformat filter — dates may render as raw timestamps",
+      autoFixed: false,
+    });
+  }
+
+  fixedModule.moduleHtml = html;
+  return fixedModule;
 }

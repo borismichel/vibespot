@@ -3,21 +3,25 @@
  */
 
 import type { ModuleFiles } from "../../ai/engine.js";
-import type { SessionSnapshot } from "../session/types.js";
+import type { SessionSnapshot, PageType } from "../session/types.js";
 
 // ---------------------------------------------------------------------------
 // Stage 1 output: Intent Analyzer
 // ---------------------------------------------------------------------------
 
+export type ContentType = "page" | "email" | "blog";
+
 export interface PipelinePlan {
   intent:
     | "create"
+    | "create_site"
     | "modify"
     | "add"
     | "remove"
     | "rearrange"
     | "style_change"
     | "question";
+  contentType?: ContentType;
   affectedModules: string[];
   unchangedModules: string[];
   newModules: { name: string; description: string; position: number }[];
@@ -34,7 +38,62 @@ export interface PipelinePlan {
     | "humanify"
   )[];
   designSystemChanges: boolean;
-  answer?: string; // For "question" intent — short-circuits the pipeline
+  answer?: string;
+  pages?: SitePagePlan[];
+  sharedModules?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Multi-page site planning (create_site intent)
+// ---------------------------------------------------------------------------
+
+export interface SitePagePlan {
+  id: string;
+  label: string;
+  pageType: PageType;
+  purpose: string;
+  slug: string;
+}
+
+export interface SiteBlueprint {
+  designSystem: {
+    cssVariables: Record<string, string>;
+    sharedCss: string;
+    sharedJs?: string;
+  };
+  pages: SitePageBlueprint[];
+  sharedModules: ModuleSpec[];
+  narrative: string;
+}
+
+export interface SitePageBlueprint {
+  pageId: string;
+  modules: {
+    name: string;
+    description: string;
+    contentBrief: string;
+    layoutNotes: string;
+  }[];
+  moduleOrder: string[];
+}
+
+export interface MultiPagePipelineResult {
+  pages: {
+    pageId: string;
+    templateId: string;
+    modules: ModuleFiles[];
+    moduleOrder: string[];
+  }[];
+  sharedModules: ModuleFiles[];
+  sharedCss: string;
+  sharedJs: string;
+  assistantMessage: string;
+  stats: {
+    pagesGenerated: number;
+    modulesGenerated: number;
+    modulesFailed: number;
+    durationMs: number;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -75,6 +134,7 @@ export interface PageBlueprint {
 export type PipelineStep =
   | "analyzing"
   | "designing"
+  | "planning_site"
   | "developing"
   | "quality_check";
 
@@ -110,6 +170,19 @@ export type PipelineEvent =
       sharedJs?: string;
     }
   | { type: "module_stream"; module: string; content: string }
+  | {
+      type: "site_blueprint_ready";
+      pages: { pageId: string; label: string; moduleCount: number }[];
+      sharedModuleCount: number;
+    }
+  | {
+      type: "page_progress";
+      pageId: string;
+      label: string;
+      status: "generating" | "complete" | "failed";
+      modulesComplete: number;
+      modulesTotal: number;
+    }
   | {
       type: "pipeline_complete";
       modulesGenerated: number;
