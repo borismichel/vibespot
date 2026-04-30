@@ -51,6 +51,89 @@ function restoreWelcome() {
 }
 
 // ---------------------------------------------------------------------------
+// Page tabs (multi-page template switcher)
+// ---------------------------------------------------------------------------
+
+let currentTemplates = [];
+
+function renderPageTabs(templates, activeTemplateId) {
+  const container = document.getElementById("page-tabs");
+  const list = document.getElementById("page-tabs-list");
+  if (!container || !list) return;
+
+  currentTemplates = templates || [];
+
+  if (currentTemplates.length <= 1) {
+    container.classList.add("hidden");
+    return;
+  }
+
+  container.classList.remove("hidden");
+  list.innerHTML = currentTemplates.map((t) => {
+    const isActive = t.id === activeTemplateId;
+    return `<button class="page-tabs__tab${isActive ? " page-tabs__tab--active" : ""}" data-template-id="${t.id}" title="${t.label} (${t.moduleCount} modules)">
+      <span class="page-tabs__tab-label">${escapeHtml(t.label)}</span>
+      <span class="page-tabs__tab-count">${t.moduleCount}</span>
+    </button>`;
+  }).join("");
+}
+
+function handlePageTabClick(e) {
+  const tab = e.target.closest(".page-tabs__tab");
+  if (!tab) return;
+  const templateId = tab.dataset.templateId;
+  if (!templateId || templateId === currentTemplateId) return;
+  if (isStreaming) return;
+
+  tab.style.opacity = "0.5";
+  fetch("/api/templates/activate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ templateId }),
+  }).then((res) => {
+    if (!res.ok) {
+      tab.style.opacity = "";
+      return;
+    }
+    connectWebSocket();
+  }).catch(() => {
+    tab.style.opacity = "";
+  });
+}
+
+function handleAddPage() {
+  if (isStreaming) return;
+  const label = prompt("Page name:");
+  if (!label || !label.trim()) return;
+
+  fetch("/api/templates", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pageType: "website_page", label: label.trim() }),
+  }).then((res) => {
+    if (!res.ok) return;
+    return res.json();
+  }).then((data) => {
+    if (data && data.id) {
+      return fetch("/api/templates/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: data.id }),
+      });
+    }
+  }).then((res) => {
+    if (res && res.ok) connectWebSocket();
+  });
+}
+
+(function initPageTabs() {
+  const list = document.getElementById("page-tabs-list");
+  const addBtn = document.getElementById("btn-add-page");
+  if (list) list.addEventListener("click", handlePageTabClick);
+  if (addBtn) addBtn.addEventListener("click", handleAddPage);
+})();
+
+// ---------------------------------------------------------------------------
 // WebSocket connection
 // ---------------------------------------------------------------------------
 
@@ -118,6 +201,10 @@ function handleWsMessage(msg) {
         updateModuleList(msg.modules);
         refreshPreview();
       }
+
+      // Render page tabs for multi-page projects
+      renderPageTabs(msg.templates, currentTemplateId);
+
       statusEngine.textContent = msg.engine || "";
       fetchHsAccountStatus();
 

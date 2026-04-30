@@ -7,7 +7,7 @@
 
 import { execSync } from "node:child_process";
 import { loadConfig, getApiKeyForEngine, type AIEngineType } from "../utils/config.js";
-import { getSession, addMessage, saveSession, updateModules, reorderModules, getModuleLibrary, getActiveTemplate } from "./session.js";
+import { getSession, addMessage, saveSession, updateModules, reorderModules, getModuleLibrary, getActiveTemplate, applyMultiPageResult } from "./session.js";
 import { parseAndApplyModules } from "./ai-parser.js";
 import { log } from "./log.js";
 import {
@@ -22,7 +22,7 @@ import { hasValidOAuthToken, getValidAccessToken } from "../utils/claude-oauth.j
 import { getFileContexts } from "./routes/upload-files.js";
 import { runAgentPipeline, isAgenticCapable, isCLIEngine } from "./agent/pipeline.js";
 import type { AgentEngine } from "./agent/engine-adapter.js";
-import type { PipelineEvent, PipelineResult } from "./agent/types.js";
+import type { PipelineEvent, PipelineResult, MultiPagePipelineResult } from "./agent/types.js";
 import type { SessionSnapshot, PipelineMetadata } from "./session/types.js";
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ function takeSnapshot(): SessionSnapshot {
   const modules = tpl ? [...tpl.modules] : [...session.modules];
   const moduleOrder = tpl ? [...tpl.moduleOrder] : [...session.moduleOrder];
 
-  return {
+  const snap: SessionSnapshot = {
     modules,
     moduleOrder,
     sharedCss: tpl?.sharedCss || session.sharedCss,
@@ -185,6 +185,18 @@ function takeSnapshot(): SessionSnapshot {
     contentMode: tpl?.contentMode,
     brandAssets: session.brandAssets ? { ...session.brandAssets } : undefined,
   };
+
+  if (session.templates.length > 1) {
+    snap.activePageLabel = tpl?.label;
+    snap.sitePages = session.templates.map((t) => ({
+      id: t.id,
+      label: t.label,
+      pageType: t.pageType,
+      moduleCount: t.modules.length,
+    }));
+  }
+
+  return snap;
 }
 
 /**
@@ -385,15 +397,41 @@ export async function handleFigmaImport(
  * Called by the WebSocket handler after successful pipeline execution.
  */
 export function applyPipelineResult(result: PipelineResult, pipelineMeta?: PipelineMetadata): void {
-  // Update modules in the session (merges new + updates existing)
-  updateModules({
-    modules: result.modules,
-    sharedCss: result.sharedCss,
-    sharedJs: result.sharedJs,
-  });
+  const multiPage = (result as PipelineResult & { multiPage?: MultiPagePipelineResult }).multiPage;
 
-  // Set the module order from the pipeline result
-  reorderModules(result.moduleOrder);
+  if (multiPage && multiPage.pages.length > 0) {
+    const pageLabels = new Map<string, { label: string; pageType: import("./session/types.js").PageType }>();
+    for (const page of multiPage.pages) {
+      pageLabels.set(page.pageId, {
+        label: page.label || page.pageId,
+        pageType: page.pageType || "website_page",
+      });
+    }
+
+    applyMultiPageResult({
+      pages: multiPage.pages,
+      sharedModules: multiPage.sharedModules,
+      sharedCss: multiPage.sharedCss,
+      sharedJs: multiPage.sharedJs,
+      pageLabels,
+    });
+  } else {
+    // Single-page result: update active template
+    updateModules({
+      modules: result.modules,
+      sharedCss: result.sharedCss,
+      sharedJs: result.sharedJs,
+    });
+    reorderModules(result.moduleOrder);
+
+    const ct = (result as PipelineResult & { contentType?: string }).contentType;
+    if (ct === "email") {
+      const tpl = getActiveTemplate();
+      if (tpl && !tpl.contentMode) {
+        tpl.contentMode = "email";
+      }
+    }
+  }
 
   // Add assistant message to chat history with pipeline metadata
   addMessage("assistant", result.assistantMessage, pipelineMeta);

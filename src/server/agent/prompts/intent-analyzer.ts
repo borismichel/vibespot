@@ -8,6 +8,7 @@ export function buildIntentAnalyzerPrompt(
   moduleNames: string[],
   libraryModuleNames: { name: string; usedIn: string[] }[],
   themeContext?: string,
+  siteContext?: { activePageLabel?: string; pages?: { id: string; label: string; moduleCount: number }[] },
 ): string {
   const moduleList =
     moduleNames.length > 0
@@ -23,23 +24,36 @@ export function buildIntentAnalyzerPrompt(
     ? `\n\n## Product Context\n${themeContext}`
     : "";
 
+  const siteSection = siteContext?.pages && siteContext.pages.length > 1
+    ? `\n\n## Multi-Page Site Context\nThis is a multi-page site. Currently editing: **${siteContext.activePageLabel || "unknown"}**\nAll pages:\n${siteContext.pages.map((p) => `- ${p.label} (${p.id}, ${p.moduleCount} modules)`).join("\n")}\n\nThe user's message applies to the current page unless they reference another page by name or say "all pages" / "every page" / "the whole site".`
+    : "";
+
   return `You are the Intent Analyzer for vibeSpot, a HubSpot CMS page builder.
 
 Your job: classify the user's request and plan which modules need work. You do NOT generate module code — you only plan.
 
 ## Theme: "${themeName}"
 
-${moduleList}${libraryList}${contextSection}
+${moduleList}${libraryList}${contextSection}${siteSection}
 
 ## Classification Rules
 
-1. **create** — User wants a new page from scratch (e.g., "build me a landing page for...")
-2. **modify** — User wants to change existing modules (e.g., "make the hero button red", "update the pricing")
-3. **add** — User wants new modules added to the existing page (e.g., "add a testimonials section")
-4. **remove** — User wants modules removed (e.g., "remove the footer")
-5. **rearrange** — User wants to reorder modules (e.g., "move pricing above features")
-6. **style_change** — User wants design system changes that affect shared CSS/multiple modules (e.g., "change the color scheme to blue")
-7. **question** — User is asking a question, not requesting changes (e.g., "what modules do I have?"). Provide the answer directly.
+1. **create** — User wants a new single page from scratch (e.g., "build me a landing page for...")
+2. **create_site** — User wants a multi-page website (e.g., "build a website with home, about, and contact pages", "create a 5-page site for..."). Use when the user mentions multiple pages, a website (not just a page), or a site with navigation.
+3. **modify** — User wants to change existing modules (e.g., "make the hero button red", "update the pricing")
+4. **add** — User wants new modules added to the existing page (e.g., "add a testimonials section")
+5. **remove** — User wants modules removed (e.g., "remove the footer")
+6. **rearrange** — User wants to reorder modules (e.g., "move pricing above features")
+7. **style_change** — User wants design system changes that affect shared CSS/multiple modules (e.g., "change the color scheme to blue")
+8. **question** — User is asking a question, not requesting changes (e.g., "what modules do I have?"). Provide the answer directly.
+
+## Multi-Page Site Rules
+
+When classifying as **create_site**:
+- Populate the \`pages\` array with one entry per page. Each page needs: id (kebab-case), label (human-readable), pageType ("landing_page" or "website_page"), purpose (1-sentence), slug (URL path without leading /).
+- Populate \`sharedModules\` with names of modules shared across all pages (typically ["site-header", "site-footer"]).
+- Always include at least a header and footer in sharedModules.
+- Page IDs should be descriptive: "wp-home", "wp-about", "wp-contact", etc.
 
 ## Key Rules
 
@@ -85,6 +99,7 @@ export const INTENT_ANALYZER_SCHEMA = {
       type: "string",
       enum: [
         "create",
+        "create_site",
         "modify",
         "add",
         "remove",
@@ -156,6 +171,26 @@ export const INTENT_ANALYZER_SCHEMA = {
       type: "string",
       description:
         'For "question" intent only — the answer to return directly',
+    },
+    pages: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "Kebab-case page ID (e.g. wp-home)" },
+          label: { type: "string", description: "Human-readable page name" },
+          pageType: { type: "string", enum: ["landing_page", "website_page", "blog_post"] },
+          purpose: { type: "string", description: "One-sentence page purpose" },
+          slug: { type: "string", description: "URL path without leading /" },
+        },
+        required: ["id", "label", "pageType", "purpose", "slug"],
+      },
+      description: 'For "create_site" intent — list of pages to generate',
+    },
+    sharedModules: {
+      type: "array",
+      items: { type: "string" },
+      description: 'For "create_site" intent — module names shared across all pages (e.g. site-header, site-footer)',
     },
   },
   required: [

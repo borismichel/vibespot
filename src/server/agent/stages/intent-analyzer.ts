@@ -36,6 +36,10 @@ export async function runIntentAnalyzer(
     moduleNames,
     libraryModules,
     snapshot.brandAssets?.themeContext,
+    snapshot.sitePages ? {
+      activePageLabel: snapshot.activePageLabel,
+      pages: snapshot.sitePages as { id: string; label: string; moduleCount: number }[],
+    } : undefined,
   );
 
   // Build messages with recent conversation history for context resolution
@@ -81,7 +85,7 @@ export async function runIntentAnalyzer(
 
   const plan = result.data as PipelinePlan;
 
-  // Ensure arrays exist
+  // Ensure arrays exist and normalize contentType
   plan.affectedModules = plan.affectedModules || [];
   plan.unchangedModules = plan.unchangedModules || [];
   plan.newModules = plan.newModules || [];

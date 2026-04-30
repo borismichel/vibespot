@@ -15,13 +15,15 @@ import { isCLIEngine } from "./engine-adapter.js";
 import type {
   PipelineEvent,
   PipelineResult,
+  MultiPagePipelineResult,
   ModuleSpec,
   PageBlueprint,
 } from "./types.js";
 import { runIntentAnalyzer } from "./stages/intent-analyzer.js";
-import { runPageArchitect } from "./stages/page-architect.js";
+import { runPageArchitect, runDesignSystem } from "./stages/page-architect.js";
+import { runSiteModulePlanner } from "./stages/site-module-planner.js";
 import { runModuleDeveloper } from "./stages/module-developer.js";
-import { validateModules } from "./stages/validator.js";
+import { validateModules, validateNavLinks } from "./stages/validator.js";
 import { log } from "../log.js";
 import { execSync } from "node:child_process";
 
@@ -109,6 +111,21 @@ export async function runAgentPipeline(
         durationMs,
       },
     };
+  }
+
+  // Multi-page site creation uses a separate flow
+  if (plan.intent === "create_site" && plan.pages && plan.pages.length > 0) {
+    return runMultiPageFlow(
+      userMessage,
+      plan,
+      snapshot,
+      engine,
+      apiKey,
+      model,
+      concurrency,
+      onEvent,
+      startTime,
+    );
   }
 
   // -----------------------------------------------------------------------
@@ -357,6 +374,7 @@ export async function runAgentPipeline(
     sharedCss,
     sharedJs,
     assistantMessage,
+    contentType: plan.contentType,
     stats: {
       modulesGenerated,
       modulesUnchanged,
@@ -364,6 +382,289 @@ export async function runAgentPipeline(
       durationMs,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Multi-page pipeline flow
+// ---------------------------------------------------------------------------
+
+async function runMultiPageFlow(
+  userMessage: string,
+  plan: import("./types.js").PipelinePlan,
+  snapshot: SessionSnapshot,
+  engine: AgentEngine,
+  apiKey: string,
+  model: string,
+  concurrency: number,
+  onEvent: (event: PipelineEvent) => void,
+  startTime: number,
+): Promise<PipelineResult> {
+  const pages = plan.pages!;
+  const sharedModuleNames = plan.sharedModules || ["site-header", "site-footer"];
+
+  // Stage 2a: Design System only (skip single-page module planner)
+  const designSystem = await runDesignSystem(
+    userMessage,
+    plan,
+    snapshot,
+    engine,
+    apiKey,
+    model,
+    onEvent,
+  );
+
+  const sharedCss = designSystem.sharedCss || snapshot.sharedCss;
+  const sharedJs = designSystem.sharedJs || snapshot.sharedJs;
+
+  onEvent({
+    type: "blueprint_ready",
+    moduleOrder: sharedModuleNames,
+    sharedCss,
+    sharedJs,
+  });
+
+  // Stage 2b: Site Module Planner (replaces single-page module planner)
+  const siteBlueprint = await runSiteModulePlanner(
+    userMessage,
+    plan,
+    snapshot,
+    sharedCss,
+    engine,
+    apiKey,
+    model,
+    onEvent,
+  );
+
+  // Stage 3: Module Developer (parallel across all pages + shared)
+  onEvent({
+    type: "agent_step",
+    step: "developing",
+    label: `Generating modules for ${pages.length} pages...`,
+  });
+
+  const allSpecs: ModuleSpec[] = [];
+
+  for (const shared of siteBlueprint.sharedModules) {
+    allSpecs.push({ ...shared });
+  }
+
+  for (const page of siteBlueprint.pages) {
+    for (const mod of page.modules) {
+      allSpecs.push({
+        name: mod.name,
+        description: mod.description,
+        contentBrief: mod.contentBrief,
+        layoutNotes: mod.layoutNotes,
+      });
+    }
+  }
+
+  // Add navigation context for header/nav modules
+  const navContext = pages
+    .map((p) => `- "${p.label}" → /${p.slug}`)
+    .join("\n");
+
+  for (const spec of allSpecs) {
+    if (spec.name.includes("header") || spec.name.includes("nav")) {
+      spec.layoutNotes += `\n\n## Site Navigation\nThis is a multi-page site. Include navigation links to all pages:\n${navContext}\nUse relative href paths. Add CSS class "${snapshot.themeName}-nav__link--active" on the current page's link.`;
+    }
+  }
+
+  const devResults = await runModuleDeveloper(
+    userMessage,
+    allSpecs,
+    sharedCss,
+    snapshot.themeName,
+    engine,
+    apiKey,
+    model,
+    concurrency,
+    onEvent,
+    plan.guidesNeeded,
+    snapshot.brandAssets,
+    plan.contentType,
+  );
+
+  const generatedModules: ModuleFiles[] = [];
+  const failedModules: string[] = [];
+
+  for (const r of devResults) {
+    if (r.module) {
+      generatedModules.push(r.module);
+    } else {
+      failedModules.push(r.moduleName);
+    }
+  }
+
+  // Stage 4: Quality Check
+  let validatedModules = generatedModules;
+  let validationIssues: { module: string; message: string; autoFixed: boolean }[] = [];
+
+  if (generatedModules.length > 0) {
+    const validationResults = validateModules(
+      generatedModules,
+      snapshot.themeName,
+      onEvent,
+      plan.contentType,
+    );
+    validatedModules = validationResults.map((r) => r.module);
+    validationIssues = validationResults.flatMap((r) => r.issues);
+
+    // Cross-page navigation validation
+    const navIssues = validateNavLinks(
+      validatedModules,
+      pages.map((p) => p.slug),
+    );
+    validationIssues.push(...navIssues);
+
+    const totalIssues = validationIssues.length;
+    if (totalIssues > 0) {
+      const autoFixed = validationIssues.filter((i) => i.autoFixed).length;
+      onEvent({
+        type: "agent_decision",
+        step: "quality_check",
+        decision: `${totalIssues} issues found, ${autoFixed} auto-fixed`,
+      });
+    } else {
+      onEvent({
+        type: "agent_decision",
+        step: "quality_check",
+        decision: "All modules passed quality checks",
+      });
+    }
+  }
+
+  // Partition modules by page for multi-page result
+  const modulesByName = new Map(validatedModules.map((m) => [m.moduleName, m]));
+  const sharedModules = siteBlueprint.sharedModules
+    .map((s) => modulesByName.get(s.name))
+    .filter((m): m is ModuleFiles => !!m);
+
+  const planPageMap = new Map(pages.map((p) => [p.id, p]));
+
+  const multiPagePages = siteBlueprint.pages.map((page) => {
+    const pageModules = page.modules
+      .map((m) => modulesByName.get(m.name))
+      .filter((m): m is ModuleFiles => !!m);
+
+    const headerModules = sharedModuleNames.filter((n) =>
+      n.includes("header") || n.includes("nav"),
+    );
+    const footerModules = sharedModuleNames.filter((n) =>
+      n.includes("footer"),
+    );
+    const fullOrder = [...headerModules, ...page.moduleOrder, ...footerModules];
+
+    const planPage = planPageMap.get(page.pageId);
+
+    return {
+      pageId: page.pageId,
+      templateId: page.pageId,
+      label: planPage?.label || page.pageId,
+      pageType: planPage?.pageType || ("website_page" as const),
+      modules: [...sharedModules, ...pageModules],
+      moduleOrder: fullOrder,
+    };
+  });
+
+  const durationMs = Date.now() - startTime;
+
+  if (failedModules.length > 0) {
+    onEvent({
+      type: "pipeline_partial",
+      succeeded: generatedModules.map((m) => m.moduleName),
+      failed: failedModules,
+      durationMs,
+    });
+  } else {
+    onEvent({
+      type: "pipeline_complete",
+      modulesGenerated: generatedModules.length,
+      modulesUnchanged: 0,
+      durationMs,
+    });
+  }
+
+  const assistantMessage = buildMultiPageAssistantMessage(
+    pages,
+    generatedModules.length,
+    failedModules,
+    durationMs,
+    siteBlueprint.narrative,
+    validationIssues,
+  );
+
+  // Return PipelineResult with multiPage data attached for the handler
+  const result: PipelineResult & { multiPage?: MultiPagePipelineResult } = {
+    modules: validatedModules,
+    moduleOrder: validatedModules.map((m) => m.moduleName),
+    sharedCss,
+    sharedJs: sharedJs || "",
+    assistantMessage,
+    stats: {
+      modulesGenerated: generatedModules.length,
+      modulesUnchanged: 0,
+      modulesFailed: failedModules.length,
+      durationMs,
+    },
+    multiPage: {
+      pages: multiPagePages,
+      sharedModules,
+      sharedCss,
+      sharedJs: sharedJs || "",
+      assistantMessage,
+      stats: {
+        pagesGenerated: pages.length,
+        modulesGenerated: generatedModules.length,
+        modulesFailed: failedModules.length,
+        durationMs,
+      },
+    },
+  };
+
+  return result;
+}
+
+function buildMultiPageAssistantMessage(
+  pages: import("./types.js").SitePagePlan[],
+  modulesGenerated: number,
+  failedModules: string[],
+  durationMs: number,
+  narrative: string,
+  validationIssues: { module: string; message: string; autoFixed: boolean }[],
+): string {
+  const seconds = Math.round(durationMs / 1000);
+  const parts: string[] = [];
+
+  parts.push(
+    `Created ${pages.length}-page site with ${modulesGenerated} modules in ${seconds}s.`,
+  );
+  parts.push(`\n\n**Pages:** ${pages.map((p) => p.label).join(", ")}`);
+
+  if (narrative) {
+    parts.push(`\n\n${narrative}`);
+  }
+
+  if (failedModules.length > 0) {
+    parts.push(
+      `\n\n**Failed:** ${failedModules.join(", ")}. You can retry these individually.`,
+    );
+  }
+
+  const unfixed = validationIssues.filter((i) => !i.autoFixed);
+  const fixed = validationIssues.filter((i) => i.autoFixed);
+  if (fixed.length > 0 || unfixed.length > 0) {
+    const valParts: string[] = [];
+    if (fixed.length > 0) {
+      valParts.push(`**Auto-fixed:** ${fixed.map((i) => `${i.module}: ${i.message}`).join(", ")}`);
+    }
+    if (unfixed.length > 0) {
+      valParts.push(`**Warnings:** ${unfixed.map((i) => `${i.module}: ${i.message}`).join(", ")}`);
+    }
+    parts.push(`\n\n${valParts.join("\n")}`);
+  }
+
+  return parts.join("");
 }
 
 // ---------------------------------------------------------------------------

@@ -5,9 +5,9 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { ModuleFiles, GeneratedAssets } from "../../ai/engine.js";
-import type { ChatMessage, TemplateEntry, SessionAsset, FieldDef } from "./types.js";
+import type { ChatMessage, TemplateEntry, SessionAsset, FieldDef, PageType } from "./types.js";
 import { getSession, saveSession } from "./store.js";
-import { getActiveTemplate } from "./templates.js";
+import { getActiveTemplate, addTemplate, setActiveTemplate } from "./templates.js";
 import { log } from "../log.js";
 
 // ---------------------------------------------------------------------------
@@ -290,6 +290,76 @@ export function loadChatFromTheme(themePath: string): ChatMessage[] {
     return Array.isArray(data.messages) ? data.messages : [];
   } catch {
     return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-page result handler
+// ---------------------------------------------------------------------------
+
+export interface MultiPageResultInput {
+  pages: {
+    pageId: string;
+    templateId: string;
+    modules: ModuleFiles[];
+    moduleOrder: string[];
+  }[];
+  sharedModules: ModuleFiles[];
+  sharedCss: string;
+  sharedJs: string;
+  pageLabels: Map<string, { label: string; pageType: PageType }>;
+}
+
+export function applyMultiPageResult(result: MultiPageResultInput): void {
+  const activeSession = getSession();
+  if (!activeSession) return;
+
+  // Sync shared CSS/JS to ALL existing templates
+  for (const tpl of activeSession.templates) {
+    tpl.sharedCss = result.sharedCss;
+    tpl.sharedJs = result.sharedJs;
+  }
+  activeSession.sharedCss = result.sharedCss;
+  activeSession.sharedJs = result.sharedJs;
+
+  // Create or update template entries for each page
+  for (const page of result.pages) {
+    const meta = result.pageLabels.get(page.pageId);
+    const label = meta?.label || page.pageId;
+    const pageType = meta?.pageType || "website_page";
+
+    let tpl = activeSession.templates.find((t) => t.id === page.templateId);
+
+    if (!tpl) {
+      tpl = addTemplate(pageType, label);
+      tpl.id = page.templateId;
+      tpl.templateFile = `templates/${page.templateId}.html`;
+    }
+
+    tpl.modules = page.modules;
+    tpl.moduleOrder = page.moduleOrder;
+    tpl.sharedCss = result.sharedCss;
+    tpl.sharedJs = result.sharedJs;
+  }
+
+  // Activate the first page
+  if (result.pages.length > 0) {
+    setActiveTemplate(result.pages[0].templateId);
+  }
+
+  activeSession.updatedAt = Date.now();
+}
+
+export function syncSharedCssToAllTemplates(): void {
+  const activeSession = getSession();
+  if (!activeSession) return;
+
+  const sharedCss = activeSession.sharedCss;
+  const sharedJs = activeSession.sharedJs;
+
+  for (const tpl of activeSession.templates) {
+    tpl.sharedCss = sharedCss;
+    tpl.sharedJs = sharedJs;
   }
 }
 

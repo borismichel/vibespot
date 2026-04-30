@@ -3,7 +3,7 @@
  */
 
 import type { ModuleFiles } from "../../ai/engine.js";
-import type { SessionSnapshot } from "../session/types.js";
+import type { SessionSnapshot, PageType } from "../session/types.js";
 
 // ---------------------------------------------------------------------------
 // Stage 1 output: Intent Analyzer
@@ -12,6 +12,7 @@ import type { SessionSnapshot } from "../session/types.js";
 export interface PipelinePlan {
   intent:
     | "create"
+    | "create_site"
     | "modify"
     | "add"
     | "remove"
@@ -26,6 +27,8 @@ export interface PipelinePlan {
     sourceTemplate: string;
     position: number;
   }[];
+  pages?: SitePagePlan[];
+  sharedModules?: string[];
   guidesNeeded: (
     | "design"
     | "content"
@@ -35,7 +38,7 @@ export interface PipelinePlan {
   )[];
   designSystemChanges: boolean;
   contentType?: "page" | "email";
-  answer?: string; // For "question" intent — short-circuits the pipeline
+  answer?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +141,49 @@ export interface PipelineResult {
   stats: {
     modulesGenerated: number;
     modulesUnchanged: number;
+    modulesFailed: number;
+    durationMs: number;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Multi-page pipeline types (VIB-159)
+// ---------------------------------------------------------------------------
+
+export interface SitePagePlan {
+  id: string;
+  label: string;
+  pageType: PageType;
+  purpose: string;
+  slug: string;
+}
+
+export interface SiteBlueprint {
+  pages: {
+    pageId: string;
+    modules: { name: string; description: string; contentBrief: string; layoutNotes: string }[];
+    moduleOrder: string[];
+  }[];
+  sharedModules: { name: string; description: string; contentBrief: string; layoutNotes: string }[];
+  narrative: string;
+}
+
+export interface MultiPagePipelineResult {
+  pages: {
+    pageId: string;
+    templateId: string;
+    label: string;
+    pageType: PageType;
+    modules: ModuleFiles[];
+    moduleOrder: string[];
+  }[];
+  sharedModules: ModuleFiles[];
+  sharedCss: string;
+  sharedJs: string;
+  assistantMessage: string;
+  stats: {
+    pagesGenerated: number;
+    modulesGenerated: number;
     modulesFailed: number;
     durationMs: number;
   };

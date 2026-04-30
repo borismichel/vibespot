@@ -101,6 +101,8 @@ export interface SessionSnapshot {
   themePath: string;
   contentMode?: ContentMode;
   brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string; plan?: string };
+  activePageLabel?: string;
+  sitePages?: ReadonlyArray<{ id: string; label: string; pageType: PageType; moduleCount: number }>;
 }
 
 export interface FieldDef {
