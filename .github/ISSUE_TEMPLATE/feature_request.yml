@@ -1,0 +1,42 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What problem does this solve, or what use case does it enable?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the feature or change you'd like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds or alternative approaches you've thought of.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Vibe coding (web UI)
+        - CLI wizard
+        - AI generation pipeline
+        - HubSpot upload / integration
+        - Marketplace validation
+        - Starter templates
+        - Other
+    validations:
+      required: true
