@@ -24,7 +24,7 @@ import { runIntentAnalyzer } from "./stages/intent-analyzer.js";
 import { runPageArchitect, runDesignSystem } from "./stages/page-architect.js";
 import { runSiteModulePlanner } from "./stages/site-module-planner.js";
 import { runModuleDeveloper } from "./stages/module-developer.js";
-import { validateModules } from "./stages/validator.js";
+import { validateModules, validateNavLinks } from "./stages/validator.js";
 import { log } from "../log.js";
 import { execSync } from "node:child_process";
 
@@ -514,6 +514,13 @@ async function runMultiPageFlow(
     );
     validatedModules = validationResults.map((r) => r.module);
     validationIssues = validationResults.flatMap((r) => r.issues);
+
+    // Cross-page navigation validation
+    const navIssues = validateNavLinks(
+      validatedModules,
+      pages.map((p) => p.slug),
+    );
+    validationIssues.push(...navIssues);
 
     const totalIssues = validationIssues.length;
     if (totalIssues > 0) {
