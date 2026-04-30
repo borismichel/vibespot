@@ -357,6 +357,7 @@ export async function runAgentPipeline(
     sharedCss,
     sharedJs,
     assistantMessage,
+    contentType: plan.contentType,
     stats: {
       modulesGenerated,
       modulesUnchanged,
