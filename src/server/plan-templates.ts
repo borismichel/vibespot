@@ -22,6 +22,7 @@ export interface PlanTemplateMetadata {
   description: string;
   icon?: string;
   order: number;
+  contentType?: "page" | "email";
 }
 
 export interface PlanTemplate extends PlanTemplateMetadata {
@@ -64,12 +65,14 @@ export function parsePlanTemplate(raw: string): PlanTemplate | null {
   const description = fields.description ?? "";
   if (!id || !label) return null;
   const orderRaw = fields.order ? Number(fields.order) : NaN;
+  const contentType = fields.contentType === "email" ? "email" as const : undefined;
   return {
     id,
     label,
     description,
     icon: fields.icon || undefined,
     order: Number.isFinite(orderRaw) ? orderRaw : 9999,
+    contentType,
     body: body.trimEnd() + "\n",
   };
 }
@@ -150,11 +153,12 @@ export function _resetPlanTemplatesCache(): void {
  * Public metadata-only listing for the API.
  */
 export function listPlanTemplateMetadata(): PlanTemplateMetadata[] {
-  return listPlanTemplates().map(({ id, label, description, icon, order }) => ({
+  return listPlanTemplates().map(({ id, label, description, icon, order, contentType }) => ({
     id,
     label,
     description,
     icon,
     order,
+    contentType,
   }));
 }
