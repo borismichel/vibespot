@@ -1,0 +1,108 @@
+[
+  {
+    "name": "preheader_text",
+    "label": "Preheader Text",
+    "type": "text",
+    "default": "Welcome aboard. Here's what happens next."
+  },
+  {
+    "name": "logo_image",
+    "label": "Logo",
+    "type": "image",
+    "default": {
+      "src": "https://placehold.co/180x40/1a1a2e/ffffff?text=YourLogo",
+      "alt": "Company Logo",
+      "width": 180,
+      "height": 40
+    }
+  },
+  {
+    "name": "heading",
+    "label": "Heading",
+    "type": "text",
+    "default": "You're in. Here's what to do first."
+  },
+  {
+    "name": "body_text",
+    "label": "Body Text",
+    "type": "text",
+    "default": "Your account is ready. Most people start with these three steps and see results within 48 hours."
+  },
+  {
+    "name": "steps",
+    "label": "Onboarding Steps",
+    "type": "group",
+    "occurrence": { "min": 1, "max": 5 },
+    "children": [
+      {
+        "name": "step_number",
+        "label": "Step Number",
+        "type": "text",
+        "default": "1"
+      },
+      {
+        "name": "step_title",
+        "label": "Step Title",
+        "type": "text",
+        "default": "Connect your data source"
+      },
+      {
+        "name": "step_description",
+        "label": "Step Description",
+        "type": "text",
+        "default": "Takes about 2 minutes. We support 40+ integrations out of the box."
+      }
+    ],
+    "default": [
+      {
+        "step_number": "1",
+        "step_title": "Connect your data source",
+        "step_description": "Takes about 2 minutes. We support 40+ integrations out of the box."
+      },
+      {
+        "step_number": "2",
+        "step_title": "Set up your first dashboard",
+        "step_description": "Pick a template or build from scratch. Most teams go live in under 10 minutes."
+      },
+      {
+        "step_number": "3",
+        "step_title": "Invite your team",
+        "step_description": "Share access with up to 5 teammates on your current plan."
+      }
+    ]
+  },
+  {
+    "name": "cta_text",
+    "label": "CTA Button Text",
+    "type": "text",
+    "default": "Go to Your Dashboard"
+  },
+  {
+    "name": "cta_link",
+    "label": "CTA Link",
+    "type": "link",
+    "default": {
+      "url": { "href": "https://app.example.com/dashboard", "type": "EXTERNAL" },
+      "open_in_new_tab": true,
+      "no_follow": false
+    }
+  },
+  {
+    "name": "help_text",
+    "label": "Help Text",
+    "type": "text",
+    "default": "Questions? Reply to this email. A real person reads every message."
+  },
+  {
+    "name": "brand_color",
+    "label": "Brand Color",
+    "type": "color",
+    "default": { "color": "#e8613a", "opacity": 100 }
+  },
+  {
+    "name": "bg_color",
+    "label": "Background Color",
+    "type": "color",
+    "default": { "color": "#f5f5f5", "opacity": 100 }
+  }
+]

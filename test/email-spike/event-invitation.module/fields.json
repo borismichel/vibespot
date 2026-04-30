@@ -1,0 +1,159 @@
+[
+  {
+    "name": "preheader_text",
+    "label": "Preheader Text",
+    "type": "text",
+    "default": "Join us May 15 for a live product demo. 200 spots left."
+  },
+  {
+    "name": "logo_image",
+    "label": "Logo",
+    "type": "image",
+    "default": {
+      "src": "https://placehold.co/180x40/1a1a2e/ffffff?text=YourLogo",
+      "alt": "Company Logo",
+      "width": 180,
+      "height": 40
+    }
+  },
+  {
+    "name": "event_image",
+    "label": "Event Banner",
+    "type": "image",
+    "default": {
+      "src": "https://placehold.co/560x280/1a1a2e/e8613a?text=Product+Demo+2026",
+      "alt": "Product Demo 2026 event banner",
+      "width": 560,
+      "height": 280
+    }
+  },
+  {
+    "name": "heading",
+    "label": "Heading",
+    "type": "text",
+    "default": "Product Demo Day: See v4.0 Before Anyone Else"
+  },
+  {
+    "name": "intro_text",
+    "label": "Intro Text",
+    "type": "text",
+    "default": "We're showing the next version live. 45 minutes, no slides, just the product. Bring your questions."
+  },
+  {
+    "name": "event_date",
+    "label": "Event Date",
+    "type": "text",
+    "default": "Thursday, May 15, 2026"
+  },
+  {
+    "name": "event_time",
+    "label": "Event Time",
+    "type": "text",
+    "default": "2:00 PM - 2:45 PM CET"
+  },
+  {
+    "name": "event_location",
+    "label": "Event Location",
+    "type": "text",
+    "default": "Online (Zoom)"
+  },
+  {
+    "name": "event_spots",
+    "label": "Spots Remaining",
+    "type": "text",
+    "default": "200 spots left"
+  },
+  {
+    "name": "agenda_items",
+    "label": "Agenda Items",
+    "type": "group",
+    "occurrence": { "min": 1, "max": 6 },
+    "children": [
+      {
+        "name": "agenda_time",
+        "label": "Time",
+        "type": "text",
+        "default": "2:00 PM"
+      },
+      {
+        "name": "agenda_title",
+        "label": "Title",
+        "type": "text",
+        "default": "Welcome + what's changed since v3"
+      }
+    ],
+    "default": [
+      {
+        "agenda_time": "2:00 PM",
+        "agenda_title": "Welcome + what's changed since v3"
+      },
+      {
+        "agenda_time": "2:10 PM",
+        "agenda_title": "Live demo: the 3 biggest new features"
+      },
+      {
+        "agenda_time": "2:30 PM",
+        "agenda_title": "Q&A with the product team"
+      },
+      {
+        "agenda_time": "2:45 PM",
+        "agenda_title": "Early access signup for beta testers"
+      }
+    ]
+  },
+  {
+    "name": "speaker_item_name",
+    "label": "Speaker Name",
+    "type": "text",
+    "default": "Sarah Chen"
+  },
+  {
+    "name": "speaker_role",
+    "label": "Speaker Role",
+    "type": "text",
+    "default": "Head of Product"
+  },
+  {
+    "name": "speaker_image",
+    "label": "Speaker Photo",
+    "type": "image",
+    "default": {
+      "src": "https://placehold.co/80x80/e8613a/ffffff?text=SC",
+      "alt": "Sarah Chen, Head of Product",
+      "width": 80,
+      "height": 80
+    }
+  },
+  {
+    "name": "cta_text",
+    "label": "CTA Button Text",
+    "type": "text",
+    "default": "Reserve Your Spot"
+  },
+  {
+    "name": "cta_link",
+    "label": "CTA Link",
+    "type": "link",
+    "default": {
+      "url": { "href": "https://events.example.com/demo-day", "type": "EXTERNAL" },
+      "open_in_new_tab": true,
+      "no_follow": false
+    }
+  },
+  {
+    "name": "calendar_link",
+    "label": "Add to Calendar Link",
+    "type": "link",
+    "default": {
+      "url": { "href": "https://events.example.com/demo-day.ics", "type": "EXTERNAL" },
+      "open_in_new_tab": true,
+      "no_follow": false
+    }
+  },
+  {
+    "name": "brand_color",
+    "label": "Brand Color",
+    "type": "color",
+    "default": { "color": "#e8613a", "opacity": 100 }
+  }
+]
