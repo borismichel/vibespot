@@ -27,12 +27,17 @@ Opens a browser with:
 - **Chat on the left** — describe your landing page in natural language
 - **Live preview on the right** — see your page render in real-time, plus a **Plan tab** and a **Code tab**
 - **Agentic pipeline** — multi-stage AI generation with real-time progress
-- **Plan mode** *(new in v1.1)* — toggle on to deliberate before generating: the AI asks elicitation questions, builds a markdown plan in a dedicated pane, and only generates after you approve
+- **Plan mode** — toggle on to deliberate before generating: the AI asks elicitation questions, builds a markdown plan in a dedicated pane, and only generates after you approve. *(v1.2)* Pre-canned plan templates for common page types (SaaS, e-commerce, event, blog, portfolio, agency, restaurant) skip the cold-start phase.
+- **Simplified setup** *(new in v1.2)* — returning users see recent projects; new users see a chat-style prompt as the primary path with templates and import flows behind a disclosure
 - **Project sidebar** — create, open, resume, or delete projects
 - **Module management** — reorder via drag-and-drop, edit fields, delete modules from module list or module library
-- **Starter templates** — SaaS, Portfolio, Restaurant, Event
+- **Starter templates** — SaaS, Portfolio, Restaurant, Event, Coming Soon — pre-built page bundles for instant preview with no AI wait
+- **Select mode** *(new in v1.2)* — click elements in the live preview to reference them in chat. Toggle from the preview topbar.
+- **Undo/redo** *(new in v1.2)* — Ctrl+Z / Ctrl+Y step through version history; a compact timeline strip above the chat input shows every generation step with hover tooltips
+- **Smart suggestions** *(new in v1.2)* — contextual suggestion chips appear after pipeline completion, filtered by existing modules
 - **From Figma** *(Beta)* — paste a Figma URL to extract design tokens, text, and assets, then generate a full page that translates the design verbatim
 - **From React** *(Beta)* — convert existing React/Lovable projects from a Git URL
+- **From HubSpot** — fetch an existing theme, then run inverse analysis to extract design tokens, module graph, and round-trip risks
 - **Field editor** — tweak text, colors, images directly
 - **File uploads** — attach images and documents via drag-and-drop or paperclip button
 - **Upload to HubSpot** — per-file progress, auto-fix, celebration popup with direct portal link
@@ -161,6 +166,7 @@ vibespot wizard       # Classic CLI wizard
 vibespot init         # Check and install required tools
 vibespot convert      # Convert a React project (no upload)
 vibespot upload       # Upload theme to HubSpot
+vibespot inverse [--path] [--json] [--apply-tokens]  # Analyze an imported theme (design tokens, module graph, risks)
 vibespot marketplace check [--fix] [--json]   # Audit theme for HubSpot Marketplace submission
 vibespot marketplace edit                     # Edit Marketplace listing metadata (marketplace.json)
 vibespot doctor       # Diagnose environment issues
@@ -181,6 +187,16 @@ Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, Figma, GitH
 - `enabledCLITools` — Which CLI tools to detect on settings load
 
 ## What's New
+
+### v1.2.0
+- **Inverse pipeline (HubSpot → vibeSpot)** — reverse-engineer imported HubSpot themes: design token extraction (`:root` vars, palette, typography, spacing), module relationship graph, field schema flags, and round-trip risk detection. Available via UI (From HubSpot → Analyze) and CLI (`vibespot inverse`).
+- **Simplified setup** — returning users land on a "Continue where you left off" rail; new users see a chat-style prompt as the primary path with starter templates and import flows behind a "More ways to start" disclosure.
+- **Select mode** — click elements in the live preview to reference them in chat. Toggle from the preview topbar; auto-deactivates during generation.
+- **Undo/redo with visual timeline** — Ctrl+Z / Ctrl+Y step through version history. A compact timeline strip above the chat input shows every generation step with hover tooltips (commit hash, age, changed modules).
+- **Smart chat suggestions** — contextual suggestion chips appear after pipeline completion, filtered by which modules exist on the page.
+- **Plan-mode templates** — 7 pre-canned plan structures (SaaS, e-commerce, event, blog, portfolio, agency, restaurant) that skip the cold-start elicitation phase and jump straight to page-specific questions.
+- **Starter templates** — 5 bundled page templates (SaaS Landing, Portfolio, Restaurant, Event, Coming Soon) for instant preview with no AI wait.
+- **HubSpot Marketplace publication path** — rule-based audit, auto-fix, and listing metadata editor for Marketplace submissions. UI (storefront icon) and CLI (`vibespot marketplace check`).
 
 ### v1.1.3
 - **Model selection persists for Codex CLI, Gemini CLI, and Gemini API** — picking a non-default model used to revert because the `/api/settings/engine` route had no cases for those engines, no config fields existed, and `getCurrentModel` returned `null` (so the dropdown reset to the first option). Added the config fields, route persistence, UI lookup, and runtime `--model`/`-m` flag plumbing into the CLI subprocess invocation.

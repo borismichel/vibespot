@@ -87,6 +87,7 @@
     <a class="doc-nav__link doc-nav__link--sub" href="#figma-image-modes">Image Modes</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#figma-pipeline">Translation Pipeline</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#figma-tips">Tips &amp; Limits</a>
+    <a class="doc-nav__link" href="#inverse-pipeline">Inverse Pipeline</a>
     <a class="doc-nav__link" href="#editing">Editing &amp; Customization</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#field-editor">Field Editor</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#design-system">Design System</a>
@@ -476,13 +477,17 @@ vibespot</code></pre>
   <p>Drag and drop files onto the chat input, or click the attachment button to browse.</p>
 
   <h4 id="starter-templates">Starter Templates</h4>
-  <p>For quick starts, the chat suggests four starter templates on an empty theme:</p>
+  <p>For quick starts, the setup screen offers five starter templates that bootstrap a new theme with pre-built modules, shared CSS/JS, and module order &mdash; instant preview with no AI wait:</p>
   <ul>
     <li><strong>SaaS Landing Page</strong> &mdash; Hero, features grid, pricing, testimonials, CTA, footer</li>
     <li><strong>Portfolio</strong> &mdash; About section, project gallery, skills, contact form</li>
     <li><strong>Restaurant</strong> &mdash; Hero with imagery, menu sections, reservation CTA, location map, hours</li>
     <li><strong>Event / Conference</strong> &mdash; Event hero with date, speakers, schedule, sponsors, registration CTA</li>
+    <li><strong>Coming Soon</strong> &mdash; Countdown hero, email signup, teaser content</li>
   </ul>
+
+  <h4 id="smart-suggestions">Smart Chat Suggestions</h4>
+  <p>After each pipeline completion, contextual suggestion chips appear below the assistant message with follow-up actions tailored to your current page. The suggestions are filtered by which modules already exist &mdash; you won't see "Add a pricing section" if you already have one. Click a chip to send it as the next message, or ignore them and type your own prompt.</p>
 
   <h3 id="preview-panel">Preview Panel</h3>
   <p>The preview panel renders your page using a local HubL subset renderer. It supports variables, conditionals, loops, filters, <code>scope_css</code>, and <code>require_css</code>/<code>require_js</code> tags. The preview automatically refreshes when modules are updated.</p>
@@ -493,6 +498,9 @@ vibespot</code></pre>
     <li><strong>Mobile</strong> &mdash; 375px</li>
   </ul>
   <p>During AI generation, modules that are being regenerated show a working overlay with a progress indicator. Modules that have already been generated remain visible and interactive.</p>
+
+  <h4 id="select-mode">Select Mode</h4>
+  <p>Click the <strong>Select</strong> toggle in the preview topbar to enter select mode. In this mode, hovering over an element in the live preview highlights it, and clicking it pre-fills the chat input with a contextual reference to that element (e.g. "In the hero module, the headline…"). This lets you point at what you want to change instead of describing it. Select mode auto-deactivates during AI generation and uses a crosshair cursor to distinguish it from normal preview interaction.</p>
 
   <h3 id="code-editor">Code Editor</h3>
   <p>Switch to the code editor tab to directly edit module files. The file tree is grouped by module name, and each module contains:</p>
@@ -858,6 +866,34 @@ vibespot</code></pre>
     <div class="doc-callout__label">&#10024; Workflow tip</div>
     <p>For the highest-fidelity output: use auto-layout in Figma, name your frames as kebab-friendly section names ("Hero", "Trust Bar", "Final CTA"), and extract real copy + final imagery into the design before importing. The result is a HubSpot theme that's ready to deploy with no manual cleanup &mdash; content editors get a fully-fielded theme they just need to plug content into.</p>
   </div>
+</div>
+
+<!-- ============================================================
+     Section: Inverse Pipeline (HubSpot → vibeSpot)
+     ============================================================ -->
+<div class="doc-section" id="inverse-pipeline">
+  <h2 id="inverse-pipeline-heading">Inverse Pipeline (HubSpot &rarr; vibeSpot) <a href="#inverse-pipeline" class="doc-anchor">#</a></h2>
+  <p class="doc-subtitle">Reverse-engineer an imported HubSpot theme so the AI understands its design system, module relationships, and round-trip risks before generating modifications.</p>
+
+  <p>When you import a theme via <strong>From HubSpot</strong>, vibeSpot downloads the files and loads modules into a session. The inverse pipeline goes further: it analyzes the theme's CSS, templates, and field schemas to extract structured context that the AI uses when generating additions or modifications.</p>
+
+  <h3 id="inverse-what">What Gets Analyzed</h3>
+  <ul>
+    <li><strong>Design tokens</strong> &mdash; <code>:root</code> CSS variables, inferred color palette (with usage counts), typography scale (family, size, weight per role), spacing tokens, border radii, and shadows. These are extracted from both the theme-level CSS and per-module stylesheets.</li>
+    <li><strong>Module relationship graph</strong> &mdash; Which modules appear in which templates, shared field patterns across modules, and orphan modules (defined but unused by any template).</li>
+    <li><strong>Field schema flags</strong> &mdash; Patterns that vibeSpot doesn't natively generate: HubDB bindings, deeply nested groups, repeater occurrence limits, custom widget types, conditional visibility rules. These are flagged so the AI avoids breaking them.</li>
+    <li><strong>Round-trip risks</strong> &mdash; HubL macros, <code>{% raw %}</code> blocks, partials outside <code>modules/</code>, custom <code>module.js</code> files, and <code>import_modules.json</code> references. These patterns survive the round-trip but need preservation &mdash; the AI is told not to touch them.</li>
+  </ul>
+
+  <h3 id="inverse-tokens">Design Token Application</h3>
+  <p>If the imported theme has no <code>:root</code> variables (common in older themes), the inverse analyzer can synthesize a <code>:root</code> block from the inferred palette and typography, populating <code>sharedCss</code> so the AI generates new modules that visually match the existing ones. Use the <strong>Apply tokens</strong> action in the UI or <code>vibespot inverse --apply-tokens</code> from the CLI.</p>
+
+  <h3 id="inverse-access">How to Access</h3>
+  <ul>
+    <li><strong>UI</strong> &mdash; After fetching a theme via <strong>From HubSpot</strong>, the import wizard shows the analysis results (tokens, module graph, risks) before you enter the editor.</li>
+    <li><strong>CLI</strong> &mdash; <code>vibespot inverse [--path &lt;theme-dir&gt;] [--json] [--apply-tokens]</code>. Without <code>--path</code>, it uses the active theme.</li>
+    <li><strong>API</strong> &mdash; <code>GET /api/inverse/analyze</code> and <code>POST /api/inverse/apply-tokens</code> routes in the web server.</li>
+  </ul>
 </div>
 
 <!-- ============================================================
@@ -1247,6 +1283,7 @@ vibespot</code></pre>
       <tr><td><code>vibespot init</code></td><td>Environment check &amp; setup</td></tr>
       <tr><td><code>vibespot convert</code></td><td>React-to-HubSpot conversion</td></tr>
       <tr><td><code>vibespot upload</code></td><td>Upload theme to HubSpot</td></tr>
+      <tr><td><code>vibespot inverse</code></td><td>Analyze an imported theme (design tokens, module graph, risks)</td></tr>
       <tr><td><code>vibespot marketplace check</code></td><td>Audit a theme against HubSpot Marketplace requirements</td></tr>
       <tr><td><code>vibespot marketplace edit</code></td><td>Edit Marketplace listing metadata (<code>marketplace.json</code>)</td></tr>
       <tr><td><code>vibespot doctor</code></td><td>Diagnostics &amp; health check</td></tr>
@@ -1324,6 +1361,18 @@ vibespot</code></pre>
   <div class="doc-collapse">
     <button class="doc-collapse__trigger">
       <span class="doc-collapse__arrow">&#9654;</span>
+      <code>vibespot inverse</code> &mdash; Analyze Imported Theme
+    </button>
+    <div class="doc-collapse__content">
+      <p>Runs the inverse analyzer on an imported HubSpot theme, extracting design tokens, module relationship graph, field schema flags, and round-trip risks. See <a href="#inverse-pipeline">Inverse Pipeline</a> for details on what gets analyzed.</p>
+      <pre><code>vibespot inverse [--path &lt;theme-dir&gt;] [--json] [--apply-tokens]</code></pre>
+      <p>Without <code>--path</code>, uses the active theme. <code>--json</code> outputs the full report as JSON. <code>--apply-tokens</code> synthesizes a <code>:root</code> CSS block from inferred tokens and writes it to the theme's <code>sharedCss</code>.</p>
+    </div>
+  </div>
+
+  <div class="doc-collapse">
+    <button class="doc-collapse__trigger">
+      <span class="doc-collapse__arrow">&#9654;</span>
       <code>vibespot doctor</code> &mdash; Diagnostics
     </button>
     <div class="doc-collapse__content">
@@ -1349,6 +1398,8 @@ vibespot</code></pre>
       <tr><td><kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>New line</td><td>Chat input</td></tr>
       <tr><td><kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save file</td><td>Code editor</td></tr>
       <tr><td><kbd>Escape</kbd></td><td>Close modal or dialog</td><td>Any overlay</td></tr>
+      <tr><td><kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Step back one version</td><td>Editor (not in text fields)</td></tr>
+      <tr><td><kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Y</kbd> or <kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Step forward one version</td><td>Editor (not in text fields)</td></tr>
       <tr><td><kbd>Escape</kbd></td><td>Close settings panel</td><td>Settings panel</td></tr>
       <tr><td><kbd>/</kbd></td><td>Focus search</td><td>Documentation</td></tr>
     </tbody>
