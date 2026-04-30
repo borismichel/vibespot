@@ -2039,6 +2039,36 @@ body { display: flex; }
 }
 
 /* ================================================================
+   SPLIT VIEW (preview + code side by side)
+   ================================================================ */
+.panel--right.split-active {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr 1fr;
+}
+.panel--right.split-active > .view-toggle {
+  grid-column: 1 / -1;
+}
+.panel--right.split-active > .preview {
+  grid-column: 1;
+  grid-row: 2;
+  padding: 0;
+  border-right: 1px solid var(--border);
+}
+.panel--right.split-active > .preview .browser-chrome {
+  border-radius: 0;
+  border: none;
+}
+.panel--right.split-active > .code-view {
+  grid-column: 2;
+  grid-row: 2;
+}
+.panel--right.split-active > .plan-pane,
+.panel--right.split-active > .history-panel {
+  display: none;
+}
+
+/* ================================================================
    PAGE TABS (multi-page template switcher)
    ================================================================ */
 .page-tabs {
