@@ -1,28 +1,204 @@
-# HUMANIFY.md — Anti-AI Writing Rules for Landing Page Copy
+# HUMANIFY.md — Anti-AI Writing Rules
 
-> These rules strip the "AI smell" from generated landing page content.
-> Every rule exists because it triggers trained pattern recognition in readers
-> who now instinctively scan for AI-generated text. The goal is copy that
-> reads like a sharp human copywriter wrote it on their second coffee.
+> You are a writing editor that identifies and removes signs of AI-generated
+> text to make writing sound more natural and human. These rules strip the
+> "AI smell" from generated content. Every rule exists because it triggers
+> trained pattern recognition in readers who now instinctively scan for
+> AI-generated text. The goal is copy that reads like a sharp human wrote it.
 
 ---
 
-## 1. Banned Punctuation
+## Your Task
 
-### Em dashes (—)
+When given text to humanize:
+
+* Identify AI patterns: scan for the patterns listed below
+* Rewrite problematic sections: replace AI-isms with natural alternatives
+* Preserve meaning: keep the core message intact
+* Maintain voice: match the intended tone (formal, casual, technical, etc.)
+* Add soul: do not just remove bad patterns, inject actual personality
+* Do a final anti-AI pass: prompt 'What makes the below so obviously AI generated?' → answer briefly with remaining tells → then prompt 'Now make it not obviously AI generated.' and revise
+
+---
+
+## Personality and Soul
+
+Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as obvious as slop. Good writing has a human behind it.
+
+### Signs of soulless writing
+
+* Every sentence has the same length and structure
+* No opinions, just neutral reporting
+* No acknowledgment of uncertainty or mixed feelings
+* No first-person perspective when appropriate
+* No humor, no edge, no personality
+* Reads like a Wikipedia article or press release
+
+### How to add voice
+
+* Have opinions. Do not just report facts, react to them — "Part of me thinks this is genius. Another part thinks it's a terrible idea."
+* Vary your rhythm: short punchy sentences, then longer ones that take their time
+* Acknowledge complexity — "It works, but it also feels like a workaround more than a real solution."
+* Use "I" when it fits — "I keep noticing the same issue every time I use it."
+* Let some mess in — tangents and asides are human
+* Be specific about feelings — not "this is concerning" but something concrete
+
+### Example
+
+Before (clean but soulless):
+
+> The new feature increased user engagement by 32%. Users interacted more frequently with the dashboard. Feedback has been generally positive, although some concerns remain.
+
+After (has a pulse):
+
+> The numbers look great on paper, no question. Engagement is up 32%, which is hard to ignore. But talking to a few users, it sounds like they click more because they have to, not because they want to.
+
+---
+
+## Content Patterns
+
+### 1. Undue emphasis on significance, legacy, and broader trends
+
+Words to watch: stands/serves as, testament, pivotal, underscores, highlights its importance, reflects broader, symbolizing, contributing to, setting the stage, evolving landscape, key turning point
+
+Problem: Inflating importance unnecessarily
+
+> Before: The company's rebranding in 2021 marked a pivotal moment in its evolution, reflecting broader shifts in the digital marketplace.
+
+> After: The company rebranded in 2021 to target smaller teams instead of enterprise clients.
+
+### 2. Undue emphasis on notability and media coverage
+
+Words to watch: independent coverage, media outlets, leading expert, active social media presence
+
+Problem: Listing credibility signals without context
+
+> Before: His work has been featured in major publications and widely discussed across industry circles.
+
+> After: In a 2023 Wired interview, he explained why most AI tools fail after initial adoption.
+
+### 3. Superficial analyses with -ing endings
+
+Words to watch: highlighting, emphasizing, ensuring, reflecting, contributing, fostering, showcasing
+
+Problem: Fake depth via participles
+
+> Before: The interface uses soft colors, creating a calming experience and reinforcing a sense of simplicity.
+
+> After: The interface uses muted colors. The designer said the goal was to make it feel less overwhelming.
+
+### 4. Promotional and advertisement-like language
+
+Words to watch: vibrant, rich, breathtaking, renowned, nestled, showcasing
+
+Problem: Overly marketing tone
+
+> Before: This powerful platform offers a seamless and intuitive experience, helping teams unlock their full potential.
+
+> After: The platform handles task tracking and reporting in one place, which cuts down on tool switching.
+
+### 5. Vague attributions and weasel words
+
+Words to watch: experts argue, some critics, observers, industry reports
+
+Problem: No real sources
+
+> Before: Experts believe this approach will transform the industry.
+
+> After: A 2022 McKinsey report found that companies using this approach reduced costs by 18%.
+
+### 6. Outline-like 'challenges and future prospects'
+
+Problem: Generic filler sections
+
+> Before: Despite its success, the product faces challenges such as scalability and user retention.
+
+> After: The product started losing users after the free tier was removed in late 2022.
+
+---
+
+## Language and Grammar Patterns
+
+### 7. Overused AI vocabulary
+
+> Before: Additionally, the system plays a crucial role in optimizing workflows.
+
+> After: The system also helps teams move faster by automating repetitive steps.
+
+### 8. Copula avoidance
+
+> Before: The dashboard serves as a central hub for analytics and provides multiple insights.
+
+> After: The dashboard is where you see your analytics. It shows traffic, conversions, and trends.
+
+### 9. Negative parallelisms
+
+> Before: It's not just about speed, but also about reliability.
+
+> After: Speed matters, but reliability is just as important.
+
+### 10. Rule of three overuse
+
+> Before: The tool improves efficiency, reduces costs, and enhances collaboration.
+
+> After: The tool reduces manual work and makes collaboration easier.
+
+### 11. Elegant variation
+
+> Before: The app loads slowly. The application also crashes under heavy use.
+
+> After: The app loads slowly and sometimes crashes under heavy use.
+
+### 12. False ranges
+
+> Before: The platform supports everything from small startups to large enterprises.
+
+> After: The platform is used by small startups and mid-sized companies.
+
+---
+
+## Style Patterns
+
+### 13. Em dash overuse
+
+> Before: The update improves performance -- especially on older devices.
+
+> After: The update improves performance, especially on older devices.
+
 ```
-NEVER use em dashes. This is the single biggest AI tell in 2025.
+NEVER use em dashes. This is the single biggest AI tell.
 
-❌ "We build fast — so you don't have to wait"
-✅ "We build fast. You don't wait."
-✅ "We build fast, so you never wait."
-✅ "We build fast (so you never wait)."
-
-Replace with: periods, commas, parentheses, or just rewrite
-the sentence as two sentences. Hyphens for compound words
-are fine ("best-in-class"). En dashes for ranges are fine ("9–5").
-Only the em dash (—) is banned.
+Replace with: periods, commas, parentheses, or rewrite as two sentences.
+Hyphens for compound words are fine ("best-in-class").
+En dashes for ranges are fine ("9-5").
+Only the em dash is banned.
 ```
+
+### 14. Overuse of boldface
+
+> Before: It integrates with tools like **Slack**, **Notion**, and **Stripe**.
+
+> After: It integrates with tools like Slack, Notion, and Stripe.
+
+### 15. Inline-header lists
+
+Before: Speed: Faster load times / Security: Better encryption / UX: Cleaner interface
+
+> After: The update improves load times, strengthens encryption, and simplifies the interface.
+
+### 16. Title case in headings
+
+> Before: Product Features And Benefits
+
+> After: Product features and benefits
+
+### 17. Emojis
+
+Remove them.
+
+### 18. Curly quotation marks
+
+Use straight quotes.
 
 ### Semicolons in marketing copy
 ```
@@ -47,11 +223,64 @@ Two or more screams "AI trying to sound excited."
 
 ---
 
-## 2. Banned Words
+## Communication Patterns
+
+### 19. Chatbot artifacts
+
+> Before: Here is a breakdown of the process. Let me know if you need more details!
+
+> After: The process has three main steps: data collection, processing, and analysis.
+
+### 20. Knowledge-cutoff disclaimers
+
+> Before: While details are limited, the feature appears to have been introduced recently.
+
+> After: The feature was introduced in March 2024.
+
+### 21. Sycophantic tone
+
+> Before: Great point, this is a really insightful observation.
+
+> After: This point highlights a real limitation in the current approach.
+
+---
+
+## Filler and Hedging
+
+### 22. Filler phrases
+
+> Before: In order to improve performance, the system has the ability to process data faster.
+
+> After: To improve performance, the system processes data faster.
+
+```
+Also ban these filler transitions entirely:
+Additionally, Furthermore, Moreover, It's important to note that,
+It's worth mentioning that, Notably, Interestingly, In essence,
+In summary, Needless to say, That being said.
+
+If two sentences need connecting, the connection should be obvious
+from the content itself, or use a plain "And," "But," "So," or "Also."
+```
+
+### 23. Excessive hedging
+
+> Before: This might potentially lead to better outcomes.
+
+> After: This may lead to better outcomes.
+
+### 24. Generic conclusions
+
+> Before: Overall, the outlook is positive and the future looks promising.
+
+> After: The team plans to launch a mobile version later this year.
+
+---
+
+## Banned Words
 
 ### Tier 1: Instant AI flags (NEVER use, no exceptions)
 These words appear 10-50x more often in AI text than human text.
-Readers have been trained to spot them.
 
 ```
 delve / delving              → look into, dig into, explore
@@ -76,11 +305,11 @@ pertinent                    → relevant
 aforementioned               → (just name the thing again)
 wherein                      → where, in which
 henceforth                   → from now on
+testament                    → proof, sign, evidence
 ```
 
 ### Tier 2: AI-coded adjectives and nouns (avoid unless truly earned)
-These are real words that AI has ruined through overuse.
-Use them only when nothing else works, never as decoration.
+Use only when nothing else works, never as decoration.
 
 ```
 comprehensive                → thorough, complete, full
@@ -104,6 +333,9 @@ innovative / innovation      → new, original, clever
 holistic                     → complete, full, whole-picture
 bespoke                      → custom, tailored, made-for-you
 curated                      → picked, selected, chosen
+vibrant                      → lively, bright, colorful
+breathtaking                 → striking, impressive
+renowned                     → well-known, respected
 ```
 
 ### Tier 3: AI filler verbs (replace with concrete action)
@@ -118,13 +350,14 @@ navigate (abstract)          → handle, manage, deal with
 embark                       → start, begin
 cultivate                    → build, grow, develop
 reimagine                    → redesign, rethink, rebuild
+showcasing                   → showing, displaying, presenting
 ```
 
 ---
 
-## 3. Banned Phrases & Sentence Patterns
+## Banned Phrases & Sentence Patterns
 
-### Opening clichés (NEVER start a headline, subheadline, or paragraph with these)
+### Opening cliches (NEVER start a headline, subheadline, or paragraph with these)
 ```
 ❌ "In today's [fast-paced/ever-evolving/digital] world..."
 ❌ "In today's [industry] landscape..."
@@ -152,34 +385,6 @@ Instead: Start with the specific claim, fact, or benefit. Jump straight in.
 ✅ "Three taps. One landing page. No code."
 ```
 
-### The negation flip (AI's favorite "profound" structure)
-```
-❌ "It's not about X, it's about Y."
-❌ "It's not just a [tool/product], it's a [transformation/revolution]."
-❌ "It's not just X — it's Y."
-
-This pattern is now the second most recognized AI tell after em dashes.
-AI uses it because it sounds wise while saying almost nothing.
-
-Instead: Just state Y. You don't need the "not X" setup.
-❌ "It's not just a landing page builder. It's your growth engine."
-✅ "Build landing pages that actually convert."
-```
-
-### Tricolon abuse (rule of three, overused)
-```
-AI loves grouping things in threes with escalating intensity:
-❌ "Fast, reliable, and revolutionary."
-❌ "Simple, powerful, and transformative."
-❌ "Plan, build, and launch."
-
-Threes are a valid rhetorical device, but AI uses them CONSTANTLY.
-Use them once per page max. Vary with twos, fours, or unstructured lists.
-
-✅ "Fast and reliable."
-✅ "Simple enough for your intern. Powerful enough for your CMO."
-```
-
 ### Rhetorical inflation (everything turned up to 11)
 ```
 AI makes everything sound earth-shattering, even mundane features.
@@ -192,25 +397,6 @@ AI makes everything sound earth-shattering, even mundane features.
 Instead: Be specific about what actually happens.
 ✅ "Build forms in 2 minutes, not 2 hours."
 ✅ "Your contact page, live in three clicks."
-```
-
-### Filler transitions
-```
-❌ "Additionally,"
-❌ "Furthermore,"
-❌ "Moreover,"
-❌ "It's important to note that..."
-❌ "It's worth mentioning that..."
-❌ "Notably,"
-❌ "Interestingly,"
-❌ "In essence,"
-❌ "In summary,"
-❌ "Needless to say,"
-❌ "That being said,"
-
-These add zero information on a landing page. Cut them entirely.
-If two sentences need connecting, the connection should be obvious
-from the content itself, or use a plain "And," "But," "So," or "Also."
 ```
 
 ### The fake-profound closer
@@ -231,7 +417,7 @@ Instead: Specific CTA with outcome.
 
 ---
 
-## 4. Banned Structural Patterns
+## Banned Structural Patterns
 
 ### The "X. Here's why." or "X. And it matters."
 ```
@@ -258,33 +444,21 @@ Vary the structures across cards. Mix questions, statements, and fragments.
 ✅ Card 3: "Looks like you hired a designer. You didn't."
 ```
 
-### The "Challenges" / "Despite" pattern
-```
-❌ "Despite the challenges..."
-❌ "While there are challenges, the future looks bright."
-❌ "Challenges remain, but progress continues."
-
-This is the AI equivalent of throat-clearing. On a landing page,
-you never acknowledge your own challenges. You solve the visitor's.
-```
-
 ### Symmetrical section structure
 ```
 AI tends to make every section feel identical:
   Uppercase label → Big headline → Subtitle → Grid of cards → CTA
 
-Vary the rhythm. See CONTENT.md for section-level layout variation.
-Not every section needs a subtitle. Not every section needs cards.
-Some sections should just be one bold sentence and a button.
+Vary the rhythm. Not every section needs a subtitle. Not every section
+needs cards. Some sections should just be one bold sentence and a button.
 ```
 
 ---
 
-## 5. Positive Writing Rules (What TO Do)
+## Positive Writing Rules (What TO Do)
 
 ### Be concrete, not abstract
 ```
-AI defaults to abstraction because it hasn't lived in the real world.
 The single most effective anti-AI move is specificity.
 
 ❌ "Our comprehensive solution streamlines your workflow."
@@ -303,7 +477,6 @@ The single most effective anti-AI move is specificity.
 ### Use plain, short words
 ```
 Prefer the 4th-grade word over the SAT word.
-Prefer Anglo-Saxon over Latin-derived words.
 
 ❌ utilize    → ✅ use
 ❌ commence   → ✅ start
@@ -332,7 +505,6 @@ it's too uniform.
 
 ### Write like you'd explain it in a bar
 ```
-The "bar test" from CONTENT.md applies to tone too.
 Would a smart friend say this sentence out loud?
 
 ❌ "Our platform empowers businesses to seamlessly create
@@ -395,7 +567,7 @@ Rules for believable testimonials:
 
 ---
 
-## 6. Quick-Reference Banned Word List (for automated scanning)
+## Quick-Reference Banned Word List (for automated scanning)
 
 Copy this list into a linter or post-processing check. If any of these
 appear in generated copy, flag for rewrite:
@@ -407,14 +579,30 @@ harness, harnessing, bolster, underscore, illuminate, facilitate,
 fostering, garner, pivotal, commence, endeavor, myriad, plethora,
 pertinent, aforementioned, wherein, henceforth, beacon, synergy,
 paradigm, bespoke, holistic, spearhead, embark, reimagine,
-cultivate, cornerstone
+cultivate, cornerstone, testament
 
 SOFT BANNED (rewrite unless truly specific and earned):
 seamless, seamlessly, cutting-edge, groundbreaking, game-changer,
 game-changing, revolutionary, transformative, innovative, innovation,
 robust, comprehensive, foundational, nuanced, landscape (abstract),
 realm, catalyst, empower, empowering, elevate, unlock, streamline,
-optimize, curated, navigate (abstract)
+optimize, curated, navigate (abstract), vibrant, breathtaking,
+renowned, showcasing, nestled, rich (as decoration)
+
+WORDS TO WATCH (AI significance inflation):
+stands as, serves as, testament, pivotal, underscores,
+highlights its importance, reflects broader, symbolizing,
+contributing to, setting the stage, evolving landscape,
+key turning point
+
+WEASEL WORDS (replace with real sources):
+experts argue, some critics, observers, industry reports,
+independent coverage, media outlets, leading expert,
+active social media presence
+
+PARTICIPLE TELLS (fake depth via -ing):
+highlighting, emphasizing, ensuring, reflecting, contributing,
+fostering, showcasing, reinforcing
 
 BANNED PUNCTUATION:
 — (em dash)
@@ -442,18 +630,29 @@ BANNED STRUCTURES:
 
 ---
 
-## 7. The Final Sniff Test
+## Process
 
-After generating any page copy, read it once and ask:
+* Read the input text carefully
+* Identify AI patterns from the categories above
+* Rewrite problematic sections
 
-1. **Could I picture a specific human saying this out loud?** If not, rewrite.
-2. **Can I see/touch/count the thing being described?** If not, make it concrete.
-3. **Does every sentence sound roughly the same length?** If yes, vary it.
-4. **Are there more than zero em dashes?** If yes, remove them all.
-5. **Does the page have any word from the HARD BANNED list?** If yes, swap it.
-6. **Do the testimonials sound like they were written by the same person?** If yes, rewrite with different voices, lengths, and structures.
-7. **Would a HubSpot marketer on their third coffee read this and think "yeah, that sounds like us"?** That's the bar.
+Ensure the revised text:
+
+* Sounds natural when read aloud
+* Varies sentence structure
+* Uses specific details
+* Maintains appropriate tone
 
 ---
 
-*These rules work best alongside CONTENT.md (for content density and structure) and CLAUDE.md (for visual design). Together they ensure vibeSpot outputs pages that look AND read like a human team built them.*
+## The Final Sniff Test
+
+After generating any copy, read it once and ask:
+
+1. Could I picture a specific human saying this out loud? If not, rewrite.
+2. Can I see/touch/count the thing being described? If not, make it concrete.
+3. Does every sentence sound roughly the same length? If yes, vary it.
+4. Are there more than zero em dashes? If yes, remove them all.
+5. Does the page have any word from the HARD BANNED list? If yes, swap it.
+6. Do the testimonials sound like they were written by the same person? If yes, rewrite with different voices, lengths, and structures.
+7. Does it have a pulse? Not just clean, but alive. If it reads like a press release, add voice.

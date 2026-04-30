@@ -15,6 +15,13 @@ import {
   buildModuleUserMessage,
   MODULE_DEVELOPER_SCHEMA,
 } from "../prompts/module-developer.js";
+import {
+  buildEmailModuleDeveloperPrompt,
+  buildEmailModuleDeveloperPromptBlocks,
+  buildEmailModuleUserMessage,
+  EMAIL_MODULE_DEVELOPER_SCHEMA,
+} from "../prompts/email-module-developer.js";
+import type { ContentType } from "../../session/types.js";
 import { log } from "../../log.js";
 
 export interface ModuleDevResult {
@@ -35,22 +42,23 @@ export async function runModuleDeveloper(
   onEvent: (event: PipelineEvent) => void,
   guidesNeeded?: string[],
   brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean },
+  contentType?: ContentType,
 ): Promise<ModuleDevResult[]> {
+  const isEmail = contentType === "email";
   onEvent({
     type: "agent_step",
     step: "developing",
-    label: `Generating ${specs.length} module${specs.length === 1 ? "" : "s"}...`,
+    label: `Generating ${specs.length} ${isEmail ? "email module" : "module"}${specs.length === 1 ? "" : "s"}...`,
   });
 
   const isAnthropicEngine = engine === "anthropic-api" || engine === "claude-oauth";
-  const systemPrompt = buildModuleDeveloperPrompt(
-    themeName,
-    sharedCss,
-    guidesNeeded,
-    brandAssets,
-  );
+  const systemPrompt = isEmail
+    ? buildEmailModuleDeveloperPrompt(themeName, brandAssets)
+    : buildModuleDeveloperPrompt(themeName, sharedCss, guidesNeeded, brandAssets);
   const systemBlocks = isAnthropicEngine
-    ? buildModuleDeveloperPromptBlocks(themeName, sharedCss, guidesNeeded, brandAssets)
+    ? isEmail
+      ? buildEmailModuleDeveloperPromptBlocks(themeName, brandAssets)
+      : buildModuleDeveloperPromptBlocks(themeName, sharedCss, guidesNeeded, brandAssets)
     : undefined;
 
   const limit = createConcurrencyLimiter(concurrency);
@@ -89,6 +97,7 @@ export async function runModuleDeveloper(
             model,
             0,
             systemBlocks,
+            isEmail,
           );
 
           onEvent({
@@ -145,19 +154,20 @@ async function generateSingleModule(
   model: string,
   retryCount = 0,
   systemBlocks?: import("../engine-adapter.js").SystemPromptBlock[],
+  isEmail = false,
 ): Promise<ModuleFiles> {
-  const userContent = buildModuleUserMessage(
-    userMessage,
-    spec,
-    spec.existingCode,
-  );
+  const userContent = isEmail
+    ? buildEmailModuleUserMessage(userMessage, spec, spec.existingCode)
+    : buildModuleUserMessage(userMessage, spec, spec.existingCode);
+
+  const schema = isEmail ? EMAIL_MODULE_DEVELOPER_SCHEMA : MODULE_DEVELOPER_SCHEMA;
 
   const result = await callAgent(engine, apiKey, model, {
     systemPrompt,
     systemBlocks,
     messages: [{ role: "user", content: userContent }],
     structuredOutput: {
-      schema: MODULE_DEVELOPER_SCHEMA as unknown as Record<string, unknown>,
+      schema: schema as unknown as Record<string, unknown>,
       name: "module_output",
     },
     maxTokens: 16000,
@@ -178,6 +188,7 @@ async function generateSingleModule(
         model,
         retryCount + 1,
         systemBlocks,
+        isEmail,
       );
     }
     throw new Error(

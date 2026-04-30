@@ -135,9 +135,10 @@ export async function runAgentPipeline(
       model,
       onEvent,
     );
-    // sharedCss already has :root block merged by the stage
-    sharedCss = blueprint.designSystem.sharedCss || sharedCss;
-    sharedJs = blueprint.designSystem.sharedJs || sharedJs;
+    if (plan.contentType !== "email") {
+      sharedCss = blueprint.designSystem.sharedCss || sharedCss;
+      sharedJs = blueprint.designSystem.sharedJs || sharedJs;
+    }
 
     // Notify client of module order for incremental preview placeholders
     onEvent({
@@ -212,6 +213,7 @@ export async function runAgentPipeline(
       onEvent,
       plan.guidesNeeded,
       snapshot.brandAssets,
+      plan.contentType,
     );
 
     for (const r of devResults) {
@@ -234,6 +236,7 @@ export async function runAgentPipeline(
       generatedModules,
       snapshot.themeName,
       onEvent,
+      plan.contentType,
     );
 
     // Replace generated modules with validated/auto-fixed versions

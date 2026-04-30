@@ -182,6 +182,7 @@ function takeSnapshot(): SessionSnapshot {
     messages: [...session.messages],
     themeName: session.themeName,
     themePath: session.themePath,
+    contentMode: tpl?.contentMode,
     brandAssets: session.brandAssets ? { ...session.brandAssets } : undefined,
   };
 }

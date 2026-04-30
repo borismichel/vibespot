@@ -86,6 +86,11 @@ export async function runIntentAnalyzer(
   plan.unchangedModules = plan.unchangedModules || [];
   plan.newModules = plan.newModules || [];
   plan.guidesNeeded = plan.guidesNeeded || [];
+  if (snapshot.contentMode === "email") {
+    plan.contentType = "email";
+  } else {
+    plan.contentType = plan.contentType === "email" ? "email" : "page";
+  }
 
   log.info("intent-analyzer", "Plan", {
     intent: plan.intent,

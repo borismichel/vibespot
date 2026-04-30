@@ -6,6 +6,7 @@
 
 import type { ModuleFiles } from "../../../ai/engine.js";
 import type { PipelineEvent } from "../types.js";
+import type { ContentType } from "../../session/types.js";
 import { tryParseJSON } from "../../ai-parser.js";
 import { log } from "../../log.js";
 
@@ -29,12 +30,15 @@ export function validateModules(
   modules: ModuleFiles[],
   themeName: string,
   onEvent: (event: PipelineEvent) => void,
+  contentType?: ContentType,
 ): ValidationResult[] {
   onEvent({
     type: "agent_step",
     step: "quality_check",
     label: "Quality check...",
   });
+
+  const isEmail = contentType === "email";
 
   return modules.map((mod) => {
     const issues: ValidationIssue[] = [];
@@ -46,12 +50,14 @@ export function validateModules(
       fixedModule.moduleName,
       "fieldsJson",
       issues,
+      isEmail,
     );
     fixedModule.metaJson = validateAndFixJson(
       fixedModule.metaJson,
       fixedModule.moduleName,
       "metaJson",
       issues,
+      isEmail,
     );
 
     // --- Reserved field names ---
@@ -68,27 +74,29 @@ export function validateModules(
       issues,
     );
 
-    // --- CDN import stripping ---
-    fixedModule.moduleCss = stripCdnImports(
-      fixedModule.moduleCss,
-      fixedModule.moduleName,
-      "moduleCss",
-      issues,
-    );
+    if (!isEmail) {
+      // --- CDN import stripping (page only) ---
+      fixedModule.moduleCss = stripCdnImports(
+        fixedModule.moduleCss,
+        fixedModule.moduleName,
+        "moduleCss",
+        issues,
+      );
 
-    // --- CSS prefix auto-fix ---
-    fixedModule.moduleCss = fixCssPrefix(
-      fixedModule.moduleCss,
-      fixedModule.moduleName,
-      themeName,
-      issues,
-    );
-    fixedModule.moduleHtml = fixHtmlClassPrefix(
-      fixedModule.moduleHtml,
-      fixedModule.moduleName,
-      themeName,
-      issues,
-    );
+      // --- CSS prefix auto-fix (page only — email uses inline styles) ---
+      fixedModule.moduleCss = fixCssPrefix(
+        fixedModule.moduleCss,
+        fixedModule.moduleName,
+        themeName,
+        issues,
+      );
+      fixedModule.moduleHtml = fixHtmlClassPrefix(
+        fixedModule.moduleHtml,
+        fixedModule.moduleName,
+        themeName,
+        issues,
+      );
+    }
 
     // --- HubL basic checks + auto-fix ---
     fixedModule.moduleHtml = fixHublSyntax(
@@ -102,6 +110,7 @@ export function validateModules(
       fixedModule.metaJson,
       fixedModule.moduleName,
       issues,
+      isEmail,
     );
 
     const valid = issues.every((i) => i.autoFixed);
@@ -126,17 +135,18 @@ function validateAndFixJson(
   moduleName: string,
   field: string,
   issues: ValidationIssue[],
+  isEmail = false,
 ): string {
   if (!jsonStr || jsonStr.trim() === "") {
     issues.push({
       module: moduleName,
       field,
       message: `Empty ${field}`,
-      autoFixed: field === "metaJson", // metaJson can be auto-generated
+      autoFixed: field === "metaJson",
     });
     if (field === "metaJson") {
       return JSON.stringify({
-        host_template_types: ["PAGE"],
+        host_template_types: [isEmail ? "EMAIL" : "PAGE"],
         is_available_for_new_content: true,
       });
     }
@@ -447,6 +457,7 @@ function ensureMetaFields(
   metaJson: string,
   moduleName: string,
   issues: ValidationIssue[],
+  isEmail = false,
 ): string {
   const parsed = tryParseJSON(metaJson);
   if (!parsed || typeof parsed !== "object") return metaJson;
@@ -455,7 +466,7 @@ function ensureMetaFields(
   let changed = false;
 
   if (!obj.host_template_types) {
-    obj.host_template_types = ["PAGE"];
+    obj.host_template_types = [isEmail ? "EMAIL" : "PAGE"];
     changed = true;
   }
   if (obj.is_available_for_new_content === undefined) {

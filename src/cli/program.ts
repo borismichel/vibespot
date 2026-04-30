@@ -7,6 +7,7 @@ import { doctorCommand } from "../commands/doctor.js";
 import { vibeCommand } from "../commands/vibe.js";
 import { marketplaceCheckCommand, marketplaceEditCommand } from "../commands/marketplace.js";
 import { inverseCommand } from "../commands/inverse.js";
+import { emailCommand } from "../commands/email.js";
 import { getVersion } from "../utils/fs.js";
 
 export function buildProgram(): Command {
@@ -62,6 +63,11 @@ export function buildProgram(): Command {
     .description("Edit Marketplace listing metadata (marketplace.json)")
     .option("-p, --path <path>", "Path to the theme directory")
     .action((opts) => marketplaceEditCommand(opts));
+
+  program
+    .command("email")
+    .description("Launch email template generation mode")
+    .action(emailCommand);
 
   program
     .command("inverse")

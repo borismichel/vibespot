@@ -1,0 +1,52 @@
+{
+  "id": "email-newsletter",
+  "name": "Newsletter",
+  "description": "Content digest with featured article and curated story grid",
+  "category": "Email",
+  "contentType": "email",
+  "modules": [
+    {
+      "moduleName": "preheader",
+      "fieldsJson": "[{\"name\":\"preview_text\",\"label\":\"Preview Text\",\"type\":\"text\",\"default\":\"This week: 3 stories worth 5 minutes of your time.\"}]",
+      "metaJson": "{\"label\":\"Preheader\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if !mso]><!-->\n<div style=\"display:none;font-size:1px;color:#f4f4f4;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;\">\n  {{ module.preview_text }}\n  &zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;\n</div>\n<!--<![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "header",
+      "fieldsJson": "[{\"name\":\"newsletter_title\",\"label\":\"Newsletter Name\",\"type\":\"text\",\"default\":\"The Weekly Brief\"},{\"name\":\"edition\",\"label\":\"Edition\",\"type\":\"text\",\"default\":\"Issue #42 \\u2014 April 2026\"}]",
+      "metaJson": "{\"label\":\"Header\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:28px 30px;background-color:#1a1a1a;text-align:center;\">\n      <h1 style=\"margin:0 0 4px;font-family:Georgia,'Times New Roman',Times,serif;font-size:24px;line-height:1.2;color:#ffffff;font-weight:700;letter-spacing:0.5px;\">{{ module.newsletter_title }}</h1>\n      <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#999999;\">{{ module.edition }}</p>\n    </td>\n  </tr>\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "featured-article",
+      "fieldsJson": "[{\"name\":\"article_image\",\"label\":\"Featured Image\",\"type\":\"image\",\"default\":{\"src\":\"https://placehold.co/600x280/e8e8e8/333333?text=Featured+Article\",\"alt\":\"Featured article image\",\"width\":600,\"height\":280}},{\"name\":\"article_title\",\"label\":\"Article Title\",\"type\":\"text\",\"default\":\"Why your onboarding flow is losing 40% of signups\"},{\"name\":\"article_summary\",\"label\":\"Summary\",\"type\":\"text\",\"default\":\"We analyzed 200 SaaS onboarding sequences and found three patterns that predict churn within the first week. The fix is simpler than you think.\"},{\"name\":\"article_link\",\"label\":\"Read More Link\",\"type\":\"link\",\"default\":{\"url\":{\"href\":\"https://example.com/blog/onboarding-churn\",\"type\":\"EXTERNAL\"},\"open_in_new_tab\":true}}]",
+      "metaJson": "{\"label\":\"Featured Article\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:0;background-color:#ffffff;\">\n      <a href=\"{{ module.article_link.url.href }}\" style=\"text-decoration:none;\">\n        <img src=\"{{ module.article_image.src }}\" alt=\"{{ module.article_image.alt }}\" width=\"600\" style=\"display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;text-decoration:none;\" />\n      </a>\n    </td>\n  </tr>\n  <tr>\n    <td style=\"padding:24px 30px 30px;background-color:#ffffff;\">\n      <h2 style=\"margin:0 0 10px;font-family:Georgia,'Times New Roman',Times,serif;font-size:24px;line-height:1.3;color:#1a1a1a;font-weight:700;\">\n        <a href=\"{{ module.article_link.url.href }}\" style=\"color:#1a1a1a;text-decoration:none;\">{{ module.article_title }}</a>\n      </h2>\n      <p style=\"margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#555555;\">{{ module.article_summary }}</p>\n      <a href=\"{{ module.article_link.url.href }}\" style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:600;color:#e8613a;text-decoration:none;\">Read the full article &rarr;</a>\n    </td>\n  </tr>\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "story-grid",
+      "fieldsJson": "[{\"name\":\"section_title\",\"label\":\"Section Title\",\"type\":\"text\",\"default\":\"Also worth reading\"},{\"name\":\"stories\",\"label\":\"Stories\",\"type\":\"group\",\"occurrence\":{\"min\":1,\"max\":4,\"default\":3},\"default\":[{\"story_title\":\"The 5-minute retention check\",\"story_summary\":\"A quick framework to diagnose where users drop off. No analytics degree required.\",\"story_link_url\":\"https://example.com/blog/retention-check\"},{\"story_title\":\"Case study: How Relay tripled activations\",\"story_summary\":\"Their secret was removing 3 steps from signup. Here's exactly what they cut.\",\"story_link_url\":\"https://example.com/blog/relay-case-study\"},{\"story_title\":\"Template: User feedback survey\",\"story_summary\":\"Steal our 6-question survey that gets 35% response rates. Copy, paste, send.\",\"story_link_url\":\"https://example.com/resources/survey-template\"}],\"children\":[{\"name\":\"story_title\",\"label\":\"Title\",\"type\":\"text\",\"default\":\"Story title\"},{\"name\":\"story_summary\",\"label\":\"Summary\",\"type\":\"text\",\"default\":\"Brief summary of the story.\"},{\"name\":\"story_link_url\",\"label\":\"Link URL\",\"type\":\"text\",\"default\":\"https://example.com\"}]}]",
+      "metaJson": "{\"label\":\"Story Grid\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:30px 30px 10px;background-color:#ffffff;border-top:1px solid #e0e0e0;\">\n      <h2 style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#999999;text-transform:uppercase;letter-spacing:1px;font-weight:600;\">{{ module.section_title }}</h2>\n    </td>\n  </tr>\n  {% for story in module.stories %}\n  <tr>\n    <td style=\"padding:16px 30px;background-color:#ffffff;{% if not loop.last %}border-bottom:1px solid #f0f0f0;{% endif %}\">\n      <h3 style=\"margin:0 0 4px;font-family:Georgia,'Times New Roman',Times,serif;font-size:18px;line-height:1.3;font-weight:700;\">\n        <a href=\"{{ story.story_link_url }}\" style=\"color:#1a1a1a;text-decoration:none;\">{{ story.story_title }}</a>\n      </h3>\n      <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#666666;\">{{ story.story_summary }}</p>\n    </td>\n  </tr>\n  {% endfor %}\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    },
+    {
+      "moduleName": "footer",
+      "fieldsJson": "[{\"name\":\"company_name\",\"label\":\"Company Name\",\"type\":\"text\",\"default\":\"Acme Inc.\"},{\"name\":\"address_line\",\"label\":\"Address\",\"type\":\"text\",\"default\":\"123 Main Street, Suite 100, San Francisco, CA 94105\"}]",
+      "metaJson": "{\"label\":\"Footer\",\"host_template_types\":[\"EMAIL\"],\"is_available_for_new_content\":true,\"css_assets\":[],\"js_assets\":[],\"icon\":\"module\"}",
+      "moduleHtml": "<!--[if mso]><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr><td><![endif]-->\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"max-width:600px;margin:0 auto;\">\n  <tr>\n    <td style=\"padding:30px;background-color:#1a1a1a;text-align:center;\">\n      <p style=\"margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#999999;\">{{ module.company_name }} | {{ module.address_line }}</p>\n      <p style=\"margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#999999;\">\n        <a href=\"{{ unsubscribe_link }}\" style=\"color:#999999;text-decoration:underline;\">Unsubscribe</a>\n        &nbsp;&middot;&nbsp;\n        <a href=\"{{ view_as_page_url }}\" style=\"color:#999999;text-decoration:underline;\">View in browser</a>\n      </p>\n    </td>\n  </tr>\n</table>\n<!--[if mso]></td></tr></table><![endif]-->",
+      "moduleCss": "",
+      "moduleJs": ""
+    }
+  ],
+  "moduleOrder": ["preheader", "header", "featured-article", "story-grid", "footer"],
+  "sharedCss": "",
+  "sharedJs": ""
+}

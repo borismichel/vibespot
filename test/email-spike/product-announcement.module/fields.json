@@ -1,0 +1,120 @@
+[
+  {
+    "name": "preheader_text",
+    "label": "Preheader Text",
+    "type": "text",
+    "default": "New in v3.2: batch processing is 4x faster."
+  },
+  {
+    "name": "logo_image",
+    "label": "Logo",
+    "type": "image",
+    "default": {
+      "src": "https://placehold.co/180x40/1a1a2e/ffffff?text=YourLogo",
+      "alt": "Company Logo",
+      "width": 180,
+      "height": 40
+    }
+  },
+  {
+    "name": "badge_text",
+    "label": "Badge Text",
+    "type": "text",
+    "default": "NEW RELEASE"
+  },
+  {
+    "name": "heading",
+    "label": "Heading",
+    "type": "text",
+    "default": "Batch processing, rebuilt from scratch"
+  },
+  {
+    "name": "subheading",
+    "label": "Subheading",
+    "type": "text",
+    "default": "v3.2 processes 10,000 records in 12 seconds. The old version took 48."
+  },
+  {
+    "name": "hero_image",
+    "label": "Product Screenshot",
+    "type": "image",
+    "default": {
+      "src": "https://placehold.co/560x300/1a1a2e/ffffff?text=Product+Screenshot",
+      "alt": "Product screenshot showing the new batch processing interface",
+      "width": 560,
+      "height": 300
+    }
+  },
+  {
+    "name": "features",
+    "label": "Feature Highlights",
+    "type": "group",
+    "occurrence": { "min": 1, "max": 6 },
+    "children": [
+      {
+        "name": "feature_title",
+        "label": "Feature Title",
+        "type": "text",
+        "default": "Parallel processing"
+      },
+      {
+        "name": "feature_description",
+        "label": "Feature Description",
+        "type": "text",
+        "default": "Run up to 8 jobs simultaneously. Each job gets its own isolated worker."
+      }
+    ],
+    "default": [
+      {
+        "feature_title": "Parallel processing",
+        "feature_description": "Run up to 8 jobs simultaneously. Each job gets its own isolated worker."
+      },
+      {
+        "feature_title": "Smart retries",
+        "feature_description": "Failed records retry 3 times with exponential backoff. No manual re-runs."
+      },
+      {
+        "feature_title": "Progress streaming",
+        "feature_description": "Watch batch progress in real time. Get notified when it finishes or fails."
+      }
+    ]
+  },
+  {
+    "name": "cta_text",
+    "label": "CTA Button Text",
+    "type": "text",
+    "default": "Try Batch v3.2 Now"
+  },
+  {
+    "name": "cta_link",
+    "label": "CTA Link",
+    "type": "link",
+    "default": {
+      "url": { "href": "https://app.example.com/batch", "type": "EXTERNAL" },
+      "open_in_new_tab": true,
+      "no_follow": false
+    }
+  },
+  {
+    "name": "secondary_cta_text",
+    "label": "Secondary CTA Text",
+    "type": "text",
+    "default": "Read the changelog"
+  },
+  {
+    "name": "secondary_cta_link",
+    "label": "Secondary CTA Link",
+    "type": "link",
+    "default": {
+      "url": { "href": "https://docs.example.com/changelog", "type": "EXTERNAL" },
+      "open_in_new_tab": true,
+      "no_follow": false
+    }
+  },
+  {
+    "name": "brand_color",
+    "label": "Brand Color",
+    "type": "color",
+    "default": { "color": "#e8613a", "opacity": 100 }
+  }
+]

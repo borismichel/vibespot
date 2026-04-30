@@ -19,9 +19,19 @@ import {
   DESIGN_SYSTEM_SCHEMA,
   MODULE_PLANNER_SCHEMA,
 } from "../prompts/page-architect.js";
+import {
+  buildEmailDesignSystemPrompt,
+  buildEmailDesignSystemPromptBlocks,
+  buildEmailModulePlannerPrompt,
+  EMAIL_DESIGN_SYSTEM_SCHEMA,
+} from "../prompts/email-architect.js";
 import { log } from "../../log.js";
 
-export async function runPageArchitect(
+/**
+ * Run only the Design System stage (2a) without the Module Planner.
+ * Used by the multi-page pipeline which replaces 2b with the Site Module Planner.
+ */
+export async function runDesignSystem(
   userMessage: string,
   plan: PipelinePlan,
   snapshot: SessionSnapshot,
@@ -29,24 +39,24 @@ export async function runPageArchitect(
   apiKey: string,
   model: string,
   onEvent: (event: PipelineEvent) => void,
-): Promise<PageBlueprint> {
-  // -------------------------------------------------------------------------
-  // Stage 2a: Design System
-  // -------------------------------------------------------------------------
+): Promise<DesignSystemOutput & { sharedCss: string }> {
+  const isEmail = plan.contentType === "email";
 
   onEvent({
     type: "agent_step",
     step: "designing",
-    label: "Creating design system...",
+    label: isEmail ? "Creating email design tokens..." : "Creating design system...",
   });
 
   const isAnthropicEngine = engine === "anthropic-api" || engine === "claude-oauth";
-  const designPrompt = buildDesignSystemPrompt(
-    snapshot.themeName,
-    snapshot.brandAssets,
-  );
+
+  const designPrompt = isEmail
+    ? buildEmailDesignSystemPrompt(snapshot.themeName, snapshot.brandAssets)
+    : buildDesignSystemPrompt(snapshot.themeName, snapshot.brandAssets);
   const designBlocks = isAnthropicEngine
-    ? buildDesignSystemPromptBlocks(snapshot.themeName, snapshot.brandAssets)
+    ? (isEmail
+        ? buildEmailDesignSystemPromptBlocks(snapshot.themeName, snapshot.brandAssets)
+        : buildDesignSystemPromptBlocks(snapshot.themeName, snapshot.brandAssets))
     : undefined;
 
   let designUserContent = `## User Request\n${userMessage}`;
@@ -55,12 +65,13 @@ export async function runPageArchitect(
   }
 
   const thinkingBudget = resolveThinkingBudget(engine);
+  const designSchema = isEmail ? EMAIL_DESIGN_SYSTEM_SCHEMA : DESIGN_SYSTEM_SCHEMA;
   const designResult = await callAgent(engine, apiKey, model, {
     systemPrompt: designPrompt,
     systemBlocks: designBlocks,
     messages: [{ role: "user", content: designUserContent }],
     structuredOutput: {
-      schema: DESIGN_SYSTEM_SCHEMA as unknown as Record<string, unknown>,
+      schema: designSchema as unknown as Record<string, unknown>,
       name: "design_system",
     },
     maxTokens: 16000,
@@ -86,10 +97,113 @@ export async function runPageArchitect(
     });
   }
 
-  // Ensure :root block exists in sharedCss
-  let sharedCss = designSystem.sharedCss || "";
+  let sharedCss = isEmail ? "" : (designSystem.sharedCss || "");
   const vars = designSystem.cssVariables;
-  if (vars && typeof vars === "object" && Object.keys(vars).length > 0) {
+  if (!isEmail && vars && typeof vars === "object" && Object.keys(vars).length > 0) {
+    if (!sharedCss.includes(":root")) {
+      const varLines = Object.entries(vars)
+        .map(([k, v]) => `  ${k.startsWith("--") ? k : `--${k}`}: ${v};`)
+        .join("\n");
+      sharedCss = `:root {\n${varLines}\n}\n\n${sharedCss}`;
+    }
+  }
+
+  const tokenCount = Object.keys(vars || {}).length;
+  const decisionParts = isEmail
+    ? [`Email design tokens: ${designSystem.aesthetic || "created"} | ${tokenCount} tokens`]
+    : [`Design system: ${designSystem.aesthetic || "created"} | ${tokenCount} variables, ${sharedCss.length} chars CSS`];
+
+  onEvent({
+    type: "agent_decision",
+    step: "designing",
+    decision: decisionParts.join("\n"),
+  });
+
+  onEvent({
+    type: "design_system_ready",
+    sharedCss,
+    sharedJs: designSystem.sharedJs || "",
+    aesthetic: designSystem.aesthetic || "",
+  });
+
+  return { ...designSystem, sharedCss };
+}
+
+export async function runPageArchitect(
+  userMessage: string,
+  plan: PipelinePlan,
+  snapshot: SessionSnapshot,
+  engine: AgentEngine,
+  apiKey: string,
+  model: string,
+  onEvent: (event: PipelineEvent) => void,
+): Promise<PageBlueprint> {
+  const isEmail = plan.contentType === "email";
+
+  // -------------------------------------------------------------------------
+  // Stage 2a: Design System (or Email Design Tokens)
+  // -------------------------------------------------------------------------
+
+  onEvent({
+    type: "agent_step",
+    step: "designing",
+    label: isEmail ? "Creating email design tokens..." : "Creating design system...",
+  });
+
+  const isAnthropicEngine = engine === "anthropic-api" || engine === "claude-oauth";
+
+  const designPrompt = isEmail
+    ? buildEmailDesignSystemPrompt(snapshot.themeName, snapshot.brandAssets)
+    : buildDesignSystemPrompt(snapshot.themeName, snapshot.brandAssets);
+  const designBlocks = isAnthropicEngine
+    ? (isEmail
+        ? buildEmailDesignSystemPromptBlocks(snapshot.themeName, snapshot.brandAssets)
+        : buildDesignSystemPromptBlocks(snapshot.themeName, snapshot.brandAssets))
+    : undefined;
+
+  let designUserContent = `## User Request\n${userMessage}`;
+  if (snapshot.modules.length > 0 && plan.designSystemChanges) {
+    designUserContent += `\n\n## Current Shared CSS (update this)\n\`\`\`css\n${snapshot.sharedCss}\n\`\`\``;
+  }
+
+  const thinkingBudget = resolveThinkingBudget(engine);
+  const designSchema = isEmail ? EMAIL_DESIGN_SYSTEM_SCHEMA : DESIGN_SYSTEM_SCHEMA;
+  const designResult = await callAgent(engine, apiKey, model, {
+    systemPrompt: designPrompt,
+    systemBlocks: designBlocks,
+    messages: [{ role: "user", content: designUserContent }],
+    structuredOutput: {
+      schema: designSchema as unknown as Record<string, unknown>,
+      name: "design_system",
+    },
+    maxTokens: 16000,
+    ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
+  });
+
+  let designSystem: DesignSystemOutput;
+
+  if (designResult.type !== "structured") {
+    log.warn("page-architect", "Design system: did not get structured output, using fallback");
+    designSystem = {
+      cssVariables: {},
+      sharedCss: snapshot.sharedCss || "",
+      sharedJs: snapshot.sharedJs || "",
+      aesthetic: "default",
+    };
+  } else {
+    designSystem = designResult.data as DesignSystemOutput;
+    log.info("page-architect", "Design system created", {
+      aesthetic: designSystem.aesthetic,
+      varCount: Object.keys(designSystem.cssVariables || {}).length,
+      cssLength: designSystem.sharedCss?.length || 0,
+    });
+  }
+
+  // For email: no CSS at all — tokens are used inline by module developers.
+  // For pages: ensure :root block exists in sharedCss.
+  let sharedCss = isEmail ? "" : (designSystem.sharedCss || "");
+  const vars = designSystem.cssVariables;
+  if (!isEmail && vars && typeof vars === "object" && Object.keys(vars).length > 0) {
     if (!sharedCss.includes(":root")) {
       const varLines = Object.entries(vars)
         .map(([k, v]) => `  ${k.startsWith("--") ? k : `--${k}`}: ${v};`)
@@ -114,10 +228,13 @@ export async function runPageArchitect(
     }
   }
 
-  const decisionParts = [
-    `Design system: ${designSystem.aesthetic || "created"} | ${Object.keys(vars || {}).length} variables, ${sharedCss.length} chars CSS`,
-    ...fontNotes,
-  ];
+  const tokenCount = Object.keys(vars || {}).length;
+  const decisionParts = isEmail
+    ? [`Email design tokens: ${designSystem.aesthetic || "created"} | ${tokenCount} tokens`]
+    : [
+        `Design system: ${designSystem.aesthetic || "created"} | ${tokenCount} variables, ${sharedCss.length} chars CSS`,
+        ...fontNotes,
+      ];
 
   onEvent({
     type: "agent_decision",
@@ -143,12 +260,19 @@ export async function runPageArchitect(
     label: "Planning modules...",
   });
 
-  const plannerPrompt = buildModulePlannerPrompt(
-    snapshot.themeName,
-    sharedCss,
-    snapshot.brandAssets,
-    plan.guidesNeeded,
-  );
+  const plannerPrompt = isEmail
+    ? buildEmailModulePlannerPrompt(
+        snapshot.themeName,
+        vars || {},
+        snapshot.brandAssets,
+        plan.guidesNeeded,
+      )
+    : buildModulePlannerPrompt(
+        snapshot.themeName,
+        sharedCss,
+        snapshot.brandAssets,
+        plan.guidesNeeded,
+      );
 
   let plannerUserContent = `## User Request\n${userMessage}`;
   if (plan.newModules.length > 0) {

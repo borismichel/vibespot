@@ -86,3 +86,51 @@ export function createThemeScaffold(themePath: string, themeName: string): void 
   mkdirSync(join(themePath, "templates", "layouts"), { recursive: true });
   writeFileSync(join(themePath, "templates", "layouts", "base.html"), baseLayout);
 }
+
+/**
+ * Add an email template to an existing theme scaffold.
+ * HubSpot email templates need a different templateType and structure.
+ */
+export function addEmailTemplateToTheme(themePath: string, themeName: string): void {
+  const emailTemplate = `<!--
+  templateType: email
+  isAvailableForNewContent: true
+  label: ${themeName} Email Template
+  screenshotPath: ../images/template-previews/email.png
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:AllowPNG/>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+  {{ standard_header_includes }}
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f4f4f4;">
+    <tr>
+      <td align="center" style="padding:20px 0;">
+        {% dnd_area "email_body"
+          label="Email Content"
+        %}
+        {% end_dnd_area %}
+      </td>
+    </tr>
+  </table>
+  {{ standard_footer_includes }}
+</body>
+</html>
+`;
+  mkdirSync(join(themePath, "templates"), { recursive: true });
+  writeFileSync(join(themePath, "templates", "email.html"), emailTemplate);
+}

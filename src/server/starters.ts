@@ -10,6 +10,7 @@ export interface StarterTemplate {
   name: string;
   description: string;
   category: string;
+  contentType?: "page" | "email";
   modules: ModuleFiles[];
   moduleOrder: string[];
   sharedCss: string;
@@ -21,6 +22,7 @@ export interface StarterMeta {
   name: string;
   description: string;
   category: string;
+  contentType?: "page" | "email";
   moduleCount: number;
 }
 
@@ -53,6 +55,7 @@ function loadAll(): StarterTemplate[] {
         name: data.name,
         description: data.description,
         category: data.category || "General",
+        contentType: data.contentType === "email" ? "email" : undefined,
         modules: data.modules || [],
         moduleOrder: data.moduleOrder || [],
         sharedCss: data.sharedCss || "",
@@ -71,6 +74,7 @@ export function listStarters(): StarterMeta[] {
     name: s.name,
     description: s.description,
     category: s.category,
+    contentType: s.contentType,
     moduleCount: s.modules.length,
   }));
 }

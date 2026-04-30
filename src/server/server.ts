@@ -207,10 +207,18 @@ function buildPipelineOnEvent(
 export interface ServerOptions {
   port: number;
   uiDir: string;
+  contentMode?: "page" | "email";
+}
+
+let serverContentMode: "page" | "email" = "page";
+
+export function getServerContentMode(): "page" | "email" {
+  return serverContentMode;
 }
 
 export function startServer(opts: ServerOptions): Promise<{ port: number; close: () => void }> {
   const { port, uiDir } = opts;
+  serverContentMode = opts.contentMode || "page";
 
   const server = createServer((req, res) => handleRequest(req, res, uiDir));
 

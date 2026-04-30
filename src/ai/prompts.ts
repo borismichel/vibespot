@@ -31,6 +31,10 @@ export function getHumanifyGuide(): string {
   return cachedAsset("humanify-guide.md");
 }
 
+export function getEmailRules(): string {
+  return cachedAsset("email-rules.md");
+}
+
 /**
  * Extract page-type-specific section from page-types.md.
  * Returns only the relevant section for the given page type.

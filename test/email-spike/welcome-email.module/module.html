@@ -1,0 +1,146 @@
+{# Welcome / Onboarding Email Module #}
+
+{# Preheader: hidden preview text for inbox #}
+<div style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">
+  {{ module.preheader_text }}
+  &zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;
+</div>
+
+{# Outer wrapper: full-width background #}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: {{ module.bg_color.color }};">
+  <tr>
+    <td align="center" style="padding: 0;">
+
+      <!--[if mso]>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600"><tr><td>
+      <![endif]-->
+
+      {# Inner container: 600px #}
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
+
+        {# Logo Bar #}
+        <tr>
+          <td align="center" style="padding: 32px 30px 24px 30px;">
+            {% if module.logo_image.src %}
+              <img src="{{ module.logo_image.src }}" alt="{{ module.logo_image.alt }}" width="{{ module.logo_image.width }}" height="{{ module.logo_image.height }}" style="display: block; border: 0; outline: none; text-decoration: none; max-width: 100%; height: auto;" />
+            {% endif %}
+          </td>
+        </tr>
+
+        {# Hero Section #}
+        <tr>
+          <td style="padding: 0 30px 24px 30px;">
+            <h1 style="margin: 0 0 16px 0; font-family: Arial, Helvetica, sans-serif; font-size: 28px; font-weight: bold; line-height: 1.2; color: #1a1a2e; text-align: center;">
+              {{ module.heading }}
+            </h1>
+            <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.5; color: #4a4a4a; text-align: center;">
+              {{ module.body_text }}
+            </p>
+          </td>
+        </tr>
+
+        {# Divider #}
+        <tr>
+          <td style="padding: 0 30px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+              <tr>
+                <td style="border-top: 1px solid #e0e0e0; font-size: 0; line-height: 0;">&nbsp;</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        {# Onboarding Steps #}
+        {% for item in module.steps %}
+        <tr>
+          <td style="padding: 24px 30px 0 30px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+              <tr>
+                {# Step Number Circle #}
+                <td width="48" valign="top" style="padding-right: 16px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td width="40" height="40" align="center" style="background-color: {{ module.brand_color.color }}; border-radius: 20px; font-family: Arial, Helvetica, sans-serif; font-size: 18px; font-weight: bold; color: #ffffff; line-height: 40px;">
+                        {{ item.step_number }}
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+                {# Step Content #}
+                <td valign="top">
+                  <h3 style="margin: 0 0 4px 0; font-family: Arial, Helvetica, sans-serif; font-size: 18px; font-weight: bold; line-height: 1.3; color: #1a1a2e;">
+                    {{ item.step_title }}
+                  </h3>
+                  <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5; color: #666666;">
+                    {{ item.step_description }}
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        {% endfor %}
+
+        {# CTA Button #}
+        <tr>
+          <td align="center" style="padding: 32px 30px;">
+            <!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"
+              href="{{ module.cta_link.url.href }}" style="height:48px;v-text-anchor:middle;width:240px;" arcsize="8%"
+              strokecolor="{{ module.brand_color.color }}" fillcolor="{{ module.brand_color.color }}">
+              <w:anchorlock/>
+              <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">
+                {{ module.cta_text }}
+              </center>
+            </v:roundrect>
+            <![endif]-->
+            <!--[if !mso]><!-->
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" style="border-radius: 4px; background-color: {{ module.brand_color.color }};">
+                  <a href="{{ module.cta_link.url.href }}" target="_blank" style="display: inline-block; padding: 14px 40px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: bold; color: #ffffff; text-decoration: none; border-radius: 4px; background-color: {{ module.brand_color.color }};">
+                    {{ module.cta_text }}
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <!--<![endif]-->
+          </td>
+        </tr>
+
+        {# Help Text #}
+        <tr>
+          <td style="padding: 0 30px 32px 30px;">
+            <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5; color: #999999; text-align: center;">
+              {{ module.help_text }}
+            </p>
+          </td>
+        </tr>
+
+      </table>
+
+      {# Footer: Unsubscribe + Address #}
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px;">
+        <tr>
+          <td align="center" style="padding: 24px 30px;">
+            <p style="margin: 0 0 8px 0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.4; color: #999999;">
+              {{ site_settings.company_name }}<br>
+              {{ site_settings.company_street_address_1 }}<br>
+              {{ site_settings.company_city }}, {{ site_settings.company_state }}
+            </p>
+            <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.4; color: #999999;">
+              <a href="{{ unsubscribe_link }}" style="color: #999999; text-decoration: underline;">Unsubscribe</a>
+              &nbsp;&middot;&nbsp;
+              <a href="{{ view_as_page_url }}" style="color: #999999; text-decoration: underline;">View in browser</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <!--[if mso]>
+      </td></tr></table>
+      <![endif]-->
+
+    </td>
+  </tr>
+</table>
