@@ -9,6 +9,8 @@ import type { SessionSnapshot, PageType } from "../session/types.js";
 // Stage 1 output: Intent Analyzer
 // ---------------------------------------------------------------------------
 
+export type ContentType = "page" | "email" | "blog";
+
 export interface PipelinePlan {
   intent:
     | "create"
@@ -19,6 +21,7 @@ export interface PipelinePlan {
     | "rearrange"
     | "style_change"
     | "question";
+  contentType?: ContentType;
   affectedModules: string[];
   unchangedModules: string[];
   newModules: { name: string; description: string; position: number }[];
@@ -37,7 +40,6 @@ export interface PipelinePlan {
     | "humanify"
   )[];
   designSystemChanges: boolean;
-  contentType?: "page" | "email";
   answer?: string;
 }
 
@@ -79,6 +81,7 @@ export interface PageBlueprint {
 export type PipelineStep =
   | "analyzing"
   | "designing"
+  | "planning_site"
   | "developing"
   | "quality_check";
 
@@ -114,6 +117,19 @@ export type PipelineEvent =
       sharedJs?: string;
     }
   | { type: "module_stream"; module: string; content: string }
+  | {
+      type: "site_blueprint_ready";
+      pages: { pageId: string; label: string; moduleCount: number }[];
+      sharedModuleCount: number;
+    }
+  | {
+      type: "page_progress";
+      pageId: string;
+      label: string;
+      status: "generating" | "complete" | "failed";
+      modulesComplete: number;
+      modulesTotal: number;
+    }
   | {
       type: "pipeline_complete";
       modulesGenerated: number;

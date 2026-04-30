@@ -5,8 +5,8 @@
  */
 
 import type { ModuleFiles } from "../../../ai/engine.js";
-import type { PipelineEvent } from "../types.js";
-import type { ContentType, BrandKit } from "../../session/types.js";
+import type { ContentType, PipelineEvent } from "../types.js";
+import type { BrandKit } from "../../session/types.js";
 import { tryParseJSON } from "../../ai-parser.js";
 import { log } from "../../log.js";
 
@@ -33,13 +33,13 @@ export function validateModules(
   contentType?: ContentType,
   brandKit?: BrandKit,
 ): ValidationResult[] {
+  const isEmail = contentType === "email";
+  const isBlog = contentType === "blog";
   onEvent({
     type: "agent_step",
     step: "quality_check",
-    label: "Quality check...",
+    label: isEmail ? "Email quality check..." : isBlog ? "Blog quality check..." : "Quality check...",
   });
-
-  const isEmail = contentType === "email";
 
   return modules.map((mod) => {
     const issues: ValidationIssue[] = [];
@@ -59,6 +59,7 @@ export function validateModules(
       "metaJson",
       issues,
       isEmail,
+      isBlog,
     );
 
     // --- Reserved field names ---
@@ -75,8 +76,11 @@ export function validateModules(
       issues,
     );
 
-    if (!isEmail) {
-      // --- CDN import stripping (page only) ---
+    if (isEmail) {
+      // --- Email-specific validation + auto-fix ---
+      fixedModule = validateEmailModule(fixedModule, issues);
+    } else {
+      // --- CDN import stripping ---
       fixedModule.moduleCss = stripCdnImports(
         fixedModule.moduleCss,
         fixedModule.moduleName,
@@ -84,7 +88,7 @@ export function validateModules(
         issues,
       );
 
-      // --- CSS prefix auto-fix (page only — email uses inline styles) ---
+      // --- CSS prefix auto-fix ---
       fixedModule.moduleCss = fixCssPrefix(
         fixedModule.moduleCss,
         fixedModule.moduleName,
@@ -97,6 +101,11 @@ export function validateModules(
         themeName,
         issues,
       );
+
+      if (isBlog) {
+        // --- Blog-specific validation + auto-fix ---
+        fixedModule = validateBlogModule(fixedModule, issues);
+      }
     }
 
     // --- HubL basic checks + auto-fix ---
@@ -112,6 +121,7 @@ export function validateModules(
       fixedModule.moduleName,
       issues,
       isEmail,
+      isBlog,
     );
 
     // --- Brand kit compliance (warnings only) ---
@@ -142,6 +152,7 @@ function validateAndFixJson(
   field: string,
   issues: ValidationIssue[],
   isEmail = false,
+  isBlog = false,
 ): string {
   if (!jsonStr || jsonStr.trim() === "") {
     issues.push({
@@ -151,8 +162,9 @@ function validateAndFixJson(
       autoFixed: field === "metaJson",
     });
     if (field === "metaJson") {
+      const defaultType = isEmail ? "EMAIL" : isBlog ? "BLOG_POST" : "PAGE";
       return JSON.stringify({
-        host_template_types: [isEmail ? "EMAIL" : "PAGE"],
+        host_template_types: [defaultType],
         is_available_for_new_content: true,
       });
     }
@@ -464,6 +476,7 @@ function ensureMetaFields(
   moduleName: string,
   issues: ValidationIssue[],
   isEmail = false,
+  isBlog = false,
 ): string {
   const parsed = tryParseJSON(metaJson);
   if (!parsed || typeof parsed !== "object") return metaJson;
@@ -472,9 +485,36 @@ function ensureMetaFields(
   let changed = false;
 
   if (!obj.host_template_types) {
-    obj.host_template_types = [isEmail ? "EMAIL" : "PAGE"];
+    const defaultType = isEmail ? "EMAIL" : isBlog ? "BLOG_POST" : "PAGE";
+    obj.host_template_types = [defaultType];
     changed = true;
+  } else if (isEmail) {
+    const types = obj.host_template_types as string[];
+    if (!types.includes("EMAIL")) {
+      obj.host_template_types = ["EMAIL"];
+      changed = true;
+      issues.push({
+        module: moduleName,
+        field: "metaJson",
+        message: 'Fixed host_template_types to ["EMAIL"] for email module',
+        autoFixed: true,
+      });
+    }
+  } else if (isBlog) {
+    const types = obj.host_template_types as string[];
+    const hasBlogType = types.includes("BLOG_POST") || types.includes("BLOG_LISTING");
+    if (!hasBlogType) {
+      obj.host_template_types = ["BLOG_POST"];
+      changed = true;
+      issues.push({
+        module: moduleName,
+        field: "metaJson",
+        message: 'Fixed host_template_types to include blog type for blog module',
+        autoFixed: true,
+      });
+    }
   }
+
   if (obj.is_available_for_new_content === undefined) {
     obj.is_available_for_new_content = true;
     changed = true;
@@ -560,14 +600,12 @@ function checkBrandKitCompliance(
 
   const htmlAndCss = (mod.moduleHtml || "") + (mod.moduleCss || "");
 
-  // Check for off-brand colors
   if (brandColors.size > 0) {
     const usedColors = new Set<string>();
     for (const match of htmlAndCss.matchAll(HEX_COLOR_RE)) {
       usedColors.add(match[0].toLowerCase());
     }
 
-    // Common neutral colors that don't need brand enforcement
     const neutrals = new Set([
       "#ffffff", "#000000", "#f4f4f4", "#f5f5f5", "#fafafa", "#eeeeee",
       "#e0e0e0", "#dddddd", "#cccccc", "#999999", "#666666", "#333333",
@@ -589,7 +627,6 @@ function checkBrandKitCompliance(
     }
   }
 
-  // Check for off-brand fonts
   if (kit.fonts?.heading || kit.fonts?.body) {
     const brandFonts: string[] = [];
     if (kit.fonts.heading) brandFonts.push(kit.fonts.heading.toLowerCase());
@@ -609,4 +646,195 @@ function checkBrandKitCompliance(
       }
     }
   }
+}
+
+/**
+ * Email-specific validation and auto-fix.
+ */
+function validateEmailModule(
+  mod: ModuleFiles,
+  issues: ValidationIssue[],
+): ModuleFiles {
+  const fixedModule = { ...mod };
+  let html = fixedModule.moduleHtml;
+
+  if (fixedModule.moduleCss && fixedModule.moduleCss.trim()) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleCss",
+      message: "Cleared moduleCss — email modules must use inline styles only",
+      autoFixed: true,
+    });
+    fixedModule.moduleCss = "";
+  }
+
+  if (fixedModule.moduleJs && fixedModule.moduleJs.trim()) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleJs",
+      message: "Cleared moduleJs — email clients do not support JavaScript",
+      autoFixed: true,
+    });
+    fixedModule.moduleJs = undefined;
+  }
+
+  if (/<style[\s>]/i.test(html)) {
+    html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Removed <style> blocks — email clients strip them",
+      autoFixed: true,
+    });
+  }
+
+  if (/display\s*:\s*flex/i.test(html)) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Contains display:flex — not supported in email clients",
+      autoFixed: false,
+    });
+  }
+
+  if (/display\s*:\s*grid/i.test(html)) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Contains display:grid — not supported in email clients",
+      autoFixed: false,
+    });
+  }
+
+  if (/var\s*\(/i.test(html)) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Contains var() — CSS custom properties not supported in email",
+      autoFixed: false,
+    });
+  }
+
+  const bannedHublRe = /\{[{%].*?(?:require_css|require_js|scope_css|get_asset_url)\s*\(.*?\}[}%]/g;
+  if (bannedHublRe.test(html)) {
+    html = html.replace(bannedHublRe, "");
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Removed banned HubL functions for email (require_css, require_js, scope_css, get_asset_url)",
+      autoFixed: true,
+    });
+  }
+
+  const linkTagRe = /<link[^>]*href="https?:\/\/[^"]*(?:fonts\.googleapis|cdnjs|unpkg|jsdelivr)[^"]*"[^>]*\/?>/gi;
+  if (linkTagRe.test(html)) {
+    html = html.replace(linkTagRe, "");
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Removed CDN <link> tags — external resources not supported in email",
+      autoFixed: true,
+    });
+  }
+
+  fixedModule.moduleHtml = html;
+  return fixedModule;
+}
+
+/**
+ * Blog-specific validation and auto-fix.
+ */
+function validateBlogModule(
+  mod: ModuleFiles,
+  issues: ValidationIssue[],
+): ModuleFiles {
+  const fixedModule = { ...mod };
+  let html = fixedModule.moduleHtml;
+
+  if (/\{\{[\s]*content\.body[\s]*\}\}/g.test(html)) {
+    html = html.replace(
+      /\{\{[\s]*content\.body[\s]*\}\}/g,
+      "{{ content.post_body }}",
+    );
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Fixed content.body → content.post_body (correct blog variable)",
+      autoFixed: true,
+    });
+  }
+
+  if (/\{\{[\s]*content\.title[\s]*\}\}/g.test(html)) {
+    html = html.replace(
+      /\{\{[\s]*content\.title[\s]*\}\}/g,
+      "{{ content.name }}",
+    );
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Fixed content.title → content.name (correct blog variable)",
+      autoFixed: true,
+    });
+  }
+
+  if (/\{\{[\s]*content\.author_name[\s]*\}\}/g.test(html)) {
+    html = html.replace(
+      /\{\{[\s]*content\.author_name[\s]*\}\}/g,
+      "{{ content.blog_post_author }}",
+    );
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Fixed content.author_name → content.blog_post_author",
+      autoFixed: true,
+    });
+  }
+
+  if (/\{\{[\s]*content\.date[\s]*\}\}/g.test(html)) {
+    html = html.replace(
+      /\{\{[\s]*content\.date[\s]*\}\}/g,
+      "{{ content.publish_date }}",
+    );
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Fixed content.date → content.publish_date",
+      autoFixed: true,
+    });
+  }
+
+  if (/\{\{[\s]*content\.image[\s]*\}\}/g.test(html)) {
+    html = html.replace(
+      /\{\{[\s]*content\.image[\s]*\}\}/g,
+      "{{ content.featured_image }}",
+    );
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Fixed content.image → content.featured_image",
+      autoFixed: true,
+    });
+  }
+
+  if (/\{%.*dnd_area.*%\}/g.test(html)) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "Contains dnd_area — blog templates typically use fixed module positions",
+      autoFixed: false,
+    });
+  }
+
+  const rawDateRe = /\{\{[\s]*content\.publish_date[\s]*\}\}/g;
+  if (rawDateRe.test(html)) {
+    issues.push({
+      module: mod.moduleName,
+      field: "moduleHtml",
+      message: "publish_date used without |datetimeformat filter — dates may render as raw timestamps",
+      autoFixed: false,
+    });
+  }
+
+  fixedModule.moduleHtml = html;
+  return fixedModule;
 }

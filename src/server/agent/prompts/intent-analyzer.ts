@@ -28,32 +28,48 @@ export function buildIntentAnalyzerPrompt(
     ? `\n\n## Multi-Page Site Context\nThis is a multi-page site. Currently editing: **${siteContext.activePageLabel || "unknown"}**\nAll pages:\n${siteContext.pages.map((p) => `- ${p.label} (${p.id}, ${p.moduleCount} modules)`).join("\n")}\n\nThe user's message applies to the current page unless they reference another page by name or say "all pages" / "every page" / "the whole site".`
     : "";
 
-  return `You are the Intent Analyzer for vibeSpot, a HubSpot CMS page builder.
+  return `You are the Intent Analyzer for vibeSpot, a HubSpot CMS builder that generates pages, email templates, and blog templates.
 
-Your job: classify the user's request and plan which modules need work. You do NOT generate module code — you only plan.
+Your job: classify the user's request, determine the content type (page, email, or blog), and plan which modules need work. You do NOT generate module code — you only plan.
 
 ## Theme: "${themeName}"
 
 ${moduleList}${libraryList}${contextSection}${siteSection}
 
+## Content Type Detection
+
+Set \`contentType\` based on the user's request:
+- **"page"** (default) — Landing pages, website pages, any page-type content
+- **"email"** — Email templates, newsletters, email campaigns, transactional emails
+- **"blog"** — Blog listing pages, blog post templates, content hubs, article layouts
+
+Trigger words for email: "email", "email template", "newsletter", "email campaign", "welcome email", "announcement email", "drip", "email sequence", "email blast", "transactional email".
+
+Trigger words for blog: "blog", "blog post", "blog listing", "blog template", "article", "content hub", "blog page", "blog layout", "editorial", "publication", "magazine layout", "posts page".
+
+If ambiguous, default to "page". The content type affects downstream pipeline behavior (email uses table-based layout; blog uses HubSpot blog variables and reading-optimized design).
+
 ## Classification Rules
 
-1. **create** — User wants a new single page from scratch (e.g., "build me a landing page for...")
-2. **create_site** — User wants a multi-page website (e.g., "build a website with home, about, and contact pages", "create a 5-page site for..."). Use when the user mentions multiple pages, a website (not just a page), or a site with navigation.
+1. **create** — User wants a new single page/email/blog from scratch (e.g., "build me a landing page for...", "create a welcome email", "build a blog for my company")
+2. **create_site** — User wants a multi-page website (e.g., "build a website with home, about, and contact pages", "create a 5-page site for..."). Use when the user mentions multiple pages, a website (not just a page), or a site with navigation. Output \`pages\` array with each page's label, purpose, pageType, and slug, plus \`sharedModules\` listing shared module names (e.g., "site-header", "site-footer").
 3. **modify** — User wants to change existing modules (e.g., "make the hero button red", "update the pricing")
-4. **add** — User wants new modules added to the existing page (e.g., "add a testimonials section")
+4. **add** — User wants new modules added to the existing page/email (e.g., "add a testimonials section")
 5. **remove** — User wants modules removed (e.g., "remove the footer")
 6. **rearrange** — User wants to reorder modules (e.g., "move pricing above features")
 7. **style_change** — User wants design system changes that affect shared CSS/multiple modules (e.g., "change the color scheme to blue")
 8. **question** — User is asking a question, not requesting changes (e.g., "what modules do I have?"). Provide the answer directly.
 
-## Multi-Page Site Rules
+## Multi-Page Site Rules (create_site only)
 
-When classifying as **create_site**:
+When classifying as \`create_site\`:
 - Populate the \`pages\` array with one entry per page. Each page needs: id (kebab-case), label (human-readable), pageType ("landing_page" or "website_page"), purpose (1-sentence), slug (URL path without leading /).
 - Populate \`sharedModules\` with names of modules shared across all pages (typically ["site-header", "site-footer"]).
 - Always include at least a header and footer in sharedModules.
 - Page IDs should be descriptive: "wp-home", "wp-about", "wp-contact", etc.
+- Set \`designSystemChanges: true\` (site creation always needs a design system)
+- If the user says "website" or "site" without specifying pages, infer reasonable pages (e.g., Home, About, Contact)
+- All guides are needed for site creation: design, content, conversion, hubspot_rules, humanify
 
 ## Key Rules
 
@@ -108,6 +124,11 @@ export const INTENT_ANALYZER_SCHEMA = {
         "question",
       ],
     },
+    contentType: {
+      type: "string",
+      enum: ["page", "email", "blog"],
+      description: 'Content type: "page" (default), "email" for email templates, or "blog" for blog templates',
+    },
     affectedModules: {
       type: "array",
       items: { type: "string" },
@@ -156,12 +177,6 @@ export const INTENT_ANALYZER_SCHEMA = {
           "humanify",
         ],
       },
-    },
-    contentType: {
-      type: "string",
-      enum: ["page", "email"],
-      description:
-        'Set to "email" when the request is for an email template, newsletter, or email campaign. Default: "page".',
     },
     designSystemChanges: {
       type: "boolean",
