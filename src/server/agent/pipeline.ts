@@ -15,11 +15,13 @@ import { isCLIEngine } from "./engine-adapter.js";
 import type {
   PipelineEvent,
   PipelineResult,
+  MultiPagePipelineResult,
   ModuleSpec,
   PageBlueprint,
 } from "./types.js";
 import { runIntentAnalyzer } from "./stages/intent-analyzer.js";
-import { runPageArchitect } from "./stages/page-architect.js";
+import { runPageArchitect, runDesignSystem } from "./stages/page-architect.js";
+import { runSiteModulePlanner } from "./stages/site-module-planner.js";
 import { runModuleDeveloper } from "./stages/module-developer.js";
 import { validateModules, validateNavLinks } from "./stages/validator.js";
 import { log } from "../log.js";
@@ -109,6 +111,21 @@ export async function runAgentPipeline(
         durationMs,
       },
     };
+  }
+
+  // Multi-page site creation uses a separate flow
+  if (plan.intent === "create_site" && plan.pages && plan.pages.length > 0) {
+    return runMultiPageFlow(
+      userMessage,
+      plan,
+      snapshot,
+      engine,
+      apiKey,
+      model,
+      concurrency,
+      onEvent,
+      startTime,
+    );
   }
 
   // -----------------------------------------------------------------------
