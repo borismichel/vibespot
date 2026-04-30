@@ -104,10 +104,6 @@ import {
   handleInverseAnalyzeRoute,
   handleInverseApplyTokensRoute,
 } from "./routes/inverse.js";
-import {
-  handleEmailPreviewClientsRoute,
-  handleEmailPreviewRenderRoute,
-} from "./routes/email-preview.js";
 
 // ---------------------------------------------------------------------------
 // MIME types for static serving
@@ -628,16 +624,6 @@ function handleApiRoute(
 
     case "/api/inverse/apply-tokens":
       if (method === "POST") handleInverseApplyTokensRoute(req, res);
-      else jsonResponse(res, 405, { error: "Method not allowed" });
-      break;
-
-    case "/api/email-preview/clients":
-      if (method === "GET") handleEmailPreviewClientsRoute(req, res);
-      else jsonResponse(res, 405, { error: "Method not allowed" });
-      break;
-
-    case "/api/email-preview/render":
-      if (method === "POST") handleEmailPreviewRenderRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
