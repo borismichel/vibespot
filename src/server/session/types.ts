@@ -24,6 +24,7 @@ export interface ChatMessage {
 export type PageType = "landing_page" | "blog_post" | "website_page" | "module_only";
 
 export type ContentMode = "page" | "email";
+export type ContentType = "page" | "email";
 
 export interface TemplateEntry {
   id: string;                    // e.g. "lp-main", "blog-post"
