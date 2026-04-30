@@ -12,6 +12,7 @@ import type { SessionSnapshot, PageType } from "../session/types.js";
 export interface PipelinePlan {
   intent:
     | "create"
+    | "create_site"
     | "modify"
     | "add"
     | "remove"
@@ -26,6 +27,8 @@ export interface PipelinePlan {
     sourceTemplate: string;
     position: number;
   }[];
+  pages?: SitePagePlan[];
+  sharedModules?: string[];
   guidesNeeded: (
     | "design"
     | "content"
@@ -35,7 +38,7 @@ export interface PipelinePlan {
   )[];
   designSystemChanges: boolean;
   contentType?: "page" | "email";
-  answer?: string; // For "question" intent — short-circuits the pipeline
+  answer?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,10 +151,11 @@ export interface PipelineResult {
 // ---------------------------------------------------------------------------
 
 export interface SitePagePlan {
-  pageId: string;
+  id: string;
   label: string;
+  pageType: PageType;
+  purpose: string;
   slug: string;
-  description: string;
 }
 
 export interface SiteBlueprint {
