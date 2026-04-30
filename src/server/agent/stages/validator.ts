@@ -486,3 +486,50 @@ function ensureMetaFields(
 
   return metaJson;
 }
+
+// ---------------------------------------------------------------------------
+// Multi-page: cross-page navigation link validation
+// ---------------------------------------------------------------------------
+
+export interface NavValidationIssue {
+  module: string;
+  message: string;
+  autoFixed: boolean;
+}
+
+export function validateNavLinks(
+  modules: ModuleFiles[],
+  pageSlugs: string[],
+): NavValidationIssue[] {
+  const issues: NavValidationIssue[] = [];
+  const slugSet = new Set(pageSlugs.map((s) => `/${s}`));
+
+  for (const mod of modules) {
+    if (!mod.moduleName.includes("header") && !mod.moduleName.includes("nav") && !mod.moduleName.includes("footer")) {
+      continue;
+    }
+
+    const hrefPattern = /href=["'](\/?[a-z0-9][a-z0-9-]*(?:\/[a-z0-9-]*)*)["']/gi;
+    let match;
+    const foundLinks: string[] = [];
+
+    while ((match = hrefPattern.exec(mod.moduleHtml)) !== null) {
+      let href = match[1];
+      if (!href.startsWith("/")) href = "/" + href;
+      if (href === "/" || href.startsWith("/http") || href.startsWith("/#")) continue;
+      foundLinks.push(href);
+    }
+
+    for (const link of foundLinks) {
+      if (!slugSet.has(link)) {
+        issues.push({
+          module: mod.moduleName,
+          message: `Nav link "${link}" does not match any page slug (valid: ${pageSlugs.map((s) => "/" + s).join(", ")})`,
+          autoFixed: false,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
