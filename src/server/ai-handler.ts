@@ -174,7 +174,7 @@ function takeSnapshot(): SessionSnapshot {
   const modules = tpl ? [...tpl.modules] : [...session.modules];
   const moduleOrder = tpl ? [...tpl.moduleOrder] : [...session.moduleOrder];
 
-  return {
+  const snap: SessionSnapshot = {
     modules,
     moduleOrder,
     sharedCss: tpl?.sharedCss || session.sharedCss,
@@ -185,6 +185,18 @@ function takeSnapshot(): SessionSnapshot {
     contentMode: tpl?.contentMode,
     brandAssets: session.brandAssets ? { ...session.brandAssets } : undefined,
   };
+
+  if (session.templates.length > 1) {
+    snap.activePageLabel = tpl?.label;
+    snap.sitePages = session.templates.map((t) => ({
+      id: t.id,
+      label: t.label,
+      pageType: t.pageType,
+      moduleCount: t.modules.length,
+    }));
+  }
+
+  return snap;
 }
 
 /**

@@ -36,6 +36,10 @@ export async function runIntentAnalyzer(
     moduleNames,
     libraryModules,
     snapshot.brandAssets?.themeContext,
+    snapshot.sitePages ? {
+      activePageLabel: snapshot.activePageLabel,
+      pages: snapshot.sitePages as { id: string; label: string; moduleCount: number }[],
+    } : undefined,
   );
 
   // Build messages with recent conversation history for context resolution
