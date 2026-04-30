@@ -1,0 +1,80 @@
+name: Bug Report
+description: Report a bug in vibeSpot
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear description of what went wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce the issue?
+      placeholder: |
+        1. Run `vibespot ...`
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Vibe coding (web UI)
+        - CLI wizard
+        - CLI command (convert, upload, etc.)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: vibeSpot version
+      description: Output of `vibespot --version`
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      description: Output of `node --version`
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ai-engine
+    attributes:
+      label: AI engine
+      options:
+        - Anthropic API
+        - Claude Code CLI
+        - OpenAI API
+        - Gemini API
+        - Gemini CLI
+        - Codex CLI
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: Paste any error output or attach screenshots.
+    validations:
+      required: false
