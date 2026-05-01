@@ -1,18 +1,20 @@
 /**
- * Inline WYSIWYG editing — click elements in the preview to edit them directly.
- * Persists changes via /api/field and refreshes the preview.
+ * Unified interact mode — merged Select + Edit into one contextual model.
+ *
+ * Editable elements (text, images, links) get inline editing.
+ * Module-level containers prefill the chat input for referencing.
  */
 
-const editModeBtn = document.getElementById("edit-mode-toggle");
-let editModeActive = false;
-let editHandlers = null;
+const interactBtn = document.getElementById("interact-mode-toggle");
+let interactModeActive = false;
+let interactHandlers = null;
 
-function ensureEditModeStyles(doc) {
-  if (doc.getElementById("vibespot-edit-css")) return;
+function ensureInteractStyles(doc) {
+  if (doc.getElementById("vibespot-interact-css")) return;
   const style = doc.createElement("style");
-  style.id = "vibespot-edit-css";
+  style.id = "vibespot-interact-css";
   style.textContent = `
-    html.vibespot-edit-mode { cursor: default; }
+    html.vibespot-interact-mode { cursor: default; }
     .vibespot-editable-hover {
       outline: 2px dashed rgba(59, 130, 246, 0.6) !important;
       outline-offset: 2px !important;
@@ -20,6 +22,12 @@ function ensureEditModeStyles(doc) {
     }
     .vibespot-editable-hover[data-edit-type="image"] {
       cursor: pointer !important;
+    }
+    .vibespot-editable-hover[data-edit-type="select"] {
+      outline-color: #e8613a !important;
+      outline-style: solid !important;
+      background-color: rgba(232, 97, 58, 0.08) !important;
+      cursor: crosshair !important;
     }
     .vibespot-editing {
       outline: 2px solid rgba(59, 130, 246, 0.9) !important;
@@ -33,11 +41,16 @@ function ensureEditModeStyles(doc) {
       pointer-events: none;
       font: 500 11px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       color: #fff;
-      background: #3b82f6;
       padding: 2px 7px;
       border-radius: 3px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.2);
       white-space: nowrap;
+    }
+    .vibespot-edit-label--edit {
+      background: #3b82f6;
+    }
+    .vibespot-edit-label--select {
+      background: #e8613a;
     }
     .vibespot-image-edit-input {
       position: fixed;
@@ -97,49 +110,98 @@ function ensureEditModeStyles(doc) {
   doc.head.appendChild(style);
 }
 
-function getEditableInfo(el) {
+// Determine if element is directly editable (text/image/link) or module-level
+function getInteractInfo(el) {
   if (!el) return null;
   const tag = (el.tagName || "").toLowerCase();
 
-  // Prefer explicit field annotations from the renderer
+  // Check for explicit field annotations first
   const annotated = el.closest("[data-vs-field]");
   if (annotated) {
     const vsType = annotated.getAttribute("data-vs-type");
-    if (vsType === "image") return { type: "image", el: annotated };
-    if (vsType === "link") return { type: "link", el: annotated };
-    return { type: "text", el: annotated };
+    if (vsType === "image") return { type: "image", el: annotated, action: "edit" };
+    if (vsType === "link") return { type: "link", el: annotated, action: "edit" };
+    return { type: "text", el: annotated, action: "edit" };
   }
   const linkAnnotated = el.closest("[data-vs-link]");
-  if (linkAnnotated) return { type: "link", el: linkAnnotated };
+  if (linkAnnotated) return { type: "link", el: linkAnnotated, action: "edit" };
 
-  // Fallback: heuristic detection for un-annotated elements
-  if (tag === "img") return { type: "image", el };
+  // Heuristic detection for editable elements
+  if (tag === "img") return { type: "image", el, action: "edit" };
   if (tag === "a" || (el.closest && el.closest("a"))) {
     const anchor = tag === "a" ? el : el.closest("a");
-    return { type: "link", el: anchor };
+    return { type: "link", el: anchor, action: "edit" };
   }
   if (tag.match(/^h[1-6]$/) || tag === "p" || tag === "span" || tag === "li" || tag === "td" || tag === "th") {
     if (el.children.length === 0 || (el.children.length === 1 && el.children[0].tagName === "BR")) {
-      return { type: "text", el };
+      return { type: "text", el, action: "edit" };
     }
     if (el.textContent && el.textContent.trim().length > 0 && el.childElementCount <= 2) {
-      return { type: "text", el };
+      return { type: "text", el, action: "edit" };
     }
   }
-  if (tag === "button") return { type: "text", el };
+  if (tag === "button") return { type: "text", el, action: "edit" };
+
+  // Module-level container → select mode (prefill chat)
+  const moduleEl = el.closest("[data-module]");
+  if (moduleEl) return { type: "select", el: moduleEl, action: "select" };
 
   return null;
 }
 
-function attachEditHandlers() {
+function describeElement(el) {
+  if (!el) return "";
+  const moduleEl = el.closest("[data-module]");
+  const moduleName = moduleEl ? moduleEl.getAttribute("data-module") : null;
+  const tag = (el.tagName || "").toLowerCase();
+  let kind = tag;
+  if (tag.match(/^h[1-6]$/)) kind = "headline";
+  else if (tag === "p") kind = "paragraph";
+  else if (tag === "a") kind = "link";
+  else if (tag === "button") kind = "button";
+  else if (tag === "img") kind = "image";
+  else if (tag === "ul" || tag === "ol") kind = "list";
+  else if (tag === "li") kind = "list item";
+
+  if (moduleName && moduleEl === el) return moduleName;
+  if (moduleName) return `${moduleName} > ${kind}`;
+  return kind;
+}
+
+function buildChatPrefill(el) {
+  if (!el) return "";
+  const moduleEl = el.closest("[data-module]");
+  const moduleName = moduleEl ? moduleEl.getAttribute("data-module") : null;
+  const tag = (el.tagName || "").toLowerCase();
+  const text = (el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 80);
+
+  let elementPart;
+  if (tag.match(/^h[1-6]$/)) elementPart = "the headline";
+  else if (tag === "p") elementPart = "the paragraph";
+  else if (tag === "a") elementPart = "the link";
+  else if (tag === "button") elementPart = "the button";
+  else if (tag === "img") elementPart = "the image";
+  else elementPart = `the ${tag}`;
+
+  if (moduleEl === el && moduleName) {
+    return `In the ${moduleName} section, `;
+  }
+  if (moduleName) {
+    const quote = text ? ` ("${text}${text.length === 80 ? "…" : ""}")` : "";
+    return `In the ${moduleName} section, ${elementPart}${quote} `;
+  }
+  return `${elementPart} `;
+}
+
+function attachInteractHandlers() {
   let doc;
   try {
     doc = previewFrame.contentDocument || previewFrame.contentWindow?.document;
   } catch { return; }
   if (!doc || !doc.body) return;
 
-  ensureEditModeStyles(doc);
-  doc.documentElement.classList.add("vibespot-edit-mode");
+  ensureInteractStyles(doc);
+  doc.documentElement.classList.add("vibespot-interact-mode");
 
   let hoveredEl = null;
   let labelEl = null;
@@ -147,7 +209,7 @@ function attachEditHandlers() {
 
   const cleanup = () => {
     if (hoveredEl) {
-      hoveredEl.classList.remove("vibespot-editable-hover");
+      hoveredEl.classList.remove("vibespot-editable-hover", "vibespot-select-hover");
       hoveredEl.removeAttribute("data-edit-type");
       hoveredEl = null;
     }
@@ -159,7 +221,7 @@ function attachEditHandlers() {
 
   const onMouseOver = (e) => {
     if (activeEditor) return;
-    const info = getEditableInfo(e.target);
+    const info = getInteractInfo(e.target);
     if (!info) {
       cleanup();
       return;
@@ -168,15 +230,22 @@ function attachEditHandlers() {
     cleanup();
     hoveredEl = info.el;
     hoveredEl.classList.add("vibespot-editable-hover");
-    hoveredEl.setAttribute("data-edit-type", info.type);
+    hoveredEl.setAttribute("data-edit-type", info.action === "select" ? "select" : info.type);
 
     if (!labelEl) {
       labelEl = doc.createElement("div");
       labelEl.className = "vibespot-edit-label";
       doc.body.appendChild(labelEl);
     }
-    const typeLabel = info.type === "image" ? "Click to edit image" : info.type === "link" ? "Click to edit link" : "Click to edit";
-    labelEl.textContent = typeLabel;
+
+    if (info.action === "select") {
+      labelEl.className = "vibespot-edit-label vibespot-edit-label--select";
+      labelEl.textContent = describeElement(info.el);
+    } else {
+      labelEl.className = "vibespot-edit-label vibespot-edit-label--edit";
+      const typeLabel = info.type === "image" ? "Click to edit image" : info.type === "link" ? "Click to edit link" : "Click to edit";
+      labelEl.textContent = typeLabel;
+    }
     const rect = info.el.getBoundingClientRect();
     labelEl.style.top = Math.max(4, rect.top - 20) + "px";
     labelEl.style.left = Math.max(4, rect.left) + "px";
@@ -197,11 +266,19 @@ function attachEditHandlers() {
     e.preventDefault();
     e.stopPropagation();
 
-    const info = getEditableInfo(e.target);
+    const info = getInteractInfo(e.target);
     if (!info) return;
 
     closeActiveEditor();
     cleanup();
+
+    if (info.action === "select") {
+      const prefill = buildChatPrefill(info.el);
+      if (typeof window.prefillChatInput === "function") {
+        window.prefillChatInput(prefill);
+      }
+      return;
+    }
 
     const moduleEl = info.el.closest("[data-module]");
     if (!moduleEl) return;
@@ -368,7 +445,7 @@ function attachEditHandlers() {
   }
 
   const onKeyDown = (e) => {
-    if (e.key === "Escape" && !activeEditor) deactivateEditMode();
+    if (e.key === "Escape" && !activeEditor) deactivateInteractMode();
   };
 
   doc.addEventListener("mouseover", onMouseOver, true);
@@ -376,7 +453,7 @@ function attachEditHandlers() {
   doc.addEventListener("click", onClick, true);
   doc.addEventListener("keydown", onKeyDown, true);
 
-  editHandlers = {
+  interactHandlers = {
     doc,
     onMouseOver,
     onMouseOut,
@@ -387,59 +464,68 @@ function attachEditHandlers() {
   };
 }
 
-function detachEditHandlers() {
-  if (!editHandlers) return;
-  const { doc, onMouseOver, onMouseOut, onClick, onKeyDown, cleanup, closeActiveEditor } = editHandlers;
+function detachInteractHandlers() {
+  if (!interactHandlers) return;
+  const { doc, onMouseOver, onMouseOut, onClick, onKeyDown, cleanup, closeActiveEditor } = interactHandlers;
   try {
     closeActiveEditor();
     cleanup();
-    doc.documentElement.classList.remove("vibespot-edit-mode");
+    doc.documentElement.classList.remove("vibespot-interact-mode");
     doc.removeEventListener("mouseover", onMouseOver, true);
     doc.removeEventListener("mouseout", onMouseOut, true);
     doc.removeEventListener("click", onClick, true);
     doc.removeEventListener("keydown", onKeyDown, true);
   } catch { /* cross-origin */ }
-  editHandlers = null;
+  interactHandlers = null;
 }
 
-function activateEditMode() {
-  if (editModeActive) return;
-  if (typeof deactivateSelectMode === "function") deactivateSelectMode();
-  editModeActive = true;
-  if (editModeBtn) editModeBtn.setAttribute("aria-pressed", "true");
-  attachEditHandlers();
+function activateInteractMode() {
+  if (interactModeActive) return;
+  interactModeActive = true;
+  if (interactBtn) interactBtn.setAttribute("aria-pressed", "true");
+  const previewContainer = document.getElementById("preview-container");
+  if (previewContainer) previewContainer.classList.add("preview--interact-mode");
+  attachInteractHandlers();
 }
 
-function deactivateEditMode() {
-  if (!editModeActive) return;
-  editModeActive = false;
-  if (editModeBtn) editModeBtn.setAttribute("aria-pressed", "false");
-  detachEditHandlers();
+function deactivateInteractMode() {
+  if (!interactModeActive) return;
+  interactModeActive = false;
+  if (interactBtn) interactBtn.setAttribute("aria-pressed", "false");
+  const previewContainer = document.getElementById("preview-container");
+  if (previewContainer) previewContainer.classList.remove("preview--interact-mode");
+  detachInteractHandlers();
 }
 
-function setEditModeDisabled(disabled) {
-  if (!editModeBtn) return;
+function setInteractModeDisabled(disabled) {
+  if (!interactBtn) return;
   if (disabled) {
-    deactivateEditMode();
-    editModeBtn.disabled = true;
+    deactivateInteractMode();
+    interactBtn.disabled = true;
   } else {
-    editModeBtn.disabled = false;
+    interactBtn.disabled = false;
   }
 }
 
-if (editModeBtn) {
-  editModeBtn.addEventListener("click", () => {
-    if (editModeBtn.disabled) return;
-    if (editModeActive) deactivateEditMode();
-    else activateEditMode();
+if (interactBtn) {
+  interactBtn.addEventListener("click", () => {
+    if (interactBtn.disabled) return;
+    if (interactModeActive) deactivateInteractMode();
+    else activateInteractMode();
   });
 }
 
-if (previewFrame) {
+if (typeof previewFrame !== "undefined" && previewFrame) {
   previewFrame.addEventListener("load", () => {
-    if (editModeActive) attachEditHandlers();
+    if (interactModeActive) attachInteractHandlers();
   });
 }
+
+// Backward-compat aliases
+window.setEditModeDisabled = setInteractModeDisabled;
+window.deactivateEditMode = deactivateInteractMode;
+window.setSelectModeDisabled = setInteractModeDisabled;
+window.deactivateSelectMode = deactivateInteractMode;
 
 // ---------------------------------------------------------------------------
 // Save helpers — find matching field in fields.json and update via /api/field
@@ -512,7 +598,6 @@ async function saveTextChange(moduleName, el, newText) {
     return;
   }
 
-  // Fallback: text-content matching for un-annotated elements
   const data = await findModuleFields(moduleName);
   if (!data) { refreshPreview(); return; }
 
@@ -545,7 +630,6 @@ async function saveImageChange(moduleName, imgEl, newSrc) {
     return;
   }
 
-  // Fallback: heuristic matching
   const data = await findModuleFields(moduleName);
   if (!data) { refreshPreview(); return; }
 
@@ -591,7 +675,6 @@ async function saveLinkChange(moduleName, anchorEl, newText, newUrl) {
     return;
   }
 
-  // Fallback: heuristic matching
   const data = await findModuleFields(moduleName);
   if (!data) { refreshPreview(); return; }
 
@@ -625,6 +708,3 @@ async function saveLinkChange(moduleName, anchorEl, newText, newUrl) {
 
   refreshPreview();
 }
-
-window.setEditModeDisabled = setEditModeDisabled;
-window.deactivateEditMode = deactivateEditMode;
