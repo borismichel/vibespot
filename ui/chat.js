@@ -2532,11 +2532,14 @@ document.getElementById("btn-starter-templates")?.addEventListener("click", () =
   if (welcome) welcome.classList.toggle("hidden");
 });
 
-// Version history
+// Version history (bottom panel)
 document.getElementById("btn-history")?.addEventListener("click", toggleHistoryPanel);
 document.getElementById("history-panel-close")?.addEventListener("click", () => {
   historyPanelOpen = false;
   document.getElementById("history-panel")?.classList.add("hidden");
+});
+document.getElementById("history-panel-collapse")?.addEventListener("click", () => {
+  document.getElementById("history-panel")?.classList.toggle("collapsed");
 });
 
 // Import from GitHub is now on the setup screen (setup.js)

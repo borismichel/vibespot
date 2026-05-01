@@ -768,51 +768,59 @@
       <main class="panel panel--right" id="panel-right">
         <div class="view-toggle" id="view-toggle">
           <button class="view-toggle__btn active" data-view="preview">Preview</button>
-          <button class="view-toggle__btn" data-view="plan" id="view-toggle-plan">Plan</button>
           <button class="view-toggle__btn" data-view="code">Code</button>
+          <div class="view-toggle__spacer"></div>
+          <button class="view-toggle__btn view-toggle__btn--plan" id="plan-sidebar-toggle" title="Toggle plan sidebar" aria-pressed="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+            Plan
+          </button>
         </div>
 
-        <div class="preview" id="preview-container">
-          <div class="browser-chrome" id="browser-chrome">
-            <div class="browser-chrome__bar">
-              <div class="browser-chrome__dots">
-                <span class="browser-chrome__dot"></span>
-                <span class="browser-chrome__dot"></span>
-                <span class="browser-chrome__dot"></span>
+        <div class="right-split">
+          <div class="preview" id="preview-container">
+            <div class="browser-chrome" id="browser-chrome">
+              <div class="browser-chrome__bar">
+                <div class="browser-chrome__dots">
+                  <span class="browser-chrome__dot"></span>
+                  <span class="browser-chrome__dot"></span>
+                  <span class="browser-chrome__dot"></span>
+                </div>
+                <div class="browser-chrome__url" id="browser-url">vibespot.app</div>
               </div>
-              <div class="browser-chrome__url" id="browser-url">vibespot.app</div>
+              <iframe id="preview-frame" class="browser-chrome__frame" sandbox="allow-scripts allow-same-origin"></iframe>
             </div>
-            <iframe id="preview-frame" class="browser-chrome__frame" sandbox="allow-scripts allow-same-origin"></iframe>
           </div>
-        </div>
 
-        <!-- Plan pane (deliberation phase) -->
-        <div class="plan-pane hidden" id="plan-pane">
-          <div class="plan-pane__scroll">
-            <div class="plan-pane__header">
-              <h2 class="plan-pane__title">Plan</h2>
-              <div class="plan-pane__header-actions">
-                <button class="plan-pane__icon-btn" id="plan-edit-toggle" title="Edit plan">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                  <span>Edit</span>
-                </button>
+          <!-- Plan sidebar (deliberation phase — coexists with preview) -->
+          <aside class="plan-sidebar hidden" id="plan-pane">
+            <div class="plan-sidebar__resize" id="plan-sidebar-resize"></div>
+            <button class="plan-sidebar__close" id="plan-sidebar-close">&times;</button>
+            <div class="plan-pane__scroll">
+              <div class="plan-pane__header">
+                <h2 class="plan-pane__title">Plan</h2>
+                <div class="plan-pane__header-actions">
+                  <button class="plan-pane__icon-btn" id="plan-edit-toggle" title="Edit plan">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    <span>Edit</span>
+                  </button>
+                </div>
               </div>
-            </div>
-            <div class="plan-pane__content" id="plan-content">
-              <div class="plan-pane__empty">
-                <p>No plan yet.</p>
-                <p class="plan-pane__empty-hint">Toggle plan mode in the chat (icon next to send) and describe what you want to build. The assistant will ask clarifying questions and draft a plan here.</p>
+              <div class="plan-pane__content" id="plan-content">
+                <div class="plan-pane__empty">
+                  <p>No plan yet.</p>
+                  <p class="plan-pane__empty-hint">Toggle plan mode in the chat (icon next to send) and describe what you want to build. The assistant will ask clarifying questions and draft a plan here.</p>
+                </div>
               </div>
+              <textarea class="plan-pane__editor hidden" id="plan-editor" spellcheck="false"></textarea>
             </div>
-            <textarea class="plan-pane__editor hidden" id="plan-editor" spellcheck="false"></textarea>
-          </div>
-          <div class="plan-pane__footer">
-            <button class="btn btn--secondary plan-pane__discard" id="plan-discard-btn">Discard &amp; start over</button>
-            <div class="plan-pane__footer-spacer"></div>
-            <button class="btn btn--secondary hidden" id="plan-edit-cancel">Cancel</button>
-            <button class="btn btn--primary hidden" id="plan-edit-save">Save</button>
-            <button class="btn btn--primary plan-pane__approve" id="plan-approve-btn">Approve plan</button>
-          </div>
+            <div class="plan-pane__footer">
+              <button class="btn btn--secondary plan-pane__discard" id="plan-discard-btn">Discard &amp; start over</button>
+              <div class="plan-pane__footer-spacer"></div>
+              <button class="btn btn--secondary hidden" id="plan-edit-cancel">Cancel</button>
+              <button class="btn btn--primary hidden" id="plan-edit-save">Save</button>
+              <button class="btn btn--primary plan-pane__approve" id="plan-approve-btn">Approve plan</button>
+            </div>
+          </aside>
         </div>
 
         <div class="code-view hidden" id="code-view">
@@ -832,13 +840,21 @@
           </div>
         </div>
 
-        <aside class="history-panel hidden" id="history-panel">
-          <div class="history-panel__header">
+        <!-- History bottom panel -->
+        <div class="history-bottom hidden" id="history-panel">
+          <div class="history-bottom__header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             <h3>Version History</h3>
-            <button class="history-panel__close" id="history-panel-close">&times;</button>
+            <div class="history-bottom__spacer"></div>
+            <button class="history-bottom__toggle" id="history-panel-collapse" title="Collapse">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <button class="history-bottom__close" id="history-panel-close" title="Close">&times;</button>
           </div>
-          <div class="history-panel__list" id="history-list"></div>
-        </aside>
+          <div class="history-bottom__body" id="history-bottom-body">
+            <div class="history-panel__list" id="history-list"></div>
+          </div>
+        </div>
       </main>
     </div>
 
