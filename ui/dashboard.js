@@ -1067,36 +1067,6 @@ document.getElementById("theme-name")?.addEventListener("dblclick", () => {
   });
 });
 
-// Download ZIP button
-document.getElementById("dashboard-download-zip")?.addEventListener("click", async () => {
-  const btn = document.getElementById("dashboard-download-zip");
-  const origHTML = btn.innerHTML;
-  btn.disabled = true;
-  btn.querySelector("span").textContent = "Downloading...";
-
-  try {
-    const res = await fetch("/api/download-zip");
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: "Download failed" }));
-      throw new Error(err.error || "Download failed");
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = (currentDashboardTheme || "theme") + ".zip";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    if (typeof vibeAlert === "function") vibeAlert(err.message, "Error");
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = origHTML;
-  }
-});
-
 // Humanify toggle
 const humanifyCheckbox = document.getElementById("humanify-checkbox");
 if (humanifyCheckbox) {
@@ -1128,14 +1098,3 @@ document.querySelectorAll(".workspace-tab").forEach((btn) => {
   });
 });
 
-// Settings tab → open settings overlay
-document.getElementById("ws-settings-open")?.addEventListener("click", () => {
-  if (typeof openSettings === "function") openSettings();
-});
-
-// Marketplace tab → run validation
-document.getElementById("ws-marketplace-check")?.addEventListener("click", () => {
-  if (typeof runMarketplaceCheck === "function") {
-    runMarketplaceCheck();
-  }
-});
