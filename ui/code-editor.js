@@ -348,6 +348,26 @@ async function loadCodeFiles() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Split view — preview + code side by side via CSS grid
+// ---------------------------------------------------------------------------
+
+function enterSplitView() {
+  const panelRight = document.getElementById("panel-right");
+  const previewEl = document.getElementById("preview-container");
+  const codeEl = document.getElementById("code-view");
+
+  panelRight.classList.add("split-active");
+  previewEl.classList.remove("hidden");
+  codeEl.classList.remove("hidden");
+  loadCodeFiles();
+}
+
+function exitSplitView() {
+  const panelRight = document.getElementById("panel-right");
+  panelRight.classList.remove("split-active");
+}
+
 document.querySelectorAll(".view-toggle__btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     const view = btn.dataset.view;
@@ -356,16 +376,18 @@ document.querySelectorAll(".view-toggle__btn").forEach((btn) => {
 
     const previewEl = document.getElementById("preview-container");
     const codeEl = document.getElementById("code-view");
-    const chromeBar = document.getElementById("browser-chrome");
 
-    if (view === "code") {
+    exitSplitView();
+
+    if (view === "split") {
+      enterSplitView();
+    } else if (view === "code") {
       previewEl.classList.add("hidden");
       codeEl.classList.remove("hidden");
       loadCodeFiles();
     } else {
       codeEl.classList.add("hidden");
       previewEl.classList.remove("hidden");
-      // Refresh preview if code was saved while in code view
       if (codeSavedSinceSwitch && typeof refreshPreview === "function") {
         refreshPreview();
       }
