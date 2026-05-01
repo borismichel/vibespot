@@ -2252,16 +2252,6 @@ async function addModuleFromLibrary(moduleName) {
   }
 }
 
-// Module bar button → toggle slideout
-document.getElementById("btn-modules")?.addEventListener("click", () => {
-  const slideout = document.getElementById("module-slideout");
-  if (slideout.classList.contains("open")) {
-    closeModuleSlideout();
-  } else {
-    openModuleSlideout();
-  }
-});
-
 // Add module button (inside slideout)
 document.getElementById("btn-add-module").addEventListener("click", toggleModuleLibraryDropdown);
 

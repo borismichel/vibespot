@@ -1524,17 +1524,11 @@ function escSettings(str) {
 // Event listeners
 // ---------------------------------------------------------------------------
 
-document.getElementById("settings-close")?.addEventListener("click", closeSettings);
-document.getElementById("settings-overlay")?.addEventListener("click", (e) => {
-  if (e.target.id === "settings-overlay") closeSettings();
-});
-
 document.getElementById("btn-setup-settings")?.addEventListener("click", () => openSettings());
 
 document.addEventListener("keydown", (e) => {
-  const overlay = document.getElementById("settings-overlay");
   const settingsTabActive = document.querySelector('.workspace-tab[data-ws-tab="settings"].active');
-  if (e.key === "Escape" && ((overlay && !overlay.classList.contains("hidden")) || settingsTabActive)) {
+  if (e.key === "Escape" && settingsTabActive) {
     closeSettings();
   }
 });
