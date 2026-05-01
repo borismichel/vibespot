@@ -2176,35 +2176,60 @@ body { display: flex; }
 /* ================================================================
    PAGE TABS (multi-page template switcher)
    ================================================================ */
-.page-tabs {
+/* Page Tree — vertical sidebar replacing horizontal tabs */
+.page-tree {
   display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 8px;
+  flex-direction: column;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+  max-height: 200px;
+  overflow: hidden;
 }
-.page-tabs::-webkit-scrollbar { display: none; }
-.page-tabs.hidden { display: none; }
-
-.page-tabs__list {
+.page-tree__header {
   display: flex;
   align-items: center;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+  justify-content: space-between;
+  padding: 8px 12px 4px;
 }
-.page-tabs__list::-webkit-scrollbar { display: none; }
+.page-tree__title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.page-tree__add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.page-tree__add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+.page-tree__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 
 .page-tabs__tab {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
+  gap: 8px;
+  padding: 6px 10px;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
@@ -2216,20 +2241,39 @@ body { display: flex; }
   white-space: nowrap;
   transition: all 0.15s;
   min-width: 0;
+  width: 100%;
+  text-align: left;
 }
 .page-tabs__tab:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
 .page-tabs__tab--active {
-  background: var(--bg-active);
+  background: var(--accent-dim);
   color: var(--text);
-  border-color: var(--border-hover);
+  border-color: var(--accent);
+  border-color: rgba(232,97,58,0.3);
 }
 .page-tabs__tab-label {
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
+  flex: 1;
+  min-width: 0;
+}
+.page-tabs__tab-badge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  padding: 1px 5px;
+  background: var(--bg-active);
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+.page-tabs__tab--active .page-tabs__tab-badge {
+  background: var(--accent-dim);
+  color: var(--accent);
 }
 .page-tabs__tab-count {
   font-size: 10px;
@@ -2238,30 +2282,59 @@ body { display: flex; }
   background: var(--bg-active);
   border-radius: var(--radius-pill);
   line-height: 16px;
+  flex-shrink: 0;
 }
 .page-tabs__tab--active .page-tabs__tab-count {
   background: var(--accent-dim);
   color: var(--accent);
 }
 
-.page-tabs__add {
+/* Inline add page form */
+.page-tree__add-inline {
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--border);
   display: flex;
+  gap: 4px;
   align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
+}
+.page-tree__add-inline.hidden { display: none; }
+.page-tree__type-select {
+  font-size: 11px;
+  font-family: var(--font);
+  padding: 4px 6px;
   border-radius: var(--radius-sm);
-  border: 1px dashed var(--border);
-  background: transparent;
-  color: var(--text-dim);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  flex-shrink: 0;
+}
+.page-tree__name-input {
+  font-size: 12px;
+  font-family: var(--font);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+}
+.page-tree__name-input::placeholder { color: var(--text-muted); }
+.page-tree__create-btn {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
   cursor: pointer;
   flex-shrink: 0;
-  transition: all 0.15s;
+  transition: background 0.15s;
 }
-.page-tabs__add:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-tint);
+.page-tree__create-btn:hover {
+  background: var(--accent-hover);
 }
 
 /* ================================================================
@@ -2437,6 +2510,73 @@ body { display: flex; }
   flex: 1;
   overflow-y: auto;
 }
+.module-slideout .field-editor__content.hidden { display: none; }
+
+/* Field editor tabs (Fields / Code) */
+.field-editor__tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+.field-editor__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  border: none;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.field-editor__tab:hover { color: var(--text); background: var(--bg-hover); }
+.field-editor__tab.active { background: var(--bg-input); color: var(--text); }
+
+/* Field editor code viewer */
+.field-editor__code {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.field-editor__code.hidden { display: none; }
+.field-editor__code-file {
+  border-bottom: 1px solid var(--border);
+}
+.field-editor__code-file-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  user-select: none;
+}
+.field-editor__code-file-header:hover { color: var(--text); }
+.field-editor__code-file-header svg { flex-shrink: 0; }
+.field-editor__code-pre {
+  margin: 0;
+  padding: 8px 12px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  background: var(--bg);
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.field-editor__code-pre.hidden { display: none; }
 
 /* Module library dropdown */
 .module-library-dropdown {

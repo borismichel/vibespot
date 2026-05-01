@@ -637,11 +637,24 @@
           </button>
         </div>
 
-        <div class="page-tabs hidden" id="page-tabs">
-          <div class="page-tabs__list" id="page-tabs-list"></div>
-          <button class="page-tabs__add" id="btn-add-page" title="Add page">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
+        <div class="page-tree" id="page-tree">
+          <div class="page-tree__header">
+            <span class="page-tree__title">Pages</span>
+            <button class="page-tree__add" id="btn-add-page" title="Add page">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <div class="page-tree__list" id="page-tabs-list"></div>
+          <div class="page-tree__add-inline hidden" id="page-tree-add-inline">
+            <select class="page-tree__type-select" id="page-tree-type">
+              <option value="landing_page">Landing Page</option>
+              <option value="website_page">Website Page</option>
+              <option value="blog_post">Blog Post</option>
+              <option value="module_only">Section Only</option>
+            </select>
+            <input class="page-tree__name-input" id="page-tree-name" placeholder="Page name..." />
+            <button class="page-tree__create-btn" id="page-tree-create">Create</button>
+          </div>
         </div>
 
         <div class="module-slideout" id="module-slideout">
@@ -659,9 +672,17 @@
             <div class="module-slideout__header">
               <button class="module-slideout__back" id="field-editor-back">&larr;</button>
               <span class="module-slideout__title" id="field-editor-title">Fields</span>
+              <div class="field-editor__tabs">
+                <button class="field-editor__tab active" id="field-editor-tab-fields" data-tab="fields">Fields</button>
+                <button class="field-editor__tab" id="field-editor-tab-code" data-tab="code">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                  Code
+                </button>
+              </div>
               <button class="module-slideout__close" id="field-editor-close">&times;</button>
             </div>
             <div class="field-editor__content" id="field-editor-content"></div>
+            <div class="field-editor__code hidden" id="field-editor-code"></div>
           </div>
         </div>
 

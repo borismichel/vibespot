@@ -56,22 +56,25 @@ function restoreWelcome() {
 
 let currentTemplates = [];
 
+const PAGE_TYPE_BADGES = {
+  landing_page: "LP",
+  blog_post: "Blog",
+  website_page: "Web",
+  module_only: "Sec",
+};
+
 function renderPageTabs(templates, activeTemplateId) {
-  const container = document.getElementById("page-tabs");
+  const container = document.getElementById("page-tree");
   const list = document.getElementById("page-tabs-list");
-  if (!container || !list) return;
+  if (!list) return;
 
   currentTemplates = templates || [];
 
-  if (currentTemplates.length <= 1) {
-    container.classList.add("hidden");
-    return;
-  }
-
-  container.classList.remove("hidden");
   list.innerHTML = currentTemplates.map((t) => {
     const isActive = t.id === activeTemplateId;
+    const badge = PAGE_TYPE_BADGES[t.pageType] || "";
     return `<button class="page-tabs__tab${isActive ? " page-tabs__tab--active" : ""}" data-template-id="${t.id}" title="${t.label} (${t.moduleCount} modules)">
+      ${badge ? `<span class="page-tabs__tab-badge">${badge}</span>` : ""}
       <span class="page-tabs__tab-label">${escapeHtml(t.label)}</span>
       <span class="page-tabs__tab-count">${t.moduleCount}</span>
     </button>`;
@@ -103,13 +106,36 @@ function handlePageTabClick(e) {
 
 function handleAddPage() {
   if (isStreaming) return;
+  const inlineForm = document.getElementById("page-tree-add-inline");
+  if (inlineForm) {
+    inlineForm.classList.toggle("hidden");
+    if (!inlineForm.classList.contains("hidden")) {
+      document.getElementById("page-tree-name")?.focus();
+    }
+    return;
+  }
   const label = prompt("Page name:");
   if (!label || !label.trim()) return;
+  createPage("website_page", label.trim());
+}
 
+function handleInlineCreate() {
+  if (isStreaming) return;
+  const nameInput = document.getElementById("page-tree-name");
+  const typeSelect = document.getElementById("page-tree-type");
+  const label = nameInput?.value?.trim();
+  if (!label) { nameInput?.focus(); return; }
+  const pageType = typeSelect?.value || "website_page";
+  createPage(pageType, label);
+  nameInput.value = "";
+  document.getElementById("page-tree-add-inline")?.classList.add("hidden");
+}
+
+function createPage(pageType, label) {
   fetch("/api/templates", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pageType: "website_page", label: label.trim() }),
+    body: JSON.stringify({ pageType, label }),
   }).then((res) => {
     if (!res.ok) return;
     return res.json();
@@ -126,11 +152,18 @@ function handleAddPage() {
   });
 }
 
-(function initPageTabs() {
+(function initPageTree() {
   const list = document.getElementById("page-tabs-list");
   const addBtn = document.getElementById("btn-add-page");
+  const createBtn = document.getElementById("page-tree-create");
+  const nameInput = document.getElementById("page-tree-name");
   if (list) list.addEventListener("click", handlePageTabClick);
   if (addBtn) addBtn.addEventListener("click", handleAddPage);
+  if (createBtn) createBtn.addEventListener("click", handleInlineCreate);
+  if (nameInput) nameInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") handleInlineCreate();
+    if (e.key === "Escape") document.getElementById("page-tree-add-inline")?.classList.add("hidden");
+  });
 })();
 
 // ---------------------------------------------------------------------------
