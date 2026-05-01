@@ -14,6 +14,7 @@ let currentEditModule = null;
 async function openFieldEditor(moduleName) {
   currentEditModule = moduleName;
   editorTitle.textContent = moduleName;
+  switchFieldEditorTab("fields");
 
   // Switch slideout to editor view
   if (typeof showEditorView === "function") {
@@ -292,4 +293,74 @@ function updateField(moduleName, fieldPath, value) {
       body: JSON.stringify({ moduleName, fieldPath, value }),
     }).then(() => refreshPreview());
   }, 300);
+}
+
+// ---------------------------------------------------------------------------
+// Field editor tabs (Fields / Code)
+// ---------------------------------------------------------------------------
+
+const fieldEditorCode = document.getElementById("field-editor-code");
+
+function switchFieldEditorTab(tab) {
+  const tabFields = document.getElementById("field-editor-tab-fields");
+  const tabCode = document.getElementById("field-editor-tab-code");
+
+  if (tab === "code") {
+    editorContent.classList.add("hidden");
+    if (fieldEditorCode) fieldEditorCode.classList.remove("hidden");
+    if (tabFields) tabFields.classList.remove("active");
+    if (tabCode) tabCode.classList.add("active");
+    if (currentEditModule) showModuleCode(currentEditModule);
+  } else {
+    editorContent.classList.remove("hidden");
+    if (fieldEditorCode) fieldEditorCode.classList.add("hidden");
+    if (tabFields) tabFields.classList.add("active");
+    if (tabCode) tabCode.classList.remove("active");
+  }
+}
+
+document.getElementById("field-editor-tab-fields")?.addEventListener("click", () => switchFieldEditorTab("fields"));
+document.getElementById("field-editor-tab-code")?.addEventListener("click", () => switchFieldEditorTab("code"));
+
+function escHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function prettyJsonSafe(str) {
+  try { return JSON.stringify(JSON.parse(str), null, 2); } catch { return str; }
+}
+
+async function showModuleCode(moduleName) {
+  if (!fieldEditorCode) return;
+  fieldEditorCode.innerHTML = "<p style='padding:12px;color:var(--text-dim)'>Loading…</p>";
+
+  try {
+    const res = await fetch("/api/modules");
+    const data = await res.json();
+    const mod = data.modules.find((m) => m.moduleName === moduleName);
+    if (!mod) {
+      fieldEditorCode.innerHTML = "<p style='padding:12px'>Module not found</p>";
+      return;
+    }
+
+    const sections = [
+      { label: "module.html", code: mod.html || "" },
+      { label: "module.css", code: mod.css || "" },
+      { label: "module.js", code: mod.js || "" },
+      { label: "fields.json", code: prettyJsonSafe(mod.fieldsJson || "[]") },
+    ];
+
+    fieldEditorCode.innerHTML = sections
+      .filter((s) => s.code.trim())
+      .map(
+        (s) => `
+        <details class="field-editor__code-file" open>
+          <summary class="field-editor__code-file-header">${escHtml(s.label)}</summary>
+          <pre class="field-editor__code-pre"><code>${escHtml(s.code)}</code></pre>
+        </details>`
+      )
+      .join("");
+  } catch (err) {
+    fieldEditorCode.innerHTML = `<p style="padding:12px">Error: ${escHtml(err.message)}</p>`;
+  }
 }

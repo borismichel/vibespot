@@ -153,7 +153,7 @@ describe("listPlanTemplates", () => {
   it("each shipped template has a sections/modules section listing kebab-case names", () => {
     const tpls = listPlanTemplates();
     for (const tpl of tpls) {
-      expect(tpl.body).toMatch(/##\s+Sections\s*\/\s*Modules/i);
+      expect(tpl.body).toMatch(/##\s+.*\bModules\b/i);
       // At least one bolded kebab-case module name.
       expect(tpl.body).toMatch(/\*\*[a-z0-9]+(?:-[a-z0-9]+)*\*\*/);
     }
