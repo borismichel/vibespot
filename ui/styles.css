@@ -2163,7 +2163,7 @@ body { display: flex; }
 .progress-bar--success .progress-bar__fill { background: var(--success); }
 .progress-bar--error .progress-bar__fill { background: var(--error); }
 
-/* Confirm dialog overlay */
+/* Confirm dialog overlay (modal variant) */
 .confirm-overlay {
   position: fixed;
   inset: 0;
@@ -2172,13 +2172,13 @@ body { display: flex; }
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fadeIn 0.12s ease;
+  animation: fadeIn var(--duration-fast) var(--ease-default);
 }
 .confirm-dialog {
   background: var(--bg-panel-solid);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 24px;
+  padding: var(--space-5);
   width: 360px;
   max-width: 90vw;
   box-shadow: var(--shadow-lg);
@@ -2194,13 +2194,13 @@ body { display: flex; }
   flex: 1;
   overflow-y: auto;
   font-size: var(--text-base);
-  line-height: 1.6;
+  line-height: var(--leading-relaxed);
   color: var(--text-muted);
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px;
-  margin-bottom: 16px;
+  padding: var(--space-5);
+  margin-bottom: var(--space-4);
   max-height: 60vh;
 }
 
@@ -2258,27 +2258,27 @@ body { display: flex; }
 }
 .confirm-dialog__title {
   font-size: var(--text-lg);
-  font-weight: 600;
-  margin-bottom: 16px;
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-4);
 }
 .confirm-dialog__check {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: var(--text-base);
   color: var(--text);
   cursor: pointer;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 .confirm-dialog__check input[type="checkbox"] {
   accent-color: var(--accent);
-  width: 16px;
-  height: 16px;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 .confirm-dialog__detail {
   font-size: var(--text-base);
   color: var(--text-dim);
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 .confirm-dialog__detail strong {
   color: var(--text);
@@ -2286,8 +2286,8 @@ body { display: flex; }
 .confirm-dialog__warn {
   font-size: var(--text-sm);
   color: var(--error);
-  margin-bottom: 20px;
-  padding-left: 24px;
+  margin-bottom: var(--space-5);
+  padding-left: var(--space-5);
 }
 .confirm-dialog__toggle {
   display: flex;
@@ -2313,7 +2313,7 @@ body { display: flex; }
   background: var(--bg-input);
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
-  transition: background var(--duration-normal);
+  transition: background var(--duration-normal) var(--ease-default);
 }
 .confirm-dialog__toggle-slider::before {
   content: "";
@@ -2324,7 +2324,8 @@ body { display: flex; }
   bottom: 2px;
   background: var(--text-dim);
   border-radius: 50%;
-  transition: transform var(--duration-normal), background var(--duration-normal);
+  transition: transform var(--duration-normal) var(--ease-default),
+              background var(--duration-normal) var(--ease-default);
 }
 .confirm-dialog__toggle-switch input:checked + .confirm-dialog__toggle-slider {
   background: var(--error);
@@ -2341,29 +2342,29 @@ body { display: flex; }
   font-size: var(--text-sm);
   color: var(--error);
   padding-left: 46px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 .confirm-dialog__input {
   width: 100%;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   font-size: var(--text-md);
   font-family: inherit;
   color: var(--text);
-  background: var(--bg-input, var(--bg-main));
+  background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   outline: none;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
   box-sizing: border-box;
 }
 .confirm-dialog__input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(255,107,53,0.2);
+  box-shadow: var(--shadow-focus);
 }
 .confirm-dialog__actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .btn-link {
@@ -5854,7 +5855,7 @@ body { display: flex; }
   background: var(--bg-input);
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
-  transition: background var(--duration-normal);
+  transition: background var(--duration-normal) var(--ease-default);
 }
 
 .brand-asset-toggle__slider::before {
@@ -5866,7 +5867,8 @@ body { display: flex; }
   bottom: 2px;
   background: var(--text-dim);
   border-radius: 50%;
-  transition: transform var(--duration-normal), background var(--duration-normal);
+  transition: transform var(--duration-normal) var(--ease-default),
+              background var(--duration-normal) var(--ease-default);
 }
 
 .brand-asset-toggle__switch input:checked + .brand-asset-toggle__slider {
