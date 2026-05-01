@@ -19,7 +19,8 @@ function toggleTheme() {
  */
 
 const setupScreen = document.getElementById("setup-screen");
-const appScreen = document.getElementById("app-screen");
+const appScreen = document.getElementById("editor");
+const appBody = document.getElementById("app-body");
 let _serverContentMode = "page";
 
 // ---------------------------------------------------------------------------
@@ -921,7 +922,8 @@ async function createFromStarter() {
 }
 
 async function fetchTheme() {
-  const name = document.getElementById("fetch-theme-name").value.trim();
+  const nameEl = document.getElementById("fetch-theme-name") || document.getElementById("dl-theme-name");
+  const name = nameEl ? nameEl.value.trim() : "";
   if (!name) {
     showError("Please enter the theme name from your HubSpot account.");
     return;
@@ -1026,11 +1028,10 @@ function showApp(themeName) {
  * Used as fallback or when navigating from dashboard to a specific template.
  */
 function showAppDirect(themeName) {
-  setupScreen.classList.add("hidden");
-  document.getElementById("setup-topbar").classList.add("hidden");
-  document.getElementById("project-rail")?.classList.remove("project-rail--expanded");
   if (typeof hideDashboard === "function") hideDashboard();
+  appBody.dataset.mode = "editor";
   appScreen.classList.remove("hidden");
+  document.getElementById("project-rail")?.classList.remove("project-rail--expanded");
   document.getElementById("theme-name").textContent = themeName;
 
   const urlEl = document.getElementById("browser-url");
@@ -1054,8 +1055,7 @@ function showAppDirect(themeName) {
 function showSetup() {
   appScreen.classList.add("hidden");
   if (typeof hideDashboard === "function") hideDashboard();
-  setupScreen.classList.remove("hidden");
-  document.getElementById("setup-topbar").classList.remove("hidden");
+  appBody.dataset.mode = "project-home";
   document.getElementById("project-rail")?.classList.add("project-rail--expanded");
   currentAppTheme = "";
 
@@ -1069,25 +1069,16 @@ function showSetup() {
   initSetup();
 }
 
-// App back button → go back to dashboard from chat
-document.getElementById("app-back")?.addEventListener("click", () => {
-  if (currentAppTheme && typeof showDashboard === "function") {
-    appScreen.classList.add("hidden");
-    showDashboard(currentAppTheme);
-  }
+// Editor back button → go back to setup
+document.getElementById("editor-back")?.addEventListener("click", () => {
+  showSetup();
 });
 
-// Logo click → go back to setup (from dashboard)
+// Logo click → go back to setup
 document.querySelectorAll(".topbar__brand").forEach((el) => {
   el.style.cursor = "pointer";
   el.addEventListener("click", () => {
-    const dashEl = document.getElementById("dashboard-screen");
-    if (dashEl && !dashEl.classList.contains("hidden")) {
-      showSetup();
-      return;
-    }
-    // Fallback
-    if (!appScreen.classList.contains("hidden")) {
+    if (appBody.dataset.mode === "editor") {
       showSetup();
     }
   });
@@ -1768,8 +1759,7 @@ function handleRoute() {
   if (appTemplateMatch) {
     const themeName = decodeURIComponent(appTemplateMatch[1]);
     const templateId = decodeURIComponent(appTemplateMatch[2]);
-    // Already showing this — nothing to do
-    if (currentAppTheme === themeName && !appScreen.classList.contains("hidden")) return;
+    if (currentAppTheme === themeName && appBody.dataset.mode === "editor") return;
     // Open theme then activate template
     openTheme(themeName).then(() => {
       if (typeof showChat === "function") {
@@ -1783,24 +1773,22 @@ function handleRoute() {
   const appMatch = hash.match(/^#\/app\/([^/]+)$/);
   if (appMatch) {
     const themeName = decodeURIComponent(appMatch[1]);
-    if (currentAppTheme === themeName && !appScreen.classList.contains("hidden")) return;
+    if (currentAppTheme === themeName && appBody.dataset.mode === "editor") return;
     openTheme(themeName);
     return;
   }
 
-  // #/dashboard/{themeName} → show dashboard for theme
+  // #/dashboard/{themeName} → show editor for theme
   const dashMatch = hash.match(/^#\/dashboard\/(.+)$/);
   if (dashMatch) {
     const themeName = decodeURIComponent(dashMatch[1]);
-    const dashEl = document.getElementById("dashboard-screen");
-    if (currentDashboardTheme === themeName && dashEl && !dashEl.classList.contains("hidden")) return;
+    if (currentDashboardTheme === themeName && appBody.dataset.mode === "editor") return;
     openTheme(themeName);
     return;
   }
 
   // Default: show setup
-  const dashEl = document.getElementById("dashboard-screen");
-  if (!appScreen.classList.contains("hidden") || (dashEl && !dashEl.classList.contains("hidden"))) {
+  if (appBody.dataset.mode === "editor") {
     showSetup();
   }
 }
