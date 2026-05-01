@@ -222,8 +222,8 @@ function handleWsMessage(msg) {
 
       // Clear previous project's chat and module list
       messagesEl.innerHTML = "";
-      document.getElementById("module-items").innerHTML = "";
-      document.getElementById("module-count").textContent = "0";
+      const _mi = document.getElementById("module-items"); if (_mi) _mi.innerHTML = "";
+      const _mc = document.getElementById("module-count") || document.getElementById("slideout-module-count"); if (_mc) _mc.textContent = "0";
       hideChatSuggestions();
       // Reset pipeline state — DOM nodes were detached by innerHTML clear
       resetPipelineState();
@@ -402,8 +402,8 @@ function handleWsMessage(msg) {
     case "needs_setup":
       // Clear stale UI if shown
       messagesEl.innerHTML = "";
-      document.getElementById("module-items").innerHTML = "";
-      document.getElementById("module-count").textContent = "0";
+      { const _mi = document.getElementById("module-items"); if (_mi) _mi.innerHTML = ""; }
+      { const _mc = document.getElementById("module-count") || document.getElementById("slideout-module-count"); if (_mc) _mc.textContent = "0"; }
       break;
 
     case "plan_updated":
