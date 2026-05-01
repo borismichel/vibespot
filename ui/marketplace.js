@@ -1,54 +1,83 @@
 /**
- * Marketplace publication panel — runs the Marketplace check against the
- * active theme, lets users browse findings, fix the auto-fixable ones, and
- * edit the marketplace.json listing sidecar.
+ * Marketplace publication tab — VIB-188 moves the marketplace check from a
+ * modal overlay into the Editor's Marketplace workspace tab. The renderer is
+ * invoked by navigation.js when the tab activates.
  */
 
-async function openMarketplacePanel() {
-  const overlay = document.createElement("div");
-  overlay.className = "confirm-overlay marketplace-overlay";
-  overlay.innerHTML = `
-    <div class="confirm-dialog marketplace-dialog">
-      <div class="confirm-dialog__title">HubSpot Marketplace check</div>
-      <div class="marketplace-body" id="marketplace-body">
-        <p class="confirm-dialog__detail">Running check…</p>
-      </div>
-      <div class="confirm-dialog__actions">
-        <button class="btn btn--ghost" data-action="close">Close</button>
-        <button class="btn btn--ghost" data-action="edit">Edit listing</button>
-        <button class="btn btn--ghost" data-action="fix" disabled>Apply fixes</button>
-        <button class="btn btn--primary" data-action="recheck">Re-check</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
+let _marketplaceState = {
+  report: null,
+  categories: [],
+  loading: false,
+  initialised: false,
+};
 
-  const body = overlay.querySelector("#marketplace-body");
-  const fixBtn = overlay.querySelector('[data-action="fix"]');
-  const editBtn = overlay.querySelector('[data-action="edit"]');
-  const recheckBtn = overlay.querySelector('[data-action="recheck"]');
-  const closeBtn = overlay.querySelector('[data-action="close"]');
+function renderMarketplacePanel(panel) {
+  if (!panel) panel = document.getElementById("ws-panel-marketplace");
+  if (!panel) return;
+  const container = panel.querySelector(".dashboard__container") || panel;
 
-  let lastCategories = [];
+  // Ensure the section scaffolding exists. If the legacy initial markup is
+  // still present (a single "Run Validation" CTA), replace it with our shell.
+  let shell = container.querySelector(".marketplace-tab");
+  if (!shell) {
+    container.innerHTML = `
+      <section class="dashboard__section marketplace-tab">
+        <div class="dashboard__section-header">
+          <h2 class="dashboard__section-title">Marketplace</h2>
+          <span class="dashboard__section-hint">Validate and publish your theme</span>
+        </div>
+        <div class="marketplace-tab__toolbar">
+          <button class="btn btn--primary btn--sm" id="btn-marketplace" type="button">
+            <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            <span data-role="check-label">Run Validation</span>
+          </button>
+          <button class="btn btn--ghost btn--sm" data-action="edit" type="button">Edit listing</button>
+          <button class="btn btn--ghost btn--sm" data-action="fix" type="button" disabled>Apply fixes</button>
+        </div>
+        <div class="marketplace-tab__body" data-role="body">
+          <p class="dashboard__empty-state">Run a marketplace validation check to see if your theme is ready for publication.</p>
+        </div>
+      </section>`;
+    shell = container.querySelector(".marketplace-tab");
+  }
+
+  if (_marketplaceState.initialised) {
+    // Refresh the report when the tab re-activates so users see fresh data.
+    if (_marketplaceState.report) {
+      renderReport(shell.querySelector('[data-role="body"]'), _marketplaceState.report);
+    }
+    return;
+  }
+  _marketplaceState.initialised = true;
+
+  const checkBtn = shell.querySelector("#btn-marketplace");
+  const editBtn = shell.querySelector('[data-action="edit"]');
+  const fixBtn = shell.querySelector('[data-action="fix"]');
+  const body = shell.querySelector('[data-role="body"]');
 
   async function refresh() {
-    body.innerHTML = `<p class="confirm-dialog__detail">Running check…</p>`;
+    if (_marketplaceState.loading) return;
+    _marketplaceState.loading = true;
+    body.innerHTML = `<p class="dashboard__empty-state">Running check…</p>`;
     try {
       const res = await fetch("/api/marketplace/check");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Check failed");
-      lastCategories = data.categories || [];
+      _marketplaceState.report = data.report;
+      _marketplaceState.categories = data.categories || [];
       renderReport(body, data.report);
       const autoFixable = (data.report.findings || []).some((f) => f.autoFixable);
       fixBtn.disabled = !autoFixable;
+      const label = checkBtn.querySelector('[data-role="check-label"]');
+      if (label) label.textContent = "Re-check";
     } catch (err) {
-      body.innerHTML = `<p class="confirm-dialog__detail">${esc(err.message)}</p>`;
+      body.innerHTML = `<p class="dashboard__empty-state">${esc(err.message)}</p>`;
+    } finally {
+      _marketplaceState.loading = false;
     }
   }
 
-  recheckBtn.addEventListener("click", refresh);
-  closeBtn.addEventListener("click", () => overlay.remove());
-  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  checkBtn.addEventListener("click", refresh);
 
   fixBtn.addEventListener("click", async () => {
     fixBtn.disabled = true;
@@ -56,6 +85,7 @@ async function openMarketplacePanel() {
       const res = await fetch("/api/marketplace/fix", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Fix failed");
+      _marketplaceState.report = data.report;
       renderReport(body, data.report, data.fix);
       const stillFixable = (data.report.findings || []).some((f) => f.autoFixable);
       fixBtn.disabled = !stillFixable;
@@ -69,8 +99,8 @@ async function openMarketplacePanel() {
       const res = await fetch("/api/marketplace/listing");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not load listing");
-      lastCategories = data.categories || lastCategories;
-      const next = await openListingEditor(data.metadata, lastCategories);
+      _marketplaceState.categories = data.categories || _marketplaceState.categories;
+      const next = await openListingEditor(data.metadata, _marketplaceState.categories);
       if (!next) return;
       const save = await fetch("/api/marketplace/listing", {
         method: "POST",
@@ -84,13 +114,19 @@ async function openMarketplacePanel() {
       await vibeAlert(err.message, "Listing");
     }
   });
+}
 
-  refresh();
+function runMarketplaceCheck() {
+  // Public entry point used by ws-tab-marketplace activation handlers.
+  const panel = document.getElementById("ws-panel-marketplace");
+  renderMarketplacePanel(panel);
+  const btn = panel?.querySelector("#btn-marketplace");
+  if (btn) btn.click();
 }
 
 function renderReport(container, report, fix) {
   if (!report) {
-    container.innerHTML = `<p class="confirm-dialog__detail">No report available.</p>`;
+    container.innerHTML = `<p class="dashboard__empty-state">No report available.</p>`;
     return;
   }
 
@@ -130,7 +166,7 @@ function renderReport(container, report, fix) {
   html += renderFindingGroup("Notes", info);
 
   if (report.findings.length === 0) {
-    html += `<p class="confirm-dialog__detail">Nothing to flag — submit when ready.</p>`;
+    html += `<p class="dashboard__empty-state">Nothing to flag — submit when ready.</p>`;
   }
 
   container.innerHTML = html;
@@ -212,7 +248,5 @@ function openListingEditor(existing, categories) {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const btn = document.getElementById("btn-marketplace");
-  if (btn) btn.addEventListener("click", openMarketplacePanel);
-});
+window.renderMarketplacePanel = renderMarketplacePanel;
+window.runMarketplaceCheck = runMarketplaceCheck;

@@ -215,15 +215,21 @@ function handleWsMessage(msg) {
   }
 
   switch (msg.type) {
-    case "init":
+    case "init": {
       currentSessionId = msg.sessionId || "";
       currentTemplateId = msg.templateId || "";
       document.getElementById("theme-name").textContent = msg.themeName || "—";
 
       // Clear previous project's chat and module list
       messagesEl.innerHTML = "";
-      document.getElementById("module-items").innerHTML = "";
-      document.getElementById("module-count").textContent = "0";
+      const initModuleItemsEl = document.getElementById("module-items");
+      if (initModuleItemsEl) initModuleItemsEl.innerHTML = "";
+      const initPageTreeModulesEl = document.getElementById("page-tree-modules");
+      if (initPageTreeModulesEl) initPageTreeModulesEl.innerHTML = "";
+      const initModuleCountEl = document.getElementById("module-count");
+      if (initModuleCountEl) initModuleCountEl.textContent = "0";
+      const initSlideoutCountEl = document.getElementById("slideout-module-count");
+      if (initSlideoutCountEl) initSlideoutCountEl.textContent = "0";
       hideChatSuggestions();
       // Reset pipeline state — DOM nodes were detached by innerHTML clear
       resetPipelineState();
@@ -309,6 +315,7 @@ function handleWsMessage(msg) {
         }
       }
       break;
+    }
 
     case "stream":
       handleStreamChunk(msg.content);
@@ -399,12 +406,19 @@ function handleWsMessage(msg) {
       appendSystemMessage("Importing from Figma: " + (msg.fileName || "design") + "...");
       break;
 
-    case "needs_setup":
+    case "needs_setup": {
       // Clear stale UI if shown
       messagesEl.innerHTML = "";
-      document.getElementById("module-items").innerHTML = "";
-      document.getElementById("module-count").textContent = "0";
+      const moduleItemsEl = document.getElementById("module-items");
+      if (moduleItemsEl) moduleItemsEl.innerHTML = "";
+      const pageTreeModulesEl = document.getElementById("page-tree-modules");
+      if (pageTreeModulesEl) pageTreeModulesEl.innerHTML = "";
+      const moduleCountEl = document.getElementById("module-count");
+      if (moduleCountEl) moduleCountEl.textContent = "0";
+      const slideoutCountEl = document.getElementById("slideout-module-count");
+      if (slideoutCountEl) slideoutCountEl.textContent = "0";
       break;
+    }
 
     case "plan_updated":
       if (window.planController) window.planController.onPlanUpdated(msg.plan || "");
@@ -2037,32 +2051,45 @@ function hideTimelineTooltip() {
 
 function updateModuleList(moduleNames) {
   const itemsEl = document.getElementById("module-items");
+  const treeEl = document.getElementById("page-tree-modules");
   const barCountEl = document.getElementById("module-count");
   const slideoutCountEl = document.getElementById("slideout-module-count");
 
   if (barCountEl) barCountEl.textContent = moduleNames.length;
   if (slideoutCountEl) slideoutCountEl.textContent = moduleNames.length;
 
-  // Preserve which items were marked as recently changed across re-renders so
-  // the dots survive the per-module `modules_updated` events that happen
-  // mid-run.
+  renderModuleListInto(itemsEl, moduleNames, { variant: "slideout" });
+  renderModuleListInto(treeEl, moduleNames, { variant: "tree" });
+}
+
+function renderModuleListInto(container, moduleNames, opts) {
+  if (!container) return;
+
+  // Preserve change-dot state across re-renders.
   const previouslyChanged = new Set(
-    Array.from(itemsEl.querySelectorAll(".module-item--changed")).map((el) => el.dataset.module),
+    Array.from(container.querySelectorAll(".module-item--changed")).map((el) => el.dataset.module),
   );
-  itemsEl.innerHTML = "";
+  container.innerHTML = "";
 
   for (const name of moduleNames) {
     const item = document.createElement("div");
-    item.className = "module-item";
+    item.className = "module-item module-item--" + (opts?.variant || "slideout");
     if (previouslyChanged.has(name)) item.classList.add("module-item--changed");
     item.dataset.module = name;
     item.innerHTML = `
-      <span class="module-item__drag">⠿</span>
+      <span class="module-item__drag" aria-hidden="true">⠿</span>
       <span class="module-item__changed-dot" aria-hidden="true"></span>
       <span class="module-item__name">${escapeHtml(name)}</span>
-      <span class="module-item__edit" title="Edit fields">⚙</span>
-      <span class="module-item__delete" title="Delete section">&times;</span>
+      <span class="module-item__edit" title="Edit fields" role="button" tabindex="0" aria-label="Edit fields">⚙</span>
+      <span class="module-item__delete" title="Delete section" role="button" tabindex="0" aria-label="Delete section">&times;</span>
     `;
+
+    item.querySelector(".module-item__name").addEventListener("click", () => {
+      // Click on the module name → scroll preview + open field editor (VIB-188).
+      if (typeof scrollPreviewToModule === "function") scrollPreviewToModule(name);
+      openFieldEditor(name);
+      highlightModuleItem(name);
+    });
 
     item.querySelector(".module-item__edit").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -2075,10 +2102,101 @@ function updateModuleList(moduleNames) {
       confirmDeleteModule(name);
     });
 
-    itemsEl.appendChild(item);
+    item.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      openModuleContextMenu(e, name);
+    });
+
+    container.appendChild(item);
   }
 
-  setupDragReorder(itemsEl);
+  setupDragReorder(container);
+}
+
+// ---------------------------------------------------------------------------
+// Module right-click context menu (VIB-188 — page tree integration)
+// ---------------------------------------------------------------------------
+
+let _moduleContextMenuEl = null;
+
+function closeModuleContextMenu() {
+  if (_moduleContextMenuEl) {
+    _moduleContextMenuEl.remove();
+    _moduleContextMenuEl = null;
+  }
+}
+
+function openModuleContextMenu(event, moduleName) {
+  closeModuleContextMenu();
+  const menu = document.createElement("div");
+  menu.className = "module-context-menu";
+  menu.setAttribute("role", "menu");
+  menu.innerHTML = `
+    <button class="module-context-menu__item" data-action="rename" type="button" role="menuitem">Rename…</button>
+    <button class="module-context-menu__item" data-action="clone" type="button" role="menuitem">Duplicate</button>
+    <button class="module-context-menu__item module-context-menu__item--danger" data-action="delete" type="button" role="menuitem">Delete</button>
+  `;
+  menu.style.position = "fixed";
+  menu.style.left = event.clientX + "px";
+  menu.style.top = event.clientY + "px";
+  menu.style.zIndex = "10000";
+  document.body.appendChild(menu);
+  _moduleContextMenuEl = menu;
+
+  menu.addEventListener("click", async (e) => {
+    const action = e.target.closest("[data-action]")?.dataset.action;
+    if (!action) return;
+    closeModuleContextMenu();
+    if (action === "rename") {
+      const next = await vibePrompt("Rename section", moduleName);
+      if (!next || next === moduleName) return;
+      try {
+        const res = await fetch("/api/modules/rename", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ moduleName, newName: next }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data?.error) {
+          await vibeAlert(data?.error || "Rename failed", "Error");
+          return;
+        }
+        const modRes = await fetch("/api/modules");
+        const modData = await modRes.json();
+        updateModuleList(modData.modules.map((m) => m.moduleName));
+        if (typeof refreshPreview === "function") refreshPreview();
+      } catch (err) {
+        await vibeAlert("Rename failed: " + err.message, "Error");
+      }
+    } else if (action === "clone") {
+      try {
+        const res = await fetch("/api/modules/clone", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ moduleName }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data?.error) {
+          await vibeAlert(data?.error || "Duplicate failed", "Error");
+          return;
+        }
+        const modRes = await fetch("/api/modules");
+        const modData = await modRes.json();
+        updateModuleList(modData.modules.map((m) => m.moduleName));
+        if (typeof refreshPreview === "function") refreshPreview();
+      } catch (err) {
+        await vibeAlert("Duplicate failed: " + err.message, "Error");
+      }
+    } else if (action === "delete") {
+      confirmDeleteModule(moduleName);
+    }
+  });
+
+  // Auto-dismiss
+  setTimeout(() => {
+    document.addEventListener("click", closeModuleContextMenu, { once: true });
+    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeModuleContextMenu(); }, { once: true });
+  }, 0);
 }
 
 function highlightModuleItem(name) {
@@ -2127,13 +2245,11 @@ function flushChangeHighlights(latestModules) {
   }
 }
 
-/** Apply the change indicator dot to each named module in the sidebar. */
+/** Apply the change indicator dot to each named module in any sidebar list. */
 function markModuleListChanged(names) {
   if (!names || names.length === 0) return;
-  const itemsEl = document.getElementById("module-items");
-  if (!itemsEl) return;
   const set = new Set(names);
-  itemsEl.querySelectorAll(".module-item").forEach((el) => {
+  document.querySelectorAll(".module-item").forEach((el) => {
     if (set.has(el.dataset.module)) el.classList.add("module-item--changed");
   });
 
@@ -2252,18 +2368,12 @@ async function addModuleFromLibrary(moduleName) {
   }
 }
 
-// Module bar button → toggle slideout
-document.getElementById("btn-modules")?.addEventListener("click", () => {
-  const slideout = document.getElementById("module-slideout");
-  if (slideout.classList.contains("open")) {
-    closeModuleSlideout();
-  } else {
-    openModuleSlideout();
-  }
-});
+// VIB-188: btn-modules (the legacy module-bar trigger) is gone. The slideout
+// stays for in-page section editing and is opened from the page tree.
 
-// Add module button (inside slideout)
-document.getElementById("btn-add-module").addEventListener("click", toggleModuleLibraryDropdown);
+// Add module button (inside slideout) — guarded; the slideout may not be
+// instantiated yet on certain entry paths.
+document.getElementById("btn-add-module")?.addEventListener("click", toggleModuleLibraryDropdown);
 
 // Slideout close buttons
 document.getElementById("module-slideout-close")?.addEventListener("click", closeModuleSlideout);
@@ -2274,7 +2384,7 @@ document.getElementById("field-editor-close")?.addEventListener("click", closeMo
 document.addEventListener("click", (e) => {
   const dropdown = document.getElementById("module-library-dropdown");
   const btn = document.getElementById("btn-add-module");
-  if (!dropdown.contains(e.target) && e.target !== btn) {
+  if (dropdown && !dropdown.contains(e.target) && e.target !== btn) {
     dropdown.classList.add("hidden");
   }
 });
@@ -2332,11 +2442,14 @@ function confirmDeleteModule(moduleName) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ moduleName, deleteEntirely }),
       }).then(() => {
-        const item = document.querySelector(`.module-item[data-module="${CSS.escape(moduleName)}"]`);
-        if (item) item.remove();
+        document.querySelectorAll(`.module-item[data-module="${CSS.escape(moduleName)}"]`)
+          .forEach((el) => el.remove());
+        const distinctNames = new Set(
+          Array.from(document.querySelectorAll(".module-item")).map((el) => el.dataset.module),
+        );
+        const count = distinctNames.size;
         const countEl = document.getElementById("module-count");
         const slideoutCountEl = document.getElementById("slideout-module-count");
-        const count = document.querySelectorAll(".module-item").length;
         if (countEl) countEl.textContent = count;
         if (slideoutCountEl) slideoutCountEl.textContent = count;
         refreshPreview();

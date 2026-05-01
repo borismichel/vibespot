@@ -21,7 +21,9 @@ const ENGINE_LABELS = {
 };
 
 // ---------------------------------------------------------------------------
-// Open / Close
+// Open settings — VIB-188: settings is now a workspace tab, not a modal
+// overlay. openSettings(tab?) routes to the Editor's Settings tab and pre-
+// selects the requested sub-tab if provided.
 // ---------------------------------------------------------------------------
 
 function openSettings(tab) {
@@ -31,16 +33,32 @@ function openSettings(tab) {
     const tabs = document.querySelectorAll("#settings-tabs .settings__tab");
     tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
   }
-  document.getElementById("settings-overlay").classList.remove("hidden");
+
+  // If we're not in editor mode, route to the Settings tab of the most
+  // recently used theme. If there's nothing to route to, render in place
+  // anyway so the Settings tab content is ready for the next time the
+  // editor is opened.
+  if (typeof getCurrentEditorTheme === "function" && typeof switchWorkspaceTab === "function") {
+    const theme = getCurrentEditorTheme()
+      || (typeof currentAppTheme !== "undefined" ? currentAppTheme : "")
+      || (typeof currentDashboardTheme !== "undefined" ? currentDashboardTheme : "");
+    if (theme && typeof enterEditor === "function") {
+      enterEditor(theme, "settings");
+    } else {
+      switchWorkspaceTab("settings");
+    }
+  }
   refreshSettings();
 }
 
 function closeSettings() {
-  document.getElementById("settings-overlay").classList.add("hidden");
+  // Backwards-compatible no-op: the settings tab can't be "closed" — switch
+  // back to the Pages tab instead.
   Object.keys(activePolls).forEach((id) => {
     clearInterval(activePolls[id]);
     delete activePolls[id];
   });
+  if (typeof switchWorkspaceTab === "function") switchWorkspaceTab("pages");
 }
 
 // ---------------------------------------------------------------------------
@@ -1507,21 +1525,11 @@ function escSettings(str) {
 }
 
 // ---------------------------------------------------------------------------
-// Event listeners
+// Event listeners — VIB-188: settings is a workspace tab, not an overlay.
+// The legacy modal close button and overlay backdrop click no longer apply.
 // ---------------------------------------------------------------------------
 
-document.getElementById("settings-close").addEventListener("click", closeSettings);
-document.getElementById("settings-overlay").addEventListener("click", (e) => {
-  if (e.target.id === "settings-overlay") closeSettings();
-});
-
-document.getElementById("btn-setup-settings").addEventListener("click", () => openSettings());
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !document.getElementById("settings-overlay").classList.contains("hidden")) {
-    closeSettings();
-  }
-});
+document.getElementById("btn-setup-settings")?.addEventListener("click", () => openSettings());
 
 // Initialize tabs
 initTabs();

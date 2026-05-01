@@ -1,9 +1,11 @@
 /**
- * Dashboard screen — project overview with templates, module library, and brand assets.
- * Sits between setup (project list) and chat (template editing).
+ * Workspace tab content — Brand and Library tab renderers, plus the import
+ * analysis section, brand kit, and template/module-library bookkeeping.
+ *
+ * VIB-188: this used to be a standalone Dashboard screen; in the two-mode
+ * architecture the same content now renders inside the Editor's workspace
+ * tabs (Brand, Library, Marketplace). Screen transitions live in navigation.js.
  */
-
-const dashboardScreen = document.getElementById("dashboard-screen");
 
 // Page type labels for display
 const PAGE_TYPE_LABELS = {
@@ -21,28 +23,25 @@ const PAGE_TYPE_FULL_LABELS = {
 };
 
 // ---------------------------------------------------------------------------
-// Show / hide dashboard
+// State exposed to navigation.js / chat.js for cross-module coordination
 // ---------------------------------------------------------------------------
 
 let currentDashboardTheme = "";
 let currentDashboardSessionId = "";
 let currentDashboardIsImported = false;
 
-async function showDashboard(themeName) {
-  currentDashboardTheme = themeName;
+// ---------------------------------------------------------------------------
+// Load dashboard data from server
+// ---------------------------------------------------------------------------
 
-  // Hide other screens
-  setupScreen.classList.add("hidden");
-  document.getElementById("setup-topbar").classList.add("hidden");
-  document.getElementById("project-rail")?.classList.remove("project-rail--expanded");
-  appScreen.classList.add("hidden");
-  dashboardScreen.classList.remove("hidden");
+async function refreshDashboard() {
+  // Pull the current active theme from the navigation layer so this works
+  // regardless of whether we're being invoked on the Brand or Library tab.
+  if (typeof getCurrentEditorTheme === "function") {
+    const t = getCurrentEditorTheme();
+    if (t) currentDashboardTheme = t;
+  }
 
-  document.getElementById("dashboard-theme-name").textContent = themeName;
-  document.getElementById("dashboard-theme-heading").textContent = themeName;
-  document.getElementById("dashboard-theme-path-text").textContent = "";
-
-  // Get sessionId for the active theme
   try {
     const themesRes = await fetch("/api/themes");
     const themesData = await themesRes.json();
@@ -53,28 +52,6 @@ async function showDashboard(themeName) {
     currentDashboardIsImported = false;
   }
 
-  // Update URL
-  const target = "#/dashboard/" + encodeURIComponent(themeName);
-  if (location.hash !== target) {
-    history.pushState(null, "", target);
-  }
-
-  // Load dashboard data
-  await refreshDashboard();
-}
-
-function hideDashboard() {
-  dashboardScreen.classList.add("hidden");
-  currentDashboardTheme = "";
-  currentDashboardIsImported = false;
-  closeModulePreview();
-}
-
-// ---------------------------------------------------------------------------
-// Load dashboard data from server
-// ---------------------------------------------------------------------------
-
-async function refreshDashboard() {
   try {
     const res = await fetch("/api/dashboard");
     const data = await res.json();
@@ -82,13 +59,10 @@ async function refreshDashboard() {
       console.warn("Dashboard load error:", data.error);
       return;
     }
-    renderTemplateList(data.templates || []);
+    if (typeof renderTemplateList === "function") renderTemplateList(data.templates || []);
     renderModuleLibrary(data.moduleLibrary || []);
     renderBrandAssets(data.brandAssets || {});
     renderBrandKit(data.brandAssets?.brandKit || null);
-    if (data.themePath) {
-      document.getElementById("dashboard-theme-path-text").textContent = data.themePath;
-    }
     if (currentDashboardIsImported) {
       await refreshInverseAnalysis();
     } else {
@@ -271,51 +245,9 @@ document.getElementById("btn-inverse-apply-tokens")?.addEventListener("click", a
 });
 
 // ---------------------------------------------------------------------------
-// Template list
+// Template management — used by the page tree (chat.js) and the template
+// rename/clone/delete flows that the page tree's right-click menu invokes.
 // ---------------------------------------------------------------------------
-
-function renderTemplateList(templates) {
-  const list = document.getElementById("dashboard-template-list");
-  const countEl = document.getElementById("dashboard-template-count");
-  countEl.textContent = templates.length;
-
-  if (templates.length === 0) {
-    list.innerHTML = `<p class="dashboard__empty-state">No templates yet. Choose a page type above to get started.</p>`;
-    return;
-  }
-
-  list.innerHTML = "";
-  for (const tpl of templates) {
-    const item = document.createElement("div");
-    item.className = "dashboard__template-item";
-    item.innerHTML = `
-      <span class="dashboard__template-badge dashboard__template-badge--${tpl.pageType}">${esc(PAGE_TYPE_LABELS[tpl.pageType] || "?")}</span>
-      <span class="dashboard__template-label">${esc(tpl.label)}</span>
-      <span class="dashboard__template-meta">${tpl.moduleCount} section${tpl.moduleCount !== 1 ? "s" : ""}</span>
-      <button class="btn btn--sm btn--primary dashboard__template-open" data-id="${esc(tpl.id)}">Open</button>
-      <button class="dashboard__template-clone" data-id="${esc(tpl.id)}" title="Clone template">&#x29C9;</button>
-      <button class="dashboard__template-delete" data-id="${esc(tpl.id)}" title="Delete template">&times;</button>
-    `;
-    list.appendChild(item);
-  }
-
-  // Event delegation — single listener handles all template actions
-  list.onclick = (e) => {
-    const openBtn = e.target.closest(".dashboard__template-open");
-    if (openBtn) return openTemplate(openBtn.dataset.id);
-    const cloneBtn = e.target.closest(".dashboard__template-clone");
-    if (cloneBtn) return cloneTemplateAction(cloneBtn.dataset.id);
-    const delBtn = e.target.closest(".dashboard__template-delete");
-    if (delBtn) return confirmDeleteTemplate(delBtn.dataset.id);
-  };
-  list.ondblclick = (e) => {
-    const labelEl = e.target.closest(".dashboard__template-label");
-    if (!labelEl) return;
-    const item = labelEl.closest(".dashboard__template-item");
-    const templateId = item?.querySelector(".dashboard__template-open")?.dataset.id;
-    if (templateId) startTemplateRename(labelEl, templateId);
-  };
-}
 
 function startTemplateRename(labelEl, templateId) {
   if (labelEl.contentEditable === "true") return;
@@ -745,8 +677,11 @@ async function openTemplate(templateId) {
       return;
     }
 
-    // Transition to chat screen
-    showChat(currentDashboardTheme, templateId);
+    // Make sure the editor is open on the Pages tab now that this template
+    // is the active one for the session.
+    if (typeof enterEditor === "function") {
+      enterEditor(currentDashboardTheme, "pages");
+    }
   } catch (err) {
     await vibeAlert("Failed to open template: " + err.message, "Error");
   }
@@ -849,68 +784,8 @@ async function handleBrandFileSelected(type, file) {
 }
 
 // ---------------------------------------------------------------------------
-// Chat screen transition
+// Event listeners — Brand/Library tab content
 // ---------------------------------------------------------------------------
-
-function showChat(themeName, templateId) {
-  hideDashboard();
-
-  // Show app screen
-  appScreen.classList.remove("hidden");
-  document.getElementById("theme-name").textContent = themeName;
-
-  // Update browser chrome URL bar
-  const urlEl = document.getElementById("browser-url");
-  if (urlEl) urlEl.textContent = themeName + ".vibespot.app";
-
-  // Update URL
-  const target = `#/app/${encodeURIComponent(themeName)}/${encodeURIComponent(templateId)}`;
-  if (location.hash !== target) {
-    history.pushState(null, "", target);
-  }
-
-  // Connect WebSocket (defined in chat.js)
-  if (typeof connectWebSocket === "function") {
-    connectWebSocket();
-  }
-
-  // Load initial preview
-  if (typeof refreshPreview === "function") {
-    refreshPreview();
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Event listeners
-// ---------------------------------------------------------------------------
-
-// Page type cards
-document.querySelectorAll(".page-type-card").forEach((card) => {
-  card.addEventListener("click", () => {
-    createTemplateFromPageType(card.dataset.type);
-  });
-});
-
-// Back button → setup
-document.getElementById("dashboard-back").addEventListener("click", () => {
-  hideDashboard();
-  if (typeof showSetup === "function") showSetup();
-});
-
-// Settings button
-document.getElementById("dashboard-settings-btn").addEventListener("click", () => {
-  if (typeof openSettings === "function") openSettings();
-});
-
-// Deploy button
-document.getElementById("dashboard-deploy-btn").addEventListener("click", () => {
-  if (typeof startUpload === "function") {
-    // Need to show app screen temporarily for upload
-    appScreen.classList.remove("hidden");
-    dashboardScreen.classList.add("hidden");
-    startUpload();
-  }
-});
 
 // Extract All button
 document.getElementById("btn-extract-all")?.addEventListener("click", async () => {
@@ -1009,111 +884,6 @@ document.getElementById("btn-import-reference")?.addEventListener("click", async
   }
 });
 
-// Dashboard theme heading — double-click to rename
-document.getElementById("dashboard-theme-heading")?.addEventListener("dblclick", () => {
-  const el = document.getElementById("dashboard-theme-heading");
-  if (!el || !currentDashboardSessionId) return;
-  if (el.contentEditable === "true") return;
-
-  const oldName = el.textContent.trim();
-  el.contentEditable = "true";
-  el.classList.add("dashboard__theme-heading--editing");
-  el.focus();
-
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
-
-  function commit() {
-    el.contentEditable = "false";
-    el.classList.remove("dashboard__theme-heading--editing");
-
-    const newName = el.textContent.trim();
-    if (!newName || newName === oldName) {
-      el.textContent = oldName;
-      return;
-    }
-
-    fetch("/api/themes/rename", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId: currentDashboardSessionId, newName }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.ok) {
-          el.textContent = data.newName;
-          currentDashboardTheme = data.newName;
-          document.getElementById("dashboard-theme-name").textContent = data.newName;
-          window.location.hash = "#/dashboard/" + encodeURIComponent(data.newName);
-          // Update rail
-          const railItem = document.querySelector(`.project-rail__item[data-name="${oldName}"]`);
-          if (railItem) {
-            railItem.dataset.name = data.newName;
-            const nameSpan = railItem.querySelector(".project-rail__item-name");
-            if (nameSpan) nameSpan.textContent = data.newName;
-            const bubble = railItem.querySelector(".project-rail__item-bubble");
-            if (bubble) bubble.textContent = data.newName.charAt(0).toUpperCase();
-          }
-          if (typeof updateRailActive === "function") updateRailActive();
-        } else {
-          el.textContent = oldName;
-          if (typeof showError === "function") showError(data.error || "Rename failed");
-        }
-      })
-      .catch(() => {
-        el.textContent = oldName;
-        if (typeof showError === "function") showError("Rename failed");
-      });
-  }
-
-  el.addEventListener("blur", commit, { once: true });
-  el.addEventListener("keydown", function handler(e) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      el.removeEventListener("keydown", handler);
-      el.blur();
-    }
-    if (e.key === "Escape") {
-      el.textContent = oldName;
-      el.removeEventListener("keydown", handler);
-      el.blur();
-    }
-  });
-});
-
-// Download ZIP button
-document.getElementById("dashboard-download-zip").addEventListener("click", async () => {
-  const btn = document.getElementById("dashboard-download-zip");
-  const origHTML = btn.innerHTML;
-  btn.disabled = true;
-  btn.querySelector("span").textContent = "Downloading...";
-
-  try {
-    const res = await fetch("/api/download-zip");
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: "Download failed" }));
-      throw new Error(err.error || "Download failed");
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = (currentDashboardTheme || "theme") + ".zip";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    if (typeof vibeAlert === "function") vibeAlert(err.message, "Error");
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = origHTML;
-  }
-});
-
 // Humanify toggle
 const humanifyCheckbox = document.getElementById("humanify-checkbox");
 if (humanifyCheckbox) {
@@ -1126,33 +896,4 @@ if (humanifyCheckbox) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Workspace tab navigation
-// ---------------------------------------------------------------------------
-
-function switchWorkspaceTab(tabName) {
-  document.querySelectorAll(".workspace-tab").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.wsTab === tabName);
-  });
-  document.querySelectorAll(".workspace-panel").forEach((panel) => {
-    panel.classList.toggle("active", panel.dataset.wsPanel === tabName);
-  });
-}
-
-document.querySelectorAll(".workspace-tab").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    switchWorkspaceTab(btn.dataset.wsTab);
-  });
-});
-
-// Settings tab → open settings overlay
-document.getElementById("ws-settings-open")?.addEventListener("click", () => {
-  if (typeof openSettings === "function") openSettings();
-});
-
-// Marketplace tab → run validation
-document.getElementById("ws-marketplace-check")?.addEventListener("click", () => {
-  if (typeof runMarketplaceCheck === "function") {
-    runMarketplaceCheck();
-  }
-});
+// Workspace tab switching is owned by navigation.js (VIB-188).

@@ -6826,3 +6826,108 @@ body { display: flex; }
   color: var(--text-dim);
   font-size: var(--text-xs);
 }
+
+/* ===========================================================================
+   VIB-188 — Page tree module list + right-click context menu
+   =========================================================================== */
+
+.page-tree__modules {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 4px 8px;
+  border-top: 1px solid var(--border, #2a2a2a);
+}
+
+.page-tree__modules:empty {
+  display: none;
+}
+
+.module-item--tree {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  margin-left: 12px;
+  border-radius: var(--radius-sm, 4px);
+  cursor: grab;
+  font-size: var(--text-sm, 13px);
+  color: var(--text-dim, #999);
+}
+.module-item--tree:hover {
+  background: var(--hover, rgba(255, 255, 255, 0.05));
+  color: var(--text, #fff);
+}
+.module-item--tree.module-item--dragging {
+  cursor: grabbing;
+  opacity: 0.7;
+}
+.module-item--tree .module-item__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.module-item--tree .module-item__edit,
+.module-item--tree .module-item__delete {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.module-item--tree:hover .module-item__edit,
+.module-item--tree:hover .module-item__delete {
+  opacity: 1;
+}
+
+/* Context menu (right-click on module) */
+.module-context-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px;
+  background: var(--bg-panel-solid, #1a1a1a);
+  border: 1px solid var(--border-hover, #3a3a3a);
+  border-radius: var(--radius-sm, 4px);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.3));
+  font-size: var(--text-sm, 13px);
+}
+.module-context-menu__item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text, #fff);
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: inherit;
+}
+.module-context-menu__item:hover {
+  background: var(--hover, rgba(255, 255, 255, 0.06));
+}
+.module-context-menu__item--danger {
+  color: var(--danger, #e8613a);
+}
+
+/* Workspace panel visibility — driven by .active class */
+.workspace-panel { display: none; }
+.workspace-panel.active { display: block; }
+.workspace-panel--pages.active { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+
+/* Mode-driven topbar children */
+.topbar__mode { display: none; }
+[data-mode="project-home"] .topbar__mode--project-home { display: inline-flex; }
+[data-mode="editor"] .topbar__mode--editor { display: inline-flex; }
+[data-mode="editor"] .topbar__mode--editor.workspace-tabs { display: flex; }
+
+/* Project Home / Editor screen visibility — by .hidden + data-mode hooks */
+[data-mode="project-home"] #editor { display: none; }
+[data-mode="editor"] #project-home { display: none; }
+
+/* Marketplace tab toolbar */
+.marketplace-tab__toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0 12px;
+}
