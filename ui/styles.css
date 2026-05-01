@@ -5237,6 +5237,8 @@ body { display: flex; }
   align-items: center;
   gap: 4px;
   width: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
