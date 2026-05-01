@@ -5138,27 +5138,178 @@ body { display: flex; }
 /* ================================================================
    SETUP TOPBAR
    ================================================================ */
-.setup-topbar {
-  position: fixed;
-  top: 0;
-  left: 220px;
-  right: 0;
-  height: var(--topbar-h);
+/* ================================================================
+   VIB-187: TWO-MODE ARCHITECTURE (Project Home + Editor)
+   ----------------------------------------------------------------
+   The app has one unified .topbar at the top of .app-body. The body
+   sets data-mode="project-home" or data-mode="editor". CSS below
+   toggles topbar children and the two main containers accordingly.
+   ================================================================ */
+
+/* Mode-conditional visibility for topbar items */
+.app-body[data-mode="project-home"] .topbar__mode--editor { display: none !important; }
+.app-body[data-mode="editor"] .topbar__mode--project-home { display: none !important; }
+
+/* Main containers — only one visible at a time */
+.app-body[data-mode="project-home"] #editor { display: none; }
+.app-body[data-mode="editor"] #project-home { display: none; }
+
+/* Statusbar belongs to the editor */
+.app-body[data-mode="project-home"] .statusbar { display: none; }
+
+/* ---- Project Home wrapper (replaces fixed setup-topbar layout) -- */
+.project-home {
+  flex: 1;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 16px;
-  background: var(--topbar-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
-  z-index: var(--z-topbar);
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
-/* Push setup content below the fixed topbar */
-.setup-topbar ~ #setup-screen {
-  padding-top: 72px;
+/* When project-home overrides .setup, drop the legacy fixed-height behaviour */
+.project-home.setup { height: auto; }
+.project-home .setup__main { padding-top: 40px; }
+
+/* ---- Editor wrapper (replaces .dashboard + .app screens) -------- */
+.editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+  overflow: hidden;
 }
+.editor.dashboard { height: auto; }
+
+/* ---- Workspace tabs slotted inside the topbar ------------------ */
+.topbar > .workspace-tabs {
+  border-bottom: none;
+  background: transparent;
+  padding: 0;
+  flex: 1;
+  justify-content: center;
+  align-self: stretch;
+  margin-bottom: 0;
+}
+.topbar > .workspace-tabs .workspace-tab {
+  padding: 0 14px;
+  font-size: var(--text-sm);
+  margin-bottom: 0;
+}
+
+/* ---- Pages workspace panel fills its container ------------------ */
+.workspace-panel--pages {
+  padding: 0;
+}
+.workspace-panel--pages.active {
+  display: flex;
+  flex-direction: column;
+}
+.workspace-panel--pages .layout {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Settings panel inside workspace-panel (no longer a modal overlay) */
+.workspace-panel--settings .settings__header {
+  border: none;
+  padding: 0 0 12px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+}
+.workspace-panel--settings .settings__title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl, 20px);
+  font-weight: 600;
+  margin: 0;
+}
+.workspace-panel--settings .settings__tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.workspace-panel--settings .settings__body {
+  display: block;
+}
+
+/* ---- Browser-chrome bar now hosts the responsive + interact toggles -- */
+.browser-chrome__bar { padding: 0 10px; gap: 8px; }
+.browser-chrome__url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.browser-chrome__bar .responsive-toggle { padding: 2px; }
+.browser-chrome__bar .responsive-btn { width: 26px; height: 22px; }
+.browser-chrome__bar .interact-mode-toggle {
+  height: 26px;
+  padding: 0 8px;
+  margin-left: 0;
+  font-size: var(--text-xs, 11px);
+}
+
+/* ---- Icon size utilities (VIB-187 standardization) -------------- */
+.icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+.icon--sm { width: var(--icon-sm); height: var(--icon-sm); }
+.icon--md { width: var(--icon-md); height: var(--icon-md); }
+
+/* ---- Visually hidden (a11y label hiding) ----------------------- */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- Recent project cards (richer with page count + recency) --- */
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.recent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-fast), border-color var(--duration-fast);
+  font: inherit;
+  color: inherit;
+}
+.recent-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+.recent-card__name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: var(--text-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-card__meta {
+  display: flex;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.recent-card__pages::after { content: " · "; }
 
 
 
