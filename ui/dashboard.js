@@ -1125,3 +1125,34 @@ if (humanifyCheckbox) {
     });
   });
 }
+
+// ---------------------------------------------------------------------------
+// Workspace tab navigation
+// ---------------------------------------------------------------------------
+
+function switchWorkspaceTab(tabName) {
+  document.querySelectorAll(".workspace-tab").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.wsTab === tabName);
+  });
+  document.querySelectorAll(".workspace-panel").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.wsPanel === tabName);
+  });
+}
+
+document.querySelectorAll(".workspace-tab").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    switchWorkspaceTab(btn.dataset.wsTab);
+  });
+});
+
+// Settings tab → open settings overlay
+document.getElementById("ws-settings-open")?.addEventListener("click", () => {
+  if (typeof openSettings === "function") openSettings();
+});
+
+// Marketplace tab → run validation
+document.getElementById("ws-marketplace-check")?.addEventListener("click", () => {
+  if (typeof runMarketplaceCheck === "function") {
+    runMarketplaceCheck();
+  }
+});
