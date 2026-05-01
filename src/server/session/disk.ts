@@ -237,12 +237,18 @@ export function scanThemeFromDisk(themePath: string): void {
   const bvPath = join(themePath, ".vibespot", "brandvoice.md");
   const tcPath = join(themePath, ".vibespot", "theme-context.md");
   const planPath = join(themePath, ".vibespot", "plan.md");
-  if (existsSync(sgPath) || existsSync(bvPath) || existsSync(tcPath) || existsSync(planPath)) {
+  const bkPath = join(themePath, ".vibespot", "brand-kit.json");
+  if (existsSync(sgPath) || existsSync(bvPath) || existsSync(tcPath) || existsSync(planPath) || existsSync(bkPath)) {
     if (!activeSession.brandAssets) activeSession.brandAssets = {};
     if (existsSync(sgPath)) activeSession.brandAssets.styleguide = safeRead(sgPath);
     if (existsSync(bvPath)) activeSession.brandAssets.brandvoice = safeRead(bvPath);
     if (existsSync(tcPath)) activeSession.brandAssets.themeContext = safeRead(tcPath);
     if (existsSync(planPath)) activeSession.brandAssets.plan = safeRead(planPath);
+    if (existsSync(bkPath)) {
+      try {
+        activeSession.brandAssets.brandKit = JSON.parse(safeRead(bkPath));
+      } catch { /* ignore malformed brand-kit.json */ }
+    }
   }
 
   // Scan template files and create per-template TemplateEntry objects

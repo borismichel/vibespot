@@ -11,10 +11,11 @@
 import { getEmailRules } from "../../../ai/prompts.js";
 import type { ModuleFiles } from "../../../ai/engine.js";
 import type { SystemPromptBlock } from "../engine-adapter.js";
+import type { BrandKit } from "../../session/types.js";
 
 export function buildEmailModuleDeveloperPrompt(
   themeName: string,
-  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string },
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string; brandKit?: BrandKit },
 ): string {
   const parts: string[] = [];
 
@@ -180,6 +181,23 @@ Modules that serve as email footers MUST include:
     parts.push(`\n\n## Anti-AI Copy Rules\n${getEmailModuleDevHumanifySummary()}`);
   }
 
+  if (brandAssets?.brandKit) {
+    const kitLines: string[] = [];
+    if (brandAssets.brandKit.colors) {
+      if (brandAssets.brandKit.colors.primary) kitLines.push(`- Primary color: ${brandAssets.brandKit.colors.primary}`);
+      if (brandAssets.brandKit.colors.secondary) kitLines.push(`- Secondary color: ${brandAssets.brandKit.colors.secondary}`);
+      if (brandAssets.brandKit.colors.accent) kitLines.push(`- Accent color: ${brandAssets.brandKit.colors.accent}`);
+    }
+    if (brandAssets.brandKit.fonts) {
+      if (brandAssets.brandKit.fonts.heading) kitLines.push(`- Heading font: ${brandAssets.brandKit.fonts.heading}`);
+      if (brandAssets.brandKit.fonts.body) kitLines.push(`- Body font: ${brandAssets.brandKit.fonts.body}`);
+    }
+    if (brandAssets.brandKit.logoUrl) kitLines.push(`- Logo URL: ${brandAssets.brandKit.logoUrl}`);
+    if (kitLines.length > 0) {
+      parts.push(`\n\n## Brand Kit — MANDATORY Design Constraints\nThe following brand identity values MUST be used. Do NOT substitute or override them:\n${kitLines.join("\n")}`);
+    }
+  }
+
   return parts.join("");
 }
 
@@ -189,7 +207,7 @@ Modules that serve as email footers MUST include:
  */
 export function buildEmailModuleDeveloperPromptBlocks(
   themeName: string,
-  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string },
+  brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean; themeContext?: string; brandKit?: BrandKit },
 ): SystemPromptBlock[] {
   const blocks: SystemPromptBlock[] = [];
 

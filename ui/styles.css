@@ -1341,6 +1341,79 @@ body { display: flex; }
   pointer-events: none;
 }
 
+/* Brand kit panel */
+.brand-kit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.brand-kit__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-kit__label {
+  width: 100px;
+  font-size: 13px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.brand-kit__color {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 2px;
+  background: var(--bg-elevated);
+}
+
+.brand-kit__hex {
+  width: 80px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+
+.brand-kit__input {
+  flex: 1;
+  max-width: 240px;
+  padding: 6px 8px;
+  font-size: 13px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+
+.brand-kit__input--wide {
+  max-width: 360px;
+}
+
+.brand-kit__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.brand-kit__btn--danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.brand-kit__btn--danger:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
 /* Back button in dashboard topbar */
 .topbar__back-btn {
   background: none;

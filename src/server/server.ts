@@ -78,6 +78,7 @@ import {
   handleModuleLibraryRoute,
   handleAddModuleToTemplateRoute,
   handleBrandAssetsRoute,
+  handleBrandKitRoute,
   handleDesignExtractRoute,
   handleReferenceImportRoute,
 } from "./routes/templates.js";
@@ -546,6 +547,10 @@ function handleApiRoute(
 
     case "/api/brand-assets":
       handleBrandAssetsRoute(method, req, res);
+      break;
+
+    case "/api/brand-kit":
+      handleBrandKitRoute(method, req, res);
       break;
 
     case "/api/brand-assets/extract":

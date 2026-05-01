@@ -85,6 +85,7 @@ async function refreshDashboard() {
     renderTemplateList(data.templates || []);
     renderModuleLibrary(data.moduleLibrary || []);
     renderBrandAssets(data.brandAssets || {});
+    renderBrandKit(data.brandAssets?.brandKit || null);
     if (data.themePath) {
       document.getElementById("dashboard-theme-path-text").textContent = data.themePath;
     }
@@ -596,6 +597,104 @@ document.getElementById("dashboard-brand-assets")?.addEventListener("change", (e
   const card = e.target.closest(".brand-asset-card");
   if (!card || !e.target.files[0]) return;
   handleBrandFileSelected(card.dataset.asset, e.target.files[0]);
+});
+
+// ---------------------------------------------------------------------------
+// Brand kit
+// ---------------------------------------------------------------------------
+
+function renderBrandKit(brandKit) {
+  const fields = {
+    primary: { color: "bk-color-primary", hex: "bk-hex-primary" },
+    secondary: { color: "bk-color-secondary", hex: "bk-hex-secondary" },
+    accent: { color: "bk-color-accent", hex: "bk-hex-accent" },
+  };
+
+  for (const [key, ids] of Object.entries(fields)) {
+    const colorInput = document.getElementById(ids.color);
+    const hexInput = document.getElementById(ids.hex);
+    const val = brandKit?.colors?.[key] || "";
+    if (colorInput) colorInput.value = val || colorInput.value;
+    if (hexInput) hexInput.value = val;
+  }
+
+  const headingInput = document.getElementById("bk-font-heading");
+  const bodyInput = document.getElementById("bk-font-body");
+  const logoInput = document.getElementById("bk-logo-url");
+  if (headingInput) headingInput.value = brandKit?.fonts?.heading || "";
+  if (bodyInput) bodyInput.value = brandKit?.fonts?.body || "";
+  if (logoInput) logoInput.value = brandKit?.logoUrl || "";
+}
+
+function collectBrandKit() {
+  const kit = {};
+  const primary = document.getElementById("bk-hex-primary")?.value?.trim();
+  const secondary = document.getElementById("bk-hex-secondary")?.value?.trim();
+  const accent = document.getElementById("bk-hex-accent")?.value?.trim();
+  const hexRe = /^#[0-9a-fA-F]{6}$/;
+  const colors = {};
+  if (primary && hexRe.test(primary)) colors.primary = primary;
+  if (secondary && hexRe.test(secondary)) colors.secondary = secondary;
+  if (accent && hexRe.test(accent)) colors.accent = accent;
+  if (Object.keys(colors).length > 0) kit.colors = colors;
+
+  const heading = document.getElementById("bk-font-heading")?.value?.trim();
+  const body = document.getElementById("bk-font-body")?.value?.trim();
+  const fonts = {};
+  if (heading) fonts.heading = heading;
+  if (body) fonts.body = body;
+  if (Object.keys(fonts).length > 0) kit.fonts = fonts;
+
+  const logo = document.getElementById("bk-logo-url")?.value?.trim();
+  if (logo) kit.logoUrl = logo;
+
+  return kit;
+}
+
+// Sync color picker ↔ hex input
+for (const key of ["primary", "secondary", "accent"]) {
+  const colorInput = document.getElementById(`bk-color-${key}`);
+  const hexInput = document.getElementById(`bk-hex-${key}`);
+  if (colorInput && hexInput) {
+    colorInput.addEventListener("input", () => { hexInput.value = colorInput.value; });
+    hexInput.addEventListener("input", () => {
+      if (/^#[0-9a-fA-F]{6}$/.test(hexInput.value)) colorInput.value = hexInput.value;
+    });
+  }
+}
+
+document.getElementById("bk-save")?.addEventListener("click", async () => {
+  const kit = collectBrandKit();
+  if (Object.keys(kit).length === 0) {
+    await vibeAlert("Please fill in at least one field.", "Info");
+    return;
+  }
+  try {
+    const res = await fetch("/api/brand-kit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(kit),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      await vibeAlert("Brand kit saved.", "Success");
+    } else {
+      await vibeAlert(data.error || "Failed to save brand kit.", "Error");
+    }
+  } catch (err) {
+    await vibeAlert("Failed to save: " + err.message, "Error");
+  }
+});
+
+document.getElementById("bk-clear")?.addEventListener("click", async () => {
+  const ok = await vibeConfirm("Clear brand kit?", "This will remove all brand kit settings.", { confirmLabel: "Clear", confirmClass: "btn--danger" });
+  if (!ok) return;
+  try {
+    await fetch("/api/brand-kit", { method: "DELETE" });
+    renderBrandKit(null);
+  } catch (err) {
+    await vibeAlert("Failed to clear: " + err.message, "Error");
+  }
 });
 
 // ---------------------------------------------------------------------------
