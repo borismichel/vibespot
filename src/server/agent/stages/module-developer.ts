@@ -7,7 +7,7 @@
 import type { ModuleFiles } from "../../../ai/engine.js";
 import type { AgentEngine } from "../engine-adapter.js";
 import { callAgent } from "../engine-adapter.js";
-import type { ModuleSpec, PipelineEvent } from "../types.js";
+import type { ContentType, ModuleSpec, PipelineEvent } from "../types.js";
 import { createConcurrencyLimiter } from "../types.js";
 import {
   buildModuleDeveloperPrompt,
@@ -21,7 +21,12 @@ import {
   buildEmailModuleUserMessage,
   EMAIL_MODULE_DEVELOPER_SCHEMA,
 } from "../prompts/email-module-developer.js";
-import type { ContentType } from "../../session/types.js";
+import {
+  buildBlogModuleDeveloperPrompt,
+  buildBlogModuleDeveloperPromptBlocks,
+  buildBlogModuleUserMessage,
+  BLOG_MODULE_DEVELOPER_SCHEMA,
+} from "../prompts/blog-module-developer.js";
 import { log } from "../../log.js";
 
 export interface ModuleDevResult {
@@ -45,24 +50,37 @@ export async function runModuleDeveloper(
   contentType?: ContentType,
 ): Promise<ModuleDevResult[]> {
   const isEmail = contentType === "email";
+  const isBlog = contentType === "blog";
+  const typeLabel = isEmail ? "email module" : isBlog ? "blog module" : "module";
   onEvent({
     type: "agent_step",
     step: "developing",
-    label: `Generating ${specs.length} ${isEmail ? "email module" : "module"}${specs.length === 1 ? "" : "s"}...`,
+    label: `Generating ${specs.length} ${typeLabel}${specs.length === 1 ? "" : "s"}...`,
   });
 
   const isAnthropicEngine = engine === "anthropic-api" || engine === "claude-oauth";
+
   const systemPrompt = isEmail
     ? buildEmailModuleDeveloperPrompt(themeName, brandAssets)
-    : buildModuleDeveloperPrompt(themeName, sharedCss, guidesNeeded, brandAssets);
+    : isBlog
+      ? buildBlogModuleDeveloperPrompt(themeName, sharedCss, guidesNeeded, brandAssets)
+      : buildModuleDeveloperPrompt(themeName, sharedCss, guidesNeeded, brandAssets);
   const systemBlocks = isAnthropicEngine
     ? isEmail
       ? buildEmailModuleDeveloperPromptBlocks(themeName, brandAssets)
-      : buildModuleDeveloperPromptBlocks(themeName, sharedCss, guidesNeeded, brandAssets)
+      : isBlog
+        ? buildBlogModuleDeveloperPromptBlocks(themeName, sharedCss, guidesNeeded, brandAssets)
+        : buildModuleDeveloperPromptBlocks(themeName, sharedCss, guidesNeeded, brandAssets)
     : undefined;
 
   const limit = createConcurrencyLimiter(concurrency);
   const total = specs.length;
+
+  const outputSchema = isEmail
+    ? EMAIL_MODULE_DEVELOPER_SCHEMA
+    : isBlog
+      ? BLOG_MODULE_DEVELOPER_SCHEMA
+      : MODULE_DEVELOPER_SCHEMA;
 
   const promises = specs.map((spec, index) =>
     limit(async (): Promise<ModuleDevResult> => {
@@ -98,6 +116,8 @@ export async function runModuleDeveloper(
             0,
             systemBlocks,
             isEmail,
+            outputSchema,
+            isBlog,
           );
 
           onEvent({
@@ -155,12 +175,14 @@ async function generateSingleModule(
   retryCount = 0,
   systemBlocks?: import("../engine-adapter.js").SystemPromptBlock[],
   isEmail = false,
+  schema: Record<string, unknown> = MODULE_DEVELOPER_SCHEMA as unknown as Record<string, unknown>,
+  isBlog = false,
 ): Promise<ModuleFiles> {
   const userContent = isEmail
     ? buildEmailModuleUserMessage(userMessage, spec, spec.existingCode)
-    : buildModuleUserMessage(userMessage, spec, spec.existingCode);
-
-  const schema = isEmail ? EMAIL_MODULE_DEVELOPER_SCHEMA : MODULE_DEVELOPER_SCHEMA;
+    : isBlog
+      ? buildBlogModuleUserMessage(userMessage, spec, spec.existingCode)
+      : buildModuleUserMessage(userMessage, spec, spec.existingCode);
 
   const result = await callAgent(engine, apiKey, model, {
     systemPrompt,
@@ -189,6 +211,8 @@ async function generateSingleModule(
         retryCount + 1,
         systemBlocks,
         isEmail,
+        schema,
+        isBlog,
       );
     }
     throw new Error(
@@ -209,11 +233,11 @@ async function generateSingleModule(
       : JSON.stringify(data.metaJson, null, 2);
 
   return {
-    moduleName: spec.name, // Always use canonical spec name, never AI-generated casing
+    moduleName: spec.name,
     fieldsJson,
     metaJson,
     moduleHtml: String(data.moduleHtml || ""),
-    moduleCss: String(data.moduleCss || ""),
-    moduleJs: data.moduleJs ? String(data.moduleJs) : undefined,
+    moduleCss: isEmail ? "" : String(data.moduleCss || ""),
+    moduleJs: isEmail ? undefined : (data.moduleJs ? String(data.moduleJs) : undefined),
   };
 }

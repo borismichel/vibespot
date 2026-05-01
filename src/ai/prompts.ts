@@ -35,6 +35,10 @@ export function getEmailRules(): string {
   return cachedAsset("email-rules.md");
 }
 
+export function getBlogRules(): string {
+  return cachedAsset("blog-rules.md");
+}
+
 /**
  * Extract page-type-specific section from page-types.md.
  * Returns only the relevant section for the given page type.
