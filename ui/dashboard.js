@@ -472,7 +472,7 @@ async function deleteBrandAsset(type) {
       body: JSON.stringify({ type }),
     });
     const data = await res.json();
-    if (data.ok) showDashboard(currentDashboardTheme);
+    if (data.ok) await refreshDashboard();
     else await vibeAlert(data.error || "Failed to remove", "Error");
   } catch (err) {
     await vibeAlert("Failed to remove: " + err.message, "Error");
