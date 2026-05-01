@@ -16,914 +16,805 @@
   <!-- ============================================================ -->
   <!-- PROJECT RAIL — persistent thin sidebar (Discord-style)       -->
   <!-- ============================================================ -->
-  <aside class="project-rail project-rail--expanded" id="project-rail">
+  <aside class="project-rail project-rail--expanded" id="project-rail" aria-label="Projects">
     <div class="project-rail__header">
       <span class="project-rail__title">Projects</span>
       <span class="project-rail__count" id="rail-project-count">0</span>
     </div>
     <div class="project-rail__items" id="project-rail-items"></div>
-    <button class="project-rail__add" id="project-rail-add" title="New project">+</button>
+    <button class="project-rail__add" id="project-rail-add" type="button" title="New project" aria-label="New project">+</button>
     <div class="project-rail__footer">
-      <a class="project-rail__settings-btn" href="https://buymeacoffee.com/vibespot" target="_blank" title="Buy me a coffee">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
+      <a class="project-rail__settings-btn" href="https://buymeacoffee.com/vibespot" target="_blank" rel="noopener" title="Buy me a coffee">
+        <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
         <span class="project-rail__settings-label">Coffee</span>
       </a>
-      <a class="project-rail__settings-btn" href="/docs/" target="_blank" title="Documentation">
-        <svg width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M3 2.5h4.5a2 2 0 0 1 2 2V16a1.5 1.5 0 0 0-1.5-1.5H3V2.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M15 2.5h-4.5a2 2 0 0 0-2 2V16a1.5 1.5 0 0 1 1.5-1.5H15V2.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+      <a class="project-rail__settings-btn" href="/docs/" target="_blank" rel="noopener" title="Documentation">
+        <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h6a3 3 0 0 1 3 3v15a2 2 0 0 0-2-2H4z"/><path d="M20 3h-6a3 3 0 0 0-3 3v15a2 2 0 0 1 2-2h7z"/></svg>
         <span class="project-rail__settings-label">Docs</span>
       </a>
-      <button class="project-rail__settings-btn" id="btn-setup-settings">
-        <svg width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M7.5 1.5h3l.4 2.1a5.5 5.5 0 0 1 1.3.7l2-.8 1.5 2.6-1.6 1.3a5.5 5.5 0 0 1 0 1.5l1.6 1.3-1.5 2.6-2-.8a5.5 5.5 0 0 1-1.3.7l-.4 2.1h-3l-.4-2.1a5.5 5.5 0 0 1-1.3-.7l-2 .8-1.5-2.6 1.6-1.3a5.5 5.5 0 0 1 0-1.5L2.3 6.1l1.5-2.6 2 .8a5.5 5.5 0 0 1 1.3-.7L7.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
+      <button class="project-rail__settings-btn" id="btn-setup-settings" type="button" aria-label="Settings">
+        <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span class="project-rail__settings-label">Settings</span>
       </button>
     </div>
   </aside>
 
   <!-- Tooltip element (positioned via JS) -->
-  <div class="project-rail__tooltip" id="project-rail-tooltip"></div>
+  <div class="project-rail__tooltip" id="project-rail-tooltip" role="tooltip"></div>
 
-  <div class="app-body" id="app-body">
+  <div class="app-body" id="app-body" data-mode="project-home">
 
-  <!-- ============================================================ -->
-  <!-- SETUP SCREEN — shown until a session is created              -->
-  <!-- ============================================================ -->
-  <div class="setup-topbar" id="setup-topbar">
-    <div class="topbar__brand">
-      <div class="topbar__logo-icon"><svg viewBox="0 0 512 512" width="18" height="18"><path d="M256 76 Q280 220 436 256 Q280 292 256 436 Q232 292 76 256 Q232 220 256 76 Z" fill="currentColor"/></svg></div>
-      <span class="topbar__brand-name">vibeSpot</span>
-    </div>
-    <div style="margin-left:auto; display:flex; align-items:center; gap:4px">
-      <button class="btn btn--ghost btn--sm" id="feedback-btn" title="Submit feedback" onclick="vibeFeedback()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="vertical-align:-2px;margin-right:4px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Feedback
-      </button>
-      <button class="topbar__icon-btn theme-toggle" title="Toggle light/dark mode" onclick="toggleTheme()">
-        <svg class="theme-toggle__icon--dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-        <svg class="theme-toggle__icon--light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-      </button>
-    </div>
-  </div>
-  <div class="setup" id="setup-screen">
-    <div class="setup__main">
-      <div class="setup__container">
-        <div class="setup__symbol">&#10022;</div>
-        <h1 class="setup__title">vibeSpot</h1>
-        <p class="setup__subtitle">Build HubSpot landing pages with AI</p>
-
-        <!-- Environment info (populated by JS) -->
-        <div class="setup__alerts" id="setup-alerts"></div>
-
-        <!-- Walkthrough (shown on first run when environment is not configured) -->
-        <div class="walkthrough hidden" id="walkthrough">
-          <div class="walkthrough__progress" id="walkthrough-progress"></div>
-          <div class="walkthrough__content" id="walkthrough-content"></div>
-        </div>
-
-        <!-- Settings link (hidden — now in sidebar footer) -->
-        <div class="setup__settings-link hidden" id="setup-settings-link"></div>
-
-        <!-- Main action buttons -->
-        <div class="setup__options" id="setup-options">
-
-          <!-- Returning users: recent projects (auto-shown when projects exist) -->
-          <div class="setup__recent hidden" id="setup-recent">
-            <div class="setup__recent-header">
-              <span class="setup__recent-title">Continue where you left off</span>
-              <button type="button" class="setup__recent-all hidden" id="setup-recent-all">View all</button>
-            </div>
-            <div class="setup__recent-list" id="setup-recent-list"></div>
-          </div>
-
-          <!-- Primary path: describe-it prompt -->
-          <div class="setup__prompt-card" id="setup-prompt-card">
-            <textarea
-              class="setup__prompt-input"
-              id="setup-prompt-input"
-              rows="3"
-              placeholder="Describe the landing page you want to build..."
-            ></textarea>
-            <div class="setup__prompt-row">
-              <span class="setup__prompt-hint" id="setup-prompt-hint">Press <span id="setup-prompt-shortcut">&#8984;&#8629;</span> or click Build to start</span>
-              <button class="btn btn--primary setup__prompt-submit" id="setup-prompt-submit" disabled>
-                <span class="setup__prompt-submit-icon">&#9650;</span>
-                <span>Build</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Secondary path: pick a template -->
-          <div class="setup__secondary">
-            <button class="setup__secondary-btn" data-action="starter">
-              <span class="setup__secondary-icon">&#9733;</span>
-              <span class="setup__secondary-label">Start from Template</span>
-              <span class="setup__secondary-meta">Browse pre-built starters</span>
-            </button>
-          </div>
-
-          <!-- Starter template panel — sits directly under the "Start from Template" button -->
-          <div class="setup__panel" id="panel-starter">
-            <div class="starter-grid" id="starter-grid">
-              <div class="starter-card" data-starter-id="saas-landing">
-                <span class="starter-card__name">SaaS Landing Page</span>
-                <span class="starter-card__desc">Modern SaaS landing page with hero, features, pricing, and CTA</span>
-                <span class="starter-card__meta">4 modules</span>
-              </div>
-              <div class="starter-card" data-starter-id="portfolio">
-                <span class="starter-card__name">Portfolio</span>
-                <span class="starter-card__desc">Creative portfolio with project gallery, about section, and contact form</span>
-                <span class="starter-card__meta">4 modules</span>
-              </div>
-              <div class="starter-card" data-starter-id="restaurant">
-                <span class="starter-card__name">Restaurant</span>
-                <span class="starter-card__desc">Restaurant landing page with menu, reservations, and location info</span>
-                <span class="starter-card__meta">4 modules</span>
-              </div>
-              <div class="starter-card" data-starter-id="event">
-                <span class="starter-card__name">Event / Conference</span>
-                <span class="starter-card__desc">Event landing page with speakers, schedule, and registration</span>
-                <span class="starter-card__meta">4 modules</span>
-              </div>
-              <div class="starter-card" data-starter-id="coming-soon">
-                <span class="starter-card__name">Coming Soon</span>
-                <span class="starter-card__desc">Pre-launch page with signup form and feature preview</span>
-                <span class="starter-card__meta">3 modules</span>
-              </div>
-            </div>
-            <div class="starter-create hidden" id="starter-create">
-              <p class="starter-create__label" id="starter-create-label"></p>
-              <div class="setup__row">
-                <input type="text" class="setup__input setup__input--wide" id="starter-theme-name" placeholder="my-landing-page" />
-                <button class="btn btn--primary" id="btn-create-from-starter">Create</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- More ways to start: collapsible advanced options -->
-          <div class="setup__more">
-            <button type="button" class="setup__more-toggle" id="setup-more-toggle" aria-expanded="false" aria-controls="setup-more-panel">
-              <span>More ways to start</span>
-              <span class="setup__more-chevron" aria-hidden="true">&#9662;</span>
-            </button>
-            <div class="setup__more-panel hidden" id="setup-more-panel">
-              <div class="setup__actions">
-                <button class="setup__action-btn" data-action="new">
-                  <span class="setup__action-icon">&#43;</span>
-                  <span>Blank Theme</span>
-                </button>
-                <button class="setup__action-btn" data-action="download">
-                  <span class="setup__action-icon">&#8595;</span>
-                  <span>From HubSpot</span>
-                </button>
-                <button class="setup__action-btn" data-action="figma">
-                  <span class="setup__action-icon">&#9670;</span>
-                  <span>From Figma</span>
-                  <span class="setup__action-badge">Beta</span>
-                </button>
-                <button class="setup__action-btn" data-action="convert">
-                  <span class="setup__action-icon">&#8634;</span>
-                  <span>From React</span>
-                  <span class="setup__action-badge">Beta</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="setup__panel hidden" id="panel-new">
-            <div class="setup__row">
-              <input type="text" class="setup__input setup__input--wide" id="new-theme-name" placeholder="my-landing-page" />
-              <button class="btn btn--primary" id="btn-create-theme">Create</button>
-            </div>
-          </div>
-
-          <div class="setup__panel hidden" id="panel-continue">
-            <div class="setup__pills" id="continue-projects"></div>
-            <p class="setup__hint setup__hint--empty hidden" id="continue-empty">No themes yet — create one above!</p>
-          </div>
-
-          <div class="setup__panel hidden" id="panel-download">
-            <div class="setup__panel-account hidden" id="dl-account">
-              <span id="dl-account-name"></span>
-              <button class="btn-link" id="dl-account-change">Change</button>
-            </div>
-            <div id="dl-account-switch" class="hidden" style="margin:0 0 12px"></div>
-            <div class="setup__row hidden" id="dl-input-row">
-              <input type="text" class="setup__input setup__input--wide" id="dl-theme-name" placeholder="Enter theme folder name on HubSpot" />
-              <button class="btn btn--primary" id="btn-fetch-theme">Download</button>
-            </div>
-            <p class="setup__hint hidden" id="dl-hint">Enter the exact folder name of your theme in the HubSpot Design Manager</p>
-            <div class="hidden" id="dl-no-account">
-              <p class="setup__hint">Connect a HubSpot account in <a href="#" id="dl-open-settings">Settings</a> to download themes.</p>
-            </div>
-          </div>
-
-          <div class="setup__panel hidden" id="panel-figma">
-            <div id="figma-token-prompt" class="hidden">
-              <p class="setup__hint">A Figma Personal Access Token is required. <a href="#" id="figma-open-settings">Add one in Settings</a> or enter it below:</p>
-              <div class="setup__row">
-                <input type="password" class="setup__input setup__input--wide" id="figma-inline-token" placeholder="figd_..." />
-                <button class="btn btn--primary" id="figma-save-token">Save</button>
-              </div>
-            </div>
-            <div id="figma-url-section">
-              <div class="setup__row">
-                <input type="text" class="setup__input setup__input--wide" id="figma-url" placeholder="https://www.figma.com/design/..." />
-                <button class="btn btn--primary" id="figma-extract-btn">Extract</button>
-              </div>
-              <p class="setup__hint">Paste a Figma design URL to extract structure, text, and assets</p>
-              <div class="figma-progress hidden" id="figma-progress"></div>
-            </div>
-            <div id="figma-summary" class="hidden"></div>
-            <div id="figma-generate" class="hidden">
-              <div class="setup__row">
-                <input type="text" class="setup__input setup__input--wide" id="figma-theme-name" placeholder="my-landing-page" />
-                <button class="btn btn--primary" id="figma-generate-btn">Generate Page</button>
-              </div>
-              <label class="figma-toggle" id="figma-image-toggle">
-                <input type="checkbox" id="figma-use-assets" checked />
-                <span class="figma-toggle__label">Import images as assets</span>
-                <span class="figma-toggle__hint" id="figma-image-hint">Images uploaded to HubSpot, no manual replacement needed</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="setup__panel hidden" id="panel-convert">
-            <div class="setup__row">
-              <input type="text" class="setup__input setup__input--wide" id="import-url" placeholder="https://github.com/user/repo or Lovable URL" />
-              <button class="btn btn--primary" id="import-btn">Import</button>
-            </div>
-            <p class="setup__hint">Convert a React or Lovable project to a HubSpot theme</p>
-          </div>
-        </div>
-
-        <div class="setup__loading hidden" id="setup-loading">
-          <div class="setup__spinner"></div>
-          <span id="setup-loading-text">Setting up...</span>
-        </div>
-
-        <div class="setup__error hidden" id="setup-error"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================================ -->
-  <!-- DASHBOARD — project overview with templates & brand assets   -->
-  <!-- ============================================================ -->
-  <div class="dashboard hidden" id="dashboard-screen">
-    <header class="topbar">
+    <!-- ============================================================ -->
+    <!-- UNIFIED TOPBAR — content varies by data-mode on .app-body    -->
+    <!-- ============================================================ -->
+    <header class="topbar" id="topbar" role="banner">
       <div class="topbar__left">
-        <button class="topbar__back-btn" id="dashboard-back" title="Back to projects">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        <button class="topbar__back-btn topbar__mode topbar__mode--editor" id="editor-back" type="button" title="Back to projects" aria-label="Back to projects">
+          <svg class="icon icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <div class="topbar__brand">
-          <div class="topbar__logo-icon"><svg viewBox="0 0 512 512" width="18" height="18"><path d="M256 76 Q280 220 436 256 Q280 292 256 436 Q232 292 76 256 Q232 220 256 76 Z" fill="currentColor"/></svg></div>
+          <div class="topbar__logo-icon" aria-hidden="true">
+            <svg viewBox="0 0 512 512" width="18" height="18"><path d="M256 76 Q280 220 436 256 Q280 292 256 436 Q232 292 76 256 Q232 220 256 76 Z" fill="currentColor"/></svg>
+          </div>
           <span class="topbar__brand-name">vibeSpot</span>
         </div>
-        <span class="topbar__project-pill" id="dashboard-theme-name"></span>
+        <span class="topbar__project-pill topbar__mode topbar__mode--editor" id="theme-name" aria-label="Project name"></span>
       </div>
+
+      <!-- Workspace tab navigation (Editor mode only) -->
+      <nav class="workspace-tabs topbar__mode topbar__mode--editor" id="workspace-tabs" role="tablist" aria-label="Workspace">
+        <button class="workspace-tab active" data-ws-tab="pages" role="tab" aria-selected="true" aria-controls="ws-panel-pages" id="ws-tab-pages" type="button">
+          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+          <span>Pages</span>
+        </button>
+        <button class="workspace-tab" data-ws-tab="brand" role="tab" aria-selected="false" aria-controls="ws-panel-brand" id="ws-tab-brand" type="button">
+          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          <span>Brand</span>
+        </button>
+        <button class="workspace-tab" data-ws-tab="library" role="tab" aria-selected="false" aria-controls="ws-panel-library" id="ws-tab-library" type="button">
+          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span>Library</span>
+        </button>
+        <button class="workspace-tab" data-ws-tab="marketplace" role="tab" aria-selected="false" aria-controls="ws-panel-marketplace" id="ws-tab-marketplace" type="button">
+          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1-5h16l1 5"/><path d="M5 9v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M9 22V12h6v10"/></svg>
+          <span>Marketplace</span>
+        </button>
+        <button class="workspace-tab" data-ws-tab="settings" role="tab" aria-selected="false" aria-controls="ws-panel-settings" id="ws-tab-settings" type="button">
+          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Settings</span>
+        </button>
+      </nav>
+
       <div class="topbar__right">
-        <button class="topbar__icon-btn" title="Submit feedback" onclick="vibeFeedback()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <!-- Project Home: Feedback as labeled pill -->
+        <button class="btn btn--ghost btn--sm topbar__mode topbar__mode--project-home" id="feedback-btn" type="button" title="Submit feedback" onclick="vibeFeedback()">
+          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Feedback
         </button>
-        <button class="topbar__icon-btn theme-toggle" title="Toggle light/dark mode" onclick="toggleTheme()">
-          <svg class="theme-toggle__icon--dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-          <svg class="theme-toggle__icon--light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <!-- Editor: Feedback as icon-only -->
+        <button class="topbar__icon-btn topbar__mode topbar__mode--editor" id="feedback-btn-editor" type="button" title="Submit feedback" aria-label="Submit feedback" onclick="vibeFeedback()">
+          <svg class="icon icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         </button>
-        <button class="topbar__icon-btn" id="dashboard-settings-btn" title="Settings">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M7.5 1.5h3l.4 2.1a5.5 5.5 0 0 1 1.3.7l2-.8 1.5 2.6-1.6 1.3a5.5 5.5 0 0 1 0 1.5l1.6 1.3-1.5 2.6-2-.8a5.5 5.5 0 0 1-1.3.7l-.4 2.1h-3l-.4-2.1a5.5 5.5 0 0 1-1.3-.7l-2 .8-1.5-2.6 1.6-1.3a5.5 5.5 0 0 1 0-1.5L2.3 6.1l1.5-2.6 2 .8a5.5 5.5 0 0 1 1.3-.7L7.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
+        <!-- Theme toggle (both modes) -->
+        <button class="topbar__icon-btn theme-toggle" type="button" title="Toggle light/dark mode" aria-label="Toggle light/dark mode" onclick="toggleTheme()">
+          <svg class="theme-toggle__icon--dark icon icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <svg class="theme-toggle__icon--light icon icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
-        <button class="btn btn--primary" id="dashboard-deploy-btn" title="Deploy entire theme to HubSpot">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:-2px"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
+        <!-- Editor-only: history (no display:none anymore), email preview, deploy -->
+        <button class="topbar__icon-btn topbar__mode topbar__mode--editor" id="btn-history" type="button" title="Version History" aria-label="Version history">
+          <svg class="icon icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </button>
+        <button class="topbar__icon-btn topbar__mode topbar__mode--editor hidden" id="btn-email-preview" type="button" title="Email client preview (Gmail, Outlook, Apple Mail)" aria-label="Email client preview">
+          <svg class="icon icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22 4 12 13 2 4"/></svg>
+        </button>
+        <button class="btn btn--primary topbar__mode topbar__mode--editor" id="btn-upload" type="button" title="Deploy theme to HubSpot">
+          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
           Deploy
         </button>
       </div>
     </header>
 
-    <!-- Workspace tab navigation -->
-    <nav class="workspace-tabs" id="workspace-tabs">
-      <button class="workspace-tab active" data-ws-tab="pages">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-        <span>Pages</span>
-      </button>
-      <button class="workspace-tab" data-ws-tab="brand">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-        <span>Brand</span>
-      </button>
-      <button class="workspace-tab" data-ws-tab="library">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        <span>Library</span>
-      </button>
-      <button class="workspace-tab" data-ws-tab="marketplace">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l1-5h16l1 5"/><path d="M5 9v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M9 22V12h6v10"/></svg>
-        <span>Marketplace</span>
-      </button>
-      <button class="workspace-tab" data-ws-tab="settings">
-        <svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M7.5 1.5h3l.4 2.1a5.5 5.5 0 0 1 1.3.7l2-.8 1.5 2.6-1.6 1.3a5.5 5.5 0 0 1 0 1.5l1.6 1.3-1.5 2.6-2-.8a5.5 5.5 0 0 1-1.3.7l-.4 2.1h-3l-.4-2.1a5.5 5.5 0 0 1-1.3-.7l-2 .8-1.5-2.6 1.6-1.3a5.5 5.5 0 0 1 0-1.5L2.3 6.1l1.5-2.6 2 .8a5.5 5.5 0 0 1 1.3-.7L7.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
-        <span>Settings</span>
-      </button>
-    </nav>
+    <!-- ============================================================ -->
+    <!-- MODE 1: PROJECT HOME — project creation + recent projects   -->
+    <!-- ============================================================ -->
+    <main class="project-home setup" id="project-home" role="main" aria-label="Project Home">
+      <div class="setup__main" id="setup-screen">
+        <div class="setup__container">
+          <div class="setup__symbol" aria-hidden="true">&#10022;</div>
+          <h1 class="setup__title">vibeSpot</h1>
+          <p class="setup__subtitle">Build HubSpot landing pages with AI</p>
 
-    <div class="dashboard__body">
-      <!-- ============ PAGES TAB ============ -->
-      <div class="workspace-panel active" id="ws-panel-pages" data-ws-panel="pages">
-        <div class="dashboard__container">
+          <div class="setup__alerts" id="setup-alerts" role="status" aria-live="polite"></div>
 
-          <h1 class="dashboard__theme-heading" id="dashboard-theme-heading"></h1>
-
-          <div class="dashboard__theme-path" id="dashboard-theme-path">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            <span class="dashboard__theme-path-text" id="dashboard-theme-path-text"></span>
-            <button class="dashboard__download-btn" id="dashboard-download-zip" title="Download theme as ZIP">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              <span>Download ZIP</span>
-            </button>
+          <div class="walkthrough hidden" id="walkthrough" aria-label="First-run walkthrough">
+            <div class="walkthrough__progress" id="walkthrough-progress"></div>
+            <div class="walkthrough__content" id="walkthrough-content"></div>
           </div>
 
-          <!-- Page Type Selector -->
-          <section class="dashboard__section">
-            <div class="dashboard__section-header">
-              <h2 class="dashboard__section-title">Create New Page</h2>
+          <div class="setup__settings-link hidden" id="setup-settings-link"></div>
+
+          <div class="setup__options" id="setup-options">
+
+            <!-- Returning users: rich recent project cards (page count + recency) -->
+            <section class="setup__recent hidden" id="setup-recent" aria-label="Recent projects">
+              <header class="setup__recent-header">
+                <h2 class="setup__recent-title">Continue where you left off</h2>
+                <button type="button" class="setup__recent-all hidden" id="setup-recent-all">View all</button>
+              </header>
+              <div class="setup__recent-list recent-grid" id="setup-recent-list" role="list"></div>
+            </section>
+
+            <!-- Primary path: describe-it prompt -->
+            <div class="setup__prompt-card" id="setup-prompt-card">
+              <label class="visually-hidden" for="setup-prompt-input">Describe the landing page you want to build</label>
+              <textarea
+                class="setup__prompt-input"
+                id="setup-prompt-input"
+                rows="3"
+                placeholder="Describe the landing page you want to build..."
+                aria-label="Describe the landing page you want to build"
+              ></textarea>
+              <div class="setup__prompt-row">
+                <span class="setup__prompt-hint" id="setup-prompt-hint">Press <span id="setup-prompt-shortcut">&#8984;&#8629;</span> or click Build to start</span>
+                <button class="btn btn--primary setup__prompt-submit" id="setup-prompt-submit" type="button" disabled>
+                  <span class="setup__prompt-submit-icon" aria-hidden="true">&#9650;</span>
+                  <span>Build</span>
+                </button>
+              </div>
             </div>
-            <div class="dashboard__page-types" id="dashboard-page-types">
-              <button class="page-type-card" data-type="landing_page">
-                <div class="page-type-card__icon">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-                </div>
-                <span class="page-type-card__label">Landing Page</span>
-                <span class="page-type-card__desc">Single-page, conversion-focused</span>
-              </button>
-              <button class="page-type-card" data-type="blog_post">
-                <div class="page-type-card__icon">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v16H4z" rx="2"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h4"/></svg>
-                </div>
-                <span class="page-type-card__label">Blog Post</span>
-                <span class="page-type-card__desc">Article with blog features</span>
-              </button>
-              <button class="page-type-card" data-type="website_page">
-                <div class="page-type-card__icon">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                </div>
-                <span class="page-type-card__label">Website Page</span>
-                <span class="page-type-card__desc">With navigation & menu</span>
-              </button>
-              <button class="page-type-card" data-type="module_only">
-                <div class="page-type-card__icon">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                </div>
-                <span class="page-type-card__label">Section Only</span>
-                <span class="page-type-card__desc">Standalone section, no template</span>
+
+            <!-- Secondary path: pick a template -->
+            <div class="setup__secondary">
+              <button class="setup__secondary-btn" data-action="starter" type="button">
+                <span class="setup__secondary-icon" aria-hidden="true">&#9733;</span>
+                <span class="setup__secondary-label">Start from Template</span>
+                <span class="setup__secondary-meta">Browse pre-built starters</span>
               </button>
             </div>
-          </section>
 
-          <!-- Template List -->
-          <section class="dashboard__section">
-            <div class="dashboard__section-header">
-              <h2 class="dashboard__section-title">Templates</h2>
-              <span class="dashboard__template-count" id="dashboard-template-count">0</span>
-            </div>
-            <div class="dashboard__template-list" id="dashboard-template-list">
-              <p class="dashboard__empty-state">No templates yet. Choose a page type above to get started.</p>
-            </div>
-          </section>
-
-        </div>
-      </div>
-
-      <!-- ============ BRAND TAB ============ -->
-      <div class="workspace-panel" id="ws-panel-brand" data-ws-panel="brand">
-        <div class="dashboard__container">
-
-          <!-- Import Analysis -->
-          <section class="dashboard__section dashboard__section--inverse hidden" id="dashboard-inverse-section">
-            <div class="dashboard__section-header">
-              <h2 class="dashboard__section-title">Import Analysis</h2>
-              <span class="dashboard__section-hint" id="inverse-status">Analyzing theme...</span>
-              <button class="btn btn--sm btn--outline hidden" id="btn-inverse-apply-tokens" title="Seed shared CSS from inferred tokens">Apply Tokens</button>
-            </div>
-            <div class="inverse-summary" id="inverse-summary"></div>
-          </section>
-
-          <!-- Brand Assets -->
-          <section class="dashboard__section">
-            <div class="dashboard__section-header">
-              <h2 class="dashboard__section-title">Brand Assets</h2>
-              <span class="dashboard__section-hint">Optional — injected into AI prompts</span>
-            </div>
-            <div class="dashboard__brand-assets" id="dashboard-brand-assets">
-              <div class="brand-asset-toggle" id="brand-toggle-humanify">
-                <label class="brand-asset-toggle__switch">
-                  <input type="checkbox" id="humanify-checkbox" checked>
-                  <span class="brand-asset-toggle__slider"></span>
-                </label>
-                <span class="brand-asset-toggle__label">Humanify</span>
-                <span class="brand-asset-toggle__tooltip" data-tooltip="Strips AI-sounding copy: removes em dashes, banned words like 'delve' and 'leverage', cliché openers, and forced enthusiasm. Makes your landing page read like a human wrote it.">?</span>
+            <!-- Starter template panel -->
+            <div class="setup__panel" id="panel-starter">
+              <div class="starter-grid" id="starter-grid">
+                <button class="starter-card" type="button" data-starter-id="saas-landing">
+                  <span class="starter-card__name">SaaS Landing Page</span>
+                  <span class="starter-card__desc">Modern SaaS landing page with hero, features, pricing, and CTA</span>
+                  <span class="starter-card__meta">4 modules</span>
+                </button>
+                <button class="starter-card" type="button" data-starter-id="portfolio">
+                  <span class="starter-card__name">Portfolio</span>
+                  <span class="starter-card__desc">Creative portfolio with project gallery, about section, and contact form</span>
+                  <span class="starter-card__meta">4 modules</span>
+                </button>
+                <button class="starter-card" type="button" data-starter-id="restaurant">
+                  <span class="starter-card__name">Restaurant</span>
+                  <span class="starter-card__desc">Restaurant landing page with menu, reservations, and location info</span>
+                  <span class="starter-card__meta">4 modules</span>
+                </button>
+                <button class="starter-card" type="button" data-starter-id="event">
+                  <span class="starter-card__name">Event / Conference</span>
+                  <span class="starter-card__desc">Event landing page with speakers, schedule, and registration</span>
+                  <span class="starter-card__meta">4 modules</span>
+                </button>
+                <button class="starter-card" type="button" data-starter-id="coming-soon">
+                  <span class="starter-card__name">Coming Soon</span>
+                  <span class="starter-card__desc">Pre-launch page with signup form and feature preview</span>
+                  <span class="starter-card__meta">3 modules</span>
+                </button>
               </div>
-              <div class="brand-asset-card" data-asset="styleguide">
-                <div class="brand-asset-card__base">
-                  <span class="brand-asset-card__icon" id="brand-icon-styleguide">+</span>
-                  <span class="brand-asset-card__label">styleguide</span>
-                </div>
-                <div class="brand-asset-card__actions">
-                  <label class="brand-asset-card__btn" title="Upload .md/.txt file"><input type="file" accept=".md,.txt" hidden>Upload</label>
-                  <button class="brand-asset-card__btn" data-action="extract" title="AI-extract from theme">Extract</button>
-                </div>
-                <div class="brand-asset-card__manage hidden">
-                  <button class="brand-asset-card__btn" data-action="view" title="View">View</button>
-                  <button class="brand-asset-card__btn brand-asset-card__btn--danger" data-action="delete" title="Remove">Delete</button>
+              <div class="starter-create hidden" id="starter-create">
+                <p class="starter-create__label" id="starter-create-label"></p>
+                <div class="setup__row">
+                  <label class="visually-hidden" for="starter-theme-name">Theme name</label>
+                  <input type="text" class="setup__input setup__input--wide" id="starter-theme-name" placeholder="my-landing-page" aria-label="Theme name" />
+                  <button class="btn btn--primary" id="btn-create-from-starter" type="button">Create</button>
                 </div>
               </div>
-              <div class="brand-asset-card" data-asset="brandvoice">
-                <div class="brand-asset-card__base">
-                  <span class="brand-asset-card__icon" id="brand-icon-brandvoice">+</span>
-                  <span class="brand-asset-card__label">brand voice</span>
-                </div>
-                <div class="brand-asset-card__actions">
-                  <label class="brand-asset-card__btn" title="Upload .md/.txt file"><input type="file" accept=".md,.txt" hidden>Upload</label>
-                  <button class="brand-asset-card__btn" data-action="extract" title="AI-extract from page copy">Extract</button>
-                </div>
-                <div class="brand-asset-card__manage hidden">
-                  <button class="brand-asset-card__btn" data-action="view" title="View">View</button>
-                  <button class="brand-asset-card__btn brand-asset-card__btn--danger" data-action="delete" title="Remove">Delete</button>
-                </div>
-              </div>
-              <div class="brand-asset-card" data-asset="themeContext">
-                <div class="brand-asset-card__base">
-                  <span class="brand-asset-card__icon" id="brand-icon-themeContext">+</span>
-                  <span class="brand-asset-card__label">product context</span>
-                </div>
-                <div class="brand-asset-card__actions">
-                  <label class="brand-asset-card__btn" title="Upload .md/.txt file"><input type="file" accept=".md,.txt" hidden>Upload</label>
-                  <button class="brand-asset-card__btn" data-action="extract" title="AI-extract from page content">Extract</button>
-                </div>
-                <div class="brand-asset-card__manage hidden">
-                  <button class="brand-asset-card__btn" data-action="view" title="View">View</button>
-                  <button class="brand-asset-card__btn brand-asset-card__btn--danger" data-action="delete" title="Remove">Delete</button>
-                </div>
-              </div>
-              <button class="btn btn--sm btn--outline" id="btn-extract-all" title="AI-extract all brand assets from this theme">Extract All</button>
-              <button class="btn btn--sm btn--outline" id="btn-import-reference" title="Import design from another HubSpot theme or local folder">Import Reference</button>
             </div>
-          </section>
 
-          <!-- Brand Kit -->
-          <section class="dashboard__section">
-            <div class="dashboard__section-header">
-              <h2 class="dashboard__section-title">Brand Kit</h2>
-              <span class="dashboard__section-hint">Colors, fonts, and logo enforced in generated modules</span>
-            </div>
-            <div class="brand-kit" id="dashboard-brand-kit">
-              <div class="brand-kit__row">
-                <label class="brand-kit__label">Primary</label>
-                <input type="color" class="brand-kit__color" id="bk-color-primary" value="#e8613a">
-                <input type="text" class="brand-kit__hex" id="bk-hex-primary" placeholder="#e8613a" maxlength="7">
-              </div>
-              <div class="brand-kit__row">
-                <label class="brand-kit__label">Secondary</label>
-                <input type="color" class="brand-kit__color" id="bk-color-secondary" value="#1a1a2e">
-                <input type="text" class="brand-kit__hex" id="bk-hex-secondary" placeholder="#1a1a2e" maxlength="7">
-              </div>
-              <div class="brand-kit__row">
-                <label class="brand-kit__label">Accent</label>
-                <input type="color" class="brand-kit__color" id="bk-color-accent" value="#f4a261">
-                <input type="text" class="brand-kit__hex" id="bk-hex-accent" placeholder="#f4a261" maxlength="7">
-              </div>
-              <div class="brand-kit__row">
-                <label class="brand-kit__label">Heading font</label>
-                <input type="text" class="brand-kit__input" id="bk-font-heading" placeholder="Georgia, serif">
-              </div>
-              <div class="brand-kit__row">
-                <label class="brand-kit__label">Body font</label>
-                <input type="text" class="brand-kit__input" id="bk-font-body" placeholder="Arial, Helvetica, sans-serif">
-              </div>
-              <div class="brand-kit__row">
-                <label class="brand-kit__label">Logo URL</label>
-                <input type="text" class="brand-kit__input brand-kit__input--wide" id="bk-logo-url" placeholder="https://example.com/logo.png">
-              </div>
-              <div class="brand-kit__actions">
-                <button class="btn btn--sm btn--primary" id="bk-save">Save Brand Kit</button>
-                <button class="btn btn--sm btn--outline brand-kit__btn--danger" id="bk-clear">Clear</button>
-              </div>
-            </div>
-          </section>
-
-        </div>
-      </div>
-
-      <!-- ============ LIBRARY TAB ============ -->
-      <div class="workspace-panel" id="ws-panel-library" data-ws-panel="library">
-        <div class="dashboard__container">
-
-          <!-- Module Library -->
-          <section class="dashboard__section">
-            <div class="dashboard__section-header">
-              <h2 class="dashboard__section-title">Section Library</h2>
-            </div>
-            <div class="dashboard__module-library" id="dashboard-module-library">
-              <p class="dashboard__empty-state">Sections will appear here as you build pages.</p>
-            </div>
-            <div class="dashboard__module-preview hidden" id="dashboard-module-preview">
-              <div class="dashboard__module-preview-header">
-                <span class="dashboard__module-preview-name" id="dashboard-preview-name"></span>
-                <span class="dashboard__module-preview-used" id="dashboard-preview-used"></span>
-                <button class="btn btn--danger btn--sm dashboard__module-preview-delete" id="dashboard-preview-delete">Delete section</button>
-                <button class="dashboard__module-preview-close" id="dashboard-preview-close">&times;</button>
-              </div>
-              <iframe class="dashboard__module-preview-frame" id="dashboard-preview-frame" sandbox="allow-scripts allow-same-origin"></iframe>
-            </div>
-          </section>
-
-        </div>
-      </div>
-
-      <!-- ============ MARKETPLACE TAB ============ -->
-      <div class="workspace-panel" id="ws-panel-marketplace" data-ws-panel="marketplace">
-        <div class="dashboard__container">
-
-          <section class="dashboard__section">
-            <div class="dashboard__section-header">
-              <h2 class="dashboard__section-title">Marketplace</h2>
-              <span class="dashboard__section-hint">Validate and publish your theme</span>
-            </div>
-            <div class="dashboard__marketplace-content" id="dashboard-marketplace-content">
-              <p class="dashboard__empty-state">Run a marketplace validation check to see if your theme is ready for publication.</p>
-              <button class="btn btn--primary btn--sm" id="ws-marketplace-check" style="margin-top:8px">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-right:4px;vertical-align:-2px"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                Run Validation
+            <!-- More ways to start: collapsible advanced options -->
+            <div class="setup__more">
+              <button type="button" class="setup__more-toggle" id="setup-more-toggle" aria-expanded="false" aria-controls="setup-more-panel">
+                <span>More ways to start</span>
+                <span class="setup__more-chevron" aria-hidden="true">&#9662;</span>
               </button>
-            </div>
-          </section>
-
-        </div>
-      </div>
-
-      <!-- ============ SETTINGS TAB ============ -->
-      <div class="workspace-panel" id="ws-panel-settings" data-ws-panel="settings">
-        <div class="dashboard__container">
-
-          <section class="dashboard__section">
-            <div class="dashboard__section-header">
-              <h2 class="dashboard__section-title">Settings</h2>
-              <span class="dashboard__section-hint">AI engine, HubSpot, and integrations</span>
-            </div>
-            <p class="dashboard__empty-state">
-              <button class="btn btn--outline btn--sm" id="ws-settings-open">Open Settings Panel</button>
-            </p>
-          </section>
-
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ============================================================ -->
-  <!-- MAIN APP — shown after a session is active                   -->
-  <!-- ============================================================ -->
-  <div class="app hidden" id="app-screen">
-    <header class="topbar">
-      <div class="topbar__left">
-        <button class="topbar__back-btn" id="app-back" title="Back to theme overview">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-        </button>
-        <span class="topbar__project-pill" id="theme-name"></span>
-      </div>
-      <div class="topbar__center">
-        <div class="responsive-toggle" id="responsive-toggle">
-          <button class="responsive-btn active" data-width="100%" title="Desktop">
-            <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><rect x="1" y="1" width="16" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/><line x1="6" y1="13" x2="12" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </button>
-          <button class="responsive-btn" data-width="768px" title="Tablet">
-            <svg width="14" height="18" viewBox="0 0 14 18" fill="none"><rect x="1" y="1" width="12" height="16" rx="1.5" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="15" r="0.75" fill="currentColor"/></svg>
-          </button>
-          <button class="responsive-btn" data-width="375px" title="Mobile">
-            <svg width="10" height="18" viewBox="0 0 10 18" fill="none"><rect x="1" y="1" width="8" height="16" rx="1.5" stroke="currentColor" stroke-width="1.5"/><circle cx="5" cy="15" r="0.75" fill="currentColor"/></svg>
-          </button>
-        </div>
-        <button class="interact-mode-toggle" id="interact-mode-toggle" title="Click to edit text, images &amp; links — or click a section to reference it in chat" aria-pressed="false">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7 17 2-7 7-2z"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          <span>Interact</span>
-        </button>
-      </div>
-      <div class="topbar__right">
-        <button class="topbar__icon-btn" title="Submit feedback" onclick="vibeFeedback()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        </button>
-        <button class="topbar__icon-btn theme-toggle" title="Toggle light/dark mode" onclick="toggleTheme()">
-          <svg class="theme-toggle__icon--dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-          <svg class="theme-toggle__icon--light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        </button>
-        <button class="topbar__icon-btn" id="btn-history" title="Version History" style="display:none">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </button>
-        <button class="topbar__icon-btn hidden" id="btn-email-preview" title="Email client preview (Gmail, Outlook, Apple Mail)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22 4 12 13 2 4"/></svg>
-        </button>
-        <button class="topbar__icon-btn" id="btn-marketplace" title="Marketplace publication check">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l1-5h16l1 5"/><path d="M5 9v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M9 22V12h6v10"/></svg>
-        </button>
-        <button class="btn btn--primary" id="btn-upload" title="Deploy theme to HubSpot">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:-2px"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
-          Deploy
-        </button>
-      </div>
-    </header>
-
-    <div class="layout">
-      <aside class="panel panel--left" id="panel-left">
-        <div class="module-bar" id="module-bar">
-          <button class="module-bar__btn" id="btn-modules">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-            <span>Sections</span>
-            <span class="module-bar__count" id="module-count">0</span>
-          </button>
-        </div>
-
-        <div class="page-tree" id="page-tree">
-          <div class="page-tree__header">
-            <span class="page-tree__title">Pages</span>
-            <button class="page-tree__add" id="btn-add-page" title="Add page">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            </button>
-          </div>
-          <div class="page-tree__list" id="page-tabs-list"></div>
-          <div class="page-tree__add-inline hidden" id="page-tree-add-inline">
-            <select class="page-tree__type-select" id="page-tree-type">
-              <option value="landing_page">Landing Page</option>
-              <option value="website_page">Website Page</option>
-              <option value="blog_post">Blog Post</option>
-              <option value="module_only">Section Only</option>
-            </select>
-            <input class="page-tree__name-input" id="page-tree-name" placeholder="Page name..." />
-            <button class="page-tree__create-btn" id="page-tree-create">Create</button>
-          </div>
-        </div>
-
-        <div class="module-slideout" id="module-slideout">
-          <div class="module-slideout__view" id="module-list-view">
-            <div class="module-slideout__header">
-              <span class="module-slideout__title">Sections</span>
-              <span class="module-slideout__count" id="slideout-module-count">0</span>
-              <button class="module-slideout__add" id="btn-add-module" title="Add section from library">+</button>
-              <button class="module-slideout__close" id="module-slideout-close">&times;</button>
-            </div>
-            <div class="module-library-dropdown hidden" id="module-library-dropdown"></div>
-            <div class="module-slideout__items" id="module-items"></div>
-          </div>
-          <div class="module-slideout__view hidden" id="module-editor-view">
-            <div class="module-slideout__header">
-              <button class="module-slideout__back" id="field-editor-back">&larr;</button>
-              <span class="module-slideout__title" id="field-editor-title">Fields</span>
-              <div class="field-editor__tabs">
-                <button class="field-editor__tab active" id="field-editor-tab-fields" data-tab="fields">Fields</button>
-                <button class="field-editor__tab" id="field-editor-tab-code" data-tab="code">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                  Code
-                </button>
-              </div>
-              <button class="module-slideout__close" id="field-editor-close">&times;</button>
-            </div>
-            <div class="field-editor__content" id="field-editor-content"></div>
-            <div class="field-editor__code hidden" id="field-editor-code"></div>
-          </div>
-        </div>
-
-        <div class="chat">
-          <div class="chat__header" id="chat-header">
-            <span class="chat__header-title" id="chat-header-title">Chat</span>
-            <span class="chat__header-context" id="chat-header-context"></span>
-          </div>
-          <div class="chat__messages" id="chat-messages">
-            <div class="chat__welcome" id="chat-welcome">
-              <p>Describe what you want or pick a template to get started.</p>
-
-              <div class="chat__section-label">Templates</div>
-              <div class="chat__starters chat__starters--rich" id="starter-templates">
-                <button class="starter-btn starter-btn--rich" data-prompt="Create a modern SaaS landing page with a hero section featuring a gradient background, a features grid with icons, a testimonials carousel, a pricing table with 3 tiers, and a CTA section.">
-                  <span class="starter-btn__label">SaaS Landing Page</span>
-                  <span class="starter-btn__desc">Hero, features, testimonials, pricing &amp; CTA</span>
-                </button>
-                <button class="starter-btn starter-btn--rich" data-prompt="Create a portfolio landing page with a hero section, a project gallery grid, an about/bio section, a skills section, and a contact form section.">
-                  <span class="starter-btn__label">Portfolio</span>
-                  <span class="starter-btn__desc">Hero, project gallery, about, skills &amp; contact</span>
-                </button>
-                <button class="starter-btn starter-btn--rich" data-prompt="Create a restaurant landing page with a hero section featuring a food image background, a menu section with categories, a reservations section, a reviews section, and a location/hours section.">
-                  <span class="starter-btn__label">Restaurant</span>
-                  <span class="starter-btn__desc">Hero, menu, reservations, reviews &amp; hours</span>
-                </button>
-                <button class="starter-btn starter-btn--rich" data-prompt="Create an event landing page with a countdown hero, a speakers section with photos and bios, a schedule/agenda section, a sponsors section with logos, and a registration CTA section.">
-                  <span class="starter-btn__label">Event / Conference</span>
-                  <span class="starter-btn__desc">Countdown hero, speakers, schedule &amp; sponsors</span>
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="history-timeline hidden" id="history-timeline" aria-label="Version history">
-            <button class="history-timeline__nav" id="history-timeline-undo" title="Undo (Ctrl+Z)" aria-label="Undo">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-            </button>
-            <div class="history-timeline__track" id="history-timeline-track"></div>
-            <button class="history-timeline__nav" id="history-timeline-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-            </button>
-            <div class="history-timeline__tooltip hidden" id="history-timeline-tooltip" role="tooltip"></div>
-          </div>
-          <div class="chat__input-area">
-            <div class="chat__mode-bar">
-              <button class="plan-toggle" id="plan-mode-toggle" title="Plan mode — deliberate before generating" aria-pressed="false">
-                <span class="plan-toggle__indicator">
-                  <svg class="plan-toggle__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
-                </span>
-                <span class="plan-toggle__label">Plan mode</span>
-                <span class="plan-toggle__state">Off</span>
-              </button>
-            </div>
-            <div class="chat__suggestions hidden" id="chat-suggestions" aria-label="Suggested next steps"></div>
-            <div class="chat__file-chips" id="file-chips"></div>
-            <div class="chat__input-wrapper">
-              <textarea class="chat__input" id="chat-input" placeholder="Describe your landing page..." rows="1"></textarea>
-              <div class="chat__input-actions">
-                <button class="chat__input-icon" id="btn-attach-file" title="Attach files (images, PDFs, docs)">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
-                </button>
-                <input type="file" id="file-input" multiple accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown,text/plain,.md,.markdown,.txt" style="display:none">
-                <button class="chat__input-icon" id="btn-starter-templates" title="Templates">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-                </button>
-                <button class="chat__send" id="chat-send" title="Send (Enter)">
-                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M3 10L17 3L10 17L9 11L3 10Z" fill="currentColor"/></svg>
-                </button>
-              </div>
-            </div>
-            <div class="chat__drop-overlay hidden" id="drop-overlay">
-              <div class="chat__drop-overlay-content">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <span>Drop files here</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <div class="resize-handle" id="resize-handle"></div>
-
-      <main class="panel panel--right" id="panel-right">
-        <div class="view-toggle" id="view-toggle">
-          <button class="view-toggle__btn active" data-view="preview">Preview</button>
-          <button class="view-toggle__btn" data-view="split">Split</button>
-          <button class="view-toggle__btn" data-view="code">Code</button>
-          <div class="view-toggle__spacer"></div>
-          <button class="view-toggle__btn view-toggle__btn--plan" id="plan-sidebar-toggle" title="Toggle plan sidebar" aria-pressed="false">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-            Plan
-          </button>
-        </div>
-
-        <div class="right-split">
-          <div class="preview" id="preview-container">
-            <div class="browser-chrome" id="browser-chrome">
-              <div class="browser-chrome__bar">
-                <div class="browser-chrome__dots">
-                  <span class="browser-chrome__dot"></span>
-                  <span class="browser-chrome__dot"></span>
-                  <span class="browser-chrome__dot"></span>
-                </div>
-                <div class="browser-chrome__url" id="browser-url">vibespot.app</div>
-              </div>
-              <iframe id="preview-frame" class="browser-chrome__frame" sandbox="allow-scripts allow-same-origin"></iframe>
-            </div>
-          </div>
-
-          <!-- Plan sidebar (deliberation phase — coexists with preview) -->
-          <aside class="plan-sidebar hidden" id="plan-pane">
-            <div class="plan-sidebar__resize" id="plan-sidebar-resize"></div>
-            <button class="plan-sidebar__close" id="plan-sidebar-close">&times;</button>
-            <div class="plan-pane__scroll">
-              <div class="plan-pane__header">
-                <h2 class="plan-pane__title">Plan</h2>
-                <div class="plan-pane__header-actions">
-                  <button class="plan-pane__icon-btn" id="plan-edit-toggle" title="Edit plan">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    <span>Edit</span>
+              <div class="setup__more-panel hidden" id="setup-more-panel">
+                <div class="setup__actions">
+                  <button class="setup__action-btn" type="button" data-action="new">
+                    <span class="setup__action-icon" aria-hidden="true">&#43;</span>
+                    <span>Blank Theme</span>
+                  </button>
+                  <button class="setup__action-btn" type="button" data-action="download">
+                    <span class="setup__action-icon" aria-hidden="true">&#8595;</span>
+                    <span>From HubSpot</span>
+                  </button>
+                  <button class="setup__action-btn" type="button" data-action="figma">
+                    <span class="setup__action-icon" aria-hidden="true">&#9670;</span>
+                    <span>From Figma</span>
+                    <span class="setup__action-badge">Beta</span>
+                  </button>
+                  <button class="setup__action-btn" type="button" data-action="convert">
+                    <span class="setup__action-icon" aria-hidden="true">&#8634;</span>
+                    <span>From React</span>
+                    <span class="setup__action-badge">Beta</span>
                   </button>
                 </div>
               </div>
-              <div class="plan-pane__content" id="plan-content">
-                <div class="plan-pane__empty">
-                  <p>No plan yet.</p>
-                  <p class="plan-pane__empty-hint">Toggle plan mode in the chat (icon next to send) and describe what you want to build. The assistant will ask clarifying questions and draft a plan here.</p>
+            </div>
+
+            <div class="setup__panel hidden" id="panel-new">
+              <div class="setup__row">
+                <label class="visually-hidden" for="new-theme-name">Theme name</label>
+                <input type="text" class="setup__input setup__input--wide" id="new-theme-name" placeholder="my-landing-page" aria-label="Theme name" />
+                <button class="btn btn--primary" id="btn-create-theme" type="button">Create</button>
+              </div>
+            </div>
+
+            <div class="setup__panel hidden" id="panel-continue">
+              <div class="setup__pills" id="continue-projects" role="list"></div>
+              <p class="setup__hint setup__hint--empty hidden" id="continue-empty">No themes yet — create one above!</p>
+            </div>
+
+            <div class="setup__panel hidden" id="panel-download">
+              <div class="setup__panel-account hidden" id="dl-account">
+                <span id="dl-account-name"></span>
+                <button class="btn-link" id="dl-account-change" type="button">Change</button>
+              </div>
+              <div id="dl-account-switch" class="hidden" style="margin:0 0 12px"></div>
+              <div class="setup__row hidden" id="dl-input-row">
+                <label class="visually-hidden" for="dl-theme-name">Theme folder name</label>
+                <input type="text" class="setup__input setup__input--wide" id="dl-theme-name" placeholder="Enter theme folder name on HubSpot" aria-label="Theme folder name" />
+                <button class="btn btn--primary" id="btn-fetch-theme" type="button">Download</button>
+              </div>
+              <p class="setup__hint hidden" id="dl-hint">Enter the exact folder name of your theme in the HubSpot Design Manager</p>
+              <div class="hidden" id="dl-no-account">
+                <p class="setup__hint">Connect a HubSpot account in <a href="#" id="dl-open-settings">Settings</a> to download themes.</p>
+              </div>
+            </div>
+
+            <div class="setup__panel hidden" id="panel-figma">
+              <div id="figma-token-prompt" class="hidden">
+                <p class="setup__hint">A Figma Personal Access Token is required. <a href="#" id="figma-open-settings">Add one in Settings</a> or enter it below:</p>
+                <div class="setup__row">
+                  <label class="visually-hidden" for="figma-inline-token">Figma access token</label>
+                  <input type="password" class="setup__input setup__input--wide" id="figma-inline-token" placeholder="figd_..." aria-label="Figma access token" />
+                  <button class="btn btn--primary" id="figma-save-token" type="button">Save</button>
                 </div>
               </div>
-              <textarea class="plan-pane__editor hidden" id="plan-editor" spellcheck="false"></textarea>
-            </div>
-            <div class="plan-pane__footer">
-              <button class="btn btn--secondary plan-pane__discard" id="plan-discard-btn">Discard &amp; start over</button>
-              <div class="plan-pane__footer-spacer"></div>
-              <button class="btn btn--secondary hidden" id="plan-edit-cancel">Cancel</button>
-              <button class="btn btn--primary hidden" id="plan-edit-save">Save</button>
-              <button class="btn btn--primary plan-pane__approve" id="plan-approve-btn">Approve plan</button>
-            </div>
-          </aside>
-        </div>
-
-        <div class="code-view hidden" id="code-view">
-          <div class="code-view__sidebar">
-            <div class="code-view__sidebar-header">Files</div>
-            <div class="code-view__file-list" id="code-file-list"></div>
-          </div>
-          <div class="code-view__editor">
-            <div class="code-view__editor-header">
-              <span class="code-view__filename" id="code-filename">Select a file</span>
-              <div class="code-view__editor-actions">
-                <span class="code-view__dirty-dot hidden" id="code-dirty-dot" title="Unsaved changes"></span>
-                <button class="btn btn--sm btn--accent" id="code-save-btn" disabled>Save</button>
+              <div id="figma-url-section">
+                <div class="setup__row">
+                  <label class="visually-hidden" for="figma-url">Figma design URL</label>
+                  <input type="text" class="setup__input setup__input--wide" id="figma-url" placeholder="https://www.figma.com/design/..." aria-label="Figma design URL" />
+                  <button class="btn btn--primary" id="figma-extract-btn" type="button">Extract</button>
+                </div>
+                <p class="setup__hint">Paste a Figma design URL to extract structure, text, and assets</p>
+                <div class="figma-progress hidden" id="figma-progress"></div>
+              </div>
+              <div id="figma-summary" class="hidden"></div>
+              <div id="figma-generate" class="hidden">
+                <div class="setup__row">
+                  <label class="visually-hidden" for="figma-theme-name">Theme name</label>
+                  <input type="text" class="setup__input setup__input--wide" id="figma-theme-name" placeholder="my-landing-page" aria-label="Theme name" />
+                  <button class="btn btn--primary" id="figma-generate-btn" type="button">Generate Page</button>
+                </div>
+                <label class="figma-toggle" id="figma-image-toggle">
+                  <input type="checkbox" id="figma-use-assets" checked />
+                  <span class="figma-toggle__label">Import images as assets</span>
+                  <span class="figma-toggle__hint" id="figma-image-hint">Images uploaded to HubSpot, no manual replacement needed</span>
+                </label>
               </div>
             </div>
-            <div class="code-view__editor-area" id="code-editor-area"></div>
-          </div>
-        </div>
 
-        <!-- History bottom panel -->
-        <div class="history-bottom hidden" id="history-panel">
-          <div class="history-bottom__header">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <h3>Version History</h3>
-            <div class="history-bottom__spacer"></div>
-            <button class="history-bottom__toggle" id="history-panel-collapse" title="Collapse">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-            <button class="history-bottom__close" id="history-panel-close" title="Close">&times;</button>
+            <div class="setup__panel hidden" id="panel-convert">
+              <div class="setup__row">
+                <label class="visually-hidden" for="import-url">Repository or Lovable URL</label>
+                <input type="text" class="setup__input setup__input--wide" id="import-url" placeholder="https://github.com/user/repo or Lovable URL" aria-label="Repository or Lovable URL" />
+                <button class="btn btn--primary" id="import-btn" type="button">Import</button>
+              </div>
+              <p class="setup__hint">Convert a React or Lovable project to a HubSpot theme</p>
+            </div>
           </div>
-          <div class="history-bottom__body" id="history-bottom-body">
-            <div class="history-panel__list" id="history-list"></div>
-          </div>
-        </div>
-      </main>
-    </div>
 
-    <!-- Upload panel -->
-    <div class="upload-panel hidden" id="upload-panel">
+          <div class="setup__loading hidden" id="setup-loading" role="status" aria-live="polite">
+            <div class="setup__spinner" aria-hidden="true"></div>
+            <span id="setup-loading-text">Setting up...</span>
+          </div>
+
+          <div class="setup__error hidden" id="setup-error" role="alert"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ============================================================ -->
+    <!-- MODE 2: EDITOR — workspace tabs (Pages/Brand/Library/etc.)  -->
+    <!-- ============================================================ -->
+    <div class="editor dashboard hidden" id="editor" role="region" aria-label="Project editor">
+      <div class="dashboard__body">
+
+        <!-- ================ PAGES TAB ================ -->
+        <section class="workspace-panel workspace-panel--pages active" id="ws-panel-pages" data-ws-panel="pages" role="tabpanel" aria-labelledby="ws-tab-pages">
+          <div class="layout">
+            <aside class="panel panel--left" id="panel-left" aria-label="Pages and chat">
+
+              <!-- Page tree (replaces module-bar; module management lives here) -->
+              <div class="page-tree" id="page-tree">
+                <div class="page-tree__header">
+                  <span class="page-tree__title">Pages</span>
+                  <button class="page-tree__add" id="btn-add-page" type="button" title="Add page" aria-label="Add page">
+                    <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  </button>
+                </div>
+                <div class="page-tree__list" id="page-tabs-list" role="tree"></div>
+                <div class="page-tree__add-inline hidden" id="page-tree-add-inline" role="group" aria-label="Create a new page">
+                  <label class="visually-hidden" for="page-tree-type">Page type</label>
+                  <select class="page-tree__type-select" id="page-tree-type" aria-label="Page type">
+                    <option value="landing_page">Landing Page</option>
+                    <option value="website_page">Website Page</option>
+                    <option value="blog_post">Blog Post</option>
+                    <option value="module_only">Section Only</option>
+                  </select>
+                  <label class="visually-hidden" for="page-tree-name">Page name</label>
+                  <input class="page-tree__name-input" id="page-tree-name" placeholder="Page name..." aria-label="Page name" />
+                  <button class="page-tree__create-btn" id="page-tree-create" type="button">Create</button>
+                </div>
+              </div>
+
+              <!-- Section editor slideout (kept for in-page section editing; opened from page tree) -->
+              <div class="module-slideout hidden" id="module-slideout" role="dialog" aria-label="Section editor">
+                <div class="module-slideout__view" id="module-list-view">
+                  <div class="module-slideout__header">
+                    <span class="module-slideout__title">Sections</span>
+                    <span class="module-slideout__count" id="slideout-module-count">0</span>
+                    <button class="module-slideout__add" id="btn-add-module" type="button" title="Add section from library" aria-label="Add section from library">+</button>
+                    <button class="module-slideout__close" id="module-slideout-close" type="button" aria-label="Close section editor">&times;</button>
+                  </div>
+                  <div class="module-library-dropdown hidden" id="module-library-dropdown" role="listbox"></div>
+                  <div class="module-slideout__items" id="module-items"></div>
+                </div>
+                <div class="module-slideout__view hidden" id="module-editor-view">
+                  <div class="module-slideout__header">
+                    <button class="module-slideout__back" id="field-editor-back" type="button" aria-label="Back to sections">&larr;</button>
+                    <span class="module-slideout__title" id="field-editor-title">Fields</span>
+                    <div class="field-editor__tabs" role="tablist" aria-label="Section editor view">
+                      <button class="field-editor__tab active" id="field-editor-tab-fields" data-tab="fields" role="tab" aria-selected="true" type="button">Fields</button>
+                      <button class="field-editor__tab" id="field-editor-tab-code" data-tab="code" role="tab" aria-selected="false" type="button">
+                        <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                        Code
+                      </button>
+                    </div>
+                    <button class="module-slideout__close" id="field-editor-close" type="button" aria-label="Close field editor">&times;</button>
+                  </div>
+                  <div class="field-editor__content" id="field-editor-content"></div>
+                  <div class="field-editor__code hidden" id="field-editor-code"></div>
+                </div>
+              </div>
+
+              <!-- Chat panel (below page tree) -->
+              <div class="chat" role="region" aria-label="Chat">
+                <div class="chat__header" id="chat-header">
+                  <span class="chat__header-title" id="chat-header-title">Chat</span>
+                  <span class="chat__header-context" id="chat-header-context"></span>
+                </div>
+                <div class="chat__messages" id="chat-messages" role="log" aria-live="polite">
+                  <div class="chat__welcome" id="chat-welcome">
+                    <p>Describe what you want or pick a template to get started.</p>
+
+                    <div class="chat__section-label">Templates</div>
+                    <div class="chat__starters chat__starters--rich" id="starter-templates">
+                      <button class="starter-btn starter-btn--rich" type="button" data-prompt="Create a modern SaaS landing page with a hero section featuring a gradient background, a features grid with icons, a testimonials carousel, a pricing table with 3 tiers, and a CTA section.">
+                        <span class="starter-btn__label">SaaS Landing Page</span>
+                        <span class="starter-btn__desc">Hero, features, testimonials, pricing &amp; CTA</span>
+                      </button>
+                      <button class="starter-btn starter-btn--rich" type="button" data-prompt="Create a portfolio landing page with a hero section, a project gallery grid, an about/bio section, a skills section, and a contact form section.">
+                        <span class="starter-btn__label">Portfolio</span>
+                        <span class="starter-btn__desc">Hero, project gallery, about, skills &amp; contact</span>
+                      </button>
+                      <button class="starter-btn starter-btn--rich" type="button" data-prompt="Create a restaurant landing page with a hero section featuring a food image background, a menu section with categories, a reservations section, a reviews section, and a location/hours section.">
+                        <span class="starter-btn__label">Restaurant</span>
+                        <span class="starter-btn__desc">Hero, menu, reservations, reviews &amp; hours</span>
+                      </button>
+                      <button class="starter-btn starter-btn--rich" type="button" data-prompt="Create an event landing page with a countdown hero, a speakers section with photos and bios, a schedule/agenda section, a sponsors section with logos, and a registration CTA section.">
+                        <span class="starter-btn__label">Event / Conference</span>
+                        <span class="starter-btn__desc">Countdown hero, speakers, schedule &amp; sponsors</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="history-timeline hidden" id="history-timeline" role="toolbar" aria-label="Version history">
+                  <button class="history-timeline__nav" id="history-timeline-undo" type="button" title="Undo (Ctrl+Z)" aria-label="Undo">
+                    <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <div class="history-timeline__track" id="history-timeline-track"></div>
+                  <button class="history-timeline__nav" id="history-timeline-redo" type="button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+                    <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                  <div class="history-timeline__tooltip hidden" id="history-timeline-tooltip" role="tooltip"></div>
+                </div>
+                <div class="chat__input-area">
+                  <div class="chat__mode-bar">
+                    <button class="plan-toggle" id="plan-mode-toggle" type="button" title="Plan mode — deliberate before generating" aria-pressed="false">
+                      <span class="plan-toggle__indicator" aria-hidden="true">
+                        <svg class="plan-toggle__icon icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+                      </span>
+                      <span class="plan-toggle__label">Plan mode</span>
+                      <span class="plan-toggle__state">Off</span>
+                    </button>
+                  </div>
+                  <div class="chat__suggestions hidden" id="chat-suggestions" aria-label="Suggested next steps"></div>
+                  <div class="chat__file-chips" id="file-chips"></div>
+                  <div class="chat__input-wrapper">
+                    <label class="visually-hidden" for="chat-input">Chat message</label>
+                    <textarea class="chat__input" id="chat-input" placeholder="Describe your landing page..." rows="1" aria-label="Chat message"></textarea>
+                    <div class="chat__input-actions">
+                      <button class="chat__input-icon" id="btn-attach-file" type="button" title="Attach files (images, PDFs, docs)" aria-label="Attach files">
+                        <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                      </button>
+                      <input type="file" id="file-input" multiple accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown,text/plain,.md,.markdown,.txt" style="display:none" aria-hidden="true">
+                      <button class="chat__input-icon" id="btn-starter-templates" type="button" title="Templates" aria-label="Templates">
+                        <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                      </button>
+                      <button class="chat__send" id="chat-send" type="button" title="Send (Enter)" aria-label="Send message">
+                        <svg class="icon icon--sm" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 12L21 4L13 22L11 14L3 12Z"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="chat__drop-overlay hidden" id="drop-overlay" aria-hidden="true">
+                    <div class="chat__drop-overlay-content">
+                      <svg class="icon icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      <span>Drop files here</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <div class="resize-handle" id="resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize panels"></div>
+
+            <main class="panel panel--right" id="panel-right" aria-label="Preview">
+              <div class="view-toggle" id="view-toggle" role="tablist" aria-label="Right pane view">
+                <button class="view-toggle__btn active" data-view="preview" type="button" role="tab" aria-selected="true">Preview</button>
+                <button class="view-toggle__btn" data-view="split" type="button" role="tab" aria-selected="false">Split</button>
+                <button class="view-toggle__btn" data-view="code" type="button" role="tab" aria-selected="false">Code</button>
+                <div class="view-toggle__spacer"></div>
+                <button class="view-toggle__btn view-toggle__btn--plan" id="plan-sidebar-toggle" type="button" title="Toggle plan sidebar" aria-pressed="false">
+                  <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+                  Plan
+                </button>
+              </div>
+
+              <div class="right-split">
+                <div class="preview" id="preview-container">
+                  <div class="browser-chrome" id="browser-chrome">
+                    <div class="browser-chrome__bar">
+                      <div class="browser-chrome__dots" aria-hidden="true">
+                        <span class="browser-chrome__dot"></span>
+                        <span class="browser-chrome__dot"></span>
+                        <span class="browser-chrome__dot"></span>
+                      </div>
+                      <div class="browser-chrome__url" id="browser-url">vibespot.app</div>
+                      <!-- Responsive toggle (moved from topbar center per VIB-184 spec) -->
+                      <div class="responsive-toggle" id="responsive-toggle" role="group" aria-label="Responsive preview">
+                        <button class="responsive-btn active" type="button" data-width="100%" title="Desktop" aria-label="Desktop preview" aria-pressed="true">
+                          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                        </button>
+                        <button class="responsive-btn" type="button" data-width="768px" title="Tablet" aria-label="Tablet preview" aria-pressed="false">
+                          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                        </button>
+                        <button class="responsive-btn" type="button" data-width="375px" title="Mobile" aria-label="Mobile preview" aria-pressed="false">
+                          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                        </button>
+                      </div>
+                      <button class="interact-mode-toggle" id="interact-mode-toggle" type="button" title="Click to edit text, images &amp; links — or click a section to reference it in chat" aria-pressed="false" aria-label="Interact / select mode">
+                        <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l7 17 2-7 7-2z"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        <span>Interact</span>
+                      </button>
+                    </div>
+                    <iframe id="preview-frame" class="browser-chrome__frame" sandbox="allow-scripts allow-same-origin" title="Live preview"></iframe>
+                  </div>
+                </div>
+
+                <!-- Plan sidebar (deliberation phase — coexists with preview) -->
+                <aside class="plan-sidebar hidden" id="plan-pane" aria-label="Plan">
+                  <div class="plan-sidebar__resize" id="plan-sidebar-resize" role="separator" aria-orientation="vertical" aria-label="Resize plan panel"></div>
+                  <button class="plan-sidebar__close" id="plan-sidebar-close" type="button" aria-label="Close plan sidebar">&times;</button>
+                  <div class="plan-pane__scroll">
+                    <div class="plan-pane__header">
+                      <h2 class="plan-pane__title">Plan</h2>
+                      <div class="plan-pane__header-actions">
+                        <button class="plan-pane__icon-btn" id="plan-edit-toggle" type="button" title="Edit plan" aria-label="Edit plan">
+                          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          <span>Edit</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="plan-pane__content" id="plan-content">
+                      <div class="plan-pane__empty">
+                        <p>No plan yet.</p>
+                        <p class="plan-pane__empty-hint">Toggle plan mode in the chat (icon next to send) and describe what you want to build. The assistant will ask clarifying questions and draft a plan here.</p>
+                      </div>
+                    </div>
+                    <label class="visually-hidden" for="plan-editor">Plan markdown</label>
+                    <textarea class="plan-pane__editor hidden" id="plan-editor" spellcheck="false" aria-label="Plan markdown"></textarea>
+                  </div>
+                  <div class="plan-pane__footer">
+                    <button class="btn btn--secondary plan-pane__discard" id="plan-discard-btn" type="button">Discard &amp; start over</button>
+                    <div class="plan-pane__footer-spacer"></div>
+                    <button class="btn btn--secondary hidden" id="plan-edit-cancel" type="button">Cancel</button>
+                    <button class="btn btn--primary hidden" id="plan-edit-save" type="button">Save</button>
+                    <button class="btn btn--primary plan-pane__approve" id="plan-approve-btn" type="button">Approve plan</button>
+                  </div>
+                </aside>
+              </div>
+
+              <div class="code-view hidden" id="code-view" role="region" aria-label="Code editor">
+                <div class="code-view__sidebar">
+                  <div class="code-view__sidebar-header">Files</div>
+                  <div class="code-view__file-list" id="code-file-list" role="tree"></div>
+                </div>
+                <div class="code-view__editor">
+                  <div class="code-view__editor-header">
+                    <span class="code-view__filename" id="code-filename">Select a file</span>
+                    <div class="code-view__editor-actions">
+                      <span class="code-view__dirty-dot hidden" id="code-dirty-dot" title="Unsaved changes" aria-label="Unsaved changes"></span>
+                      <button class="btn btn--sm btn--accent" id="code-save-btn" type="button" disabled>Save</button>
+                    </div>
+                  </div>
+                  <div class="code-view__editor-area" id="code-editor-area"></div>
+                </div>
+              </div>
+
+              <!-- History bottom panel -->
+              <div class="history-bottom hidden" id="history-panel" role="region" aria-label="Version history">
+                <div class="history-bottom__header">
+                  <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <h3>Version History</h3>
+                  <div class="history-bottom__spacer"></div>
+                  <button class="history-bottom__toggle" id="history-panel-collapse" type="button" title="Collapse" aria-label="Collapse history panel">
+                    <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                  <button class="history-bottom__close" id="history-panel-close" type="button" title="Close" aria-label="Close history panel">&times;</button>
+                </div>
+                <div class="history-bottom__body" id="history-bottom-body">
+                  <div class="history-panel__list" id="history-list"></div>
+                </div>
+              </div>
+            </main>
+          </div>
+        </section>
+
+        <!-- ================ BRAND TAB ================ -->
+        <section class="workspace-panel" id="ws-panel-brand" data-ws-panel="brand" role="tabpanel" aria-labelledby="ws-tab-brand">
+          <div class="dashboard__container">
+
+            <!-- Import Analysis (visible when an imported theme has been analyzed) -->
+            <section class="dashboard__section dashboard__section--inverse hidden" id="dashboard-inverse-section">
+              <div class="dashboard__section-header">
+                <h2 class="dashboard__section-title">Import Analysis</h2>
+                <span class="dashboard__section-hint" id="inverse-status">Analyzing theme...</span>
+                <button class="btn btn--sm btn--outline hidden" id="btn-inverse-apply-tokens" type="button" title="Seed shared CSS from inferred tokens">Apply Tokens</button>
+              </div>
+              <div class="inverse-summary" id="inverse-summary"></div>
+            </section>
+
+            <!-- Brand Assets -->
+            <section class="dashboard__section">
+              <div class="dashboard__section-header">
+                <h2 class="dashboard__section-title">Brand Assets</h2>
+                <span class="dashboard__section-hint">Optional — injected into AI prompts</span>
+              </div>
+              <div class="dashboard__brand-assets" id="dashboard-brand-assets">
+                <div class="brand-asset-toggle" id="brand-toggle-humanify">
+                  <label class="brand-asset-toggle__switch">
+                    <input type="checkbox" id="humanify-checkbox" checked aria-label="Humanify generated copy">
+                    <span class="brand-asset-toggle__slider"></span>
+                  </label>
+                  <span class="brand-asset-toggle__label">Humanify</span>
+                  <span class="brand-asset-toggle__tooltip" data-tooltip="Strips AI-sounding copy: removes em dashes, banned words like 'delve' and 'leverage', cliché openers, and forced enthusiasm. Makes your landing page read like a human wrote it.">?</span>
+                </div>
+                <div class="brand-asset-card" data-asset="styleguide">
+                  <div class="brand-asset-card__base">
+                    <span class="brand-asset-card__icon" id="brand-icon-styleguide" aria-hidden="true">+</span>
+                    <span class="brand-asset-card__label">styleguide</span>
+                  </div>
+                  <div class="brand-asset-card__actions">
+                    <label class="brand-asset-card__btn" title="Upload .md/.txt file"><input type="file" accept=".md,.txt" hidden aria-label="Upload styleguide file">Upload</label>
+                    <button class="brand-asset-card__btn" type="button" data-action="extract" title="AI-extract from theme">Extract</button>
+                  </div>
+                  <div class="brand-asset-card__manage hidden">
+                    <button class="brand-asset-card__btn" type="button" data-action="view" title="View">View</button>
+                    <button class="brand-asset-card__btn brand-asset-card__btn--danger" type="button" data-action="delete" title="Remove">Delete</button>
+                  </div>
+                </div>
+                <div class="brand-asset-card" data-asset="brandvoice">
+                  <div class="brand-asset-card__base">
+                    <span class="brand-asset-card__icon" id="brand-icon-brandvoice" aria-hidden="true">+</span>
+                    <span class="brand-asset-card__label">brand voice</span>
+                  </div>
+                  <div class="brand-asset-card__actions">
+                    <label class="brand-asset-card__btn" title="Upload .md/.txt file"><input type="file" accept=".md,.txt" hidden aria-label="Upload brand voice file">Upload</label>
+                    <button class="brand-asset-card__btn" type="button" data-action="extract" title="AI-extract from page copy">Extract</button>
+                  </div>
+                  <div class="brand-asset-card__manage hidden">
+                    <button class="brand-asset-card__btn" type="button" data-action="view" title="View">View</button>
+                    <button class="brand-asset-card__btn brand-asset-card__btn--danger" type="button" data-action="delete" title="Remove">Delete</button>
+                  </div>
+                </div>
+                <div class="brand-asset-card" data-asset="themeContext">
+                  <div class="brand-asset-card__base">
+                    <span class="brand-asset-card__icon" id="brand-icon-themeContext" aria-hidden="true">+</span>
+                    <span class="brand-asset-card__label">product context</span>
+                  </div>
+                  <div class="brand-asset-card__actions">
+                    <label class="brand-asset-card__btn" title="Upload .md/.txt file"><input type="file" accept=".md,.txt" hidden aria-label="Upload product context file">Upload</label>
+                    <button class="brand-asset-card__btn" type="button" data-action="extract" title="AI-extract from page content">Extract</button>
+                  </div>
+                  <div class="brand-asset-card__manage hidden">
+                    <button class="brand-asset-card__btn" type="button" data-action="view" title="View">View</button>
+                    <button class="brand-asset-card__btn brand-asset-card__btn--danger" type="button" data-action="delete" title="Remove">Delete</button>
+                  </div>
+                </div>
+                <button class="btn btn--sm btn--outline" id="btn-extract-all" type="button" title="AI-extract all brand assets from this theme">Extract All</button>
+                <button class="btn btn--sm btn--outline" id="btn-import-reference" type="button" title="Import design from another HubSpot theme or local folder">Import Reference</button>
+              </div>
+            </section>
+
+            <!-- Brand Kit -->
+            <section class="dashboard__section">
+              <div class="dashboard__section-header">
+                <h2 class="dashboard__section-title">Brand Kit</h2>
+                <span class="dashboard__section-hint">Colors, fonts, and logo enforced in generated modules</span>
+              </div>
+              <div class="brand-kit" id="dashboard-brand-kit">
+                <div class="brand-kit__row">
+                  <label class="brand-kit__label" for="bk-color-primary">Primary</label>
+                  <input type="color" class="brand-kit__color" id="bk-color-primary" value="#e8613a" aria-label="Primary color">
+                  <input type="text" class="brand-kit__hex" id="bk-hex-primary" placeholder="#e8613a" maxlength="7" aria-label="Primary color hex">
+                </div>
+                <div class="brand-kit__row">
+                  <label class="brand-kit__label" for="bk-color-secondary">Secondary</label>
+                  <input type="color" class="brand-kit__color" id="bk-color-secondary" value="#1a1a2e" aria-label="Secondary color">
+                  <input type="text" class="brand-kit__hex" id="bk-hex-secondary" placeholder="#1a1a2e" maxlength="7" aria-label="Secondary color hex">
+                </div>
+                <div class="brand-kit__row">
+                  <label class="brand-kit__label" for="bk-color-accent">Accent</label>
+                  <input type="color" class="brand-kit__color" id="bk-color-accent" value="#f4a261" aria-label="Accent color">
+                  <input type="text" class="brand-kit__hex" id="bk-hex-accent" placeholder="#f4a261" maxlength="7" aria-label="Accent color hex">
+                </div>
+                <div class="brand-kit__row">
+                  <label class="brand-kit__label" for="bk-font-heading">Heading font</label>
+                  <input type="text" class="brand-kit__input" id="bk-font-heading" placeholder="Georgia, serif" aria-label="Heading font">
+                </div>
+                <div class="brand-kit__row">
+                  <label class="brand-kit__label" for="bk-font-body">Body font</label>
+                  <input type="text" class="brand-kit__input" id="bk-font-body" placeholder="Arial, Helvetica, sans-serif" aria-label="Body font">
+                </div>
+                <div class="brand-kit__row">
+                  <label class="brand-kit__label" for="bk-logo-url">Logo URL</label>
+                  <input type="text" class="brand-kit__input brand-kit__input--wide" id="bk-logo-url" placeholder="https://example.com/logo.png" aria-label="Logo URL">
+                </div>
+                <div class="brand-kit__actions">
+                  <button class="btn btn--sm btn--primary" id="bk-save" type="button">Save Brand Kit</button>
+                  <button class="btn btn--sm btn--outline brand-kit__btn--danger" id="bk-clear" type="button">Clear</button>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </section>
+
+        <!-- ================ LIBRARY TAB ================ -->
+        <section class="workspace-panel" id="ws-panel-library" data-ws-panel="library" role="tabpanel" aria-labelledby="ws-tab-library">
+          <div class="dashboard__container">
+
+            <section class="dashboard__section">
+              <div class="dashboard__section-header">
+                <h2 class="dashboard__section-title">Section Library</h2>
+                <span class="dashboard__section-hint">Reusable sections across all pages</span>
+              </div>
+              <div class="dashboard__module-library module-library-grid" id="dashboard-module-library">
+                <p class="dashboard__empty-state">Sections will appear here as you build pages.</p>
+              </div>
+              <div class="dashboard__module-preview hidden" id="dashboard-module-preview">
+                <div class="dashboard__module-preview-header">
+                  <span class="dashboard__module-preview-name" id="dashboard-preview-name"></span>
+                  <span class="dashboard__module-preview-used" id="dashboard-preview-used"></span>
+                  <button class="btn btn--danger btn--sm dashboard__module-preview-delete" id="dashboard-preview-delete" type="button">Delete section</button>
+                  <button class="dashboard__module-preview-close" id="dashboard-preview-close" type="button" aria-label="Close preview">&times;</button>
+                </div>
+                <iframe class="dashboard__module-preview-frame" id="dashboard-preview-frame" sandbox="allow-scripts allow-same-origin" title="Section preview"></iframe>
+              </div>
+            </section>
+
+          </div>
+        </section>
+
+        <!-- ================ MARKETPLACE TAB ================ -->
+        <section class="workspace-panel" id="ws-panel-marketplace" data-ws-panel="marketplace" role="tabpanel" aria-labelledby="ws-tab-marketplace">
+          <div class="dashboard__container">
+
+            <section class="dashboard__section">
+              <div class="dashboard__section-header">
+                <h2 class="dashboard__section-title">Marketplace</h2>
+                <span class="dashboard__section-hint">Validate and publish your theme</span>
+              </div>
+              <div class="dashboard__marketplace-content" id="dashboard-marketplace-content">
+                <p class="dashboard__empty-state">Run a marketplace validation check to see if your theme is ready for publication.</p>
+                <button class="btn btn--primary btn--sm" id="btn-marketplace" type="button">
+                  <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                  Run Validation
+                </button>
+              </div>
+            </section>
+
+          </div>
+        </section>
+
+        <!-- ================ SETTINGS TAB (formerly modal overlay) ================ -->
+        <section class="workspace-panel workspace-panel--settings" id="ws-panel-settings" data-ws-panel="settings" role="tabpanel" aria-labelledby="ws-tab-settings">
+          <div class="dashboard__container">
+
+            <header class="settings__header">
+              <h2 class="settings__title">Settings</h2>
+            </header>
+            <nav class="settings__tabs" id="settings-tabs" role="tablist" aria-label="Settings categories">
+              <button class="settings__tab active" data-tab="ai" type="button" role="tab" aria-selected="true">AI</button>
+              <button class="settings__tab" data-tab="hubspot" type="button" role="tab" aria-selected="false">HubSpot</button>
+              <button class="settings__tab" data-tab="figma" type="button" role="tab" aria-selected="false">Figma</button>
+              <button class="settings__tab" data-tab="github" type="button" role="tab" aria-selected="false">GitHub</button>
+              <button class="settings__tab" data-tab="vibespot" type="button" role="tab" aria-selected="false">vibeSpot</button>
+            </nav>
+            <div class="settings__body" id="settings-body" role="tabpanel">
+              <div class="settings__loading">
+                <div class="settings__spinner-lg" aria-hidden="true"></div>
+                <span>Loading environment...</span>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </div><!-- /.dashboard__body -->
+    </div><!-- /#editor -->
+
+    <!-- ============================================================ -->
+    <!-- EDITOR-WIDE OVERLAYS (upload panel, email preview, statusbar) -->
+    <!-- ============================================================ -->
+
+    <div class="upload-panel hidden" id="upload-panel" role="region" aria-label="Upload status">
       <div class="upload-panel__header">
         <span class="upload-panel__title" id="upload-status-text">Upload</span>
         <div class="upload-panel__actions" id="upload-actions"></div>
-        <button class="upload-panel__toggle" id="upload-panel-toggle" title="Toggle log">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2 8 6 4 10 8"/></svg>
+        <button class="upload-panel__toggle" id="upload-panel-toggle" type="button" title="Toggle log" aria-label="Toggle upload log">
+          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 15 12 9 18 15"/></svg>
         </button>
       </div>
       <pre class="upload-panel__log" id="upload-log"></pre>
     </div>
 
-    <!-- Email client preview overlay -->
-    <div class="email-preview-overlay hidden" id="email-preview-overlay">
+    <div class="email-preview-overlay hidden" id="email-preview-overlay" role="dialog" aria-modal="true" aria-label="Email client preview">
       <div class="email-preview-panel">
         <div class="email-preview-panel__header">
           <h3>Email Client Preview</h3>
-          <div class="email-preview-panel__tabs" id="email-preview-tabs">
-            <button class="email-preview-tab active" data-client="gmail">Gmail</button>
-            <button class="email-preview-tab" data-client="outlook">Outlook Desktop</button>
-            <button class="email-preview-tab" data-client="apple-mail">Apple Mail</button>
+          <div class="email-preview-panel__tabs" id="email-preview-tabs" role="tablist" aria-label="Email clients">
+            <button class="email-preview-tab active" type="button" data-client="gmail" role="tab" aria-selected="true">Gmail</button>
+            <button class="email-preview-tab" type="button" data-client="outlook" role="tab" aria-selected="false">Outlook Desktop</button>
+            <button class="email-preview-tab" type="button" data-client="apple-mail" role="tab" aria-selected="false">Apple Mail</button>
           </div>
-          <button class="email-preview-panel__close" id="email-preview-close">&times;</button>
+          <button class="email-preview-panel__close" id="email-preview-close" type="button" aria-label="Close email preview">&times;</button>
         </div>
         <div class="email-preview-panel__notes" id="email-preview-notes"></div>
         <div class="email-preview-panel__body">
-          <iframe class="email-preview-panel__frame" id="email-preview-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+          <iframe class="email-preview-panel__frame" id="email-preview-frame" sandbox="allow-scripts allow-same-origin" title="Email client preview"></iframe>
         </div>
       </div>
     </div>
 
-    <footer class="statusbar">
+    <footer class="statusbar" role="contentinfo">
       <span id="status-text">Ready</span>
       <span class="statusbar__pill" id="status-hs-account"></span>
       <span id="status-engine" class="statusbar__engine"></span>
     </footer>
-  </div>
 
-  <!-- ============================================================ -->
-  <!-- SETTINGS OVERLAY — accessible from setup screen & main app   -->
-  <!-- ============================================================ -->
-  <div class="settings-overlay hidden" id="settings-overlay">
-    <div class="settings-panel">
-      <div class="settings__header">
-        <h2 class="settings__title">Settings</h2>
-        <button class="settings__close" id="settings-close">&times;</button>
-      </div>
-      <div class="settings__tabs" id="settings-tabs">
-        <button class="settings__tab active" data-tab="ai">AI</button>
-        <button class="settings__tab" data-tab="hubspot">HubSpot</button>
-        <button class="settings__tab" data-tab="figma">Figma</button>
-        <button class="settings__tab" data-tab="github">GitHub</button>
-        <button class="settings__tab" data-tab="vibespot">vibeSpot</button>
-      </div>
-      <div class="settings__body" id="settings-body">
-        <!-- Populated dynamically by settings.js -->
-        <div class="settings__loading">
-          <div class="settings__spinner-lg"></div>
-          <span>Loading environment...</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  </div><!-- /app-body -->
+  </div><!-- /.app-body -->
 
   <script src="/vendor/marked.umd.js"></script>
   <script src="/vendor/codemirror-bundle.global.js"></script>
