@@ -849,25 +849,19 @@ function renderStarterGrid(starters) {
     </div>
   `).join("");
 
+  const renderGroup = (title, list) =>
+    `<div class="starter-grid__group">
+      <h4 class="starter-grid__heading">${escHtml(title)}</h4>
+      <div class="starter-grid__section">${renderCards(list)}</div>
+    </div>`;
+
   let html = "";
   if (_serverContentMode === "email") {
-    if (emailStarters.length > 0) {
-      html += `<h4 class="starter-grid__heading">Email Templates</h4>`;
-      html += `<div class="starter-grid__section">${renderCards(emailStarters)}</div>`;
-    }
-    if (pageStarters.length > 0) {
-      html += `<h4 class="starter-grid__heading">Page Templates</h4>`;
-      html += `<div class="starter-grid__section">${renderCards(pageStarters)}</div>`;
-    }
+    if (emailStarters.length > 0) html += renderGroup("Email Templates", emailStarters);
+    if (pageStarters.length > 0) html += renderGroup("Page Templates", pageStarters);
   } else {
-    if (pageStarters.length > 0) {
-      html += `<h4 class="starter-grid__heading">Page Templates</h4>`;
-      html += `<div class="starter-grid__section">${renderCards(pageStarters)}</div>`;
-    }
-    if (emailStarters.length > 0) {
-      html += `<h4 class="starter-grid__heading">Email Templates</h4>`;
-      html += `<div class="starter-grid__section">${renderCards(emailStarters)}</div>`;
-    }
+    if (pageStarters.length > 0) html += renderGroup("Page Templates", pageStarters);
+    if (emailStarters.length > 0) html += renderGroup("Email Templates", emailStarters);
   }
   grid.innerHTML = html;
 
