@@ -362,7 +362,7 @@ function handleWsMessage(msg) {
       break;
 
     case "parse_warning":
-      appendSystemMessage(msg.message || "Section changes could not be applied.");
+      appendSystemMessage(msg.message || "Module changes could not be applied.");
       break;
 
     case "error":
@@ -781,7 +781,7 @@ function handlePipelineComplete(msg) {
   if (msg.answer) {
     stats.textContent = `Answered in ${duration}`;
   } else {
-    stats.textContent = `Generated ${msg.modulesGenerated} section${msg.modulesGenerated === 1 ? "" : "s"} in ${duration}`;
+    stats.textContent = `Generated ${msg.modulesGenerated} module${msg.modulesGenerated === 1 ? "" : "s"} in ${duration}`;
     if (msg.modulesUnchanged > 0) {
       stats.textContent += ` (${msg.modulesUnchanged} unchanged)`;
     }
@@ -813,7 +813,7 @@ function handlePipelinePartial(msg) {
   const stats = document.createElement("div");
   stats.className = "pipeline-stats pipeline-stats--partial";
   const duration = formatDuration(msg.durationMs);
-  stats.textContent = `${msg.succeeded.length} sections succeeded, ${msg.failed.length} failed in ${duration}`;
+  stats.textContent = `${msg.succeeded.length} modules succeeded, ${msg.failed.length} failed in ${duration}`;
   bubble.appendChild(stats);
 
   clearStreamStatus();
@@ -849,19 +849,19 @@ function pickContextualSuggestions(moduleNames) {
   const additive = [];
 
   if (!has("testimonial") && !has("review") && !has("quote")) {
-    additive.push("Add a testimonials section");
+    additive.push("Add a testimonials module");
   }
   if (!has("pricing") && !has("plan") && !has("tier")) {
     additive.push("Add a pricing table");
   }
   if (!has("faq") && !has("question")) {
-    additive.push("Add an FAQ section");
+    additive.push("Add an FAQ module");
   }
   if (!has("contact") && !has("form")) {
     additive.push("Add a contact form");
   }
   if (!has("hero") && !has("banner")) {
-    additive.push("Add a hero section");
+    additive.push("Add a hero module");
   }
   if (!has("feature") && !has("benefit")) {
     additive.push("Add a features grid with icons");
@@ -870,10 +870,10 @@ function pickContextualSuggestions(moduleNames) {
     additive.push("Add a footer with social links");
   }
   if (!has("stat") && !has("metric") && !has("number")) {
-    additive.push("Add a stats section with key numbers");
+    additive.push("Add a stats module with key numbers");
   }
   if (!has("cta") && !has("call")) {
-    additive.push("Add a call-to-action section");
+    additive.push("Add a call-to-action module");
   }
 
   const refinements = [
@@ -942,12 +942,12 @@ async function handleAgenticPrompt() {
     "vibeSpot can decompose AI generation into specialized agents:\n\n" +
     "• Intent Analyzer — classifies your request\n" +
     "• Page Architect — designs the page structure\n" +
-    "• Section Developer — generates each section in parallel\n" +
+    "• Module Developer — generates each module in parallel\n" +
     "• Validator — checks and auto-fixes errors\n\n" +
     "Tradeoffs:\n" +
     "✓ Better quality — each agent is focused on one task\n" +
     "✓ Structured output — eliminates JSON parsing failures\n" +
-    "✓ Only changed sections regenerated on edits\n" +
+    "✓ Only changed modules regenerated on edits\n" +
     "✗ Uses more calls per request (API calls or CLI subprocess calls)\n\n" +
     "You can change this anytime in Settings.",
     "Use Agentic Pipeline",
@@ -1438,7 +1438,7 @@ function finishStreaming() {
   if (streamingMsgEl && streamBuffer) {
     const rendered = renderMarkdown(streamBuffer);
     const visibleText = rendered.replace(/<[^>]*>/g, "").trim();
-    streamingMsgEl.innerHTML = visibleText ? rendered : "<em>Sections applied.</em>";
+    streamingMsgEl.innerHTML = visibleText ? rendered : "<em>Modules applied.</em>";
   }
 
   streamingMsgEl = null;
@@ -1581,7 +1581,7 @@ function appendRestoredAssistantMessage(text, timestamp, pipeline) {
       : "";
 
     const duration = formatDuration(pipeline.stats.durationMs);
-    let statsText = `Generated ${pipeline.stats.modulesGenerated} section${pipeline.stats.modulesGenerated === 1 ? "" : "s"} in ${duration}`;
+    let statsText = `Generated ${pipeline.stats.modulesGenerated} module${pipeline.stats.modulesGenerated === 1 ? "" : "s"} in ${duration}`;
     if (pipeline.stats.modulesUnchanged > 0) {
       statsText += ` (${pipeline.stats.modulesUnchanged} unchanged)`;
     }
@@ -1719,7 +1719,7 @@ function attachHistoryToggle() {
 async function doRollback(hash) {
   const scoped = currentTemplateId && !historyShowAll;
   const msg = scoped
-    ? "This template's sections will be restored to the selected version. Other templates are not affected."
+    ? "This template's modules will be restored to the selected version. Other templates are not affected."
     : "All theme files will be replaced, but chat history is preserved.";
   const ok = await vibeConfirm("Restore this version?", msg, { confirmLabel: "Restore", confirmClass: "btn--primary" });
   if (!ok) return;
@@ -1954,7 +1954,7 @@ function showTimelineTooltip(entryEl) {
   const more = (commit.changedModules || []).length - modules.length;
   const modulesLine = modules.length
     ? modules.join(", ") + (more > 0 ? ` +${more} more` : "")
-    : "No section changes";
+    : "No module changes";
 
   // Strip [templateId] prefix for display; keep "Rollback to:" prefix because
   // that case is filtered out earlier and won't reach here.

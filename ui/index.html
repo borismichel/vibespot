@@ -32,11 +32,11 @@
   <!-- ============================================================ -->
   <aside class="project-rail project-rail--expanded" id="project-rail" aria-label="Projects">
     <div class="project-rail__header">
-      <span class="project-rail__title">Projects</span>
+      <span class="project-rail__title" title="Each project maps to one HubSpot theme">Projects</span>
       <span class="project-rail__count" id="rail-project-count">0</span>
     </div>
     <div class="project-rail__items" id="project-rail-items"></div>
-    <button class="project-rail__add" id="project-rail-add" type="button" title="New project" aria-label="New project">+</button>
+    <button class="project-rail__add" id="project-rail-add" type="button" title="New project (HubSpot theme)" aria-label="New project">+</button>
     <div class="project-rail__footer">
       <a class="project-rail__settings-btn" href="https://buymeacoffee.com/vibespot" target="_blank" rel="noopener" title="Buy me a coffee">
         <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
@@ -81,11 +81,11 @@
           <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
           <span>Pages</span>
         </button>
-        <button class="workspace-tab" data-ws-tab="brand" role="tab" aria-selected="false" aria-controls="ws-panel-brand" id="ws-tab-brand" type="button">
+        <button class="workspace-tab" data-ws-tab="brand" role="tab" aria-selected="false" aria-controls="ws-panel-brand" id="ws-tab-brand" type="button" title="Brand assets and Brand Kit (HubSpot Brand Kit)">
           <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
           <span>Brand</span>
         </button>
-        <button class="workspace-tab" data-ws-tab="library" role="tab" aria-selected="false" aria-controls="ws-panel-library" id="ws-tab-library" type="button">
+        <button class="workspace-tab" data-ws-tab="library" role="tab" aria-selected="false" aria-controls="ws-panel-library" id="ws-tab-library" type="button" title="Reusable HubSpot modules across pages (Module Library)">
           <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
           <span>Library</span>
         </button>
@@ -365,7 +365,7 @@
                     <option value="website_page">Website Page</option>
                     <option value="blog_post">Blog Post</option>
                     <option value="email">Email</option>
-                    <option value="module_only">Section Only</option>
+                    <option value="module_only">Module Only</option>
                   </select>
                   <label class="visually-hidden" for="page-tree-name">Page name</label>
                   <input class="page-tree__name-input" id="page-tree-name" placeholder="Page name..." aria-label="Page name" />
@@ -373,23 +373,23 @@
                 </div>
               </div>
 
-              <!-- Section editor slideout (kept for in-page section editing; opened from page tree) -->
-              <div class="module-slideout hidden" id="module-slideout" role="dialog" aria-label="Section editor">
+              <!-- Module editor slideout (kept for in-page module editing; opened from page tree) -->
+              <div class="module-slideout hidden" id="module-slideout" role="dialog" aria-label="Module editor">
                 <div class="module-slideout__view" id="module-list-view">
                   <div class="module-slideout__header">
-                    <span class="module-slideout__title">Sections</span>
+                    <span class="module-slideout__title">Modules</span>
                     <span class="module-slideout__count" id="slideout-module-count">0</span>
-                    <button class="module-slideout__add" id="btn-add-module" type="button" title="Add section from library" aria-label="Add section from library">+</button>
-                    <button class="module-slideout__close" id="module-slideout-close" type="button" aria-label="Close section editor">&times;</button>
+                    <button class="module-slideout__add" id="btn-add-module" type="button" title="Add module from library" aria-label="Add module from library">+</button>
+                    <button class="module-slideout__close" id="module-slideout-close" type="button" aria-label="Close module editor">&times;</button>
                   </div>
                   <div class="module-library-dropdown hidden" id="module-library-dropdown" role="listbox"></div>
                   <div class="module-slideout__items" id="module-items"></div>
                 </div>
                 <div class="module-slideout__view hidden" id="module-editor-view">
                   <div class="module-slideout__header">
-                    <button class="module-slideout__back" id="field-editor-back" type="button" aria-label="Back to sections">&larr;</button>
+                    <button class="module-slideout__back" id="field-editor-back" type="button" aria-label="Back to module list">&larr;</button>
                     <span class="module-slideout__title" id="field-editor-title">Fields</span>
-                    <div class="field-editor__tabs" role="tablist" aria-label="Section editor view">
+                    <div class="field-editor__tabs" role="tablist" aria-label="Module editor view">
                       <button class="field-editor__tab active" id="field-editor-tab-fields" data-tab="fields" role="tab" aria-selected="true" type="button">Fields</button>
                       <button class="field-editor__tab" id="field-editor-tab-code" data-tab="code" role="tab" aria-selected="false" type="button">
                         <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
@@ -507,7 +507,7 @@
                           <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                         </button>
                       </div>
-                      <button class="interact-mode-toggle" id="interact-mode-toggle" type="button" title="Click to edit text, images &amp; links — or click a section to reference it in chat" aria-pressed="false" aria-label="Interact / select mode">
+                      <button class="interact-mode-toggle" id="interact-mode-toggle" type="button" title="Click to edit text, images &amp; links — or click a module to reference it in chat" aria-pressed="false" aria-label="Interact / select mode">
                         <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l7 17 2-7 7-2z"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         <span>Interact</span>
                       </button>
@@ -779,20 +779,20 @@
 
             <section class="dashboard__section">
               <div class="dashboard__section-header">
-                <h2 class="dashboard__section-title">Section Library</h2>
-                <span class="dashboard__section-hint">Reusable sections across all pages</span>
+                <h2 class="dashboard__section-title">Module Library</h2>
+                <span class="dashboard__section-hint">Reusable HubSpot modules across all pages</span>
               </div>
               <div class="dashboard__module-library module-library-grid" id="dashboard-module-library">
-                <p class="dashboard__empty-state">Sections will appear here as you build pages.</p>
+                <p class="dashboard__empty-state">Modules will appear here as you build pages.</p>
               </div>
               <div class="dashboard__module-preview hidden" id="dashboard-module-preview">
                 <div class="dashboard__module-preview-header">
                   <span class="dashboard__module-preview-name" id="dashboard-preview-name"></span>
                   <span class="dashboard__module-preview-used" id="dashboard-preview-used"></span>
-                  <button class="btn btn--danger btn--sm dashboard__module-preview-delete" id="dashboard-preview-delete" type="button">Delete section</button>
+                  <button class="btn btn--danger btn--sm dashboard__module-preview-delete" id="dashboard-preview-delete" type="button">Delete module</button>
                   <button class="dashboard__module-preview-close" id="dashboard-preview-close" type="button" aria-label="Close preview">&times;</button>
                 </div>
-                <iframe class="dashboard__module-preview-frame" id="dashboard-preview-frame" sandbox="allow-scripts allow-same-origin" title="Section preview"></iframe>
+                <iframe class="dashboard__module-preview-frame" id="dashboard-preview-frame" sandbox="allow-scripts allow-same-origin" title="Module preview"></iframe>
               </div>
             </section>
 
