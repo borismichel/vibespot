@@ -48,6 +48,7 @@ Hover-activated toolbar over module sections in the preview pane. When hovering 
 
 ### Changes
 
+- **Surface all entry points on Project Home** ([VIB-224](/VIB/issues/VIB-224)) — replaced hidden "More ways to start" disclosure with a visible 5-card grid (Template, Blank, HubSpot Import, Figma Import, React Convert).
 - **Two-mode architecture** ([VIB-187](/VIB/issues/VIB-187)) — restructured the UI into two distinct modes: Project Home (project selection, templates, settings) and Editor (chat, preview, modules), controlled by `data-mode` attribute on `.app-body`. Cleaner state boundaries between browsing and editing.
 - **Deduplicate template surfaces** ([VIB-231](/VIB/issues/VIB-231)) — chat welcome no longer shows the page-template grid; it now offers three conversation starters ("Describe your page", "Upload a Figma design", "Import from HubSpot"). Page templates live on the Library tab and are reachable via the templates icon in the chat input area.
 - **Align UI terminology with HubSpot vocabulary** ([VIB-233](/VIB/issues/VIB-233)) — user-facing copy now uses HubSpot's canonical terms (Module, Module Library, Brand Kit) instead of the legacy "section" phrasing. Where vibeSpot keeps a different concept (e.g. Project ↔ Theme), the HubSpot equivalent is shown in tooltips. Adds a "HubSpot Terminology" reference section to `ui/docs/index.html`.

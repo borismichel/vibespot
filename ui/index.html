@@ -210,17 +210,37 @@
               </div>
             </section>
 
-            <!-- Secondary path: pick a template -->
-            <section class="setup__templates" aria-labelledby="setup-templates-heading">
-              <h3 class="setup__section-label" id="setup-templates-heading">Or start from a template</h3>
-              <div class="setup__secondary">
-                <button class="setup__secondary-btn" data-action="starter" type="button">
-                  <span class="setup__secondary-icon" aria-hidden="true">&#9733;</span>
-                  <span class="setup__secondary-label">Start from Template</span>
-                  <span class="setup__secondary-meta">Browse pre-built starters</span>
-                </button>
-              </div>
-            </section>
+            <!-- Entry points: all import/creation paths visible as cards -->
+            <h3 class="setup__section-label" id="setup-templates-heading">Or start from a template</h3>
+            <div class="setup__entry-grid" id="setup-entry-grid" role="list" aria-label="Other ways to start">
+              <button class="setup__entry-card" type="button" data-action="starter" role="listitem">
+                <span class="setup__entry-card__icon" aria-hidden="true">&#9733;</span>
+                <span class="setup__entry-card__label">Template</span>
+                <span class="setup__entry-card__desc">Pre-built starters</span>
+              </button>
+              <button class="setup__entry-card" type="button" data-action="new" role="listitem">
+                <span class="setup__entry-card__icon" aria-hidden="true">&#43;</span>
+                <span class="setup__entry-card__label">Blank</span>
+                <span class="setup__entry-card__desc">Empty theme</span>
+              </button>
+              <button class="setup__entry-card" type="button" data-action="download" role="listitem">
+                <span class="setup__entry-card__icon" aria-hidden="true">&#8595;</span>
+                <span class="setup__entry-card__label">HubSpot Import</span>
+                <span class="setup__entry-card__desc">Pull from your account</span>
+              </button>
+              <button class="setup__entry-card" type="button" data-action="figma" role="listitem">
+                <span class="setup__entry-card__icon" aria-hidden="true">&#9670;</span>
+                <span class="setup__entry-card__label">Figma Import</span>
+                <span class="setup__entry-card__desc">From a Figma file</span>
+                <span class="setup__entry-card__badge">Beta</span>
+              </button>
+              <button class="setup__entry-card" type="button" data-action="convert" role="listitem">
+                <span class="setup__entry-card__icon" aria-hidden="true">&#8634;</span>
+                <span class="setup__entry-card__label">React Convert</span>
+                <span class="setup__entry-card__desc">Convert React/Lovable</span>
+                <span class="setup__entry-card__badge">Beta</span>
+              </button>
+            </div>
 
             <!-- Starter template panel -->
             <div class="setup__panel" id="panel-starter">
@@ -257,36 +277,6 @@
                   <label class="visually-hidden" for="starter-theme-name">Theme name</label>
                   <input type="text" class="setup__input setup__input--wide" id="starter-theme-name" placeholder="my-landing-page" aria-label="Theme name" />
                   <button class="btn btn--primary" id="btn-create-from-starter" type="button">Create</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- More ways to start: collapsible advanced options -->
-            <div class="setup__more">
-              <button type="button" class="setup__more-toggle" id="setup-more-toggle" aria-expanded="false" aria-controls="setup-more-panel">
-                <span>More ways to start</span>
-                <span class="setup__more-chevron" aria-hidden="true">&#9662;</span>
-              </button>
-              <div class="setup__more-panel hidden" id="setup-more-panel">
-                <div class="setup__actions">
-                  <button class="setup__action-btn" type="button" data-action="new">
-                    <span class="setup__action-icon" aria-hidden="true">&#43;</span>
-                    <span>Blank Theme</span>
-                  </button>
-                  <button class="setup__action-btn" type="button" data-action="download">
-                    <span class="setup__action-icon" aria-hidden="true">&#8595;</span>
-                    <span>From HubSpot</span>
-                  </button>
-                  <button class="setup__action-btn" type="button" data-action="figma">
-                    <span class="setup__action-icon" aria-hidden="true">&#9670;</span>
-                    <span>From Figma</span>
-                    <span class="setup__action-badge">Beta</span>
-                  </button>
-                  <button class="setup__action-btn" type="button" data-action="convert">
-                    <span class="setup__action-icon" aria-hidden="true">&#8634;</span>
-                    <span>From React</span>
-                    <span class="setup__action-badge">Beta</span>
-                  </button>
                 </div>
               </div>
             </div>
