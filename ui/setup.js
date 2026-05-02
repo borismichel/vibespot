@@ -239,7 +239,11 @@ function showAssetTypeCards() {
   const promptCard = document.getElementById("setup-prompt-card");
   const recent = document.getElementById("setup-recent");
   const promptInput = document.getElementById("setup-prompt-input");
+  const question = document.getElementById("setup-question");
+  const importPanel = document.getElementById("setup-import-sources");
   if (cards) cards.classList.remove("hidden");
+  if (question) question.classList.remove("hidden");
+  if (importPanel) importPanel.classList.add("hidden");
   if (promptCard) {
     promptCard.classList.add("hidden");
     promptCard.dataset.assetType = "";
@@ -1655,7 +1659,8 @@ async function downloadThemeByName() {
 // ---------------------------------------------------------------------------
 
 // Asset-type cards (guided entry — VIB-255). The "From Template" card opens
-// the existing starter grid; the others reveal a pre-scoped describe prompt.
+// the existing starter grid; "Import" shows source picker; others reveal a
+// pre-scoped describe prompt.
 document.querySelectorAll(".setup__type-card").forEach((card) => {
   card.addEventListener("click", () => {
     const action = card.dataset.action;
@@ -1667,6 +1672,11 @@ document.querySelectorAll(".setup__type-card").forEach((card) => {
       }, 60);
       return;
     }
+    const assetType = card.dataset.assetType;
+    if (assetType === "import") {
+      showImportSources();
+      return;
+    }
     showScopedPrompt(card);
   });
 });
@@ -1676,6 +1686,31 @@ document.getElementById("setup-prompt-back")?.addEventListener("click", () => {
   showAssetTypeCards();
 });
 
+// Import source picker
+function showImportSources() {
+  const cards = document.getElementById("setup-type-cards");
+  const importPanel = document.getElementById("setup-import-sources");
+  const question = document.getElementById("setup-question");
+  if (cards) cards.classList.add("hidden");
+  if (question) question.classList.add("hidden");
+  if (importPanel) importPanel.classList.remove("hidden");
+}
+
+document.getElementById("setup-import-back")?.addEventListener("click", () => {
+  const importPanel = document.getElementById("setup-import-sources");
+  if (importPanel) importPanel.classList.add("hidden");
+  showAssetTypeCards();
+});
+
+document.querySelectorAll(".setup__import-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const action = btn.dataset.action;
+    const importPanel = document.getElementById("setup-import-sources");
+    if (importPanel) importPanel.classList.add("hidden");
+    showAssetTypeCards();
+    togglePanel(action);
+  });
+});
 
 // "View all" link in recent projects → open the full Continue panel
 document.getElementById("setup-recent-all")?.addEventListener("click", () => {
