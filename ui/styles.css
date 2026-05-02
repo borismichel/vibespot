@@ -135,6 +135,7 @@
   --shadow-sm: 0 4px 16px rgba(0,0,0,0.3);
   --shadow-lg: 0 16px 48px rgba(0,0,0,0.5);
   --shadow-xl: 0 20px 60px rgba(0,0,0,0.6);
+  --shadow-card: none;
   --shadow-focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-glow);
   --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-glow);
   --overlay-bg: var(--bg-overlay);
@@ -159,8 +160,8 @@
   --bg-active: rgba(0,0,0,0.07);
   --bg-elevated: rgba(0,0,0,0.03);
   --bg-overlay: rgba(0,0,0,0.5);
-  --border: rgba(0,0,0,0.08);
-  --border-hover: rgba(0,0,0,0.15);
+  --border: rgba(0,0,0,0.12);
+  --border-hover: rgba(0,0,0,0.2);
   --text: #1a1a1a;
   --text-dim: rgba(0,0,0,0.55);
   --text-muted: rgba(0,0,0,0.3);
@@ -182,6 +183,7 @@
   --shadow-sm: 0 4px 16px rgba(0,0,0,0.08);
   --shadow-lg: 0 16px 48px rgba(0,0,0,0.12);
   --shadow-xl: 0 20px 60px rgba(0,0,0,0.15);
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
   --shadow-focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-glow);
   --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-glow);
   --overlay-bg: var(--bg-overlay);
@@ -491,6 +493,7 @@ body { display: flex; }
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
   color: var(--text);
   font-family: var(--font);
   text-align: left;
@@ -541,7 +544,7 @@ body { display: flex; }
   border: 1px solid var(--accent-glow);
   border-radius: var(--radius-lg);
   padding: var(--space-5) var(--space-5) var(--space-4);
-  box-shadow: 0 0 0 1px var(--accent-tint), 0 8px 32px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-card, 0 0 0 1px var(--accent-tint), 0 8px 32px rgba(0, 0, 0, 0.18));
   transition: border-color var(--duration-normal), box-shadow var(--duration-normal);
 }
 .setup__prompt-card:hover {
@@ -1288,6 +1291,7 @@ body { display: flex; }
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-default);
   text-align: center;
@@ -2213,6 +2217,7 @@ body { display: flex; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-card);
   transition: all var(--duration-fast) var(--ease-default);
 }
 .card:hover {
@@ -3729,6 +3734,7 @@ body { display: flex; }
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
   cursor: pointer;
   text-align: left;
   font-family: inherit;
@@ -4269,6 +4275,7 @@ body { display: flex; }
   font-size: var(--text-sm);
   background: var(--surface-elevated, rgba(255,255,255,0.04));
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
   transition: border-color 220ms ease, background 220ms ease;
 }

@@ -44,6 +44,7 @@ Hover-activated toolbar over module sections in the preview pane. When hovering 
 - **Brand tab visual preview** ([VIB-226](/VIB/issues/VIB-226)) — live brand preview card above the brand kit form: color swatches for primary/secondary/accent, sample heading + body text rendered with configured fonts, and a logo thumbnail. Form fields grouped into Colors / Fonts / Logo cards with `max-width: 480px`.
 - **Workspace tab visual weight** ([VIB-230](/VIB/issues/VIB-230)) — increased visual weight of the active workspace tab for clearer navigation affordance.
 - **Slim preview browser-chrome bar** ([VIB-225](/VIB/issues/VIB-225)) — slimmed down the preview pane's browser-chrome bar to reduce visual noise and reclaim vertical space.
+- **Light mode polish** ([VIB-228](/VIB/issues/VIB-228)) — light mode as default for new visitors, tighter light-mode borders, `--shadow-card` token for subtle card lift.
 
 ### Changes
 
