@@ -1,4 +1,5 @@
-/* Theme init — runs synchronously before DOM to prevent flash */
+/* Theme init — runs synchronously before DOM to prevent flash.
+   Light is the default to match HubSpot's light-first ecosystem. */
 const VIBESPOT_THEMES = ["dark", "light", "hubspot"];
 const VIBESPOT_THEME_LABELS = {
   dark: "Dark",
@@ -7,9 +8,7 @@ const VIBESPOT_THEME_LABELS = {
 };
 (function initTheme() {
   const stored = localStorage.getItem("vibespot-theme");
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const fallback = prefersDark ? "dark" : "light";
-  const theme = VIBESPOT_THEMES.includes(stored) ? stored : fallback;
+  const theme = VIBESPOT_THEMES.includes(stored) ? stored : "light";
   document.documentElement.setAttribute("data-theme", theme);
 })();
 
