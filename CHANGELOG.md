@@ -4,6 +4,14 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## Unreleased
+
+### Fixed
+
+- **Settings tab permanent spinner** ([VIB-212](/VIB/issues/VIB-212)) — switching to the editor's Settings workspace tab now triggers the environment fetch instead of leaving the default "Loading environment..." spinner in place. Added a 3 s fetch timeout with a retry-able fallback message so a hung backend can no longer wedge the panel.
+
+---
+
 ## v1.3.0 — 2026-04-30
 
 ### Email template generation — Phase 1 ([VIB-158](/VIB/issues/VIB-158))

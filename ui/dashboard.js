@@ -1090,6 +1090,9 @@ function switchWorkspaceTab(tabName) {
   document.querySelectorAll(".workspace-panel").forEach((panel) => {
     panel.classList.toggle("active", panel.dataset.wsPanel === tabName);
   });
+  if (tabName === "settings" && typeof refreshSettings === "function") {
+    refreshSettings();
+  }
 }
 
 document.querySelectorAll(".workspace-tab").forEach((btn) => {

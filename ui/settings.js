@@ -81,13 +81,41 @@ async function refreshSettings() {
   const body = document.getElementById("settings-body");
   body.innerHTML = `<div class="settings__loading"><div class="settings__spinner-lg"></div><span>Loading environment...</span></div>`;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+
   try {
-    const res = await fetch("/api/settings/status");
+    const res = await fetch("/api/settings/status", { signal: controller.signal });
+    clearTimeout(timeout);
     settingsData = await res.json();
     renderSettings(settingsData);
   } catch (err) {
-    body.innerHTML = `<div class="settings__loading" style="color:var(--error)">Failed to load settings</div>`;
+    clearTimeout(timeout);
+    const aborted = err && err.name === "AbortError";
+    renderSettingsError(body, aborted);
   }
+}
+
+function renderSettingsError(body, timedOut) {
+  const message = timedOut
+    ? "Settings took too long to load. The server may be busy or unreachable."
+    : "Failed to load settings.";
+  body.innerHTML = "";
+  const wrap = el("div", "settings__empty-state");
+  wrap.style.cssText = "padding:32px;text-align:center;color:var(--text-muted);";
+  const heading = el("div", "");
+  heading.style.cssText = "font-weight:600;color:var(--text);margin-bottom:8px;";
+  heading.textContent = timedOut ? "Settings unavailable" : "Couldn't load settings";
+  wrap.appendChild(heading);
+  const desc = el("p", "");
+  desc.style.cssText = "margin:0 0 16px;font-size:13px;";
+  desc.textContent = message;
+  wrap.appendChild(desc);
+  const retry = el("button", "btn btn--sm btn--primary");
+  retry.textContent = "Retry";
+  retry.addEventListener("click", () => refreshSettings());
+  wrap.appendChild(retry);
+  body.appendChild(wrap);
 }
 
 function renderSettings(data) {
