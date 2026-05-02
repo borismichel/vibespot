@@ -8,6 +8,8 @@ All notable changes to vibeSpot are documented here.
 
 ### Features
 
+- **Guided entry with asset type cards** ([VIB-255](/VIB/issues/VIB-255)) — replace the cold "vibeSpot — Build HubSpot landing pages with AI" project-home heading with a warm guided entry: a time-of-day greeting (Good morning / afternoon / evening with a 👋 wave), the prompt "What would you like to create today?", and 5 asset-type cards (Landing Page, Email, Website, Blog Post, From Template) inspired by Notion/Monday. Clicking a card transitions to a pre-scoped describe prompt with a back link and an asset-type eyebrow (e.g. "EMAIL — Describe the email you want to create…"); "From Template" opens the existing starter grid. The starter panel is no longer auto-expanded on load — cards are the primary entry. Touches `ui/index.html`, `ui/styles.css`, `ui/setup.js`.
+
 - **First-visit onboarding walkthrough** ([VIB-235](/VIB/issues/VIB-235)) — 3-step product intro shown on the project home for fresh installs (no projects, no local themes), reusing the existing `#walkthrough` element. Steps: (1) what vibeSpot is, (2) how it maps to HubSpot (sections → modules, tokens → `:root` vars, project → CMS theme), (3) try it with a pre-filled sample prompt that lands in the setup describe-it textarea. Adds back/next/skip controls, progress dots, and persists a `vibespot:introSeen` localStorage flag so it does not reappear. After the intro completes, the existing AI-engine setup walkthrough still triggers if no engine is configured. Force-show with `?intro` in the URL.
 
 ### Enhancements

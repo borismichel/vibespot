@@ -125,13 +125,85 @@ async function initSetup() {
     // Reset starter cache so each visit re-fetches from server
     _startersCache = null;
 
-    // Auto-expand the starter template panel so templates are visible by default
+    // Set warm time-of-day greeting; show asset-type cards as the primary entry.
+    initGuidedEntry();
+
+    // Reset to cards-first state (no panel, prompt hidden).
     activePanel = null;
-    togglePanel("starter");
+    showAssetTypeCards();
 
   } catch (err) {
     showError("Could not connect to server. Is vibeSpot running?");
   }
+}
+
+// ---------------------------------------------------------------------------
+// Guided entry — time-of-day greeting + asset-type card flow (VIB-255)
+// ---------------------------------------------------------------------------
+
+function initGuidedEntry() {
+  const textEl = document.getElementById("setup-greeting-text");
+  if (!textEl) return;
+  const hour = new Date().getHours();
+  let greeting = "Welcome";
+  if (hour < 5) greeting = "Working late";
+  else if (hour < 12) greeting = "Good morning";
+  else if (hour < 17) greeting = "Good afternoon";
+  else greeting = "Good evening";
+  textEl.textContent = greeting;
+}
+
+let _selectedAssetType = null;
+
+function showAssetTypeCards() {
+  const cards = document.getElementById("setup-type-cards");
+  const promptCard = document.getElementById("setup-prompt-card");
+  const recent = document.getElementById("setup-recent");
+  const promptInput = document.getElementById("setup-prompt-input");
+  if (cards) cards.classList.remove("hidden");
+  if (promptCard) {
+    promptCard.classList.add("hidden");
+    promptCard.dataset.assetType = "";
+  }
+  if (recent && recent.dataset.hasItems === "1") recent.classList.remove("hidden");
+  if (promptInput) {
+    promptInput.value = "";
+    const submit = document.getElementById("setup-prompt-submit");
+    if (submit) submit.disabled = true;
+  }
+  // Close any open advanced panel (e.g. starter grid) when returning to cards.
+  document.querySelectorAll(".setup__panel").forEach((p) => p.classList.add("hidden"));
+  document.querySelectorAll(".setup__action-btn").forEach((b) => b.classList.remove("active"));
+  activePanel = null;
+  _selectedAssetType = null;
+}
+
+function showScopedPrompt(card) {
+  const cards = document.getElementById("setup-type-cards");
+  const promptCard = document.getElementById("setup-prompt-card");
+  const recent = document.getElementById("setup-recent");
+  const eyebrow = document.getElementById("setup-prompt-eyebrow");
+  const input = document.getElementById("setup-prompt-input");
+  if (!promptCard || !input) return;
+
+  const assetType = card.dataset.assetType || "landing-page";
+  const placeholder = card.dataset.promptPlaceholder || "Describe what you want to build...";
+  const label = card.dataset.promptEyebrow || "Project";
+
+  _selectedAssetType = assetType;
+  promptCard.dataset.assetType = assetType;
+  if (eyebrow) eyebrow.textContent = label;
+  input.placeholder = placeholder;
+  input.setAttribute("aria-label", placeholder.replace(/\.\.\.$/, ""));
+
+  // Stash the selected type so downstream session/chat code can read it later.
+  window.__pendingAssetType = assetType;
+
+  if (cards) cards.classList.add("hidden");
+  if (recent) recent.classList.add("hidden");
+  promptCard.classList.remove("hidden");
+
+  setTimeout(() => input.focus(), 60);
 }
 
 async function saveAlertApiKey(key) {
@@ -221,9 +293,11 @@ function populateRecentProjects(info) {
   const projects = deduplicateProjects(info);
   if (projects.length === 0) {
     section.classList.add("hidden");
+    section.dataset.hasItems = "0";
     list.innerHTML = "";
     return;
   }
+  section.dataset.hasItems = "1";
 
   // Most recently updated first; locals (no updatedAt) follow
   const withTime = projects.filter((p) => p.updatedAt).sort((a, b) => b.updatedAt - a.updatedAt);
@@ -1445,15 +1519,26 @@ document.querySelectorAll(".setup__action-btn").forEach((btn) => {
   btn.addEventListener("click", () => togglePanel(btn.dataset.action));
 });
 
-// Secondary "Start from Template" button — always opens, never toggles closed
-document.querySelectorAll(".setup__secondary-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    activePanel = null;
-    togglePanel(btn.dataset.action);
-    setTimeout(() => {
-      document.getElementById("panel-starter")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }, 60);
+// Asset-type cards (guided entry — VIB-255). The "From Template" card opens
+// the existing starter grid; the others reveal a pre-scoped describe prompt.
+document.querySelectorAll(".setup__type-card").forEach((card) => {
+  card.addEventListener("click", () => {
+    const action = card.dataset.action;
+    if (action === "starter") {
+      activePanel = null;
+      togglePanel("starter");
+      setTimeout(() => {
+        document.getElementById("panel-starter")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 60);
+      return;
+    }
+    showScopedPrompt(card);
   });
+});
+
+// "Back" link inside the scoped describe prompt restores the asset-type cards.
+document.getElementById("setup-prompt-back")?.addEventListener("click", () => {
+  showAssetTypeCards();
 });
 
 // "More ways to start" toggle

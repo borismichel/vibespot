@@ -134,9 +134,11 @@
     <main class="project-home setup" id="project-home" role="main" aria-label="Project Home">
       <div class="setup__main" id="setup-screen">
         <div class="setup__container">
-          <div class="setup__symbol" aria-hidden="true">&#10022;</div>
-          <h1 class="setup__title">vibeSpot</h1>
-          <p class="setup__subtitle">Build HubSpot landing pages with AI</p>
+          <p class="setup__greeting" id="setup-greeting">
+            <span class="setup__greeting-wave" aria-hidden="true">&#128075;</span>
+            <span class="setup__greeting-text" id="setup-greeting-text">Welcome</span>
+          </p>
+          <h1 class="setup__title">What would you like to create today?</h1>
 
           <div class="setup__alerts" id="setup-alerts" role="status" aria-live="polite"></div>
 
@@ -149,6 +151,35 @@
 
           <div class="setup__options" id="setup-options">
 
+            <!-- Asset type cards: pick what to create first; clicking opens a scoped describe prompt or the template grid -->
+            <div class="setup__type-cards" id="setup-type-cards" role="list" aria-label="Choose an asset type">
+              <button class="setup__type-card" type="button" role="listitem" data-asset-type="landing-page" data-prompt-placeholder="Describe the landing page you want to build..." data-prompt-eyebrow="Landing Page" aria-label="Create a landing page">
+                <span class="setup__type-card-icon" aria-hidden="true">&#128196;</span>
+                <span class="setup__type-card-label">Landing Page</span>
+                <span class="setup__type-card-desc">Convert visitors with a focused page</span>
+              </button>
+              <button class="setup__type-card" type="button" role="listitem" data-asset-type="email" data-prompt-placeholder="Describe the email you want to create..." data-prompt-eyebrow="Email" aria-label="Create an email">
+                <span class="setup__type-card-icon" aria-hidden="true">&#9993;&#65039;</span>
+                <span class="setup__type-card-label">Email</span>
+                <span class="setup__type-card-desc">Marketing or transactional email</span>
+              </button>
+              <button class="setup__type-card" type="button" role="listitem" data-asset-type="website" data-prompt-placeholder="Describe the website you want to build..." data-prompt-eyebrow="Website" aria-label="Create a website">
+                <span class="setup__type-card-icon" aria-hidden="true">&#127760;</span>
+                <span class="setup__type-card-label">Website</span>
+                <span class="setup__type-card-desc">Multi-page site</span>
+              </button>
+              <button class="setup__type-card" type="button" role="listitem" data-asset-type="blog-post" data-prompt-placeholder="Describe the blog post you want to write..." data-prompt-eyebrow="Blog Post" aria-label="Create a blog post">
+                <span class="setup__type-card-icon" aria-hidden="true">&#128221;</span>
+                <span class="setup__type-card-label">Blog Post</span>
+                <span class="setup__type-card-desc">Long-form article</span>
+              </button>
+              <button class="setup__type-card setup__type-card--template" type="button" role="listitem" data-asset-type="template" data-action="starter" aria-label="Start from a pre-built template">
+                <span class="setup__type-card-icon" aria-hidden="true">&#127912;</span>
+                <span class="setup__type-card-label">From Template</span>
+                <span class="setup__type-card-desc">Browse pre-built starters</span>
+              </button>
+            </div>
+
             <!-- Returning users: rich recent project cards (page count + recency) -->
             <section class="setup__recent hidden" id="setup-recent" aria-label="Recent projects">
               <header class="setup__recent-header">
@@ -158,15 +189,22 @@
               <div class="setup__recent-list recent-grid" id="setup-recent-list" role="list"></div>
             </section>
 
-            <!-- Primary path: describe-it prompt -->
-            <div class="setup__prompt-card" id="setup-prompt-card">
-              <label class="visually-hidden" for="setup-prompt-input">Describe the landing page you want to build</label>
+            <!-- Scoped describe prompt: hidden until user picks an asset type card -->
+            <div class="setup__prompt-card hidden" id="setup-prompt-card" data-asset-type="">
+              <div class="setup__prompt-header" id="setup-prompt-header">
+                <button class="setup__prompt-back" id="setup-prompt-back" type="button" aria-label="Back to asset types">
+                  <span aria-hidden="true">&#8592;</span>
+                  <span>Back</span>
+                </button>
+                <span class="setup__prompt-eyebrow" id="setup-prompt-eyebrow">Landing Page</span>
+              </div>
+              <label class="visually-hidden" for="setup-prompt-input">Describe what you want to create</label>
               <textarea
                 class="setup__prompt-input"
                 id="setup-prompt-input"
                 rows="3"
                 placeholder="Describe the landing page you want to build..."
-                aria-label="Describe the landing page you want to build"
+                aria-label="Describe what you want to create"
               ></textarea>
               <div class="setup__prompt-row">
                 <span class="setup__prompt-hint" id="setup-prompt-hint">Press <span id="setup-prompt-shortcut">&#8984;&#8629;</span> or click Build to start</span>
@@ -175,15 +213,6 @@
                   <span>Build</span>
                 </button>
               </div>
-            </div>
-
-            <!-- Secondary path: pick a template -->
-            <div class="setup__secondary">
-              <button class="setup__secondary-btn" data-action="starter" type="button">
-                <span class="setup__secondary-icon" aria-hidden="true">&#9733;</span>
-                <span class="setup__secondary-label">Start from Template</span>
-                <span class="setup__secondary-meta">Browse pre-built starters</span>
-              </button>
             </div>
 
             <!-- Starter template panel -->
