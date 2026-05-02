@@ -70,6 +70,7 @@ function handleConversationStarterClick(e) {
 // ---------------------------------------------------------------------------
 
 let currentTemplates = [];
+let pageDragSourceId = null;
 
 const PAGE_TYPE_BADGES = {
   landing_page: "LP",
@@ -79,8 +80,24 @@ const PAGE_TYPE_BADGES = {
   module_only: "Sec",
 };
 
+// Inline SVG icons keyed by page type. Stroke-only so they inherit currentColor.
+const PAGE_TYPE_ICONS = {
+  landing_page: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/></svg>',
+  website_page: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><circle cx="6" cy="7" r="0.6" fill="currentColor"/><circle cx="8.4" cy="7" r="0.6" fill="currentColor"/></svg>',
+  blog_post: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="14" y2="15"/></svg>',
+  email: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3,7 12,13 21,7"/></svg>',
+  module_only: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="4" rx="1"/><rect x="4" y="14" width="10" height="4" rx="1"/></svg>',
+};
+
+const PAGE_TYPE_LABELS = {
+  landing_page: "Landing page",
+  website_page: "Website page",
+  blog_post: "Blog post",
+  email: "Email",
+  module_only: "Section",
+};
+
 function renderPageTabs(templates, activeTemplateId) {
-  const container = document.getElementById("page-tree");
   const list = document.getElementById("page-tabs-list");
   if (!list) return;
 
@@ -89,11 +106,19 @@ function renderPageTabs(templates, activeTemplateId) {
   list.innerHTML = currentTemplates.map((t) => {
     const isActive = t.id === activeTemplateId;
     const badge = PAGE_TYPE_BADGES[t.pageType] || "";
-    return `<button class="page-tabs__tab${isActive ? " page-tabs__tab--active" : ""}" role="treeitem" aria-selected="${isActive ? "true" : "false"}" data-template-id="${t.id}" title="${t.label} (${t.moduleCount} modules)">
-      ${badge ? `<span class="page-tabs__tab-badge">${badge}</span>` : ""}
-      <span class="page-tabs__tab-label">${escapeHtml(t.label)}</span>
-      <span class="page-tabs__tab-count">${t.moduleCount}</span>
-    </button>`;
+    const icon = PAGE_TYPE_ICONS[t.pageType] || PAGE_TYPE_ICONS.website_page;
+    const typeLabel = PAGE_TYPE_LABELS[t.pageType] || t.pageType;
+    const titleAttr = `${t.label} — ${typeLabel} (${t.moduleCount} modules)`;
+    return `<div class="page-tabs__row${isActive ? " page-tabs__row--active" : ""}" role="treeitem" aria-selected="${isActive ? "true" : "false"}" data-template-id="${t.id}" draggable="true" title="${escapeHtml(titleAttr)}">
+      <span class="page-tabs__handle" aria-hidden="true" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/></svg></span>
+      <button class="page-tabs__tab" type="button" data-template-id="${t.id}" data-action="activate">
+        <span class="page-tabs__icon" aria-hidden="true">${icon}</span>
+        ${badge ? `<span class="page-tabs__tab-badge">${badge}</span>` : ""}
+        <span class="page-tabs__tab-label">${escapeHtml(t.label)}</span>
+        <span class="page-tabs__tab-count">${t.moduleCount}</span>
+      </button>
+      <button class="page-tabs__menu-btn" type="button" data-template-id="${t.id}" data-action="menu" title="Page actions" aria-label="Page actions" aria-haspopup="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="6" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="18" r="1"/></svg></button>
+    </div>`;
   }).join("");
 }
 
@@ -109,6 +134,13 @@ function refreshPageTabs() {
 }
 
 function handlePageTabClick(e) {
+  const menuBtn = e.target.closest(".page-tabs__menu-btn");
+  if (menuBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    openPageContextMenu(menuBtn.dataset.templateId, menuBtn);
+    return;
+  }
   const tab = e.target.closest(".page-tabs__tab");
   if (!tab) return;
   const templateId = tab.dataset.templateId;
@@ -129,6 +161,282 @@ function handlePageTabClick(e) {
   }).catch(() => {
     tab.style.opacity = "";
   });
+}
+
+// ---------------------------------------------------------------------------
+// Page tree context menu (right-click / kebab) — Edit, Duplicate, Delete, Move
+// ---------------------------------------------------------------------------
+
+function handlePageTabContextMenu(e) {
+  const row = e.target.closest(".page-tabs__row");
+  if (!row) return;
+  e.preventDefault();
+  openPageContextMenu(row.dataset.templateId, e);
+}
+
+function openPageContextMenu(templateId, anchor) {
+  closePageContextMenu();
+  if (!templateId) return;
+  const template = currentTemplates.find((t) => t.id === templateId);
+  if (!template) return;
+
+  const idx = currentTemplates.findIndex((t) => t.id === templateId);
+  const canMoveUp = idx > 0;
+  const canMoveDown = idx >= 0 && idx < currentTemplates.length - 1;
+
+  const menu = document.createElement("div");
+  menu.className = "page-tree__context-menu";
+  menu.id = "page-context-menu";
+  menu.setAttribute("role", "menu");
+  menu.innerHTML = [
+    `<button type="button" role="menuitem" data-action="edit">Edit name…</button>`,
+    `<button type="button" role="menuitem" data-action="duplicate">Duplicate</button>`,
+    `<div class="page-tree__context-sep" role="separator"></div>`,
+    `<button type="button" role="menuitem" data-action="move-up"${canMoveUp ? "" : " disabled"}>Move up</button>`,
+    `<button type="button" role="menuitem" data-action="move-down"${canMoveDown ? "" : " disabled"}>Move down</button>`,
+    `<div class="page-tree__context-sep" role="separator"></div>`,
+    `<button type="button" role="menuitem" data-action="delete" class="page-tree__context-menu-danger">Delete…</button>`,
+  ].join("");
+  document.body.appendChild(menu);
+
+  // Position the menu. Anchor can be a MouseEvent or an HTMLElement.
+  let x = 0;
+  let y = 0;
+  if (anchor instanceof Event) {
+    x = anchor.clientX;
+    y = anchor.clientY;
+  } else if (anchor && anchor.getBoundingClientRect) {
+    const r = anchor.getBoundingClientRect();
+    x = r.right;
+    y = r.bottom;
+  }
+  // Constrain to viewport.
+  const menuRect = menu.getBoundingClientRect();
+  if (x + menuRect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - menuRect.width - 8);
+  if (y + menuRect.height > window.innerHeight - 8) y = Math.max(8, window.innerHeight - menuRect.height - 8);
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+
+  menu.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn || btn.disabled) return;
+    const action = btn.dataset.action;
+    closePageContextMenu();
+    runPageAction(templateId, action);
+  });
+
+  // Dismiss on outside click / scroll / Escape.
+  setTimeout(() => {
+    document.addEventListener("click", closePageContextMenu, { once: true });
+    document.addEventListener("contextmenu", closePageContextMenu, { once: true });
+    window.addEventListener("scroll", closePageContextMenu, { capture: true, once: true });
+  }, 0);
+}
+
+function closePageContextMenu() {
+  const menu = document.getElementById("page-context-menu");
+  if (menu) menu.remove();
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closePageContextMenu();
+});
+
+function runPageAction(templateId, action) {
+  if (isStreaming) return;
+  switch (action) {
+    case "edit": return renamePageAction(templateId);
+    case "duplicate": return duplicatePageAction(templateId);
+    case "delete": return deletePageAction(templateId);
+    case "move-up": return movePageAction(templateId, -1);
+    case "move-down": return movePageAction(templateId, 1);
+  }
+}
+
+function renamePageAction(templateId) {
+  const tpl = currentTemplates.find((t) => t.id === templateId);
+  if (!tpl) return;
+  // Inline rename: turn the label cell into a contenteditable.
+  const row = document.querySelector(`.page-tabs__row[data-template-id="${CSS.escape(templateId)}"]`);
+  const labelEl = row && row.querySelector(".page-tabs__tab-label");
+  if (!labelEl) {
+    // Fallback: native prompt.
+    const next = prompt("Rename page", tpl.label);
+    if (!next || next.trim() === tpl.label) return;
+    sendRename(templateId, next.trim());
+    return;
+  }
+  const oldLabel = tpl.label;
+  labelEl.contentEditable = "true";
+  labelEl.classList.add("page-tabs__tab-label--editing");
+  labelEl.focus();
+  const range = document.createRange();
+  range.selectNodeContents(labelEl);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  let committed = false;
+  function commit() {
+    if (committed) return;
+    committed = true;
+    labelEl.contentEditable = "false";
+    labelEl.classList.remove("page-tabs__tab-label--editing");
+    const next = labelEl.textContent.trim();
+    if (!next || next === oldLabel) {
+      labelEl.textContent = oldLabel;
+      return;
+    }
+    sendRename(templateId, next);
+  }
+  labelEl.addEventListener("blur", commit, { once: true });
+  labelEl.addEventListener("keydown", function handler(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      labelEl.removeEventListener("keydown", handler);
+      commit();
+    } else if (e.key === "Escape") {
+      labelEl.removeEventListener("keydown", handler);
+      committed = true;
+      labelEl.textContent = oldLabel;
+      labelEl.contentEditable = "false";
+      labelEl.classList.remove("page-tabs__tab-label--editing");
+    }
+  });
+}
+
+function sendRename(templateId, newLabel) {
+  fetch("/api/templates/rename", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ templateId, newLabel }),
+  }).then((r) => r.json()).then((data) => {
+    if (data && data.ok) refreshPageTabs();
+  }).catch(() => {});
+}
+
+function duplicatePageAction(templateId) {
+  const tpl = currentTemplates.find((t) => t.id === templateId);
+  if (!tpl) return;
+  const label = prompt("Name for the duplicated page:", `${tpl.label} (Copy)`);
+  if (!label || !label.trim()) return;
+  fetch("/api/templates/clone", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ templateId, label: label.trim() }),
+  }).then((r) => r.json()).then((data) => {
+    if (data && data.ok && data.template && data.template.id) {
+      // Activate the clone so the user lands on it (mirrors createPage flow).
+      return fetch("/api/templates/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: data.template.id }),
+      }).then(() => { refreshPageTabs(); connectWebSocket(); });
+    }
+  }).catch(() => {});
+}
+
+function deletePageAction(templateId) {
+  const tpl = currentTemplates.find((t) => t.id === templateId);
+  if (!tpl) return;
+  const msg = `Delete "${tpl.label}"? This removes the page and its template file. Sections (modules) are kept in the library.`;
+  if (!confirm(msg)) return;
+  fetch("/api/templates", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ templateId, deleteModules: false }),
+  }).then((r) => r.json()).then((data) => {
+    if (data && data.ok) {
+      refreshPageTabs();
+      // If we deleted the active page, the server picks a new active — reconnect.
+      if (templateId === currentTemplateId) connectWebSocket();
+    }
+  }).catch(() => {});
+}
+
+function movePageAction(templateId, delta) {
+  const ids = currentTemplates.map((t) => t.id);
+  const idx = ids.indexOf(templateId);
+  if (idx < 0) return;
+  const target = idx + delta;
+  if (target < 0 || target >= ids.length) return;
+  ids.splice(idx, 1);
+  ids.splice(target, 0, templateId);
+  sendReorder(ids);
+}
+
+function sendReorder(templateIds) {
+  // Optimistic re-render so the move feels instant.
+  const map = new Map(currentTemplates.map((t) => [t.id, t]));
+  const next = templateIds.map((id) => map.get(id)).filter(Boolean);
+  if (next.length === currentTemplates.length) {
+    renderPageTabs(next, currentTemplateId);
+  }
+  fetch("/api/templates/reorder", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ templateIds }),
+  }).then((r) => r.json()).then((data) => {
+    if (!data || !data.ok) refreshPageTabs();
+  }).catch(() => refreshPageTabs());
+}
+
+// ---------------------------------------------------------------------------
+// Drag and drop reordering (HTML5)
+// ---------------------------------------------------------------------------
+
+function handlePageTabDragStart(e) {
+  const row = e.target.closest(".page-tabs__row");
+  if (!row) return;
+  pageDragSourceId = row.dataset.templateId || null;
+  row.classList.add("page-tabs__row--dragging");
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = "move";
+    // Some browsers need data set to start the drag.
+    try { e.dataTransfer.setData("text/plain", pageDragSourceId || ""); } catch (_) {}
+  }
+}
+
+function handlePageTabDragEnd(e) {
+  const row = e.target.closest(".page-tabs__row");
+  if (row) row.classList.remove("page-tabs__row--dragging");
+  pageDragSourceId = null;
+  document.querySelectorAll(".page-tabs__row--drop-before, .page-tabs__row--drop-after")
+    .forEach((el) => el.classList.remove("page-tabs__row--drop-before", "page-tabs__row--drop-after"));
+}
+
+function handlePageTabDragOver(e) {
+  if (!pageDragSourceId) return;
+  const row = e.target.closest(".page-tabs__row");
+  if (!row || row.dataset.templateId === pageDragSourceId) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+  const rect = row.getBoundingClientRect();
+  const before = e.clientY - rect.top < rect.height / 2;
+  document.querySelectorAll(".page-tabs__row--drop-before, .page-tabs__row--drop-after")
+    .forEach((el) => el.classList.remove("page-tabs__row--drop-before", "page-tabs__row--drop-after"));
+  row.classList.add(before ? "page-tabs__row--drop-before" : "page-tabs__row--drop-after");
+}
+
+function handlePageTabDrop(e) {
+  if (!pageDragSourceId) return;
+  const row = e.target.closest(".page-tabs__row");
+  if (!row) return;
+  const targetId = row.dataset.templateId;
+  if (!targetId || targetId === pageDragSourceId) return;
+  e.preventDefault();
+  const ids = currentTemplates.map((t) => t.id);
+  const from = ids.indexOf(pageDragSourceId);
+  const to = ids.indexOf(targetId);
+  if (from < 0 || to < 0) return;
+  const rect = row.getBoundingClientRect();
+  const before = e.clientY - rect.top < rect.height / 2;
+  ids.splice(from, 1);
+  // After removing the source, the target index may have shifted by one.
+  const adjustedTo = to > from ? to - 1 : to;
+  const insertAt = before ? adjustedTo : adjustedTo + 1;
+  ids.splice(insertAt, 0, pageDragSourceId);
+  sendReorder(ids);
 }
 
 function handleAddPage() {
@@ -191,7 +499,14 @@ function createPage(pageType, label) {
   const addBtn = document.getElementById("btn-add-page");
   const createBtn = document.getElementById("page-tree-create");
   const nameInput = document.getElementById("page-tree-name");
-  if (list) list.addEventListener("click", handlePageTabClick);
+  if (list) {
+    list.addEventListener("click", handlePageTabClick);
+    list.addEventListener("contextmenu", handlePageTabContextMenu);
+    list.addEventListener("dragstart", handlePageTabDragStart);
+    list.addEventListener("dragend", handlePageTabDragEnd);
+    list.addEventListener("dragover", handlePageTabDragOver);
+    list.addEventListener("drop", handlePageTabDrop);
+  }
   if (addBtn) addBtn.addEventListener("click", handleAddPage);
   if (createBtn) createBtn.addEventListener("click", handleInlineCreate);
   if (nameInput) nameInput.addEventListener("keydown", (e) => {

@@ -23,6 +23,7 @@ import {
   cloneTemplate,
   getModuleLibrary,
   renameTemplate,
+  reorderTemplates,
   type PageType,
 } from "../session.js";
 import { ensureDir, writeFile } from "../../utils/fs.js";
@@ -229,6 +230,27 @@ export function handleTemplateRenameRoute(req: IncomingMessage, res: ServerRespo
       }
       saveSession();
       jsonResponse(res, 200, { ok: true, newLabel: newLabel.trim() });
+    } catch (err) {
+      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
+export function handleTemplateReorderRoute(req: IncomingMessage, res: ServerResponse): void {
+  readBody(req, (body) => {
+    try {
+      const { templateIds } = JSON.parse(body);
+      if (!Array.isArray(templateIds) || templateIds.some((id) => typeof id !== "string")) {
+        jsonResponse(res, 400, { error: "templateIds must be an array of strings" });
+        return;
+      }
+      const ok = reorderTemplates(templateIds);
+      if (!ok) {
+        jsonResponse(res, 400, { error: "Reorder rejected (length mismatch or no session)" });
+        return;
+      }
+      saveSession();
+      jsonResponse(res, 200, { ok: true });
     } catch (err) {
       jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
     }
