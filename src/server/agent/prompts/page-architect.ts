@@ -96,17 +96,20 @@ IntersectionObserver-based scroll animation JS. Wrap in IIFE.
 
 ## Font Strategy
 Use system font stacks that approximate the desired aesthetic. Pick TWO stacks:
-- Display: for headings (e.g., Georgia, "Times New Roman", serif for editorial)
-- Body: for text (e.g., system-ui, -apple-system, "Segoe UI", sans-serif)
+- Display: for headings
+- Body: for text
 
-Good system font stacks by style:
-| Style | Display Stack | Body Stack |
-|-------|--------------|------------|
-| Editorial | Georgia, Cambria, "Times New Roman", serif | system-ui, -apple-system, "Segoe UI", sans-serif |
-| Modern | system-ui, -apple-system, sans-serif | "Segoe UI", Roboto, sans-serif |
-| Warm | Optima, Candara, "Noto Sans", sans-serif | "Trebuchet MS", system-ui, sans-serif |
-| Monospace/Tech | "SF Mono", "Cascadia Code", "Fira Code", monospace | system-ui, sans-serif |
-| Geometric | Futura, "Century Gothic", "Trebuchet MS", sans-serif | system-ui, sans-serif |`);
+**Choose the pairing that best fits the content's mood** — don't default to the same one every time:
+| Style | Display Stack | Body Stack | Best for |
+|-------|--------------|------------|----------|
+| Editorial | Georgia, Cambria, "Times New Roman", serif | system-ui, -apple-system, "Segoe UI", sans-serif | Media, luxury, culture |
+| Modern | system-ui, -apple-system, sans-serif | "Segoe UI", Roboto, sans-serif | SaaS, tech, startups |
+| Warm | Optima, Candara, "Noto Sans", sans-serif | "Trebuchet MS", system-ui, sans-serif | Local business, food, wellness |
+| Monospace/Tech | "SF Mono", "Cascadia Code", "Fira Code", monospace | system-ui, sans-serif | Developer tools, data, cyber |
+| Geometric | Futura, "Century Gothic", "Trebuchet MS", sans-serif | system-ui, sans-serif | Architecture, design, fashion |
+| Classic | "Book Antiqua", Palatino, "Palatino Linotype", serif | Georgia, "Times New Roman", serif | Law, finance, heritage |
+| Friendly | "Comic Sans MS", Chalkboard, cursive | "Trebuchet MS", system-ui, sans-serif | Kids, casual, fun brands |
+| Contrast pair | Georgia, serif (display) | system-ui, sans-serif (body) | When you want serif/sans tension |`);
 
   parts.push(`\n\n## Design Guide\n${getArchitectDesignSummary()}`);
 
@@ -117,9 +120,17 @@ Good system font stacks by style:
     parts.push(`\n\n## Product Context\n${brandAssets.themeContext}`);
   }
 
-  if (brandAssets?.brandKit) {
+  const hasBrandKit = brandAssets?.brandKit && (
+    brandAssets.brandKit.colors?.primary ||
+    brandAssets.brandKit.colors?.secondary ||
+    brandAssets.brandKit.colors?.accent ||
+    brandAssets.brandKit.fonts?.heading ||
+    brandAssets.brandKit.fonts?.body
+  );
+
+  if (hasBrandKit) {
     const kitLines: string[] = [];
-    const bk = brandAssets.brandKit;
+    const bk = brandAssets!.brandKit!;
     if (bk.colors?.primary) kitLines.push(`- Primary color: ${bk.colors.primary}`);
     if (bk.colors?.secondary) kitLines.push(`- Secondary color: ${bk.colors.secondary}`);
     if (bk.colors?.accent) kitLines.push(`- Accent color: ${bk.colors.accent}`);
@@ -129,6 +140,15 @@ Good system font stacks by style:
     if (kitLines.length > 0) {
       parts.push(`\n\n## Brand Kit — MANDATORY Design Constraints\nThe following brand identity values MUST be used. Do NOT substitute or override them:\n${kitLines.join("\n")}`);
     }
+  }
+
+  if (!hasBrandKit && !brandAssets?.styleguide) {
+    parts.push(`\n\n## No Brand Provided — Be Creative
+No brand colors, fonts, or styleguide have been set for this project. You MUST:
+1. **Invent a completely original color palette** inspired by the topic, industry, and audience described in the user's request. Do NOT fall back to generic blue-on-white or any memorized default palette.
+2. **Choose a font pairing** (display + body) that matches the mood. Don't always pick the same stack — vary between editorial serif, modern sans, geometric, warm humanist, or monospace/tech based on what fits.
+3. **Make bold aesthetic choices.** The user expects a unique design, not a template. Surprise them with a palette and style they wouldn't have picked themselves but that perfectly fits their content.
+4. **Never reuse colors from previous generations.** Each project deserves its own identity.`);
   }
 
   return parts.join("");
@@ -165,9 +185,18 @@ export function buildDesignSystemPromptBlocks(
   const dynamicParts: string[] = [];
   if (brandAssets?.styleguide) dynamicParts.push(`## Brand Style Guide\n${brandAssets.styleguide}`);
   if (brandAssets?.themeContext) dynamicParts.push(`## Product Context\n${brandAssets.themeContext}`);
-  if (brandAssets?.brandKit) {
+
+  const hasBrandKit = brandAssets?.brandKit && (
+    brandAssets.brandKit.colors?.primary ||
+    brandAssets.brandKit.colors?.secondary ||
+    brandAssets.brandKit.colors?.accent ||
+    brandAssets.brandKit.fonts?.heading ||
+    brandAssets.brandKit.fonts?.body
+  );
+
+  if (hasBrandKit) {
     const kitLines: string[] = [];
-    const bk = brandAssets.brandKit;
+    const bk = brandAssets!.brandKit!;
     if (bk.colors?.primary) kitLines.push(`- Primary color: ${bk.colors.primary}`);
     if (bk.colors?.secondary) kitLines.push(`- Secondary color: ${bk.colors.secondary}`);
     if (bk.colors?.accent) kitLines.push(`- Accent color: ${bk.colors.accent}`);
@@ -178,6 +207,16 @@ export function buildDesignSystemPromptBlocks(
       dynamicParts.push(`## Brand Kit — MANDATORY Design Constraints\nThe following brand identity values MUST be used. Do NOT substitute or override them:\n${kitLines.join("\n")}`);
     }
   }
+
+  if (!hasBrandKit && !brandAssets?.styleguide) {
+    dynamicParts.push(`## No Brand Provided — Be Creative
+No brand colors, fonts, or styleguide have been set for this project. You MUST:
+1. **Invent a completely original color palette** inspired by the topic, industry, and audience described in the user's request. Do NOT fall back to generic blue-on-white or any memorized default palette.
+2. **Choose a font pairing** (display + body) that matches the mood. Don't always pick the same stack — vary between editorial serif, modern sans, geometric, warm humanist, or monospace/tech based on what fits.
+3. **Make bold aesthetic choices.** The user expects a unique design, not a template. Surprise them with a palette and style they wouldn't have picked themselves but that perfectly fits their content.
+4. **Never reuse colors from previous generations.** Each project deserves its own identity.`);
+  }
+
   if (dynamicParts.length > 0) {
     blocks.push({ type: "text", text: dynamicParts.join("\n\n") });
   }
@@ -359,12 +398,12 @@ Before designing, decide on:
 
 When a user gives a simple prompt like "build me a landing page for a coffee shop," internally expand it:
 - Pick an aesthetic (warm, editorial, slightly vintage)
-- Pick specific colors (cream bg #faf7f2, espresso #3c1e0e, gold accent #c4956a)
+- Pick ORIGINAL colors derived from the topic (coffee → think espresso browns, cream tones, warm gold — but pick your own unique hex values every time)
 - Decide hero style (full-bleed image background, overlaid text)
 - Choose layout approach (asymmetric sections, large visual areas)
 - Add texture (subtle paper/grain noise overlay)
 - Set animations (scroll-triggered reveals)
-The user gives the "what," you decide the "how it should look and feel."
+The user gives the "what," you decide the "how it should look and feel." Every project gets a fresh, unique palette.
 
 ### Typography Scale
 Include these in the CSS custom properties:
@@ -381,14 +420,25 @@ letter-spacing: -0.02em to -0.04em for large headings (tighter = more premium)
 ### Color Palettes
 Pick a dominant (70%), secondary (25%), accent (5%). Ensure WCAG AA contrast (4.5:1 body, 3:1 large text).
 
-\`\`\`
-DARK LUXURY:    --bg: #0a0a0a; --surface: #141414; --text: #e8e8e8; --primary: #c9a84c; --accent: #e8d5a3
-WARM EARTH:     --bg: #faf7f2; --surface: #f0ebe3; --text: #2d2418; --primary: #8b5e3c; --accent: #c4956a
-COOL MINIMAL:   --bg: #fafafa; --surface: #f1f1f1; --text: #1a1a1a; --primary: #0055ff; --accent: #00c4ff
-FOREST:         --bg: #0f1a0f; --surface: #1a2e1a; --text: #d4e8d0; --primary: #4ade80; --accent: #22c55e
-EDITORIAL CREAM:--bg: #fffdf5; --surface: #f5f0e8; --text: #1c1917; --primary: #dc2626; --accent: #f97316
-NOIR:           --bg: #000000; --surface: #111111; --text: #ffffff; --primary: #ffffff; --accent: #666666
-\`\`\`
+**CRITICAL: Invent a UNIQUE color palette for every page.** Do NOT reuse the same colors across projects. Derive your palette from the topic, industry, audience, and mood:
+- A yoga studio might use sage greens and warm sand tones
+- A fintech app might use deep navy with electric teal accents
+- A bakery might use warm cream with burnt sienna and dusty rose
+- A cybersecurity firm might use charcoal with acid green highlights
+
+Palette directions to explore (pick one and create ORIGINAL hex values):
+- **Dark luxury**: near-black bg, muted metallic primary, warm accent
+- **Warm earth**: off-white bg with warm undertones, organic primary, earthy accent
+- **Cool minimal**: clean light bg, saturated primary, complementary accent
+- **Nature**: deep green/blue bg, vibrant green primary, analogous accent
+- **Editorial**: warm paper bg, bold red/orange primary, warm accent
+- **Monochrome**: true black bg, white primary, mid-gray accent
+- **Bold pop**: vibrant bg, contrasting primary, playful accent
+- **Sunset warm**: warm gradient-inspired bg, coral/amber primary, pink accent
+- **Ocean**: deep blue bg, cyan/teal primary, seafoam accent
+- **Industrial**: concrete gray bg, amber/orange primary, steel accent
+
+Never copy hex values from previous generations or examples. Generate fresh values every time based on the specific content.
 
 ### Layout Patterns
 1. **Split hero**: Content left, visual right (50/50 or 60/40)
