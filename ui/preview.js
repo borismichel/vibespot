@@ -3,12 +3,43 @@
  */
 
 const previewFrame = document.getElementById("preview-frame");
+const previewEmptyState = document.getElementById("preview-empty-state");
 
 // Highlights to apply once the iframe finishes loading after the next refresh.
 let pendingChangedModules = null;
 let pendingNewModules = null;
 
+/**
+ * Show or hide the preview empty state. Called when generation starts or when
+ * the iframe finishes loading and we can detect whether any modules rendered.
+ */
+function setPreviewEmptyState(show) {
+  if (!previewEmptyState) return;
+  previewEmptyState.setAttribute("aria-hidden", show ? "false" : "true");
+}
+
+/**
+ * Inspect iframe contents post-load and toggle the empty state accordingly.
+ * Empty state stays visible if the rendered preview has no module content.
+ */
+function syncEmptyStateFromFrame() {
+  if (!previewEmptyState) return;
+  try {
+    const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+    if (!doc || !doc.body) {
+      setPreviewEmptyState(true);
+      return;
+    }
+    const hasModules = doc.querySelector("[data-module]") !== null;
+    setPreviewEmptyState(!hasModules);
+  } catch {
+    // cross-origin — assume content is present
+    setPreviewEmptyState(false);
+  }
+}
+
 previewFrame.addEventListener("load", () => {
+  syncEmptyStateFromFrame();
   if (!pendingChangedModules && !pendingNewModules) return;
   const changed = pendingChangedModules;
   const fresh = pendingNewModules;
@@ -151,6 +182,7 @@ function scrollPreviewToModule(moduleName) {
  * Called when AI generation starts to entertain the user while waiting.
  */
 function showGeneratingPreview() {
+  setPreviewEmptyState(false);
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>

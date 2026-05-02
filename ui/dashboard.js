@@ -622,7 +622,69 @@ function renderBrandKit(brandKit) {
   if (headingInput) headingInput.value = brandKit?.fonts?.heading || "";
   if (bodyInput) bodyInput.value = brandKit?.fonts?.body || "";
   if (logoInput) logoInput.value = brandKit?.logoUrl || "";
+
+  updateBrandPreview();
 }
+
+function updateBrandPreview() {
+  const hexRe = /^#[0-9a-fA-F]{6}$/;
+  const swatchKeys = ["primary", "secondary", "accent"];
+  for (const key of swatchKeys) {
+    const swatch = document.getElementById(`brand-preview-swatch-${key}`);
+    const hex = document.getElementById(`bk-hex-${key}`)?.value?.trim();
+    if (!swatch) continue;
+    if (hex && hexRe.test(hex)) {
+      swatch.style.background = hex;
+      swatch.dataset.empty = "false";
+      swatch.title = `${key.charAt(0).toUpperCase() + key.slice(1)} ${hex}`;
+    } else {
+      swatch.style.background = "";
+      swatch.dataset.empty = "true";
+      swatch.title = `${key.charAt(0).toUpperCase() + key.slice(1)} (not set)`;
+    }
+  }
+
+  const headingFont = document.getElementById("bk-font-heading")?.value?.trim();
+  const bodyFont = document.getElementById("bk-font-body")?.value?.trim();
+  const headingPreview = document.getElementById("brand-preview-heading");
+  const bodyPreview = document.getElementById("brand-preview-body");
+  if (headingPreview) headingPreview.style.fontFamily = headingFont || "Georgia, serif";
+  if (bodyPreview) bodyPreview.style.fontFamily = bodyFont || "Arial, Helvetica, sans-serif";
+
+  const logoUrl = document.getElementById("bk-logo-url")?.value?.trim();
+  const logoImg = document.getElementById("brand-preview-logo");
+  const logoPlaceholder = document.getElementById("brand-preview-logo-placeholder");
+  if (logoImg && logoPlaceholder) {
+    if (logoUrl) {
+      logoImg.src = logoUrl;
+      logoImg.hidden = false;
+      logoPlaceholder.hidden = true;
+      logoImg.onerror = () => {
+        logoImg.hidden = true;
+        logoPlaceholder.hidden = false;
+        logoPlaceholder.textContent = "Bad URL";
+      };
+      logoImg.onload = () => {
+        logoPlaceholder.textContent = "No logo";
+      };
+    } else {
+      logoImg.hidden = true;
+      logoImg.removeAttribute("src");
+      logoPlaceholder.hidden = false;
+      logoPlaceholder.textContent = "No logo";
+    }
+  }
+}
+
+for (const id of [
+  "bk-hex-primary", "bk-hex-secondary", "bk-hex-accent",
+  "bk-color-primary", "bk-color-secondary", "bk-color-accent",
+  "bk-font-heading", "bk-font-body", "bk-logo-url",
+]) {
+  document.getElementById(id)?.addEventListener("input", updateBrandPreview);
+}
+
+document.addEventListener("DOMContentLoaded", () => updateBrandPreview());
 
 function collectBrandKit() {
   const kit = {};
@@ -855,10 +917,6 @@ function showChat(themeName, templateId) {
   if (ab) ab.dataset.mode = "editor";
   dashboardScreen.classList.remove("hidden");
   document.getElementById("theme-name").textContent = themeName;
-
-  // Update browser chrome URL bar
-  const urlEl = document.getElementById("browser-url");
-  if (urlEl) urlEl.textContent = themeName + ".vibespot.app";
 
   // Update URL
   const target = `#/app/${encodeURIComponent(themeName)}/${encodeURIComponent(templateId)}`;

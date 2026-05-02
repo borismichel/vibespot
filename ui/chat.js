@@ -2598,11 +2598,6 @@ document.getElementById("responsive-toggle").addEventListener("click", (e) => {
   chrome.style.maxWidth = isFullWidth ? "none" : width;
   chrome.style.flex = isFullWidth ? "1" : "none";
   chrome.style.width = isFullWidth ? "" : width;
-
-  // Update browser URL bar with theme name
-  const urlEl = document.getElementById("browser-url");
-  const themeName = document.getElementById("theme-name")?.textContent || "vibespot.app";
-  if (urlEl) urlEl.textContent = themeName + ".vibespot.app";
 });
 
 // ---------------------------------------------------------------------------
