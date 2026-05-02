@@ -975,3 +975,32 @@ kbd {
   h1 { font-size: 1.5rem; }
   h2 { font-size: 1.2rem; }
 }
+
+/* ================================================================
+   Screenshot Placeholders
+   Shown until real screenshots are added by the UX team.
+   Replace with <img class="doc-screenshot" src="..." alt="...">
+   ================================================================ */
+.doc-screenshot-placeholder {
+  margin: 20px 0 28px;
+  padding: 40px 24px;
+  border: 2px dashed var(--doc-border-strong);
+  border-radius: var(--doc-radius-lg);
+  background: var(--doc-bg-card);
+  text-align: center;
+}
+.doc-screenshot-placeholder p {
+  color: var(--doc-text-muted);
+  font-size: 13px;
+  font-style: italic;
+  margin: 0;
+}
+
+.doc-screenshot {
+  margin: 20px 0 28px;
+  border: 1px solid var(--doc-border-strong);
+  border-radius: var(--doc-radius-lg);
+  max-width: 100%;
+  height: auto;
+  display: block;
+}

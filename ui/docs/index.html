@@ -59,12 +59,16 @@
     <span class="doc-nav__heading">Using vibeSpot</span>
     <a class="doc-nav__link" href="#editor">The Editor</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#editor-layout">Layout</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#workspace-tabs">Workspace Tabs</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#chat-panel">Chat</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#preview-panel">Preview</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#code-editor">Code Editor</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#module-sidebar">Modules</a>
     <a class="doc-nav__link" href="#creating-pages">Creating Pages</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#onboarding">Onboarding</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#first-page">Your First Page</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#content-types">Content Types</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#multi-page">Multi-Page Sites</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#templates">Templates</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#module-library">Module Library</a>
   </div>
@@ -89,7 +93,10 @@
     <a class="doc-nav__link doc-nav__link--sub" href="#figma-tips">Tips &amp; Limits</a>
     <a class="doc-nav__link" href="#inverse-pipeline">Inverse Pipeline</a>
     <a class="doc-nav__link" href="#editing">Editing &amp; Customization</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#inline-wysiwyg">Inline Editing</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#visual-controls">Visual Controls</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#field-editor">Field Editor</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#brand-kit">Brand Kit</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#design-system">Design System</a>
   </div>
 
@@ -351,12 +358,29 @@ vibespot</code></pre>
   <p>The vibeSpot editor is a browser-based environment for building HubSpot CMS pages. It combines a chat-driven AI assistant with a live preview and code editing capabilities.</p>
 
   <h3 id="editor-layout">Layout Overview</h3>
+  <p>vibeSpot uses a <strong>two-mode architecture</strong>: <strong>Project Home</strong> for project selection and setup, and <strong>Editor</strong> for building pages. The active mode is controlled by a <code>data-mode</code> attribute and switches automatically when you open a project.</p>
   <p>The editor has three main panels separated by a draggable resize handle:</p>
   <ul>
     <li><strong>Left panel</strong> (380px default) &mdash; Contains a module bar button at the top (click to open the module slideout) and the chat interface below it. The module slideout overlays the chat when open. The chat header shows the template name and active AI engine.</li>
     <li><strong>Resize handle</strong> &mdash; A 4px draggable divider between panels. Turns orange on hover. Drag to resize the left/right split. The left panel has a minimum width of 300px and maximum of 600px.</li>
-    <li><strong>Right panel</strong> (fills remaining space) &mdash; Live preview of the rendered page (default) or the code editor (toggle via the Preview/Code tabs). The preview includes browser chrome with dots and a URL bar.</li>
+    <li><strong>Right panel</strong> (fills remaining space) &mdash; Live preview of the rendered page (default), or toggle between Preview, Split, Plan, and Code views. The preview includes a slim browser chrome bar with dots and a URL display.</li>
   </ul>
+  <p>On <strong>tablet</strong> viewports (768&ndash;1024px), the project rail collapses to a 48px icon-only width, the chat panel narrows, and topbar labels hide to prevent clipping. On viewports <strong>below 768px</strong>, a responsive gate dialog is shown &mdash; the full editor requires a wider screen.</p>
+
+  <h3 id="workspace-tabs">Workspace Tabs</h3>
+  <p>The Project Home dashboard is organized into workspace tabs, each covering a distinct concern:</p>
+  <ul>
+    <li><strong>Pages</strong> &mdash; Create new pages and manage existing templates. The page tree sidebar shows all templates with type badges (LP, Blog, Web, Sec), labels, and module counts.</li>
+    <li><strong>Brand</strong> &mdash; Brand kit (colors, fonts, logo URL) with a live visual preview card showing color swatches, sample text, and logo thumbnail. Also surfaces import analysis results for themes fetched from HubSpot.</li>
+    <li><strong>Library</strong> &mdash; The shared module library across all pages of the active theme. Browse, preview, and add reusable modules to any template.</li>
+    <li><strong>Marketplace</strong> &mdash; Marketplace validation and listing metadata editor.</li>
+    <li><strong>Settings</strong> &mdash; Quick access to AI, HubSpot, Figma, GitHub, and vibeSpot configuration.</li>
+  </ul>
+
+  <!-- Screenshot placeholder: workspace tabs on project home -->
+  <div class="doc-screenshot-placeholder" data-screenshot="workspace-tabs">
+    <p><em>Screenshot: workspace tabs (Pages, Brand, Library, Marketplace, Settings) on the Project Home screen</em></p>
+  </div>
 
   <!-- Editor Layout Mockup -->
   <div class="doc-mockup">
@@ -463,6 +487,11 @@ vibespot</code></pre>
     </div>
   </div>
 
+  <!-- Screenshot placeholder: full editor layout -->
+  <div class="doc-screenshot-placeholder" data-screenshot="editor-full-layout">
+    <p><em>Screenshot: the full editor layout showing chat panel, preview, and topbar</em></p>
+  </div>
+
   <p>The topbar provides access to theme settings, upload, version history, responsive viewport toggle, and the settings gear.</p>
 
   <h3 id="chat-panel">Chat Panel</h3>
@@ -478,13 +507,14 @@ vibespot</code></pre>
   <p>Drag and drop files onto the chat input, or click the attachment button to browse.</p>
 
   <h4 id="starter-templates">Starter Templates</h4>
-  <p>For quick starts, the setup screen offers five starter templates that bootstrap a new theme with pre-built modules, shared CSS/JS, and module order &mdash; instant preview with no AI wait:</p>
+  <p>For quick starts, the Library tab offers six starter templates that bootstrap a new theme with pre-built modules, shared CSS/JS, and module order &mdash; instant preview with no AI wait:</p>
   <ul>
     <li><strong>SaaS Landing Page</strong> &mdash; Hero, features grid, pricing, testimonials, CTA, footer</li>
     <li><strong>Portfolio</strong> &mdash; About section, project gallery, skills, contact form</li>
     <li><strong>Restaurant</strong> &mdash; Hero with imagery, menu sections, reservation CTA, location map, hours</li>
     <li><strong>Event / Conference</strong> &mdash; Event hero with date, speakers, schedule, sponsors, registration CTA</li>
     <li><strong>Coming Soon</strong> &mdash; Countdown hero, email signup, teaser content</li>
+    <li><strong>Blog Content Hub</strong> &mdash; 8-module blog layout with post body, author bio, related posts, sidebar, and navigation</li>
   </ul>
 
   <h4 id="smart-suggestions">Smart Chat Suggestions</h4>
@@ -500,8 +530,21 @@ vibespot</code></pre>
   </ul>
   <p>During AI generation, modules that are being regenerated show a working overlay with a progress indicator. Modules that have already been generated remain visible and interactive.</p>
 
-  <h4 id="select-mode">Select Mode</h4>
-  <p>Click the <strong>Select</strong> toggle in the preview topbar to enter select mode. In this mode, hovering over an element in the live preview highlights it, and clicking it pre-fills the chat input with a contextual reference to that element (e.g. "In the hero module, the headline…"). This lets you point at what you want to change instead of describing it. Select mode auto-deactivates during AI generation and uses a crosshair cursor to distinguish it from normal preview interaction.</p>
+  <h4 id="split-view">Split View</h4>
+  <p>Click the <strong>Split</strong> button in the view toggle to show the live preview and code editor side by side in a 50/50 CSS grid layout. This is useful when you want to see how code changes affect the preview in real time. Switching between Preview, Split, Plan, and Code views is fully coordinated.</p>
+
+  <!-- Screenshot placeholder: split-pane view -->
+  <div class="doc-screenshot-placeholder" data-screenshot="split-pane-view">
+    <p><em>Screenshot: split-pane view with live preview on the left and code editor on the right</em></p>
+  </div>
+
+  <h4 id="interact-mode">Interact Mode</h4>
+  <p>The <strong>Interact</strong> toggle in the preview topbar replaces the previous separate Select and Edit modes with a single contextual mode. When active:</p>
+  <ul>
+    <li><strong>Editable elements</strong> (text, images, links) &mdash; get inline WYSIWYG editing. Click to edit directly in the preview; changes persist via the API.</li>
+    <li><strong>Module containers</strong> &mdash; prefill the chat input with a contextual reference so you can describe what you want to change.</li>
+  </ul>
+  <p>Interact mode auto-deactivates during AI generation and uses a crosshair cursor to distinguish it from normal preview interaction.</p>
 
   <h3 id="code-editor">Code Editor</h3>
   <p>Switch to the code editor tab to directly edit module files. The file tree is grouped by module name, and each module contains:</p>
@@ -596,6 +639,20 @@ vibespot</code></pre>
     <li><strong>From React (Beta)</strong> &mdash; Clones a React or Lovable project from a Git URL and converts its components into native HubSpot modules. The conversion uses the built-in conversion guide to map React patterns to HubL equivalents.</li>
   </ul>
 
+  <h3 id="onboarding">Onboarding Walkthrough</h3>
+  <p>On first launch (no projects, no local themes), vibeSpot shows a <strong>3-step onboarding walkthrough</strong> on the Project Home screen:</p>
+  <ol class="doc-steps">
+    <li><strong>What is vibeSpot?</strong> &mdash; A brief intro to the product and what it does.</li>
+    <li><strong>How it maps to HubSpot</strong> &mdash; Sections become modules, design tokens become <code>:root</code> CSS variables, a project becomes a CMS theme.</li>
+    <li><strong>Try it</strong> &mdash; A pre-filled sample prompt lands in the setup textarea so you can start building immediately.</li>
+  </ol>
+  <p>The walkthrough includes back/next/skip controls and progress dots. Once completed, a <code>vibespot:introSeen</code> localStorage flag prevents it from reappearing. After the intro, the existing AI-engine setup walkthrough still triggers if no engine is configured. Force-show with <code>?intro</code> in the URL.</p>
+
+  <!-- Screenshot placeholder: onboarding walkthrough -->
+  <div class="doc-screenshot-placeholder" data-screenshot="onboarding-walkthrough">
+    <p><em>Screenshot: the 3-step onboarding walkthrough on first launch</em></p>
+  </div>
+
   <h3 id="first-page">Your First Page</h3>
   <p>Follow these steps to build your first landing page from scratch:</p>
   <ol class="doc-steps">
@@ -614,12 +671,42 @@ vibespot</code></pre>
     <p><strong>Event:</strong> "Design a tech conference page for DevSummit 2026. Hero with event date and location, speaker grid with photos, 2-day schedule in tabs, sponsor logos, and early-bird registration CTA."</p>
   </div>
 
+  <h3 id="content-types">Content Types</h3>
+  <p>vibeSpot supports three content types, each with its own pipeline prompts, validation rules, and starter templates:</p>
+  <ul>
+    <li><strong>Landing Page</strong> &mdash; The default. Full-width marketing pages with standard HubSpot CMS modules.</li>
+    <li><strong>Email</strong> &mdash; HubSpot email templates with table-based layout, inline CSS design tokens, and MSO/VML conditional structure for Outlook compatibility. Select "Email" from the page type dropdown in the web UI, or use <code>vibespot email</code> from the CLI. The pipeline routes through email-specific prompts at every stage (architect, module developer, validator).</li>
+    <li><strong>Blog</strong> &mdash; Blog templates with HubSpot blog variables (<code>content.post_body</code>, <code>content.author</code>, <code>blog_recent_posts</code>, etc.). Blog-specific prompts, validator auto-fix, and a pre-built Blog Content Hub starter template with 8 modules.</li>
+  </ul>
+  <p>The intent analyzer detects the content type from your prompt (e.g. "create a welcome email" triggers the email pipeline). You can also set it explicitly via the page type dropdown.</p>
+
+  <!-- Screenshot placeholder: page type dropdown showing LP/Email/Blog -->
+  <div class="doc-screenshot-placeholder" data-screenshot="content-type-dropdown">
+    <p><em>Screenshot: page type dropdown with Landing Page, Email, and Blog options</em></p>
+  </div>
+
+  <h3 id="multi-page">Multi-Page Sites</h3>
+  <p>vibeSpot can create full multi-page HubSpot sites from a single prompt. When the intent analyzer detects a site-level request (e.g. "build a 5-page website for a restaurant"), it uses the <code>create_site</code> intent to plan:</p>
+  <ul>
+    <li><strong>Shared modules</strong> &mdash; header and footer modules used across all pages</li>
+    <li><strong>Per-page layouts</strong> &mdash; each page gets its own template with unique modules, a label, page type, and slug</li>
+    <li><strong>Cross-page navigation</strong> &mdash; nav links between pages are validated to ensure they match actual page slugs</li>
+  </ul>
+  <p>In the editor, a <strong>page tree sidebar</strong> replaces the old horizontal tab bar. It shows all templates with type badges (LP, Blog, Web, Sec), labels, and module counts. Click a page to switch to it &mdash; the chat, modules, and preview reload for that template. An inline creation form lets you add new pages with a type selector.</p>
+  <p><strong>Page-scoped chat</strong> means the intent analyzer knows which page you're editing, enabling prompts like "same header as the home page" or "update all pages." The AI context includes <code>activePageLabel</code> and the full list of site pages.</p>
+
+  <!-- Screenshot placeholder: multi-page page tree sidebar -->
+  <div class="doc-screenshot-placeholder" data-screenshot="multi-page-tree">
+    <p><em>Screenshot: page tree sidebar showing multiple pages with type badges and module counts</em></p>
+  </div>
+
   <h3 id="templates">Templates</h3>
   <p>Each theme can contain multiple templates. Templates define different page layouts that share the same module library and design system.</p>
   <p>Supported page types:</p>
   <ul>
     <li><strong>Landing Page</strong> &mdash; The default. Full-width marketing pages.</li>
-    <li><strong>Blog Post</strong> &mdash; Content-focused layout with sidebar.</li>
+    <li><strong>Email</strong> &mdash; Table-based email templates with MSO/VML compatibility.</li>
+    <li><strong>Blog Post</strong> &mdash; Content-focused layout with HubSpot blog variable support.</li>
     <li><strong>Website Page</strong> &mdash; Standard pages for your site (About, Contact, etc.).</li>
     <li><strong>Module Only</strong> &mdash; Generate standalone modules without a page template.</li>
   </ul>
@@ -703,6 +790,7 @@ vibespot</code></pre>
       <tr><td><code>remove</code></td><td>Delete a module from the page</td><td>"Remove the testimonials section"</td></tr>
       <tr><td><code>rearrange</code></td><td>Reorder existing modules without changing their content</td><td>"Move the CTA section above the footer"</td></tr>
       <tr><td><code>style_change</code></td><td>Update the design system or shared CSS without module changes</td><td>"Change the primary color to green and increase font sizes"</td></tr>
+      <tr><td><code>create_site</code></td><td>Generate a full multi-page site with shared modules</td><td>"Build a 5-page restaurant website with Home, Menu, About, Gallery, and Contact"</td></tr>
       <tr><td><code>question</code></td><td>Ask about the page, modules, or HubSpot features (no generation)</td><td>"What modules does this page have?"</td></tr>
     </tbody>
   </table>
@@ -902,7 +990,36 @@ vibespot</code></pre>
      ============================================================ -->
 <div class="doc-section" id="editing">
   <h2 id="editing-heading">Editing &amp; Customization <a href="#editing" class="doc-anchor">#</a></h2>
-  <p>After AI generation, you have full control over every aspect of your page. vibeSpot provides three editing paths depending on your needs.</p>
+  <p>After AI generation, you have full control over every aspect of your page. vibeSpot provides multiple editing paths depending on your needs &mdash; from clicking directly in the preview to editing raw code.</p>
+
+  <h3 id="inline-wysiwyg">Inline WYSIWYG Editing</h3>
+  <p>The most direct way to edit your page. With <a href="#interact-mode">Interact mode</a> active, click text, images, or links directly in the live preview to edit them inline:</p>
+  <ul>
+    <li><strong>Text</strong> &mdash; Click any text element to get a contenteditable field. Type your changes and click away to save.</li>
+    <li><strong>Images</strong> &mdash; Click an image to swap the URL.</li>
+    <li><strong>Links</strong> &mdash; Click a link to edit both the text and the href in a popup.</li>
+  </ul>
+  <p>Changes persist via <code>/api/field</code> and refresh the preview automatically. Server-side field annotations (<code>annotateFieldRefs</code>) provide deterministic click-to-field mapping so the correct field is always updated. Interact mode is mutually exclusive with normal preview scrolling and disables during AI generation.</p>
+
+  <!-- Screenshot placeholder: inline WYSIWYG editing a headline -->
+  <div class="doc-screenshot-placeholder" data-screenshot="inline-wysiwyg-editing">
+    <p><em>Screenshot: editing a headline directly in the live preview via inline WYSIWYG</em></p>
+  </div>
+
+  <h3 id="visual-controls">Per-Section Visual Controls</h3>
+  <p>Hover over any module section in the preview pane to reveal a floating toolbar with visual controls mapped to the module's fields:</p>
+  <ul>
+    <li><strong>Color picker</strong> &mdash; for color fields (background, text color, accent)</li>
+    <li><strong>Padding/margin sliders</strong> &mdash; for spacing fields</li>
+    <li><strong>Image URL swap</strong> &mdash; for image fields</li>
+    <li><strong>Font size selector</strong> &mdash; for text-size number fields</li>
+  </ul>
+  <p>All changes persist via <code>/api/field</code> with debounced saves and the preview refreshes on popover close. This is the fastest path for visual adjustments without touching a form or code.</p>
+
+  <!-- Screenshot placeholder: hover toolbar with color/spacing controls -->
+  <div class="doc-screenshot-placeholder" data-screenshot="visual-controls-toolbar">
+    <p><em>Screenshot: hover toolbar showing color picker and spacing controls over a module</em></p>
+  </div>
 
   <h3 id="field-editor">No-Code Field Editing</h3>
   <p>The fastest way to tweak content. Open the module slideout (click the <strong>Modules</strong> button), then click the gear icon (&#9881;) on any module. The slideout switches to the field editor view with a form generated from the module's <code>fields.json</code>. See <a href="#field-editor-sidebar">Field Editor controls</a> for the full list of supported field types.</p>
@@ -922,6 +1039,20 @@ vibespot</code></pre>
   <h3 id="module-ordering">Reordering Modules</h3>
   <p>Module order in the slideout list equals page order. Open the module slideout and drag items by their grip handle (&#x2837;) to rearrange. The preview updates immediately.</p>
   <p>Recommended landing page flow: Navigation &rarr; Hero &rarr; Features/Content &rarr; Social Proof &rarr; CTA/Pricing &rarr; Footer.</p>
+
+  <h3 id="brand-kit">Brand Kit</h3>
+  <p>The <strong>Brand</strong> workspace tab provides a structured brand kit that persists as <code>brand-kit.json</code> in <code>.vibespot/</code>. Configure:</p>
+  <ul>
+    <li><strong>Colors</strong> &mdash; primary, secondary, and accent colors via color pickers</li>
+    <li><strong>Fonts</strong> &mdash; heading and body font families</li>
+    <li><strong>Logo URL</strong> &mdash; your logo image reference</li>
+  </ul>
+  <p>A <strong>live preview card</strong> above the form shows color swatches, sample heading and body text rendered with your configured fonts, and a logo thumbnail. Brand kit values are injected as mandatory design constraints into the email architect, email module developer, and page architect prompts. The validator warns on off-brand colors and fonts in generated modules.</p>
+
+  <!-- Screenshot placeholder: brand tab with live preview card -->
+  <div class="doc-screenshot-placeholder" data-screenshot="brand-kit-preview">
+    <p><em>Screenshot: Brand tab with live preview card showing swatches, sample text, and logo</em></p>
+  </div>
 
   <h3 id="design-system">Design System</h3>
   <p>The agentic pipeline generates a consistent design system stored in the theme's shared CSS:</p>
@@ -1280,6 +1411,7 @@ vibespot</code></pre>
     </thead>
     <tbody>
       <tr><td><code>vibespot</code></td><td>Start the web UI (default)</td></tr>
+      <tr><td><code>vibespot email</code></td><td>Start in email template mode</td></tr>
       <tr><td><code>vibespot wizard</code></td><td>Interactive CLI wizard</td></tr>
       <tr><td><code>vibespot init</code></td><td>Environment check &amp; setup</td></tr>
       <tr><td><code>vibespot convert</code></td><td>React-to-HubSpot conversion</td></tr>
