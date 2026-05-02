@@ -4515,33 +4515,52 @@ body { display: flex; }
   border-top: 1px solid var(--border);
   font-size: var(--text-sm);
   color: var(--text-muted);
+  gap: 12px;
 }
 
-.statusbar__engine {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
+.statusbar__state {
+  flex: 0 0 auto;
 }
 
-.statusbar__pill {
+.statusbar__info {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.statusbar__item {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  padding: 2px 10px;
   font-size: var(--text-sm);
-  background: var(--accent-tint);
   color: var(--text-dim);
-  border: 1px solid var(--border);
+  white-space: nowrap;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.statusbar__pill:empty { display: none; }
-.statusbar__pill--visible { display: inline-flex; }
-.statusbar__pill-dot,
+.statusbar__item:empty { display: none; }
+.statusbar__item + .statusbar__item:not(:empty) {
+  border-left: 1px solid var(--border);
+}
+.statusbar__item:not(:empty)::before {
+  content: attr(data-label) ":";
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-right: 2px;
+}
+
 .statusbar__dot {
   display: inline-block;
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--success);
+  flex-shrink: 0;
 }
 .statusbar__dot--ok { background: var(--success); }
 

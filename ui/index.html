@@ -824,9 +824,13 @@
     </div>
 
     <footer class="statusbar" role="contentinfo">
-      <span id="status-text">Ready</span>
-      <span class="statusbar__pill" id="status-hs-account"></span>
-      <span id="status-engine" class="statusbar__engine"></span>
+      <span id="status-text" class="statusbar__state">Ready</span>
+      <div class="statusbar__info">
+        <span id="status-engine" class="statusbar__item statusbar__item--engine" data-label="Engine"></span>
+        <span id="status-hs-account" class="statusbar__item statusbar__item--portal" data-label="Portal"></span>
+        <span id="status-theme" class="statusbar__item statusbar__item--theme" data-label="Theme"></span>
+        <span id="status-last-saved" class="statusbar__item statusbar__item--saved" data-label="Last saved" title=""></span>
+      </div>
     </footer>
 
   </div><!-- /.app-body -->

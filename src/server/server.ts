@@ -1260,6 +1260,7 @@ ${errorContext}`;
       messages: session.messages,
       gitAvailable: isGitAvailable(),
       engine: cfg.aiEngine ? engineLabels[cfg.aiEngine] || cfg.aiEngine : "",
+      updatedAt: session.updatedAt,
       // Multi-template context
       templateId: activeTpl?.id || null,
       pageType: activeTpl?.pageType || null,

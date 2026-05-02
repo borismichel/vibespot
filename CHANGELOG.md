@@ -6,6 +6,10 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### Improvements
+
+- **Status bar information density** ([VIB-236](/VIB/issues/VIB-236)) — replace the lone "Ready" footer with a compact run-time summary: keep the activity state on the left and add a labelled `Engine | Portal | Theme | Last saved` group on the right. Last-saved time hydrates from the session on connect and reactively updates on `modules_updated` / `version_created` WebSocket events, with a 30s relative-time tick and an absolute timestamp tooltip. Existing JS sites that set the engine label are unchanged — labels are applied via CSS `::before` so empty items collapse cleanly.
+
 ### Fixes
 
 - **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restore `.starter-grid__group/heading/section` CSS rules and wrap each section in `.starter-grid__group` so the dynamic starter render keeps its grouped grid layout in both dark and light modes. Add explicit `background: var(--bg)` to `.project-home` / `.project-home .setup__main` and declare `color-scheme: dark/light` alongside the data-theme tokens so native form widgets, scrollbars, and any flex/scroll overflow follow the active theme.
