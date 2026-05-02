@@ -6,6 +6,10 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### UI
+
+- **All entry points visible on Project Home** ([VIB-224](/VIB/issues/VIB-224)) — replace the "More ways to start" disclosure (and the standalone "Start from Template" button) with a single always-visible 5-card grid (`.setup__entry-grid`): Template, Blank, HubSpot Import, Figma Import, React Convert. Each card shows icon + label + short description; Figma/React keep their Beta badge. Cards drive the existing `togglePanel()` flow, so the underlying setup panels (`panel-starter`, `panel-new`, `panel-download`, `panel-figma`, `panel-convert`) are unchanged. The grid drops to 2 columns under 768px to stay legible alongside the VIB-211 mobile gate.
+
 ### Fixes
 
 - **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restore `.starter-grid__group/heading/section` CSS rules and wrap each section in `.starter-grid__group` so the dynamic starter render keeps its grouped grid layout in both dark and light modes. Add explicit `background: var(--bg)` to `.project-home` / `.project-home .setup__main` and declare `color-scheme: dark/light` alongside the data-theme tokens so native form widgets, scrollbars, and any flex/scroll overflow follow the active theme.
