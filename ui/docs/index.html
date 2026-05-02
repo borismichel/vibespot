@@ -377,10 +377,7 @@ vibespot</code></pre>
     <li><strong>Settings</strong> &mdash; Quick access to AI, HubSpot, Figma, GitHub, and vibeSpot configuration.</li>
   </ul>
 
-  <!-- Screenshot placeholder: workspace tabs on project home -->
-  <div class="doc-screenshot-placeholder" data-screenshot="workspace-tabs">
-    <p><em>Screenshot: workspace tabs (Pages, Brand, Library, Marketplace, Settings) on the Project Home screen</em></p>
-  </div>
+  <img class="doc-screenshot" src="screenshots/workspace-tabs.png" alt="Workspace tabs — Pages, Brand, Library, Marketplace, and Settings — visible in the editor topbar">
 
   <!-- Editor Layout Mockup -->
   <div class="doc-mockup">
@@ -487,10 +484,7 @@ vibespot</code></pre>
     </div>
   </div>
 
-  <!-- Screenshot placeholder: full editor layout -->
-  <div class="doc-screenshot-placeholder" data-screenshot="editor-full-layout">
-    <p><em>Screenshot: the full editor layout showing chat panel, preview, and topbar</em></p>
-  </div>
+  <img class="doc-screenshot" src="screenshots/editor-full-layout.png" alt="The full editor layout showing chat panel on the left, live preview on the right, and workspace tabs in the topbar">
 
   <p>The topbar provides access to theme settings, upload, version history, responsive viewport toggle, and the settings gear.</p>
 
@@ -533,10 +527,7 @@ vibespot</code></pre>
   <h4 id="split-view">Split View</h4>
   <p>Click the <strong>Split</strong> button in the view toggle to show the live preview and code editor side by side in a 50/50 CSS grid layout. This is useful when you want to see how code changes affect the preview in real time. Switching between Preview, Split, Plan, and Code views is fully coordinated.</p>
 
-  <!-- Screenshot placeholder: split-pane view -->
-  <div class="doc-screenshot-placeholder" data-screenshot="split-pane-view">
-    <p><em>Screenshot: split-pane view with live preview on the left and code editor on the right</em></p>
-  </div>
+  <img class="doc-screenshot" src="screenshots/split-pane-view.png" alt="Split-pane view with live preview on the left and code editor on the right">
 
   <h4 id="interact-mode">Interact Mode</h4>
   <p>The <strong>Interact</strong> toggle in the preview topbar replaces the previous separate Select and Edit modes with a single contextual mode. When active:</p>
@@ -648,10 +639,7 @@ vibespot</code></pre>
   </ol>
   <p>The walkthrough includes back/next/skip controls and progress dots. Once completed, a <code>vibespot:introSeen</code> localStorage flag prevents it from reappearing. After the intro, the existing AI-engine setup walkthrough still triggers if no engine is configured. Force-show with <code>?intro</code> in the URL.</p>
 
-  <!-- Screenshot placeholder: onboarding walkthrough -->
-  <div class="doc-screenshot-placeholder" data-screenshot="onboarding-walkthrough">
-    <p><em>Screenshot: the 3-step onboarding walkthrough on first launch</em></p>
-  </div>
+  <img class="doc-screenshot" src="screenshots/onboarding-walkthrough.png" alt="The 3-step onboarding walkthrough shown on first launch, with progress dots and Skip/Next controls">
 
   <h3 id="first-page">Your First Page</h3>
   <p>Follow these steps to build your first landing page from scratch:</p>
@@ -680,10 +668,7 @@ vibespot</code></pre>
   </ul>
   <p>The intent analyzer detects the content type from your prompt (e.g. "create a welcome email" triggers the email pipeline). You can also set it explicitly via the page type dropdown.</p>
 
-  <!-- Screenshot placeholder: page type dropdown showing LP/Email/Blog -->
-  <div class="doc-screenshot-placeholder" data-screenshot="content-type-dropdown">
-    <p><em>Screenshot: page type dropdown with Landing Page, Email, and Blog options</em></p>
-  </div>
+  <img class="doc-screenshot" src="screenshots/content-type-dropdown.png" alt="Page type dropdown showing Landing Page, Email, Website, and Blog Post options">
 
   <h3 id="multi-page">Multi-Page Sites</h3>
   <p>vibeSpot can create full multi-page HubSpot sites from a single prompt. When the intent analyzer detects a site-level request (e.g. "build a 5-page website for a restaurant"), it uses the <code>create_site</code> intent to plan:</p>
@@ -695,10 +680,7 @@ vibespot</code></pre>
   <p>In the editor, a <strong>page tree sidebar</strong> replaces the old horizontal tab bar. It shows all templates with type badges (LP, Blog, Web, Sec), labels, and module counts. Click a page to switch to it &mdash; the chat, modules, and preview reload for that template. An inline creation form lets you add new pages with a type selector.</p>
   <p><strong>Page-scoped chat</strong> means the intent analyzer knows which page you're editing, enabling prompts like "same header as the home page" or "update all pages." The AI context includes <code>activePageLabel</code> and the full list of site pages.</p>
 
-  <!-- Screenshot placeholder: multi-page page tree sidebar -->
-  <div class="doc-screenshot-placeholder" data-screenshot="multi-page-tree">
-    <p><em>Screenshot: page tree sidebar showing multiple pages with type badges and module counts</em></p>
-  </div>
+  <img class="doc-screenshot" src="screenshots/multi-page-tree.png" alt="Page tree sidebar showing Landing Page, About Us, and Company Blog with type badges and module counts">
 
   <h3 id="templates">Templates</h3>
   <p>Each theme can contain multiple templates. Templates define different page layouts that share the same module library and design system.</p>
@@ -1001,10 +983,7 @@ vibespot</code></pre>
   </ul>
   <p>Changes persist via <code>/api/field</code> and refresh the preview automatically. Server-side field annotations (<code>annotateFieldRefs</code>) provide deterministic click-to-field mapping so the correct field is always updated. Interact mode is mutually exclusive with normal preview scrolling and disables during AI generation.</p>
 
-  <!-- Screenshot placeholder: inline WYSIWYG editing a headline -->
-  <div class="doc-screenshot-placeholder" data-screenshot="inline-wysiwyg-editing">
-    <p><em>Screenshot: editing a headline directly in the live preview via inline WYSIWYG</em></p>
-  </div>
+  <img class="doc-screenshot" src="screenshots/inline-wysiwyg-editing.png" alt="Editing a headline directly in the live preview via inline WYSIWYG — the text is selected with a blue highlight">
 
   <h3 id="visual-controls">Per-Section Visual Controls</h3>
   <p>Hover over any module section in the preview pane to reveal a floating toolbar with visual controls mapped to the module's fields:</p>
@@ -1016,10 +995,7 @@ vibespot</code></pre>
   </ul>
   <p>All changes persist via <code>/api/field</code> with debounced saves and the preview refreshes on popover close. This is the fastest path for visual adjustments without touching a form or code.</p>
 
-  <!-- Screenshot placeholder: hover toolbar with color/spacing controls -->
-  <div class="doc-screenshot-placeholder" data-screenshot="visual-controls-toolbar">
-    <p><em>Screenshot: hover toolbar showing color picker and spacing controls over a module</em></p>
-  </div>
+  <img class="doc-screenshot" src="screenshots/visual-controls-toolbar.png" alt="Interact mode showing a Click to edit tooltip and dashed selection border over a module section">
 
   <h3 id="field-editor">No-Code Field Editing</h3>
   <p>The fastest way to tweak content. Open the module slideout (click the <strong>Modules</strong> button), then click the gear icon (&#9881;) on any module. The slideout switches to the field editor view with a form generated from the module's <code>fields.json</code>. See <a href="#field-editor-sidebar">Field Editor controls</a> for the full list of supported field types.</p>
@@ -1049,10 +1025,7 @@ vibespot</code></pre>
   </ul>
   <p>A <strong>live preview card</strong> above the form shows color swatches, sample heading and body text rendered with your configured fonts, and a logo thumbnail. Brand kit values are injected as mandatory design constraints into the email architect, email module developer, and page architect prompts. The validator warns on off-brand colors and fonts in generated modules.</p>
 
-  <!-- Screenshot placeholder: brand tab with live preview card -->
-  <div class="doc-screenshot-placeholder" data-screenshot="brand-kit-preview">
-    <p><em>Screenshot: Brand tab with live preview card showing swatches, sample text, and logo</em></p>
-  </div>
+  <img class="doc-screenshot" src="screenshots/brand-kit-preview.png" alt="Brand tab showing live preview card with color swatches, sample heading and body text, color inputs, and font selectors">
 
   <h3 id="design-system">Design System</h3>
   <p>The agentic pipeline generates a consistent design system stored in the theme's shared CSS:</p>
