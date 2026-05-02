@@ -195,6 +195,57 @@
   --title-gradient: linear-gradient(135deg, #1a1a1a, #6b6878);
 }
 
+/* ---------------------------------------------------------------- HubSpot Light
+   HubSpot-adjacent palette: white/gray surfaces with the signature #ff5c35
+   coral accent. Picked so that HubSpotters opening vibeSpot land in a
+   familiar visual space without us cloning their UI. */
+[data-theme="hubspot"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-panel: #f5f8fa;
+  --bg-panel-solid: #f5f8fa;
+  --bg-input: #ffffff;
+  --bg-hover: rgba(45, 62, 80, 0.05);
+  --bg-active: rgba(255, 92, 53, 0.1);
+  --bg-elevated: #ffffff;
+  --bg-overlay: rgba(45, 62, 80, 0.55);
+  --border: #cbd6e2;
+  --border-hover: #7c98b6;
+  --text: #2d3e50;
+  --text-dim: #506e91;
+  --text-muted: #7c98b6;
+  --accent: #ff5c35;
+  --accent-hover: #ff7a5c;
+  --accent-dim: rgba(255, 92, 53, 0.14);
+  --accent-glow: rgba(255, 92, 53, 0.3);
+  --accent-tint: rgba(255, 92, 53, 0.06);
+  --accent-gradient: linear-gradient(135deg, #ff5c35, #ff8f73);
+  --success: #00bda5;
+  --warning: #f5c26b;
+  --error: #f2545b;
+  --danger: var(--error);
+  --info: #0091ae;
+  --success-dim: rgba(0, 189, 165, 0.12);
+  --warning-dim: rgba(245, 194, 107, 0.16);
+  --error-dim: rgba(242, 84, 91, 0.12);
+  --info-dim: rgba(0, 145, 174, 0.12);
+  --shadow-sm: 0 4px 16px rgba(45, 62, 80, 0.08);
+  --shadow-lg: 0 16px 48px rgba(45, 62, 80, 0.12);
+  --shadow-xl: 0 20px 60px rgba(45, 62, 80, 0.16);
+  --shadow-focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-glow);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-glow);
+  --overlay-bg: var(--bg-overlay);
+  --scrollbar-thumb: rgba(45, 62, 80, 0.18);
+  --scrollbar-hover: rgba(45, 62, 80, 0.32);
+  --bg-deep: #eaf0f6;
+  --bg-code: rgba(45, 62, 80, 0.05);
+  --bg-code-block: #f5f8fa;
+  --text-on-accent: #ffffff;
+  --topbar-bg: rgba(255, 255, 255, 0.92);
+  --chrome-dot: rgba(45, 62, 80, 0.12);
+  --title-gradient: linear-gradient(135deg, #2d3e50, #506e91);
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body {
@@ -1876,6 +1927,70 @@ body { display: flex; }
   letter-spacing: 0.01em;
 }
 
+/* HubSpot portal indicator (always visible in topbar) */
+.portal-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              background var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+}
+.portal-indicator:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.portal-indicator__icon {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+}
+.portal-indicator:hover .portal-indicator__icon {
+  color: var(--accent);
+}
+.portal-indicator__dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  box-shadow: none;
+}
+.portal-indicator__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.portal-indicator--connected {
+  border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+  background: var(--success-dim);
+  color: var(--text);
+}
+.portal-indicator--connected:hover {
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border));
+  background: color-mix(in srgb, var(--success) 14%, var(--bg-panel));
+}
+.portal-indicator--connected .portal-indicator__dot {
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 22%, transparent);
+}
+.portal-indicator--connected .portal-indicator__icon {
+  color: var(--success);
+}
+
 
 /* ================================================================
    COMPONENT LIBRARY (per VIB-184 spec)
@@ -2837,6 +2952,34 @@ body { display: flex; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* HubL / HubSpot-fields trust badges next to generated module files.
+   Inline-flex pill that visually flags the file as real CMS output. */
+.code-view__file-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  flex: 0 0 auto;
+}
+.code-view__file-tag--hubl {
+  background: var(--accent-tint);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.code-view__file-tag--fields {
+  background: var(--info-dim);
+  color: var(--info);
+  border: 1px solid color-mix(in srgb, var(--info) 30%, transparent);
 }
 
 /* Editor area */
@@ -6058,10 +6201,32 @@ body { display: flex; }
   flex-direction: column;
   gap: 4px;
   margin-top: auto;
-  border-top: 1px solid var(--border);
-  padding: 8px;
+  padding: 4px 8px 8px;
   flex-shrink: 0;
   align-items: center;
+}
+
+/* HubSpot-style IA section divider with caps-label header. Sits above the
+   Resources cluster (Coffee/Docs/Settings) to create a clear sidebar
+   section break — matches the section-stacked left-rail pattern HubSpot
+   uses across Marketing Hub. Hidden when the rail is collapsed. */
+.project-rail__section-divider {
+  display: none;
+  margin: 12px 8px 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.project-rail--expanded .project-rail__section-divider {
+  display: block;
+}
+.project-rail__section-label {
+  display: block;
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 4px 4px;
 }
 
 .project-rail--expanded .project-rail__footer {
@@ -6505,9 +6670,12 @@ body { display: flex; }
 /* ================================================================
    THEME TOGGLE (light/dark)
    ================================================================ */
-.theme-toggle__icon--light { display: none; }
+.theme-toggle__icon--light,
+.theme-toggle__icon--hubspot { display: none; }
 [data-theme="light"] .theme-toggle__icon--dark { display: none; }
 [data-theme="light"] .theme-toggle__icon--light { display: block; }
+[data-theme="hubspot"] .theme-toggle__icon--dark { display: none; }
+[data-theme="hubspot"] .theme-toggle__icon--hubspot { display: block; color: var(--accent); }
 
 /* ================================================================
    PLAN MODE

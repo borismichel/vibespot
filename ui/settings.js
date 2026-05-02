@@ -1099,12 +1099,16 @@ async function switchHsAccount(portalId, btn) {
     });
     const data = await res.json();
     if (data.jobId) {
-      pollJob(data.jobId, () => refreshSettings(), () => {
+      pollJob(data.jobId, () => {
+        refreshSettings();
+        if (typeof refreshPortalIndicator === "function") refreshPortalIndicator();
+      }, () => {
         btn.textContent = "Failed";
         btn.disabled = false;
       });
     } else {
       refreshSettings();
+      if (typeof refreshPortalIndicator === "function") refreshPortalIndicator();
     }
   } catch {
     btn.textContent = "Failed";
