@@ -6,6 +6,10 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### Features
+
+- **First-visit onboarding walkthrough** ([VIB-235](/VIB/issues/VIB-235)) — 3-step product intro shown on the project home for fresh installs (no projects, no local themes), reusing the existing `#walkthrough` element. Steps: (1) what vibeSpot is, (2) how it maps to HubSpot (sections → modules, tokens → `:root` vars, project → CMS theme), (3) try it with a pre-filled sample prompt that lands in the setup describe-it textarea. Adds back/next/skip controls, progress dots, and persists a `vibespot:introSeen` localStorage flag so it does not reappear. After the intro completes, the existing AI-engine setup walkthrough still triggers if no engine is configured. Force-show with `?intro` in the URL.
+
 ### Enhancements
 
 - **Brand tab visual preview** ([VIB-226](/VIB/issues/VIB-226)) — add a live brand preview card above the brand kit form: color swatches for primary/secondary/accent, sample heading + body text rendered with the configured fonts, and a logo thumbnail when a URL is provided. Group the form fields into Colors / Fonts / Logo cards and constrain the form to `max-width: 480px` so the brand tab no longer reads as a sparse data-entry list.
