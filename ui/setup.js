@@ -207,6 +207,7 @@ async function initSetup() {
     // Auto-expand the starter template panel so templates are visible by default
     activePanel = null;
     togglePanel("starter");
+    activePanel = null; // reset so the first user click on Template card opens rather than closes
 
   } catch (err) {
     showError("Could not connect to server. Is vibeSpot running?");
