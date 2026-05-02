@@ -38,6 +38,7 @@ Hover-activated toolbar over module sections in the preview pane. When hovering 
 
 ### Enhancements
 
+- **Code quality indicators** ([VIB-234](/VIB/issues/VIB-234)) — HubL validity badge in browser-chrome bar, browser-chrome dots, URL bar. Badge shows valid/warning/error states with counts.
 - **HubSpot visual language** ([VIB-219](/VIB/issues/VIB-219)) — always-visible HubSpot portal indicator in topbar, polled from `/api/settings/status`. Connected state shows portal name + ID with green dot; disconnected links to Settings. Resource links in project rail sidebar.
 - **Project Home visual hierarchy** ([VIB-221](/VIB/issues/VIB-221)) — hero prompt section with "Start building" heading, enlarged prompt card with accent-glow border, promoted Build button to `btn--lg`, demoted template entry under "Or start from a template" label, standardised vertical rhythm.
 - **CSS token system** ([VIB-185](/VIB/issues/VIB-185)) — comprehensive design token system: spacing scale (`--space-0..10`), typography (`--text-xs..display`, `--weight-*`, `--leading-*`), z-index (`--z-base..confirm`), transitions (`--duration-fast/normal/slow`, `--ease-*`), icons, layout, and status/badge colors. 270 font-size, 48 border-radius, and 109 transition declarations migrated to tokens.
