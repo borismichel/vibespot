@@ -41,12 +41,27 @@ const _welcomeHtml = document.getElementById("chat-welcome")?.outerHTML || "";
 function restoreWelcome() {
   if (!_welcomeHtml || messagesEl.querySelector(".chat__welcome")) return;
   messagesEl.insertAdjacentHTML("afterbegin", _welcomeHtml);
-  const el = messagesEl.querySelector("#starter-templates");
-  if (el) {
-    el.addEventListener("click", (e) => {
-      const btn = e.target.closest(".starter-btn");
-      if (btn) sendMessage(btn.dataset.prompt);
-    });
+  const el = messagesEl.querySelector("#conversation-starters");
+  if (el) el.addEventListener("click", handleConversationStarterClick);
+}
+
+function handleConversationStarterClick(e) {
+  const btn = e.target.closest(".starter-btn");
+  if (!btn) return;
+  const action = btn.dataset.action;
+  if (action === "describe") {
+    inputEl?.focus();
+  } else if (action === "figma") {
+    document.getElementById("btn-attach-file")?.click();
+  } else if (action === "hubspot-import") {
+    if (inputEl) {
+      inputEl.value = "Import this HubSpot page and adapt it: ";
+      inputEl.style.height = "auto";
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 150) + "px";
+      inputEl.focus();
+      const end = inputEl.value.length;
+      inputEl.setSelectionRange(end, end);
+    }
   }
 }
 
@@ -2507,20 +2522,24 @@ window.prefillChatInput = function (text) {
   inputEl.setSelectionRange(end, end);
 };
 
-// Starter template buttons
-document.getElementById("starter-templates").addEventListener("click", (e) => {
+// Conversation starter buttons in chat welcome
+document.getElementById("conversation-starters")?.addEventListener("click", handleConversationStarterClick);
+
+// Page Template buttons in the Library tab — send the prompt and surface the chat
+document.getElementById("library-template-starters")?.addEventListener("click", (e) => {
   const btn = e.target.closest(".starter-btn");
-  if (btn) sendMessage(btn.dataset.prompt);
+  if (!btn || !btn.dataset.prompt) return;
+  document.getElementById("ws-tab-pages")?.click();
+  sendMessage(btn.dataset.prompt);
 });
 
-// Templates icon in input area — toggle welcome section visibility
+// Templates icon in input area — switch to Library tab where templates live
 document.getElementById("btn-starter-templates")?.addEventListener("click", () => {
-  let welcome = document.getElementById("chat-welcome");
-  if (!welcome) {
-    restoreWelcome();
-    welcome = document.getElementById("chat-welcome");
+  const libraryTab = document.getElementById("ws-tab-library");
+  if (libraryTab) {
+    libraryTab.click();
+    document.getElementById("library-page-templates")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  if (welcome) welcome.classList.toggle("hidden");
 });
 
 // Version history (bottom panel)
