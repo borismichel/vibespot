@@ -6,6 +6,10 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### Features
+
+- **Code quality indicators** ([VIB-234](/VIB/issues/VIB-234)) — add a "Valid HubL" badge in the preview toolbar that flips to a clickable "HubL issues" pill (with count + flash) when the lightweight client-side HubL balance check fails for any module in the run; show a collapsible code-snippet preview (first ~12 lines of `module.html`) on each completed module card in chat with an "Open in code view →" shortcut; give the Code view-toggle button an icon and an accent-tinted treatment so it reads as a real entry point alongside Preview / Split.
+
 ### Fixes
 
 - **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restore `.starter-grid__group/heading/section` CSS rules and wrap each section in `.starter-grid__group` so the dynamic starter render keeps its grouped grid layout in both dark and light modes. Add explicit `background: var(--bg)` to `.project-home` / `.project-home .setup__main` and declare `color-scheme: dark/light` alongside the data-theme tokens so native form widgets, scrollbars, and any flex/scroll overflow follow the active theme.

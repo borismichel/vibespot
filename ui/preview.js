@@ -382,3 +382,85 @@ function clearAllModulesWorking() {
 // Do NOT auto-refresh here.
 
 // Select/edit mode has been unified into interact mode (inline-edit.js)
+
+// ---------------------------------------------------------------------------
+// HubL validity badge — aggregates per-module checks reported by chat.js into
+// a single status pill in the preview toolbar.
+// ---------------------------------------------------------------------------
+
+const hublBadgeEl = document.getElementById("hubl-badge");
+const hublBadgeLabelEl = hublBadgeEl ? hublBadgeEl.querySelector(".hubl-badge__label") : null;
+const hublBadgeCountEl = document.getElementById("hubl-badge-count");
+const hublModuleIssues = new Map();
+let hublBadgeReveal = null;
+
+function applyHublBadgeState() {
+  if (!hublBadgeEl) return;
+  let totalIssues = 0;
+  for (const issues of hublModuleIssues.values()) totalIssues += issues.length;
+  const failedModules = Array.from(hublModuleIssues.values()).filter((arr) => arr.length > 0).length;
+
+  const state = totalIssues === 0 ? "valid" : "issues";
+  hublBadgeEl.dataset.state = state;
+  hublBadgeEl.classList.toggle("hubl-badge--valid", state === "valid");
+  hublBadgeEl.classList.toggle("hubl-badge--issues", state === "issues");
+
+  if (hublBadgeLabelEl) {
+    hublBadgeLabelEl.textContent = state === "valid" ? "Valid HubL" : "HubL issues";
+  }
+  if (hublBadgeCountEl) {
+    if (state === "valid") {
+      hublBadgeCountEl.classList.add("hidden");
+      hublBadgeCountEl.textContent = "";
+    } else {
+      hublBadgeCountEl.classList.remove("hidden");
+      hublBadgeCountEl.textContent = String(totalIssues);
+    }
+  }
+
+  if (state === "valid") {
+    const checked = hublModuleIssues.size;
+    hublBadgeEl.title = checked === 0
+      ? "HubL syntax check — no modules generated yet."
+      : `HubL syntax check — all ${checked} module${checked === 1 ? "" : "s"} parse cleanly.`;
+  } else {
+    hublBadgeEl.title = `${totalIssues} HubL issue${totalIssues === 1 ? "" : "s"} across ${failedModules} module${failedModules === 1 ? "" : "s"}. Click to review.`;
+  }
+}
+
+function flashHublBadge() {
+  if (!hublBadgeEl) return;
+  hublBadgeEl.classList.remove("hubl-badge--flash");
+  // Force reflow so the animation restarts.
+  void hublBadgeEl.offsetWidth;
+  hublBadgeEl.classList.add("hubl-badge--flash");
+}
+
+window.resetHublCheck = function () {
+  hublModuleIssues.clear();
+  applyHublBadgeState();
+};
+
+window.reportHublCheck = function (moduleName, issues) {
+  if (!moduleName) return;
+  hublModuleIssues.set(moduleName, Array.isArray(issues) ? issues : []);
+  applyHublBadgeState();
+  flashHublBadge();
+};
+
+if (hublBadgeEl) {
+  applyHublBadgeState();
+  hublBadgeEl.addEventListener("click", () => {
+    if (hublBadgeEl.dataset.state !== "issues") return;
+    const lines = [];
+    for (const [name, issues] of hublModuleIssues) {
+      if (!issues.length) continue;
+      lines.push(`• ${name}: ${issues.map((i) => i.message || i.kind).join(", ")}`);
+    }
+    if (typeof appendSystemMessage === "function") {
+      appendSystemMessage(`HubL issues in current run:\n${lines.join("\n")}`);
+    } else {
+      console.warn("HubL issues:\n" + lines.join("\n"));
+    }
+  });
+}

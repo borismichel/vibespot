@@ -680,7 +680,134 @@ function handleModuleProgress(msg) {
     changedModulesInRun.add(msg.module);
   }
 
+  // Render code snippet preview when a module finishes generating, and update
+  // the global "Valid HubL" indicator based on a quick syntax check.
+  if (msg.status === "complete" && msg.moduleFiles) {
+    appendModuleCardSnippet(card, msg.module, msg.moduleFiles);
+    if (typeof window.reportHublCheck === "function") {
+      const issues = quickCheckHubl(msg.moduleFiles);
+      window.reportHublCheck(msg.module, issues);
+    }
+  } else if (msg.status === "failed" && typeof window.reportHublCheck === "function") {
+    window.reportHublCheck(msg.module, [{ kind: "generation_failed", message: "Module generation failed" }]);
+  }
+
   scrollToBottom();
+}
+
+// ---------------------------------------------------------------------------
+// Code snippet preview inside a pipeline module card
+// ---------------------------------------------------------------------------
+
+const HUBL_PREVIEW_MAX_LINES = 12;
+const HUBL_PREVIEW_MAX_CHARS = 800;
+
+function appendModuleCardSnippet(card, moduleName, files) {
+  if (card.querySelector(".pipeline-module-card__snippet")) return;
+  const snippet = buildHublSnippet(files.moduleHtml || "");
+  if (!snippet) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "pipeline-module-card__snippet";
+
+  const header = document.createElement("div");
+  header.className = "pipeline-module-card__snippet-head";
+  header.innerHTML = `
+    <span class="pipeline-module-card__snippet-label">module.html</span>
+    <button class="pipeline-module-card__snippet-toggle" type="button" aria-expanded="false">
+      <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      <span class="pipeline-module-card__snippet-toggle-label">Show code</span>
+    </button>`;
+
+  const codeWrap = document.createElement("div");
+  codeWrap.className = "pipeline-module-card__snippet-code hidden";
+  const pre = document.createElement("pre");
+  const codeEl = document.createElement("code");
+  codeEl.className = "language-hubl";
+  codeEl.textContent = snippet.text;
+  pre.appendChild(codeEl);
+  codeWrap.appendChild(pre);
+
+  if (snippet.truncated) {
+    const more = document.createElement("button");
+    more.className = "pipeline-module-card__snippet-open";
+    more.type = "button";
+    more.textContent = "Open in code view →";
+    more.addEventListener("click", () => openCodeViewForModule(moduleName));
+    codeWrap.appendChild(more);
+  }
+
+  header.querySelector("button").addEventListener("click", () => {
+    const expanded = !codeWrap.classList.contains("hidden");
+    codeWrap.classList.toggle("hidden", expanded);
+    const toggle = header.querySelector(".pipeline-module-card__snippet-toggle");
+    toggle.setAttribute("aria-expanded", expanded ? "false" : "true");
+    const lbl = toggle.querySelector(".pipeline-module-card__snippet-toggle-label");
+    if (lbl) lbl.textContent = expanded ? "Show code" : "Hide code";
+  });
+
+  wrap.appendChild(header);
+  wrap.appendChild(codeWrap);
+  card.appendChild(wrap);
+}
+
+function buildHublSnippet(html) {
+  if (!html) return null;
+  const trimmed = html.replace(/^\n+/, "").replace(/\n+$/, "");
+  const lines = trimmed.split("\n");
+  let out = lines.slice(0, HUBL_PREVIEW_MAX_LINES).join("\n");
+  let truncated = lines.length > HUBL_PREVIEW_MAX_LINES;
+  if (out.length > HUBL_PREVIEW_MAX_CHARS) {
+    out = out.slice(0, HUBL_PREVIEW_MAX_CHARS);
+    truncated = true;
+  }
+  return { text: out, truncated };
+}
+
+function openCodeViewForModule(moduleName) {
+  const codeBtn = document.querySelector('.view-toggle__btn[data-view="code"]');
+  if (codeBtn) codeBtn.click();
+  // Best-effort selection of the module's html file if the file list is ready.
+  setTimeout(() => {
+    const list = document.getElementById("code-file-list");
+    if (!list) return;
+    const target = Array.from(list.querySelectorAll("[data-file-path]")).find((el) => {
+      const p = el.getAttribute("data-file-path") || "";
+      return p.includes(`/${moduleName}.module/module.html`) || p.endsWith(`${moduleName}.module/module.html`);
+    });
+    if (target) target.click();
+  }, 80);
+}
+
+// Lightweight HubL validity check — flags the same balance issues the
+// server-side validator would auto-fix, plus reserved field/ deprecated type
+// markers that the server already strips. The badge is a hint, not a gate.
+function quickCheckHubl(files) {
+  const issues = [];
+  const html = files && typeof files.moduleHtml === "string" ? files.moduleHtml : "";
+  if (!html) return issues;
+
+  const blockOpeners = ["if", "for", "block", "with", "macro", "filter", "raw", "scope_css"];
+  const stack = [];
+  const tagRe = /\{%-?\s*(end)?(\w+)/g;
+  let match;
+  while ((match = tagRe.exec(html))) {
+    const isEnd = !!match[1];
+    const name = match[2];
+    if (isEnd) {
+      if (!stack.length || stack[stack.length - 1] !== name) {
+        issues.push({ kind: "unbalanced_close", tag: name, message: `Stray {% end${name} %}` });
+      } else {
+        stack.pop();
+      }
+    } else if (blockOpeners.includes(name)) {
+      stack.push(name);
+    }
+  }
+  for (const open of stack) {
+    issues.push({ kind: "unbalanced_open", tag: open, message: `Missing {% end${open} %}` });
+  }
+  return issues;
 }
 
 function startPipelineEstimate() {
@@ -1188,6 +1315,7 @@ async function sendMessage(text) {
   );
   changedModulesInRun = new Set();
   clearModuleListChanged();
+  if (typeof window.resetHublCheck === "function") window.resetHublCheck();
 
   // Start streaming indicator
   startStreaming();
