@@ -207,6 +207,7 @@ async function initSetup() {
     // Auto-expand the starter template panel so templates are visible by default
     activePanel = null;
     togglePanel("starter");
+    activePanel = null; // reset so the first user click on Template card opens rather than closes
 
   } catch (err) {
     showError("Could not connect to server. Is vibeSpot running?");
@@ -1337,7 +1338,7 @@ let remoteThemesLoaded = false;
 
 function togglePanel(action) {
   const panels = document.querySelectorAll(".setup__panel");
-  const buttons = document.querySelectorAll(".setup__action-btn");
+  const buttons = document.querySelectorAll(".setup__entry-card");
 
   // Close if same panel clicked
   if (activePanel === action) {
@@ -1358,8 +1359,8 @@ function togglePanel(action) {
     activePanel = action;
   }
 
-  // Mark button active
-  const btn = document.querySelector(`.setup__action-btn[data-action="${action}"]`);
+  // Mark card active
+  const btn = document.querySelector(`.setup__entry-card[data-action="${action}"]`);
   if (btn) btn.classList.add("active");
 
   // Focus input if applicable
@@ -1519,33 +1520,20 @@ async function downloadThemeByName() {
 // Event listeners
 // ---------------------------------------------------------------------------
 
-// Action buttons (advanced "More ways to start" panel)
-document.querySelectorAll(".setup__action-btn").forEach((btn) => {
-  btn.addEventListener("click", () => togglePanel(btn.dataset.action));
-});
-
-// Secondary "Start from Template" button — always opens, never toggles closed
-document.querySelectorAll(".setup__secondary-btn").forEach((btn) => {
+// Entry-point cards: every creation/import path is visible in the grid
+const PANEL_BY_ACTION = { starter: "panel-starter", new: "panel-new", download: "panel-download", figma: "panel-figma", convert: "panel-convert" };
+document.querySelectorAll(".setup__entry-card").forEach((btn) => {
   btn.addEventListener("click", () => {
-    activePanel = null;
-    togglePanel(btn.dataset.action);
-    setTimeout(() => {
-      document.getElementById("panel-starter")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }, 60);
+    const action = btn.dataset.action;
+    togglePanel(action);
+    const panelId = PANEL_BY_ACTION[action];
+    if (panelId) {
+      setTimeout(() => {
+        document.getElementById(panelId)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 60);
+    }
   });
 });
-
-// "More ways to start" toggle
-function expandMoreOptions(expand) {
-  const toggle = document.getElementById("setup-more-toggle");
-  const panel = document.getElementById("setup-more-panel");
-  if (!toggle || !panel) return;
-  const willExpand = expand ?? panel.classList.contains("hidden");
-  panel.classList.toggle("hidden", !willExpand);
-  toggle.setAttribute("aria-expanded", willExpand ? "true" : "false");
-  toggle.classList.toggle("setup__more-toggle--open", willExpand);
-}
-document.getElementById("setup-more-toggle")?.addEventListener("click", () => expandMoreOptions());
 
 // "View all" link in recent projects → open the full Continue panel
 document.getElementById("setup-recent-all")?.addEventListener("click", () => {
