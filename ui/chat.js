@@ -74,7 +74,7 @@ const PAGE_TYPE_ICONS = {
   module_only: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="4" rx="1"/><rect x="4" y="14" width="10" height="4" rx="1"/></svg>',
 };
 
-const PAGE_TYPE_LABELS = {
+const PAGE_TYPE_LABEL_LONG = {
   landing_page: "Landing page",
   website_page: "Website page",
   blog_post: "Blog post",
@@ -92,7 +92,7 @@ function renderPageTabs(templates, activeTemplateId) {
     const isActive = t.id === activeTemplateId;
     const badge = PAGE_TYPE_BADGES[t.pageType] || "";
     const icon = PAGE_TYPE_ICONS[t.pageType] || PAGE_TYPE_ICONS.website_page;
-    const typeLabel = PAGE_TYPE_LABELS[t.pageType] || t.pageType;
+    const typeLabel = PAGE_TYPE_LABEL_LONG[t.pageType] || t.pageType;
     const titleAttr = `${t.label} — ${typeLabel} (${t.moduleCount} modules)`;
     return `<div class="page-tabs__row${isActive ? " page-tabs__row--active" : ""}" role="treeitem" aria-selected="${isActive ? "true" : "false"}" data-template-id="${t.id}" draggable="true" title="${escapeHtml(titleAttr)}">
       <span class="page-tabs__handle" aria-hidden="true" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/></svg></span>
