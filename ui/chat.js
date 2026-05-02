@@ -60,6 +60,7 @@ const PAGE_TYPE_BADGES = {
   landing_page: "LP",
   blog_post: "Blog",
   website_page: "Web",
+  email: "Email",
   module_only: "Sec",
 };
 

@@ -11,6 +11,7 @@ const _shellOpt: ExecFileSyncOptions = process.platform === "win32" ? { shell: t
 import { jsonResponse, readBody } from "../route-helpers.js";
 import { log } from "../log.js";
 import { getHubSpotPak } from "../../utils/config.js";
+import { addEmailTemplateToTheme } from "../../hubspot/theme-scaffold.js";
 import {
   getSession,
   saveSession,
@@ -40,7 +41,7 @@ export function handleDashboardRoute(res: ServerResponse): void {
     templates: session.templates.map((t) => ({
       id: t.id,
       label: t.label,
-      pageType: t.pageType,
+      pageType: t.contentMode === "email" ? "email" : t.pageType,
       moduleCount: t.modules.length,
       messageCount: t.messages.length,
     })),
@@ -115,7 +116,7 @@ export function handleTemplatesRoute(method: string, req: IncomingMessage, res: 
       templates: session.templates.map((t) => ({
         id: t.id,
         label: t.label,
-        pageType: t.pageType,
+        pageType: t.contentMode === "email" ? "email" : t.pageType,
         moduleCount: t.modules.length,
       })),
       activeTemplateId: session.activeTemplateId,
@@ -131,13 +132,20 @@ export function handleTemplatesRoute(method: string, req: IncomingMessage, res: 
           jsonResponse(res, 400, { error: "pageType and label are required" });
           return;
         }
-        const validTypes: PageType[] = ["landing_page", "blog_post", "website_page", "module_only"];
+        const validTypes = ["landing_page", "blog_post", "website_page", "module_only", "email"];
         if (!validTypes.includes(pageType)) {
           jsonResponse(res, 400, { error: `Invalid pageType: ${pageType}` });
           return;
         }
 
-        const entry = addTemplate(pageType, label);
+        const isEmail = pageType === "email";
+        const resolvedPageType: PageType = isEmail ? "module_only" : pageType;
+        const entry = addTemplate(resolvedPageType, label, isEmail ? "email" : undefined);
+
+        if (isEmail && session.themePath) {
+          addEmailTemplateToTheme(session.themePath, session.themeName);
+        }
+
         saveSession();
 
         jsonResponse(res, 200, {
