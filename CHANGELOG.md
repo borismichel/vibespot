@@ -6,6 +6,10 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### UI
+
+- **Project rail context-aware behavior** ([VIB-222](/VIB/issues/VIB-222)) — rail is now a fixed 48px icon-only sidebar in both modes. On Project Home the rail no longer mirrors the center "Continue where you left off" cards; it shows only the footer (Coffee / Docs / Settings) so the center stage owns the project browser. In Editor mode the rail becomes a session context strip: a back-to-projects button, the current-project bubble, and a click-to-open project switcher popover (with rename / delete still available). Removed the `.project-rail--expanded` state and the legacy in-rail project list, header, count, and add-button.
+
 ### Fixes
 
 - **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restore `.starter-grid__group/heading/section` CSS rules and wrap each section in `.starter-grid__group` so the dynamic starter render keeps its grouped grid layout in both dark and light modes. Add explicit `background: var(--bg)` to `.project-home` / `.project-home .setup__main` and declare `color-scheme: dark/light` alongside the data-theme tokens so native form widgets, scrollbars, and any flex/scroll overflow follow the active theme.

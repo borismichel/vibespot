@@ -28,30 +28,44 @@
   </div>
 
   <!-- ============================================================ -->
-  <!-- PROJECT RAIL — persistent thin sidebar (Discord-style)       -->
+  <!-- PROJECT RAIL — persistent thin sidebar (context-aware)       -->
+  <!--   Project Home: footer-only (center owns project browser)   -->
+  <!--   Editor: session context (back, current project, switcher) -->
   <!-- ============================================================ -->
-  <aside class="project-rail project-rail--expanded" id="project-rail" aria-label="Projects">
-    <div class="project-rail__header">
-      <span class="project-rail__title">Projects</span>
-      <span class="project-rail__count" id="rail-project-count">0</span>
+  <aside class="project-rail" id="project-rail" data-mode="project-home" aria-label="Projects">
+    <!-- Editor session context (visible only in editor mode) -->
+    <div class="project-rail__session" id="project-rail-session">
+      <button class="project-rail__back" id="project-rail-back" type="button" title="Back to projects" aria-label="Back to projects">
+        <svg class="icon icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button class="project-rail__current" id="project-rail-current" type="button" title="Current project" aria-haspopup="menu" aria-expanded="false">
+        <span class="project-rail__current-bubble" id="project-rail-current-bubble">P</span>
+      </button>
+      <span class="project-rail__current-name" id="project-rail-current-name" aria-hidden="true"></span>
     </div>
-    <div class="project-rail__items" id="project-rail-items"></div>
-    <button class="project-rail__add" id="project-rail-add" type="button" title="New project" aria-label="New project">+</button>
+
+    <!-- Footer (both modes) -->
     <div class="project-rail__footer">
       <a class="project-rail__settings-btn" href="https://buymeacoffee.com/vibespot" target="_blank" rel="noopener" title="Buy me a coffee">
         <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
-        <span class="project-rail__settings-label">Coffee</span>
       </a>
       <a class="project-rail__settings-btn" href="/docs/" target="_blank" rel="noopener" title="Documentation">
         <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h6a3 3 0 0 1 3 3v15a2 2 0 0 0-2-2H4z"/><path d="M20 3h-6a3 3 0 0 0-3 3v15a2 2 0 0 1 2-2h7z"/></svg>
-        <span class="project-rail__settings-label">Docs</span>
       </a>
-      <button class="project-rail__settings-btn" id="btn-setup-settings" type="button" aria-label="Settings">
+      <button class="project-rail__settings-btn" id="btn-setup-settings" type="button" title="Settings" aria-label="Settings">
         <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        <span class="project-rail__settings-label">Settings</span>
       </button>
     </div>
   </aside>
+
+  <!-- Project switcher popover (Editor mode) — anchored to current bubble -->
+  <div class="project-switcher" id="project-switcher" role="menu" aria-labelledby="project-rail-current" hidden>
+    <div class="project-switcher__header">
+      <span class="project-switcher__title">Switch project</span>
+      <button class="project-switcher__add" id="project-switcher-add" type="button" title="New project" aria-label="New project">+</button>
+    </div>
+    <div class="project-switcher__list" id="project-switcher-list" role="none"></div>
+  </div>
 
   <!-- Tooltip element (positioned via JS) -->
   <div class="project-rail__tooltip" id="project-rail-tooltip" role="tooltip"></div>
