@@ -987,8 +987,11 @@ function handleSuggestBrandExtraction() {
   scrollToBottom();
 
   el.querySelector("#btn-accept-extraction").addEventListener("click", () => {
-    el.querySelector(".brand-extraction-prompt__actions").innerHTML =
-      '<span class="brand-extraction-prompt__status">Extracting...</span>';
+    const container = el.querySelector(".chat-msg__system");
+    if (container) {
+      container.innerHTML =
+        '<span class="brand-extraction-prompt__status">Extracting…</span>';
+    }
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "extract_brand_assets" }));
     }
