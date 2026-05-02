@@ -4,6 +4,14 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## Unreleased
+
+### Fixes
+
+- **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restore `.starter-grid__group/heading/section` CSS rules and wrap each section in `.starter-grid__group` so the dynamic starter render keeps its grouped grid layout in both dark and light modes. Add explicit `background: var(--bg)` to `.project-home` / `.project-home .setup__main` and declare `color-scheme: dark/light` alongside the data-theme tokens so native form widgets, scrollbars, and any flex/scroll overflow follow the active theme.
+
+---
+
 ## v1.3.0 — 2026-04-30
 
 ### Email template generation — Phase 1 ([VIB-158](/VIB/issues/VIB-158))
