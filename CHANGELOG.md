@@ -6,23 +6,56 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### Multi-page sites ([VIB-159](/VIB/issues/VIB-159))
+
+Create full multi-page HubSpot sites from a single prompt. The intent analyzer detects site requests (`create_site` intent) and plans shared modules (header/footer) plus per-page layouts with unique slugs. Page tabs in the editor let you switch between templates — each tab shows the page label, type badge, and module count. Cross-page navigation link validation (`validateNavLinks`) catches broken inter-page links in nav/header/footer modules. Page-scoped chat context tells the AI which page you're editing, enabling cross-page references like "same header as the home page."
+
+- **Intent analyzer** — `create_site` intent with `pages` array (id, label, pageType, purpose, slug) and `sharedModules` field
+- **Site module planner** — plans shared + per-page modules in a single architect pass
+- **Page tabs UI** — template switching with auto-reload of modules, chat, and preview
+- **Page-scoped chat** — `activePageLabel` and `sitePages` in session snapshot for cross-page AI context
+- **Nav link validation** — post-pipeline check for href links that don't match any page slug
+
+### Inline WYSIWYG editing ([VIB-162](/VIB/issues/VIB-162))
+
+Click text, images, and links directly in the live preview to edit them inline. Changes persist via `/api/field` and refresh the preview. Edit mode toggles from the preview topbar — mutually exclusive with Select mode, both disabled during AI generation. Server-side field annotations (`annotateFieldRefs`) provide deterministic click-to-field mapping.
+
+### Per-section visual controls ([VIB-164](/VIB/issues/VIB-164))
+
+Hover-activated toolbar over module sections in the preview pane. When hovering a `[data-module]` element, a floating toolbar appears with controls mapped to the module's fields: color picker for color fields, padding/margin sliders for spacing fields, image URL swap for image fields, and font size selector for text-size number fields. All changes persist via `/api/field` with debounced saves and preview refresh on popover close.
+
 ### Features
 
-- **First-visit onboarding walkthrough** ([VIB-235](/VIB/issues/VIB-235)) — 3-step product intro shown on the project home for fresh installs (no projects, no local themes), reusing the existing `#walkthrough` element. Steps: (1) what vibeSpot is, (2) how it maps to HubSpot (sections → modules, tokens → `:root` vars, project → CMS theme), (3) try it with a pre-filled sample prompt that lands in the setup describe-it textarea. Adds back/next/skip controls, progress dots, and persists a `vibespot:introSeen` localStorage flag so it does not reappear. After the intro completes, the existing AI-engine setup walkthrough still triggers if no engine is configured. Force-show with `?intro` in the URL.
+- **First-visit onboarding walkthrough** ([VIB-235](/VIB/issues/VIB-235)) — 3-step product intro shown on the project home for fresh installs (no projects, no local themes). Steps: (1) what vibeSpot is, (2) how it maps to HubSpot (sections → modules, tokens → `:root` vars, project → CMS theme), (3) try it with a pre-filled sample prompt. Adds back/next/skip controls, progress dots, and persists a `vibespot:introSeen` localStorage flag. Force-show with `?intro` in the URL.
+- **Blog template generation** ([VIB-160](/VIB/issues/VIB-160)) — blog as a content type alongside page and email. Blog-specific prompts with HubSpot blog variables (`content.post_body`, `content.author`, `blog_recent_posts`), blog validator auto-fix, and a pre-built Blog Content Hub starter template (8 modules).
+- **Split-pane view** ([VIB-163](/VIB/issues/VIB-163)) — "Split" button in the view toggle shows live preview and code editor in a 50/50 CSS grid layout. Fully coordinated with Preview, Plan, and Code view switching.
+- **Brand kit enforcement** ([VIB-166](/VIB/issues/VIB-166)) — structured brand kit (colors, fonts, logo URL) persisted as `brand-kit.json` in `.vibespot/`. Values injected as mandatory design constraints into email architect, email module developer, and page architect prompts. Validator warns on off-brand colors and fonts.
+- **Workspace tab navigation** ([VIB-173](/VIB/issues/VIB-173)) — dashboard restructured into workspace tabs: Pages, Brand, Library, Marketplace, Settings. Unified Interact mode replaces separate Select + Edit modes — editable elements get inline editing, module containers prefill the chat input.
+- **Page tree sidebar** ([VIB-174](/VIB/issues/VIB-174)) — replaces horizontal page tabs with a vertical tree showing all templates with type badges (LP, Blog, Web, Sec), labels, and module counts. Always visible; includes inline page creation form with type selector.
+- **Editor mode simplification** ([VIB-175](/VIB/issues/VIB-175)) — unified Interact mode, Plan as a resizable sidebar (coexists with preview), per-module code viewer tabs (Fields/Code) in the field editor, and Version History as a collapsible bottom panel.
+- **Email option in page type dropdown** ([VIB-199](/VIB/issues/VIB-199)) — email generation is now reachable from the web UI page type dropdown (not just the `vibespot email` CLI), setting `contentMode` to `"email"` and scaffolding the email template.
 
 ### Enhancements
 
-- **Brand tab visual preview** ([VIB-226](/VIB/issues/VIB-226)) — add a live brand preview card above the brand kit form: color swatches for primary/secondary/accent, sample heading + body text rendered with the configured fonts, and a logo thumbnail when a URL is provided. Group the form fields into Colors / Fonts / Logo cards and constrain the form to `max-width: 480px` so the brand tab no longer reads as a sparse data-entry list.
+- **CSS token system** ([VIB-185](/VIB/issues/VIB-185)) — comprehensive design token system: spacing scale (`--space-0..10`), typography (`--text-xs..display`, `--weight-*`, `--leading-*`), z-index (`--z-base..confirm`), transitions (`--duration-fast/normal/slow`, `--ease-*`), icons, layout, and status/badge colors. 270 font-size, 48 border-radius, and 109 transition declarations migrated to tokens.
+- **Component CSS library** ([VIB-186](/VIB/issues/VIB-186)) — spec-compliant base classes for Button, IconButton, Input, Textarea, Card, Badge, Toggle, Tabs, Toast, Modal, ChatBubble, EmptyState, Spinner, ProgressBar — all referencing design tokens. Existing BEM classes aliased for compatibility.
+- **Brand tab visual preview** ([VIB-226](/VIB/issues/VIB-226)) — live brand preview card above the brand kit form: color swatches for primary/secondary/accent, sample heading + body text rendered with configured fonts, and a logo thumbnail. Form fields grouped into Colors / Fonts / Logo cards with `max-width: 480px`.
+- **Workspace tab visual weight** ([VIB-230](/VIB/issues/VIB-230)) — increased visual weight of the active workspace tab for clearer navigation affordance.
+- **Slim preview browser-chrome bar** ([VIB-225](/VIB/issues/VIB-225)) — slimmed down the preview pane's browser-chrome bar to reduce visual noise and reclaim vertical space.
 
 ### Changes
 
-- **Deduplicate template surfaces** ([VIB-231](/VIB/issues/VIB-231)) — chat welcome no longer shows the page-template grid; it now offers three conversation starters ("Describe your page", "Upload a Figma design", "Import from HubSpot"). Page templates live on the Library tab and are reachable via the templates icon in the chat input area, which now switches to that tab.
-- **Align UI terminology with HubSpot vocabulary** ([VIB-233](/VIB/issues/VIB-233)) — user-facing copy now uses HubSpot's canonical terms (Module, Module Library, Brand Kit) instead of the legacy "section" phrasing. Internal code already used `module`; the UI was the inconsistency. Where vibeSpot keeps a different concept (e.g. Project &harr; Theme), the HubSpot equivalent is shown in tooltips on the project rail and Brand / Library workspace tabs. Adds a "HubSpot Terminology" reference section to `ui/docs/index.html` with a vibeSpot &rarr; HubSpot mapping table. Touched `ui/index.html`, `ui/chat.js`, `ui/dashboard.js`, `ui/inline-edit.js`, `ui/field-editor.js`, `ui/settings.js`, `ui/docs/index.html`.
+- **Two-mode architecture** ([VIB-187](/VIB/issues/VIB-187)) — restructured the UI into two distinct modes: Project Home (project selection, templates, settings) and Editor (chat, preview, modules), controlled by `data-mode` attribute on `.app-body`. Cleaner state boundaries between browsing and editing.
+- **Deduplicate template surfaces** ([VIB-231](/VIB/issues/VIB-231)) — chat welcome no longer shows the page-template grid; it now offers three conversation starters ("Describe your page", "Upload a Figma design", "Import from HubSpot"). Page templates live on the Library tab and are reachable via the templates icon in the chat input area.
+- **Align UI terminology with HubSpot vocabulary** ([VIB-233](/VIB/issues/VIB-233)) — user-facing copy now uses HubSpot's canonical terms (Module, Module Library, Brand Kit) instead of the legacy "section" phrasing. Where vibeSpot keeps a different concept (e.g. Project ↔ Theme), the HubSpot equivalent is shown in tooltips. Adds a "HubSpot Terminology" reference section to `ui/docs/index.html`.
 
 ### Fixes
 
-- **Editor preview empty state** ([VIB-213](/VIB/issues/VIB-213)) — replace the blank white preview rectangle with a designed empty state inside `.browser-chrome` (vibeSpot sparkle mark, "Your page will appear here as you build it" headline, and a chat-input hint). Built on existing tokens (`--accent`, `--bg-panel-solid`, `--accent-tint`, `--accent-glow`, `--text-dim`); auto-hides when generation begins (`showGeneratingPreview`) or when the iframe finishes loading any `[data-module]`.
-- **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restore `.starter-grid__group/heading/section` CSS rules and wrap each section in `.starter-grid__group` so the dynamic starter render keeps its grouped grid layout in both dark and light modes. Add explicit `background: var(--bg)` to `.project-home` / `.project-home .setup__main` and declare `color-scheme: dark/light` alongside the data-theme tokens so native form widgets, scrollbars, and any flex/scroll overflow follow the active theme.
+- **Mobile responsive layout** ([VIB-211](/VIB/issues/VIB-211)) — responsive gate dialog shown at viewports < 768px; tablet breakpoint (768–1024px) collapses the project rail to icon-only width, tightens chat panel, and hides topbar text to prevent clipping.
+- **Editor preview empty state** ([VIB-213](/VIB/issues/VIB-213)) — designed empty state inside `.browser-chrome` with vibeSpot sparkle mark, headline, and chat-input hint. Auto-hides when generation begins or when the iframe loads content.
+- **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restored starter grid CSS rules and added explicit background/color-scheme declarations for dark/light parity.
+- **Scrollable project rail** ([VIB-181](/VIB/issues/VIB-181)) — project rail items now scroll instead of overflowing the container.
+- **Dead code cleanup and QC tooling** ([VIB-191](/VIB/issues/VIB-191)) — removed 6 dead event listeners from the VIB-187 restructure. Added `ui-element-refs.test.ts` validator and `PRE-MERGE-QC.md` checklist.
 
 ---
 
