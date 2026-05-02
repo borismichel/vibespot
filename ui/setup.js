@@ -117,11 +117,11 @@ const ENGINE_DISPLAY_NAMES = {
 
 async function initSetup() {
   try {
-    // Show loading spinner in rail while fetching
-    const railItems = document.getElementById("project-rail-items");
-    if (railItems) {
-      railItems.innerHTML = `
-        <div class="project-rail__loading">
+    // Show loading spinner in switcher while fetching
+    const switcherList = document.getElementById("project-switcher-list");
+    if (switcherList) {
+      switcherList.innerHTML = `
+        <div class="project-switcher__loading">
           <div class="setup__spinner"></div>
           <span>Loading projects...</span>
         </div>`;
@@ -130,7 +130,7 @@ async function initSetup() {
     const res = await fetch("/api/setup");
     const info = await res.json();
 
-    // Populate the project rail with all projects
+    // Populate the project switcher with all projects (used in editor mode)
     populateProjectRail(info);
 
     // Show "Continue where you left off" cards above the create options
@@ -343,40 +343,43 @@ function populateRecentProjects(info) {
 }
 
 // ---------------------------------------------------------------------------
-// Collapsible Project Rail (expanded on setup, collapsed on dashboard/chat)
+// Project switcher (rendered into the editor-mode rail popover)
 // ---------------------------------------------------------------------------
 
 const railTooltip = document.getElementById("project-rail-tooltip");
 
+/**
+ * Populate the project switcher menu with all projects. Item DOM uses the
+ * stable `.project-rail__item*` class names so the rename / delete logic in
+ * chat.js + setup.js can keep targeting them.
+ */
 function populateProjectRail(info) {
-  const rail = document.getElementById("project-rail-items");
-  const countEl = document.getElementById("rail-project-count");
-  if (!rail) return;
-  rail.innerHTML = "";
+  const list = document.getElementById("project-switcher-list");
+  if (!list) return;
+  list.innerHTML = "";
 
   const projects = deduplicateProjects(info);
-  if (countEl) countEl.textContent = projects.length;
 
   if (projects.length === 0) {
-    rail.innerHTML = '<div class="project-rail__empty">No projects yet.<br>Create one to get started.</div>';
+    list.innerHTML = '<div class="project-switcher__empty">No projects yet.<br>Create one to get started.</div>';
     return;
   }
 
   for (const p of projects) {
-    const item = document.createElement("div");
+    const item = document.createElement("button");
+    item.type = "button";
     item.className = "project-rail__item";
     item.dataset.name = p.name;
+    if (p.sessionId) item.dataset.sessionId = p.sessionId;
 
     const initial = p.name.charAt(0).toUpperCase();
     const meta = p.updatedAt ? timeAgo(p.updatedAt) : "on disk";
 
-    // Bubble (always visible — in collapsed mode this is the only thing shown)
     const bubble = document.createElement("div");
     bubble.className = "project-rail__item-bubble";
     bubble.textContent = initial;
     item.appendChild(bubble);
 
-    // Info (visible when expanded via CSS)
     const infoEl = document.createElement("div");
     infoEl.className = "project-rail__item-info";
     infoEl.innerHTML = `
@@ -384,7 +387,6 @@ function populateProjectRail(info) {
       <span class="project-rail__item-meta">${meta}</span>`;
     item.appendChild(infoEl);
 
-    // Double-click on name to rename
     const nameSpan = infoEl.querySelector(".project-rail__item-name");
     if (nameSpan) {
       nameSpan.addEventListener("dblclick", (e) => {
@@ -393,8 +395,8 @@ function populateProjectRail(info) {
       });
     }
 
-    // Delete button (visible when expanded + hover)
     const delBtn = document.createElement("button");
+    delBtn.type = "button";
     delBtn.className = "project-rail__item-delete";
     delBtn.innerHTML = "&times;";
     delBtn.title = "Delete project";
@@ -404,44 +406,17 @@ function populateProjectRail(info) {
     });
     item.appendChild(delBtn);
 
-    // Tooltip (only when collapsed — skip when expanded since name is visible)
-    item.addEventListener("mouseenter", () => {
-      const railEl = document.getElementById("project-rail");
-      if (railEl && railEl.classList.contains("project-rail--expanded")) return;
-
-      let stats = "";
-      if (p.moduleCount != null) {
-        stats = p.moduleCount + " section" + (p.moduleCount !== 1 ? "s" : "");
-        if (p.templateCount > 1) stats += " \u00b7 " + p.templateCount + " templates";
-        stats += p.updatedAt ? " \u00b7 " + timeAgo(p.updatedAt) : " \u00b7 on disk";
-      } else {
-        stats = p.updatedAt ? timeAgo(p.updatedAt) : "on disk";
-      }
-
-      railTooltip.innerHTML =
-        '<div class="project-rail__tooltip-name">' + esc(p.name) + "</div>" +
-        '<div class="project-rail__tooltip-stats">' + stats + "</div>";
-
-      const rect = item.getBoundingClientRect();
-      railTooltip.style.top = rect.top + "px";
-      railTooltip.classList.add("project-rail__tooltip--visible");
-    });
-
-    item.addEventListener("mouseleave", () => {
-      railTooltip.classList.remove("project-rail__tooltip--visible");
-    });
-
-    // Click to open (blocked while AI is generating)
     item.addEventListener("click", () => {
       if (typeof isStreaming !== "undefined" && isStreaming) {
         showError("Cannot switch projects while AI is generating.");
         return;
       }
+      closeProjectSwitcher();
       if (p.sessionId) resumeSession(p.sessionId);
       else openTheme(p.name);
     });
 
-    rail.appendChild(item);
+    list.appendChild(item);
   }
 
   updateRailActive();
@@ -452,12 +427,97 @@ function updateRailActive() {
   document.querySelectorAll(".project-rail__item").forEach((btn) => {
     btn.classList.toggle("project-rail__item--active", btn.dataset.name === current);
   });
+  // Refresh the rail's current-project bubble + name (editor mode only).
+  const bubble = document.getElementById("project-rail-current-bubble");
+  const nameEl = document.getElementById("project-rail-current-name");
+  if (bubble) bubble.textContent = current ? current.charAt(0).toUpperCase() : "P";
+  if (nameEl) nameEl.textContent = current || "";
+  const trigger = document.getElementById("project-rail-current");
+  if (trigger) trigger.title = current ? current + " — switch project" : "Switch project";
 }
 
-// "+" button → open New Theme panel (show setup first if needed)
-document.getElementById("project-rail-add")?.addEventListener("click", () => {
-  if (setupScreen.classList.contains("hidden")) showSetup();
+// ---------------------------------------------------------------------------
+// Switcher popover open/close
+// ---------------------------------------------------------------------------
+
+function openProjectSwitcher() {
+  const popover = document.getElementById("project-switcher");
+  const trigger = document.getElementById("project-rail-current");
+  if (!popover || !trigger) return;
+  const rect = trigger.getBoundingClientRect();
+  popover.style.top = Math.max(8, rect.top) + "px";
+  popover.hidden = false;
+  trigger.setAttribute("aria-expanded", "true");
+  // Refresh data so the list reflects the latest sessions.
+  fetch("/api/setup")
+    .then((r) => r.json())
+    .then((info) => populateProjectRail(info))
+    .catch(() => {});
+}
+
+function closeProjectSwitcher() {
+  const popover = document.getElementById("project-switcher");
+  const trigger = document.getElementById("project-rail-current");
+  if (popover) popover.hidden = true;
+  if (trigger) trigger.setAttribute("aria-expanded", "false");
+}
+
+function toggleProjectSwitcher() {
+  const popover = document.getElementById("project-switcher");
+  if (!popover) return;
+  if (popover.hidden) openProjectSwitcher();
+  else closeProjectSwitcher();
+}
+
+document.getElementById("project-rail-current")?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleProjectSwitcher();
+});
+
+document.getElementById("project-rail-back")?.addEventListener("click", () => {
+  if (typeof isStreaming !== "undefined" && isStreaming) {
+    showError("Cannot leave the editor while AI is generating.");
+    return;
+  }
+  closeProjectSwitcher();
+  showSetup();
+});
+
+document.getElementById("project-switcher-add")?.addEventListener("click", () => {
+  closeProjectSwitcher();
+  showSetup();
   togglePanel("new");
+});
+
+// Close on outside click / Escape
+document.addEventListener("click", (e) => {
+  const popover = document.getElementById("project-switcher");
+  if (!popover || popover.hidden) return;
+  const trigger = document.getElementById("project-rail-current");
+  if (popover.contains(e.target) || (trigger && trigger.contains(e.target))) return;
+  closeProjectSwitcher();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeProjectSwitcher();
+});
+
+// Tooltip on the current-project bubble (editor rail)
+document.getElementById("project-rail-current")?.addEventListener("mouseenter", () => {
+  const popover = document.getElementById("project-switcher");
+  if (popover && !popover.hidden) return;
+  const name = currentAppTheme || currentDashboardTheme || "";
+  if (!name) return;
+  railTooltip.innerHTML =
+    '<div class="project-rail__tooltip-name">' + esc(name) + "</div>" +
+    '<div class="project-rail__tooltip-stats">Click to switch project</div>';
+  const rect = document.getElementById("project-rail-current").getBoundingClientRect();
+  railTooltip.style.top = rect.top + "px";
+  railTooltip.classList.add("project-rail__tooltip--visible");
+});
+
+document.getElementById("project-rail-current")?.addEventListener("mouseleave", () => {
+  railTooltip.classList.remove("project-rail__tooltip--visible");
 });
 
 // ---------------------------------------------------------------------------
@@ -1255,7 +1315,7 @@ function showAppDirect(themeName) {
   if (typeof hideDashboard === "function") hideDashboard();
   appBody.dataset.mode = "editor";
   appScreen.classList.remove("hidden");
-  document.getElementById("project-rail")?.classList.remove("project-rail--expanded");
+  document.getElementById("project-rail")?.setAttribute("data-mode", "editor");
   document.getElementById("theme-name").textContent = themeName;
 
   currentAppTheme = themeName;
@@ -1277,7 +1337,8 @@ function showSetup() {
   appScreen.classList.add("hidden");
   if (typeof hideDashboard === "function") hideDashboard();
   appBody.dataset.mode = "project-home";
-  document.getElementById("project-rail")?.classList.add("project-rail--expanded");
+  document.getElementById("project-rail")?.setAttribute("data-mode", "project-home");
+  closeProjectSwitcher();
   currentAppTheme = "";
 
   hideLoading();
