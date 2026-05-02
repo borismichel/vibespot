@@ -39,8 +39,12 @@ export function syncFlatFieldsFromTemplate(tpl: TemplateEntry): void {
 export function syncFlatFieldsToTemplate(): void {
   const activeSession = getSession();
   if (!activeSession) return;
-  const tpl = getActiveTemplate();
-  if (!tpl) return;
+  let tpl = getActiveTemplate();
+  if (!tpl) {
+    if (activeSession.modules.length === 0) return;
+    tpl = addTemplate("landing_page", `${activeSession.themeName} Landing Page`);
+    activeSession.activeTemplateId = tpl.id;
+  }
   tpl.modules = activeSession.modules;
   tpl.moduleOrder = activeSession.moduleOrder;
   tpl.sharedCss = activeSession.sharedCss;

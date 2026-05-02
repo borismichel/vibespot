@@ -788,10 +788,17 @@ function handleWsConnection(ws: WebSocket): void {
 
           // After generation, send updated preview
           sendToClient({ type: "generation_complete" });
-          sendToClient({
-            type: "modules_updated",
-            modules: getOrderedModules().map((m) => m.moduleName),
-          });
+          {
+            const sess = getSession();
+            sendToClient({
+              type: "modules_updated",
+              modules: getOrderedModules().map((m) => m.moduleName),
+              templateId: sess?.activeTemplateId || null,
+              templates: (sess?.templates || []).map((t) => ({
+                id: t.id, label: t.label, pageType: t.pageType, moduleCount: t.modules.length,
+              })),
+            });
+          }
           clearPipelineEventLog();
 
           // Suggest brand asset extraction if none exist yet
@@ -872,10 +879,17 @@ function handleWsConnection(ws: WebSocket): void {
           commitThemeState(getSession()!.themePath, `Figma import: ${extraction.fileName}`);
 
           sendToClient({ type: "generation_complete" });
-          sendToClient({
-            type: "modules_updated",
-            modules: getOrderedModules().map((m) => m.moduleName),
-          });
+          {
+            const sess = getSession();
+            sendToClient({
+              type: "modules_updated",
+              modules: getOrderedModules().map((m) => m.moduleName),
+              templateId: sess?.activeTemplateId || null,
+              templates: (sess?.templates || []).map((t) => ({
+                id: t.id, label: t.label, pageType: t.pageType, moduleCount: t.modules.length,
+              })),
+            });
+          }
           clearPipelineEventLog();
         } catch (err) {
           clearPipelineEventLog();
@@ -1121,10 +1135,17 @@ ${errorContext}`;
           }
 
           ws.send(JSON.stringify({ type: "upload_fix_complete" }));
-          ws.send(JSON.stringify({
-            type: "modules_updated",
-            modules: getOrderedModules().map((m) => m.moduleName),
-          }));
+          {
+            const sess = getSession();
+            ws.send(JSON.stringify({
+              type: "modules_updated",
+              modules: getOrderedModules().map((m) => m.moduleName),
+              templateId: sess?.activeTemplateId || null,
+              templates: (sess?.templates || []).map((t: any) => ({
+                id: t.id, label: t.label, pageType: t.pageType, moduleCount: t.modules.length,
+              })),
+            }));
+          }
         } catch (err) {
           ws.send(JSON.stringify({
             type: "upload_failed",
@@ -1202,10 +1223,17 @@ ${errorContext}`;
           }
 
           sendToClient({ type: "generation_complete" });
-          sendToClient({
-            type: "modules_updated",
-            modules: getOrderedModules().map((m) => m.moduleName),
-          });
+          {
+            const sess = getSession();
+            sendToClient({
+              type: "modules_updated",
+              modules: getOrderedModules().map((m) => m.moduleName),
+              templateId: sess?.activeTemplateId || null,
+              templates: (sess?.templates || []).map((t) => ({
+                id: t.id, label: t.label, pageType: t.pageType, moduleCount: t.modules.length,
+              })),
+            });
+          }
           clearPipelineEventLog();
         } catch (err) {
           clearPipelineEventLog();
