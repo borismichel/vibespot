@@ -382,8 +382,15 @@ function exitSplitView() {
 document.querySelectorAll(".view-toggle__btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     const view = btn.dataset.view;
-    document.querySelectorAll(".view-toggle__btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
+    document.querySelectorAll(".view-toggle__btn").forEach((b) => {
+      const isActive = b === btn;
+      b.classList.toggle("active", isActive);
+      // Only the role="tab" buttons (Preview / Split / Code) carry
+      // aria-selected — the plan sidebar toggle uses aria-pressed instead.
+      if (b.getAttribute("role") === "tab") {
+        b.setAttribute("aria-selected", isActive ? "true" : "false");
+      }
+    });
 
     const previewEl = document.getElementById("preview-container");
     const codeEl = document.getElementById("code-view");
