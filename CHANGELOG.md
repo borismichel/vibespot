@@ -51,6 +51,7 @@ Hover-activated toolbar over module sections in the preview pane. When hovering 
 
 ### Fixes
 
+- **Settings tab permanent spinner** ([VIB-212](/VIB/issues/VIB-212)) — switching to the editor's Settings workspace tab now triggers the environment fetch instead of leaving the default "Loading environment..." spinner in place. Added a 3 s fetch timeout with a retry-able fallback message so a hung backend can no longer wedge the panel.
 - **Mobile responsive layout** ([VIB-211](/VIB/issues/VIB-211)) — responsive gate dialog shown at viewports < 768px; tablet breakpoint (768–1024px) collapses the project rail to icon-only width, tightens chat panel, and hides topbar text to prevent clipping.
 - **Editor preview empty state** ([VIB-213](/VIB/issues/VIB-213)) — designed empty state inside `.browser-chrome` with vibeSpot sparkle mark, headline, and chat-input hint. Auto-hides when generation begins or when the iframe loads content.
 - **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restored starter grid CSS rules and added explicit background/color-scheme declarations for dark/light parity.
