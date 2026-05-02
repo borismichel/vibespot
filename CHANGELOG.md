@@ -38,6 +38,7 @@ Hover-activated toolbar over module sections in the preview pane. When hovering 
 
 ### Enhancements
 
+- **Status bar information density** ([VIB-236](/VIB/issues/VIB-236)) — enhanced statusbar with module count, page type badge, uptime, and memory usage indicators.
 - **Code quality indicators** ([VIB-234](/VIB/issues/VIB-234)) — HubL validity badge in browser-chrome bar, browser-chrome dots, URL bar. Badge shows valid/warning/error states with counts.
 - **HubSpot visual language** ([VIB-219](/VIB/issues/VIB-219)) — always-visible HubSpot portal indicator in topbar, polled from `/api/settings/status`. Connected state shows portal name + ID with green dot; disconnected links to Settings. Resource links in project rail sidebar.
 - **Project Home visual hierarchy** ([VIB-221](/VIB/issues/VIB-221)) — hero prompt section with "Start building" heading, enlarged prompt card with accent-glow border, promoted Build button to `btn--lg`, demoted template entry under "Or start from a template" label, standardised vertical rhythm.
