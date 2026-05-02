@@ -1,6 +1,8 @@
 /* vibeSpot — Vibe Coding UI */
 
 :root {
+  color-scheme: dark;
+
   /* Background */
   --bg: #0c0a09;
   --bg-panel: rgba(255,255,255,0.03);
@@ -149,6 +151,7 @@
 
 /* ---------------------------------------------------------------- Light Mode */
 [data-theme="light"] {
+  color-scheme: light;
   --bg: #faf9f7;
   --bg-panel: rgba(0,0,0,0.02);
   --bg-panel-solid: #f3f2f0;
@@ -3357,7 +3360,8 @@ body { display: flex; }
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: var(--space-3);
 }
-.starter-grid:not(:has(.starter-grid__group)) {
+/* Flat fallback when groups are not present (hardcoded HTML cards) */
+.starter-grid:not(:has(.starter-grid__group, .starter-grid__section)) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: var(--space-3);
@@ -5190,11 +5194,15 @@ body { display: flex; }
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  background: var(--bg);
 }
 
 /* When project-home overrides .setup, drop the legacy fixed-height behaviour */
 .project-home.setup { height: auto; }
-.project-home .setup__main { padding-top: 40px; }
+.project-home .setup__main {
+  padding-top: 40px;
+  background: var(--bg);
+}
 
 /* ---- Editor wrapper (replaces .dashboard + .app screens) -------- */
 .editor {
