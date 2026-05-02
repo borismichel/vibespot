@@ -24,6 +24,16 @@ npm run build && npx tsx test/validate.ts
 
 This test clones a real repo, creates a HubSpot theme, runs AI conversion via Claude Code, validates all generated files, uploads to HubSpot, verifies in HubSpot, then cleans up. Takes 3-5 minutes. The test is local-only (not in git or npm).
 
+### UI Element Reference Check
+
+After any changes to `ui/*.js` or `ui/index.html`, run:
+
+```bash
+npx tsx test/ui-element-refs.test.ts
+```
+
+This validates that every `getElementById`/`querySelector("#id")` in JS files references an ID that exists in the HTML (or is dynamically created). Exits non-zero on crash-causing mismatches. See `test/PRE-MERGE-QC.md` for the full pre-merge checklist.
+
 There is no unit test suite or linting configured.
 
 ## Architecture

@@ -3,7 +3,7 @@
  * Sits between setup (project list) and chat (template editing).
  */
 
-const dashboardScreen = document.getElementById("dashboard-screen");
+const dashboardScreen = document.getElementById("editor");
 
 // Page type labels for display
 const PAGE_TYPE_LABELS = {
@@ -31,16 +31,12 @@ let currentDashboardIsImported = false;
 async function showDashboard(themeName) {
   currentDashboardTheme = themeName;
 
-  // Hide other screens
-  setupScreen.classList.add("hidden");
-  document.getElementById("setup-topbar").classList.add("hidden");
+  const ab = document.getElementById("app-body");
+  if (ab) ab.dataset.mode = "editor";
   document.getElementById("project-rail")?.classList.remove("project-rail--expanded");
-  appScreen.classList.add("hidden");
   dashboardScreen.classList.remove("hidden");
 
-  document.getElementById("dashboard-theme-name").textContent = themeName;
-  document.getElementById("dashboard-theme-heading").textContent = themeName;
-  document.getElementById("dashboard-theme-path-text").textContent = "";
+  document.getElementById("theme-name").textContent = themeName;
 
   // Get sessionId for the active theme
   try {
@@ -64,7 +60,6 @@ async function showDashboard(themeName) {
 }
 
 function hideDashboard() {
-  dashboardScreen.classList.add("hidden");
   currentDashboardTheme = "";
   currentDashboardIsImported = false;
   closeModulePreview();
@@ -86,8 +81,9 @@ async function refreshDashboard() {
     renderModuleLibrary(data.moduleLibrary || []);
     renderBrandAssets(data.brandAssets || {});
     renderBrandKit(data.brandAssets?.brandKit || null);
-    if (data.themePath) {
-      document.getElementById("dashboard-theme-path-text").textContent = data.themePath;
+    const pathEl = document.getElementById("dashboard-theme-path-text");
+    if (data.themePath && pathEl) {
+      pathEl.textContent = data.themePath;
     }
     if (currentDashboardIsImported) {
       await refreshInverseAnalysis();
@@ -277,7 +273,8 @@ document.getElementById("btn-inverse-apply-tokens")?.addEventListener("click", a
 function renderTemplateList(templates) {
   const list = document.getElementById("dashboard-template-list");
   const countEl = document.getElementById("dashboard-template-count");
-  countEl.textContent = templates.length;
+  if (!list) return;
+  if (countEl) countEl.textContent = templates.length;
 
   if (templates.length === 0) {
     list.innerHTML = `<p class="dashboard__empty-state">No templates yet. Choose a page type above to get started.</p>`;
@@ -384,6 +381,7 @@ let activePreviewModule = "";
 
 function renderModuleLibrary(modules) {
   const container = document.getElementById("dashboard-module-library");
+  if (!container) return;
 
   if (modules.length === 0) {
     container.innerHTML = `<p class="dashboard__empty-state">Sections will appear here as you build pages.</p>`;
@@ -443,17 +441,17 @@ async function showModulePreview(moduleName, usedIn) {
 function closeModulePreview() {
   activePreviewModule = "";
   const previewEl = document.getElementById("dashboard-module-preview");
-  previewEl.classList.add("hidden");
+  if (previewEl) previewEl.classList.add("hidden");
   document.querySelectorAll(".dashboard__module-chip").forEach((c) => {
     c.classList.remove("dashboard__module-chip--active");
   });
 }
 
 // Close button for module preview
-document.getElementById("dashboard-preview-close").addEventListener("click", closeModulePreview);
+document.getElementById("dashboard-preview-close")?.addEventListener("click", closeModulePreview);
 
 // Delete button for module preview
-document.getElementById("dashboard-preview-delete").addEventListener("click", async () => {
+document.getElementById("dashboard-preview-delete")?.addEventListener("click", async () => {
   const moduleName = activePreviewModule;
   if (!moduleName) return;
 
@@ -853,10 +851,9 @@ async function handleBrandFileSelected(type, file) {
 // ---------------------------------------------------------------------------
 
 function showChat(themeName, templateId) {
-  hideDashboard();
-
-  // Show app screen
-  appScreen.classList.remove("hidden");
+  const ab = document.getElementById("app-body");
+  if (ab) ab.dataset.mode = "editor";
+  dashboardScreen.classList.remove("hidden");
   document.getElementById("theme-name").textContent = themeName;
 
   // Update browser chrome URL bar
@@ -891,23 +888,9 @@ document.querySelectorAll(".page-type-card").forEach((card) => {
   });
 });
 
-// Back button → setup
-document.getElementById("dashboard-back").addEventListener("click", () => {
-  hideDashboard();
-  if (typeof showSetup === "function") showSetup();
-});
-
-// Settings button
-document.getElementById("dashboard-settings-btn").addEventListener("click", () => {
-  if (typeof openSettings === "function") openSettings();
-});
-
-// Deploy button
-document.getElementById("dashboard-deploy-btn").addEventListener("click", () => {
+// Deploy button (topbar)
+document.getElementById("btn-upload")?.addEventListener("click", () => {
   if (typeof startUpload === "function") {
-    // Need to show app screen temporarily for upload
-    appScreen.classList.remove("hidden");
-    dashboardScreen.classList.add("hidden");
     startUpload();
   }
 });
@@ -1009,9 +992,9 @@ document.getElementById("btn-import-reference")?.addEventListener("click", async
   }
 });
 
-// Dashboard theme heading — double-click to rename
-document.getElementById("dashboard-theme-heading")?.addEventListener("dblclick", () => {
-  const el = document.getElementById("dashboard-theme-heading");
+// Theme name pill — double-click to rename
+document.getElementById("theme-name")?.addEventListener("dblclick", () => {
+  const el = document.getElementById("theme-name");
   if (!el || !currentDashboardSessionId) return;
   if (el.contentEditable === "true") return;
 
@@ -1046,7 +1029,7 @@ document.getElementById("dashboard-theme-heading")?.addEventListener("dblclick",
         if (data.ok) {
           el.textContent = data.newName;
           currentDashboardTheme = data.newName;
-          document.getElementById("dashboard-theme-name").textContent = data.newName;
+          document.getElementById("theme-name").textContent = data.newName;
           window.location.hash = "#/dashboard/" + encodeURIComponent(data.newName);
           // Update rail
           const railItem = document.querySelector(`.project-rail__item[data-name="${oldName}"]`);
@@ -1084,36 +1067,6 @@ document.getElementById("dashboard-theme-heading")?.addEventListener("dblclick",
   });
 });
 
-// Download ZIP button
-document.getElementById("dashboard-download-zip").addEventListener("click", async () => {
-  const btn = document.getElementById("dashboard-download-zip");
-  const origHTML = btn.innerHTML;
-  btn.disabled = true;
-  btn.querySelector("span").textContent = "Downloading...";
-
-  try {
-    const res = await fetch("/api/download-zip");
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: "Download failed" }));
-      throw new Error(err.error || "Download failed");
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = (currentDashboardTheme || "theme") + ".zip";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    if (typeof vibeAlert === "function") vibeAlert(err.message, "Error");
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = origHTML;
-  }
-});
-
 // Humanify toggle
 const humanifyCheckbox = document.getElementById("humanify-checkbox");
 if (humanifyCheckbox) {
@@ -1145,14 +1098,3 @@ document.querySelectorAll(".workspace-tab").forEach((btn) => {
   });
 });
 
-// Settings tab → open settings overlay
-document.getElementById("ws-settings-open")?.addEventListener("click", () => {
-  if (typeof openSettings === "function") openSettings();
-});
-
-// Marketplace tab → run validation
-document.getElementById("ws-marketplace-check")?.addEventListener("click", () => {
-  if (typeof runMarketplaceCheck === "function") {
-    runMarketplaceCheck();
-  }
-});

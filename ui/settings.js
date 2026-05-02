@@ -24,6 +24,8 @@ const ENGINE_LABELS = {
 // Open / Close
 // ---------------------------------------------------------------------------
 
+let _prevWorkspaceTab = "pages";
+
 function openSettings(tab) {
   if (typeof closeMenu === "function") closeMenu();
   if (tab) {
@@ -31,12 +33,24 @@ function openSettings(tab) {
     const tabs = document.querySelectorAll("#settings-tabs .settings__tab");
     tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
   }
-  document.getElementById("settings-overlay").classList.remove("hidden");
+  const overlay = document.getElementById("settings-overlay");
+  if (overlay) {
+    overlay.classList.remove("hidden");
+  } else if (typeof switchWorkspaceTab === "function") {
+    const activeWs = document.querySelector(".workspace-tab.active");
+    if (activeWs && activeWs.dataset.wsTab !== "settings") _prevWorkspaceTab = activeWs.dataset.wsTab;
+    switchWorkspaceTab("settings");
+  }
   refreshSettings();
 }
 
 function closeSettings() {
-  document.getElementById("settings-overlay").classList.add("hidden");
+  const overlay = document.getElementById("settings-overlay");
+  if (overlay) {
+    overlay.classList.add("hidden");
+  } else if (typeof switchWorkspaceTab === "function") {
+    switchWorkspaceTab(_prevWorkspaceTab || "pages");
+  }
   Object.keys(activePolls).forEach((id) => {
     clearInterval(activePolls[id]);
     delete activePolls[id];
@@ -1510,15 +1524,11 @@ function escSettings(str) {
 // Event listeners
 // ---------------------------------------------------------------------------
 
-document.getElementById("settings-close").addEventListener("click", closeSettings);
-document.getElementById("settings-overlay").addEventListener("click", (e) => {
-  if (e.target.id === "settings-overlay") closeSettings();
-});
-
-document.getElementById("btn-setup-settings").addEventListener("click", () => openSettings());
+document.getElementById("btn-setup-settings")?.addEventListener("click", () => openSettings());
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !document.getElementById("settings-overlay").classList.contains("hidden")) {
+  const settingsTabActive = document.querySelector('.workspace-tab[data-ws-tab="settings"].active');
+  if (e.key === "Escape" && settingsTabActive) {
     closeSettings();
   }
 });
