@@ -871,20 +871,23 @@ body { display: flex; }
   gap: 6px;
   padding: 10px 16px;
   font-family: var(--font);
-  font-size: var(--text-base);
-  font-weight: 500;
+  font-size: var(--text-md);
+  font-weight: 600;
   color: var(--text-dim);
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-radius: 6px 6px 0 0;
   cursor: pointer;
-  transition: color var(--duration-fast), border-color var(--duration-fast);
+  transition: color var(--duration-fast), border-color var(--duration-fast),
+    background-color var(--duration-fast);
   white-space: nowrap;
   margin-bottom: -1px;
 }
 
 .workspace-tab:hover {
   color: var(--text);
+  background-color: var(--bg-hover);
 }
 
 .workspace-tab.active {
@@ -5227,8 +5230,17 @@ body { display: flex; }
 }
 .topbar > .workspace-tabs .workspace-tab {
   padding: 0 14px;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
+  font-weight: 600;
   margin-bottom: 0;
+  align-self: stretch;
+  border-radius: 0;
+}
+.topbar > .workspace-tabs .workspace-tab:hover {
+  background-color: var(--bg-hover);
+}
+.topbar > .workspace-tabs .workspace-tab.active {
+  border-bottom-color: var(--accent);
 }
 
 /* ---- Pages workspace panel fills its container ------------------ */
