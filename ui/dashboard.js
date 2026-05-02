@@ -10,14 +10,14 @@ const PAGE_TYPE_LABELS = {
   landing_page: "LP",
   blog_post: "Blog",
   website_page: "Web",
-  module_only: "Sec",
+  module_only: "Mod",
 };
 
 const PAGE_TYPE_FULL_LABELS = {
   landing_page: "Landing Page",
   blog_post: "Blog Post",
   website_page: "Website Page",
-  module_only: "Section Only",
+  module_only: "Module Only",
 };
 
 // ---------------------------------------------------------------------------
@@ -288,7 +288,7 @@ function renderTemplateList(templates) {
     item.innerHTML = `
       <span class="dashboard__template-badge dashboard__template-badge--${tpl.pageType}">${esc(PAGE_TYPE_LABELS[tpl.pageType] || "?")}</span>
       <span class="dashboard__template-label">${esc(tpl.label)}</span>
-      <span class="dashboard__template-meta">${tpl.moduleCount} section${tpl.moduleCount !== 1 ? "s" : ""}</span>
+      <span class="dashboard__template-meta">${tpl.moduleCount} module${tpl.moduleCount !== 1 ? "s" : ""}</span>
       <button class="btn btn--sm btn--primary dashboard__template-open" data-id="${esc(tpl.id)}">Open</button>
       <button class="dashboard__template-clone" data-id="${esc(tpl.id)}" title="Clone template">&#x29C9;</button>
       <button class="dashboard__template-delete" data-id="${esc(tpl.id)}" title="Delete template">&times;</button>
@@ -384,7 +384,7 @@ function renderModuleLibrary(modules) {
   if (!container) return;
 
   if (modules.length === 0) {
-    container.innerHTML = `<p class="dashboard__empty-state">Sections will appear here as you build pages.</p>`;
+    container.innerHTML = `<p class="dashboard__empty-state">Modules will appear here as you build pages.</p>`;
     closeModulePreview();
     return;
   }
@@ -456,7 +456,7 @@ document.getElementById("dashboard-preview-delete")?.addEventListener("click", a
   if (!moduleName) return;
 
   const ok = await vibeConfirm(
-    `Delete section "${moduleName}"?`,
+    `Delete module "${moduleName}"?`,
     "This will remove it from all templates and delete it from disk.",
     { confirmLabel: "Delete" }
   );
@@ -471,7 +471,7 @@ document.getElementById("dashboard-preview-delete")?.addEventListener("click", a
     closeModulePreview();
     await refreshDashboard();
   } catch (err) {
-    await vibeAlert("Failed to delete section: " + err.message, "Error");
+    await vibeAlert("Failed to delete module: " + err.message, "Error");
   }
 });
 
@@ -566,7 +566,7 @@ async function extractBrandAsset(type, card) {
       );
       if (view) await vibeViewContent(data.content, ASSET_LABELS[type], ASSET_FILES[type]);
     } else {
-      await vibeAlert(data.error || "Nothing to extract — generate some sections first.", "Info");
+      await vibeAlert(data.error || "Nothing to extract — generate some modules first.", "Info");
     }
   } catch (err) {
     await vibeAlert("Extraction failed: " + err.message, "Error");
@@ -704,7 +704,7 @@ async function createTemplateFromPageType(pageType) {
     landing_page: "Landing Page",
     blog_post: "Blog Post",
     website_page: "Website Page",
-    module_only: "Section",
+    module_only: "Module",
   };
 
   const label = await vibePrompt("Template name", defaultLabels[pageType] || "New Template");
@@ -781,8 +781,8 @@ function vibeDeleteTemplateDialog() {
         <div class="confirm-dialog__title">Delete template?</div>
         <p class="confirm-dialog__warn">This cannot be undone.</p>
         <div class="confirm-dialog__actions" style="flex-direction:column;gap:8px">
-          <button class="btn btn--danger" data-action="with_modules" style="width:100%">Delete template and its sections</button>
-          <button class="btn btn--secondary" data-action="template_only" style="width:100%">Delete template only (keep sections)</button>
+          <button class="btn btn--danger" data-action="with_modules" style="width:100%">Delete template and its modules</button>
+          <button class="btn btn--secondary" data-action="template_only" style="width:100%">Delete template only (keep modules)</button>
           <button class="btn btn--secondary" data-action="cancel" style="width:100%">Cancel</button>
         </div>
       </div>
@@ -930,7 +930,7 @@ document.getElementById("btn-extract-all")?.addEventListener("click", async () =
       if (names.length > 0) {
         await vibeAlert(`Extracted: ${names.join(", ")}`, "Done");
       } else {
-        await vibeAlert("Nothing to extract \u2014 generate some sections first.", "Info");
+        await vibeAlert("Nothing to extract \u2014 generate some modules first.", "Info");
       }
     } else {
       await vibeAlert(data.error || "Extraction failed", "Error");

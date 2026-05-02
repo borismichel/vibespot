@@ -184,11 +184,11 @@ function buildChatPrefill(el) {
   else elementPart = `the ${tag}`;
 
   if (moduleEl === el && moduleName) {
-    return `In the ${moduleName} section, `;
+    return `In the ${moduleName} module, `;
   }
   if (moduleName) {
     const quote = text ? ` ("${text}${text.length === 80 ? "…" : ""}")` : "";
-    return `In the ${moduleName} section, ${elementPart}${quote} `;
+    return `In the ${moduleName} module, ${elementPart}${quote} `;
   }
   return `${elementPart} `;
 }

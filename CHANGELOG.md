@@ -4,6 +4,21 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## Unreleased
+
+### Align UI terminology with HubSpot vocabulary ([VIB-233](/VIB/issues/VIB-233))
+
+User-facing copy now uses HubSpot's canonical terms (Module, Module Library, Brand Kit) instead of the legacy &ldquo;section&rdquo; phrasing. Internal code already used `module`; the UI was the inconsistency. Where vibeSpot keeps a different concept (e.g. Project &harr; Theme), the HubSpot equivalent is shown in tooltips. A new "HubSpot Terminology" section in the docs documents the mapping.
+
+- **[ui/index.html](ui/index.html)** — module slideout titles, page-tree page-type option (`Module Only`), Library tab header (`Module Library`), tooltips on Brand and Library workspace tabs explaining the HubSpot equivalents, project-rail tooltip clarifying Project &harr; Theme.
+- **[ui/dashboard.js](ui/dashboard.js)** — page-type labels, template meta count, empty-state copy, delete-template/delete-module dialogs, brand-asset extract messages.
+- **[ui/chat.js](ui/chat.js)** — pipeline stats, contextual chat suggestions, agentic-pipeline onboarding copy, history-timeline change summaries.
+- **[ui/inline-edit.js](ui/inline-edit.js)** — "In the X module" preamble for select-mode-generated chat refs.
+- **[ui/field-editor.js](ui/field-editor.js)**, **[ui/settings.js](ui/settings.js)** — module-not-found, settings descriptions, agentic-pipeline status copy.
+- **[ui/docs/index.html](ui/docs/index.html)** — new "HubSpot Terminology" section under Reference with a vibeSpot &rarr; HubSpot mapping table.
+
+---
+
 ## v1.3.0 — 2026-04-30
 
 ### Email template generation — Phase 1 ([VIB-158](/VIB/issues/VIB-158))
