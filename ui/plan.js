@@ -466,6 +466,8 @@
     btn.setAttribute("aria-pressed", planModeActive ? "true" : "false");
     const state = btn.querySelector(".plan-toggle__state");
     if (state) state.textContent = planModeActive ? "On" : "Off";
+    // Notify other UI (e.g. chat input placeholder) that plan-mode flipped.
+    window.dispatchEvent(new CustomEvent("plan-mode-changed", { detail: { active: planModeActive } }));
   }
 
   function reflectModeBadge() {

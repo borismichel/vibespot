@@ -2526,16 +2526,51 @@ inputEl.addEventListener("keydown", (e) => {
   }
 });
 
-// Auto-grow textarea
-inputEl.addEventListener("input", () => {
+// Auto-grow textarea — 3 rows default, expand up to 6 rows.
+// Line-height (1.5) × font-size (14px) × 6 rows + ~8px padding = ~134px.
+const CHAT_INPUT_MAX_HEIGHT = 134;
+function autoGrowChatInput() {
   inputEl.style.height = "auto";
-  inputEl.style.height = Math.min(inputEl.scrollHeight, 150) + "px";
+  inputEl.style.height = Math.min(inputEl.scrollHeight, CHAT_INPUT_MAX_HEIGHT) + "px";
+}
+inputEl.addEventListener("input", () => {
+  autoGrowChatInput();
 
   // Hide suggestion chips as soon as the user starts typing
   if (suggestionsVisible && inputEl.value.length > 0) {
     hideChatSuggestions();
   }
 });
+
+// Contextual placeholder — adapts to plan mode and whether a page already exists.
+function updateChatPlaceholder() {
+  if (!inputEl) return;
+  const planActive = !!window.planModeActive;
+  const moduleCountEl = document.getElementById("module-count");
+  const moduleCount = moduleCountEl ? parseInt(moduleCountEl.textContent || "0", 10) || 0 : 0;
+  let placeholder;
+  if (planActive) {
+    placeholder = "Describe what you want to plan...";
+  } else if (moduleCount > 0) {
+    placeholder = "Describe what you want to change...";
+  } else {
+    placeholder = "Describe your landing page...";
+  }
+  inputEl.placeholder = placeholder;
+}
+
+// Re-evaluate placeholder when plan mode changes (plan.js dispatches this) or
+// when the module list updates.
+window.addEventListener("plan-mode-changed", updateChatPlaceholder);
+const _moduleCountEl = document.getElementById("module-count");
+if (_moduleCountEl && typeof MutationObserver !== "undefined") {
+  new MutationObserver(updateChatPlaceholder).observe(_moduleCountEl, {
+    childList: true,
+    characterData: true,
+    subtree: true,
+  });
+}
+updateChatPlaceholder();
 
 // Suggestion chip click — pre-fill input and focus, do not auto-send so the
 // user can edit before pressing Enter.
@@ -2557,8 +2592,7 @@ window.prefillChatInput = function (text) {
   const existing = inputEl.value;
   const prefix = existing.trim() ? existing.replace(/\s+$/, "") + "\n\n" : "";
   inputEl.value = prefix + text;
-  inputEl.style.height = "auto";
-  inputEl.style.height = Math.min(inputEl.scrollHeight, 150) + "px";
+  autoGrowChatInput();
   inputEl.focus();
   const end = inputEl.value.length;
   inputEl.setSelectionRange(end, end);
