@@ -145,7 +145,6 @@
   --bg-code-block: rgba(0,0,0,0.4);
   --text-on-accent: #fff;
   --topbar-bg: rgba(12,10,9,0.85);
-  --chrome-dot: rgba(255,255,255,0.08);
   --title-gradient: linear-gradient(135deg, #ffffff, #a5a3b3);
 }
 
@@ -193,7 +192,6 @@
   --bg-code-block: rgba(0,0,0,0.06);
   --text-on-accent: #fff;
   --topbar-bg: rgba(250,249,247,0.85);
-  --chrome-dot: rgba(0,0,0,0.1);
   --title-gradient: linear-gradient(135deg, #1a1a1a, #6b6878);
 }
 
@@ -4394,34 +4392,15 @@ body { display: flex; }
 }
 
 .browser-chrome__bar {
-  height: 36px;
+  height: 22px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 14px;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 8px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-}
-
-.browser-chrome__dots {
-  display: flex;
-  gap: 6px;
-}
-
-.browser-chrome__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--chrome-dot);
-}
-
-.browser-chrome__url {
-  flex: 1;
-  text-align: center;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  font-family: var(--font-mono);
 }
 
 .browser-chrome__frame {
@@ -5333,23 +5312,18 @@ body { display: flex; }
   display: block;
 }
 
-/* ---- Browser-chrome bar now hosts the responsive + interact toggles -- */
-.browser-chrome__bar { padding: 0 10px; gap: 8px; }
-.browser-chrome__url {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.browser-chrome__bar .responsive-toggle { padding: 2px; }
-.browser-chrome__bar .responsive-btn { width: 26px; height: 22px; }
+/* ---- Browser-chrome bar hosts the responsive + interact toggles, slim ---- */
+.browser-chrome__bar .responsive-toggle { padding: 1px; }
+.browser-chrome__bar .responsive-btn { width: 22px; height: 18px; }
+.browser-chrome__bar .responsive-btn .icon { width: 12px; height: 12px; }
 .browser-chrome__bar .interact-mode-toggle {
-  height: 26px;
+  height: 20px;
   padding: 0 8px;
   margin-left: 0;
   font-size: var(--text-xs, 11px);
+  gap: 4px;
 }
+.browser-chrome__bar .interact-mode-toggle .icon { width: 12px; height: 12px; }
 
 /* ---- Icon size utilities (VIB-187 standardization) -------------- */
 .icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }

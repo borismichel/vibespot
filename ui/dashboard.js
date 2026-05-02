@@ -856,10 +856,6 @@ function showChat(themeName, templateId) {
   dashboardScreen.classList.remove("hidden");
   document.getElementById("theme-name").textContent = themeName;
 
-  // Update browser chrome URL bar
-  const urlEl = document.getElementById("browser-url");
-  if (urlEl) urlEl.textContent = themeName + ".vibespot.app";
-
   // Update URL
   const target = `#/app/${encodeURIComponent(themeName)}/${encodeURIComponent(templateId)}`;
   if (location.hash !== target) {
