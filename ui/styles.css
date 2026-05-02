@@ -1805,6 +1805,34 @@ body { display: flex; }
   flex: 0 0 auto;
 }
 
+/* Group of related topbar controls (e.g. undo / redo / history) shown as a
+   single visual cluster with a shared subtle background. */
+.topbar__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-input, var(--bg-hover));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.topbar__group .topbar__icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: calc(var(--radius-sm) - 1px);
+}
+.topbar__group .topbar__icon-btn--with-label {
+  width: auto;
+  padding: 0 10px;
+  gap: 6px;
+  color: var(--text);
+}
+.topbar__icon-btn-label {
+  font-size: var(--text-sm, 13px);
+  font-weight: var(--weight-medium, 500);
+  letter-spacing: 0.01em;
+}
+
 
 /* ================================================================
    COMPONENT LIBRARY (per VIB-184 spec)
