@@ -74,12 +74,23 @@ function renderPageTabs(templates, activeTemplateId) {
   list.innerHTML = currentTemplates.map((t) => {
     const isActive = t.id === activeTemplateId;
     const badge = PAGE_TYPE_BADGES[t.pageType] || "";
-    return `<button class="page-tabs__tab${isActive ? " page-tabs__tab--active" : ""}" data-template-id="${t.id}" title="${t.label} (${t.moduleCount} modules)">
+    return `<button class="page-tabs__tab${isActive ? " page-tabs__tab--active" : ""}" role="treeitem" aria-selected="${isActive ? "true" : "false"}" data-template-id="${t.id}" title="${t.label} (${t.moduleCount} modules)">
       ${badge ? `<span class="page-tabs__tab-badge">${badge}</span>` : ""}
       <span class="page-tabs__tab-label">${escapeHtml(t.label)}</span>
       <span class="page-tabs__tab-count">${t.moduleCount}</span>
     </button>`;
   }).join("");
+}
+
+function refreshPageTabs() {
+  return fetch("/api/templates")
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (!data) return;
+      currentTemplateId = data.activeTemplateId || currentTemplateId;
+      renderPageTabs(data.templates || [], currentTemplateId);
+    })
+    .catch(() => {});
 }
 
 function handlePageTabClick(e) {
@@ -138,18 +149,25 @@ function createPage(pageType, label) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pageType, label }),
   }).then((res) => {
-    if (!res.ok) return;
+    if (!res.ok) return null;
     return res.json();
   }).then((data) => {
-    if (data && data.id) {
-      return fetch("/api/templates/activate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateId: data.id }),
-      });
-    }
-  }).then((res) => {
-    if (res && res.ok) connectWebSocket();
+    const newId = data && data.template && data.template.id;
+    if (!newId) return;
+    // Server's addTemplate already marks the new template as active, but we
+    // call activate to sync the flat-field cache and let the WS reconnect
+    // re-broadcast the full session (modules + templates + active id).
+    return fetch("/api/templates/activate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ templateId: newId }),
+    }).then((res) => {
+      if (!res || !res.ok) return;
+      // Re-render the tree immediately from the canonical list so the new
+      // page shows up even before the WS init message arrives.
+      refreshPageTabs();
+      connectWebSocket();
+    });
   });
 }
 
