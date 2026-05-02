@@ -5319,6 +5319,34 @@ body { display: flex; }
   display: flex;
   gap: 8px;
   margin-top: 16px;
+  align-items: center;
+}
+.walkthrough__actions-spacer { flex: 1; }
+
+.walkthrough__bullets {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  color: var(--text-dim);
+  font-size: var(--text-base);
+  line-height: 1.6;
+}
+.walkthrough__bullets li { margin-bottom: 6px; }
+.walkthrough__bullets li strong { color: var(--text); font-weight: 600; }
+.walkthrough__bullets li code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
+
+.walkthrough__sample-prompt-body {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text);
+  line-height: 1.55;
+  white-space: pre-wrap;
 }
 
 /* ================================================================

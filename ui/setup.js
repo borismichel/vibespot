@@ -98,10 +98,20 @@ async function initSetup() {
       }, 0);
     }
 
-    // Check if we should show the walkthrough (fresh environment)
+    // First-visit product intro: 3-step walkthrough explaining vibeSpot.
+    // Add ?intro to URL to force-show it for testing.
+    const params = new URLSearchParams(location.search);
+    const introSeen = localStorage.getItem(INTRO_SEEN_KEY) === "1";
+    const isFreshUser = info.sessions.length === 0 && info.localThemes.length === 0;
+    if (params.has("intro") || (!introSeen && isFreshUser)) {
+      showIntroWalkthrough(info);
+      return;
+    }
+
+    // Check if we should show the engine-setup walkthrough (fresh environment).
     // Add ?walkthrough to URL to force-show it for testing
-    if (new URLSearchParams(location.search).has("walkthrough") ||
-        (!info.aiAvailable && info.sessions.length === 0 && info.localThemes.length === 0)) {
+    if (params.has("walkthrough") ||
+        (!info.aiAvailable && isFreshUser)) {
       showWalkthrough();
       return;
     }
@@ -500,6 +510,146 @@ function confirmDeleteProject(project) {
       showError("Failed to delete project.");
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// First-visit product intro walkthrough (3 steps)
+// ---------------------------------------------------------------------------
+
+const INTRO_SEEN_KEY = "vibespot:introSeen";
+const INTRO_SAMPLE_PROMPT =
+  "A landing page for a B2B SaaS product called Northwind Analytics. " +
+  "Include a hero with a headline and CTA, three feature cards, a customer logo bar, " +
+  "a testimonial, and a final call-to-action section.";
+
+function renderIntroProgress(stepIndex, totalSteps) {
+  let html = "";
+  for (let i = 0; i < totalSteps; i++) {
+    const cls = i === stepIndex ? "active" : i < stepIndex ? "done" : "";
+    html += `<div class="walkthrough__step-dot ${cls}">${i < stepIndex ? "&#10003;" : i + 1}</div>`;
+    if (i < totalSteps - 1) html += `<div class="walkthrough__step-line"></div>`;
+  }
+  return html;
+}
+
+function dismissIntroWalkthrough(info) {
+  try { localStorage.setItem(INTRO_SEEN_KEY, "1"); } catch {}
+  const url = new URL(location.href);
+  if (url.searchParams.has("intro")) {
+    url.searchParams.delete("intro");
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }
+  document.getElementById("walkthrough").classList.add("hidden");
+  // If the user still has no AI engine on a fresh install, fall through to
+  // the engine-setup walkthrough; otherwise reveal the normal setup options.
+  if (info && !info.aiAvailable && (info.sessions || []).length === 0 && (info.localThemes || []).length === 0) {
+    showWalkthrough();
+  } else {
+    document.getElementById("setup-options").classList.remove("hidden");
+  }
+}
+
+function showIntroWalkthrough(info) {
+  const walkthrough = document.getElementById("walkthrough");
+  const options = document.getElementById("setup-options");
+  const progress = document.getElementById("walkthrough-progress");
+  const content = document.getElementById("walkthrough-content");
+  if (!walkthrough || !options || !progress || !content) return;
+
+  walkthrough.classList.remove("hidden");
+  options.classList.add("hidden");
+
+  const STEPS = [
+    {
+      title: "Welcome to vibeSpot",
+      body: `
+        <p>vibeSpot turns plain-language descriptions into native HubSpot CMS landing pages.
+        Describe what you want, watch a live preview build, then upload the result straight to HubSpot.</p>
+        <ul class="walkthrough__bullets">
+          <li>Chat-driven editing with a side-by-side preview</li>
+          <li>Generates real HubL modules, not screenshots or mockups</li>
+          <li>Works with Claude, OpenAI, or Gemini &mdash; API key or CLI</li>
+        </ul>
+      `,
+    },
+    {
+      title: "How it maps to HubSpot",
+      body: `
+        <p>Every vibeSpot page becomes a fully editable HubSpot theme. The pieces line up like this:</p>
+        <ul class="walkthrough__bullets">
+          <li><strong>Sections</strong> &rarr; HubSpot <strong>modules</strong> with editable fields</li>
+          <li><strong>Shared CSS &amp; tokens</strong> &rarr; theme-level <code>:root</code> variables</li>
+          <li><strong>Project</strong> &rarr; uploadable <strong>HubSpot CMS theme</strong> with templates</li>
+        </ul>
+        <p>Marketers can keep editing fields in HubSpot after upload &mdash; no code changes required.</p>
+      `,
+    },
+    {
+      title: "Try it with a pre-filled prompt",
+      body: `
+        <p>We&rsquo;ll drop a sample prompt into the builder so you can see vibeSpot in action.
+        You can edit it before pressing <strong>Build</strong>.</p>
+        <div class="walkthrough__card walkthrough__sample-prompt">
+          <div class="walkthrough__card-title">Sample prompt</div>
+          <div class="walkthrough__sample-prompt-body">${esc(INTRO_SAMPLE_PROMPT)}</div>
+        </div>
+      `,
+    },
+  ];
+
+  let stepIndex = 0;
+
+  function render() {
+    const step = STEPS[stepIndex];
+    progress.innerHTML = renderIntroProgress(stepIndex, STEPS.length);
+
+    const isLast = stepIndex === STEPS.length - 1;
+    const primaryLabel = isLast ? "Try it now" : "Next";
+    const backBtn = stepIndex > 0
+      ? `<button class="btn btn--secondary" id="intro-back">Back</button>`
+      : "";
+
+    content.innerHTML = `
+      <div class="walkthrough__step-title">${esc(step.title)}</div>
+      <div class="walkthrough__step-desc">${step.body}</div>
+      <div class="walkthrough__actions">
+        <button class="btn btn--ghost" id="intro-skip">Skip intro</button>
+        <span class="walkthrough__actions-spacer"></span>
+        ${backBtn}
+        <button class="btn btn--primary" id="intro-next">${primaryLabel}</button>
+      </div>
+    `;
+
+    document.getElementById("intro-skip").addEventListener("click", () => dismissIntroWalkthrough(info));
+    document.getElementById("intro-next").addEventListener("click", () => {
+      if (isLast) {
+        // Pre-fill the prompt and hand off to the normal builder flow.
+        const promptInput = document.getElementById("setup-prompt-input");
+        if (promptInput) {
+          promptInput.value = INTRO_SAMPLE_PROMPT;
+          promptInput.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        dismissIntroWalkthrough(info);
+        // Focus the prompt so the user lands ready to edit / submit.
+        setTimeout(() => {
+          const el = document.getElementById("setup-prompt-input");
+          if (el) {
+            el.focus();
+            if (typeof el.scrollIntoView === "function") {
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }
+        }, 0);
+        return;
+      }
+      stepIndex++;
+      render();
+    });
+    const backEl = document.getElementById("intro-back");
+    if (backEl) backEl.addEventListener("click", () => { stepIndex--; render(); });
+  }
+
+  render();
 }
 
 // ---------------------------------------------------------------------------
