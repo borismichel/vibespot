@@ -6,6 +6,10 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### Enhancements
+
+- **Brand tab visual preview** ([VIB-226](/VIB/issues/VIB-226)) — add a live brand preview card above the brand kit form: color swatches for primary/secondary/accent, sample heading + body text rendered with the configured fonts, and a logo thumbnail when a URL is provided. Group the form fields into Colors / Fonts / Logo cards and constrain the form to `max-width: 480px` so the brand tab no longer reads as a sparse data-entry list.
+
 ### Fixes
 
 - **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restore `.starter-grid__group/heading/section` CSS rules and wrap each section in `.starter-grid__group` so the dynamic starter render keeps its grouped grid layout in both dark and light modes. Add explicit `background: var(--bg)` to `.project-home` / `.project-home .setup__main` and declare `color-scheme: dark/light` alongside the data-theme tokens so native form widgets, scrollbars, and any flex/scroll overflow follow the active theme.

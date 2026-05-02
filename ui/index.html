@@ -679,33 +679,67 @@
                 <span class="dashboard__section-hint">Colors, fonts, and logo enforced in generated modules</span>
               </div>
               <div class="brand-kit" id="dashboard-brand-kit">
-                <div class="brand-kit__row">
-                  <label class="brand-kit__label" for="bk-color-primary">Primary</label>
-                  <input type="color" class="brand-kit__color" id="bk-color-primary" value="#e8613a" aria-label="Primary color">
-                  <input type="text" class="brand-kit__hex" id="bk-hex-primary" placeholder="#e8613a" maxlength="7" aria-label="Primary color hex">
+                <div class="brand-preview" id="brand-preview" aria-label="Live brand preview">
+                  <div class="brand-preview__logo">
+                    <img class="brand-preview__logo-img" id="brand-preview-logo" alt="Logo preview" hidden>
+                    <span class="brand-preview__logo-placeholder" id="brand-preview-logo-placeholder">No logo</span>
+                  </div>
+                  <div class="brand-preview__type">
+                    <div class="brand-preview__heading" id="brand-preview-heading">The quick brown fox</div>
+                    <div class="brand-preview__body" id="brand-preview-body">Pack my box with five dozen liquor jugs.</div>
+                  </div>
+                  <div class="brand-preview__swatches" aria-label="Color swatches">
+                    <div class="brand-preview__swatch" id="brand-preview-swatch-primary" title="Primary">
+                      <span class="brand-preview__swatch-name">Primary</span>
+                    </div>
+                    <div class="brand-preview__swatch" id="brand-preview-swatch-secondary" title="Secondary">
+                      <span class="brand-preview__swatch-name">Secondary</span>
+                    </div>
+                    <div class="brand-preview__swatch" id="brand-preview-swatch-accent" title="Accent">
+                      <span class="brand-preview__swatch-name">Accent</span>
+                    </div>
+                  </div>
                 </div>
-                <div class="brand-kit__row">
-                  <label class="brand-kit__label" for="bk-color-secondary">Secondary</label>
-                  <input type="color" class="brand-kit__color" id="bk-color-secondary" value="#1a1a2e" aria-label="Secondary color">
-                  <input type="text" class="brand-kit__hex" id="bk-hex-secondary" placeholder="#1a1a2e" maxlength="7" aria-label="Secondary color hex">
+
+                <div class="brand-kit__group" aria-labelledby="brand-kit-group-colors">
+                  <div class="brand-kit__group-title" id="brand-kit-group-colors">Colors</div>
+                  <div class="brand-kit__row">
+                    <label class="brand-kit__label" for="bk-color-primary">Primary</label>
+                    <input type="color" class="brand-kit__color" id="bk-color-primary" value="#e8613a" aria-label="Primary color">
+                    <input type="text" class="brand-kit__hex" id="bk-hex-primary" placeholder="#e8613a" maxlength="7" aria-label="Primary color hex">
+                  </div>
+                  <div class="brand-kit__row">
+                    <label class="brand-kit__label" for="bk-color-secondary">Secondary</label>
+                    <input type="color" class="brand-kit__color" id="bk-color-secondary" value="#1a1a2e" aria-label="Secondary color">
+                    <input type="text" class="brand-kit__hex" id="bk-hex-secondary" placeholder="#1a1a2e" maxlength="7" aria-label="Secondary color hex">
+                  </div>
+                  <div class="brand-kit__row">
+                    <label class="brand-kit__label" for="bk-color-accent">Accent</label>
+                    <input type="color" class="brand-kit__color" id="bk-color-accent" value="#f4a261" aria-label="Accent color">
+                    <input type="text" class="brand-kit__hex" id="bk-hex-accent" placeholder="#f4a261" maxlength="7" aria-label="Accent color hex">
+                  </div>
                 </div>
-                <div class="brand-kit__row">
-                  <label class="brand-kit__label" for="bk-color-accent">Accent</label>
-                  <input type="color" class="brand-kit__color" id="bk-color-accent" value="#f4a261" aria-label="Accent color">
-                  <input type="text" class="brand-kit__hex" id="bk-hex-accent" placeholder="#f4a261" maxlength="7" aria-label="Accent color hex">
+
+                <div class="brand-kit__group" aria-labelledby="brand-kit-group-fonts">
+                  <div class="brand-kit__group-title" id="brand-kit-group-fonts">Fonts</div>
+                  <div class="brand-kit__row">
+                    <label class="brand-kit__label" for="bk-font-heading">Heading</label>
+                    <input type="text" class="brand-kit__input" id="bk-font-heading" placeholder="Georgia, serif" aria-label="Heading font">
+                  </div>
+                  <div class="brand-kit__row">
+                    <label class="brand-kit__label" for="bk-font-body">Body</label>
+                    <input type="text" class="brand-kit__input" id="bk-font-body" placeholder="Arial, Helvetica, sans-serif" aria-label="Body font">
+                  </div>
                 </div>
-                <div class="brand-kit__row">
-                  <label class="brand-kit__label" for="bk-font-heading">Heading font</label>
-                  <input type="text" class="brand-kit__input" id="bk-font-heading" placeholder="Georgia, serif" aria-label="Heading font">
+
+                <div class="brand-kit__group" aria-labelledby="brand-kit-group-logo">
+                  <div class="brand-kit__group-title" id="brand-kit-group-logo">Logo</div>
+                  <div class="brand-kit__row">
+                    <label class="brand-kit__label" for="bk-logo-url">URL</label>
+                    <input type="text" class="brand-kit__input brand-kit__input--wide" id="bk-logo-url" placeholder="https://example.com/logo.png" aria-label="Logo URL">
+                  </div>
                 </div>
-                <div class="brand-kit__row">
-                  <label class="brand-kit__label" for="bk-font-body">Body font</label>
-                  <input type="text" class="brand-kit__input" id="bk-font-body" placeholder="Arial, Helvetica, sans-serif" aria-label="Body font">
-                </div>
-                <div class="brand-kit__row">
-                  <label class="brand-kit__label" for="bk-logo-url">Logo URL</label>
-                  <input type="text" class="brand-kit__input brand-kit__input--wide" id="bk-logo-url" placeholder="https://example.com/logo.png" aria-label="Logo URL">
-                </div>
+
                 <div class="brand-kit__actions">
                   <button class="btn btn--sm btn--primary" id="bk-save" type="button">Save Brand Kit</button>
                   <button class="btn btn--sm btn--outline brand-kit__btn--danger" id="bk-clear" type="button">Clear</button>
