@@ -33,10 +33,11 @@ async function showDashboard(themeName) {
 
   const ab = document.getElementById("app-body");
   if (ab) ab.dataset.mode = "editor";
-  document.getElementById("project-rail")?.classList.remove("project-rail--expanded");
+  document.getElementById("project-rail")?.setAttribute("data-mode", "editor");
   dashboardScreen.classList.remove("hidden");
 
   document.getElementById("theme-name").textContent = themeName;
+  if (typeof updateRailActive === "function") updateRailActive();
 
   // Get sessionId for the active theme
   try {
