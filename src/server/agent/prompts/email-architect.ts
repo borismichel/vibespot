@@ -50,22 +50,22 @@ You produce a token map (colors, fonts, sizes) and a style guide string that dow
 ### cssVariables
 A flat object mapping token names to literal CSS values. These are NOT CSS custom properties — they are a reference map for module developers to copy into inline styles. Use descriptive names:
 
-**Colors**:
-- bg-color: email body background (e.g., "#f4f4f4")
-- content-bg: main content area background (e.g., "#ffffff")
-- text-color: primary text color (e.g., "#333333")
-- text-muted: secondary text color (e.g., "#666666")
-- text-light: light text for footers (e.g., "#999999")
-- heading-color: heading text color (e.g., "#1a1a1a")
-- primary-color: primary brand/CTA color (e.g., "#e8613a")
-- primary-hover: darker primary for button states (e.g., "#d14e2a")
+**Colors** (choose original values that fit the topic — no default palette):
+- bg-color: email body background
+- content-bg: main content area background
+- text-color: primary text color
+- text-muted: secondary text color
+- text-light: light text for footers
+- heading-color: heading text color
+- primary-color: primary brand/CTA color
+- primary-hover: darker primary for button states
 - accent-color: accent/highlight color
-- border-color: divider/border color (e.g., "#e0e0e0")
+- border-color: divider/border color
 - footer-bg: footer background color
 
-**Typography** (web-safe stacks only):
-- font-heading: heading font stack (e.g., "Georgia, 'Times New Roman', serif")
-- font-body: body font stack (e.g., "Arial, Helvetica, sans-serif")
+**Typography** (web-safe stacks only — pick the pairing that fits the mood):
+- font-heading: heading font stack
+- font-body: body font stack
 - size-h1: main heading size in px (e.g., "28px")
 - size-h2: section heading size in px (e.g., "22px")
 - size-h3: subheading size in px (e.g., "18px")
@@ -135,7 +135,12 @@ Do NOT use: system-ui, -apple-system, Segoe UI, Inter, or any Google Fonts.
   }
 
   const kitBlock = formatBrandKitConstraints(brandAssets?.brandKit);
-  if (kitBlock) parts.push(kitBlock);
+  if (kitBlock) {
+    parts.push(kitBlock);
+  } else if (!brandAssets?.styleguide) {
+    parts.push(`\n\n## No Brand Provided — Be Creative
+No brand colors or fonts have been set. Invent an original color palette that fits the email's topic and audience. Do NOT fall back to generic grays and blues. Choose web-safe font pairings (heading + body) that match the mood — vary between serif, sans-serif, and other stacks based on what fits.`);
+  }
 
   return parts.join("");
 }
@@ -164,7 +169,12 @@ export function buildEmailDesignSystemPromptBlocks(
   if (brandAssets?.styleguide) dynamicParts.push(`## Brand Style Guide\n${brandAssets.styleguide}`);
   if (brandAssets?.themeContext) dynamicParts.push(`## Product Context\n${brandAssets.themeContext}`);
   const kitBlock = formatBrandKitConstraints(brandAssets?.brandKit);
-  if (kitBlock) dynamicParts.push(kitBlock);
+  if (kitBlock) {
+    dynamicParts.push(kitBlock);
+  } else if (!brandAssets?.styleguide) {
+    dynamicParts.push(`## No Brand Provided — Be Creative
+No brand colors or fonts have been set. Invent an original color palette that fits the email's topic and audience. Do NOT fall back to generic grays and blues. Choose web-safe font pairings (heading + body) that match the mood — vary between serif, sans-serif, and other stacks based on what fits.`);
+  }
   if (dynamicParts.length > 0) {
     blocks.push({ type: "text", text: dynamicParts.join("\n\n") });
   }
