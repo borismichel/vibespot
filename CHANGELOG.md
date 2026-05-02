@@ -26,6 +26,7 @@ Hover-activated toolbar over module sections in the preview pane. When hovering 
 
 ### Features
 
+- **Page tree context actions** ([VIB-232](/VIB/issues/VIB-232)) — page tree items get type icons, drag-to-reorder, and right-click context menu (Rename, Duplicate, Move, Delete) with server-side routes for page operations.
 - **First-visit onboarding walkthrough** ([VIB-235](/VIB/issues/VIB-235)) — 3-step product intro shown on the project home for fresh installs (no projects, no local themes). Steps: (1) what vibeSpot is, (2) how it maps to HubSpot (sections → modules, tokens → `:root` vars, project → CMS theme), (3) try it with a pre-filled sample prompt. Adds back/next/skip controls, progress dots, and persists a `vibespot:introSeen` localStorage flag. Force-show with `?intro` in the URL.
 - **Blog template generation** ([VIB-160](/VIB/issues/VIB-160)) — blog as a content type alongside page and email. Blog-specific prompts with HubSpot blog variables (`content.post_body`, `content.author`, `blog_recent_posts`), blog validator auto-fix, and a pre-built Blog Content Hub starter template (8 modules).
 - **Split-pane view** ([VIB-163](/VIB/issues/VIB-163)) — "Split" button in the view toggle shows live preview and code editor in a 50/50 CSS grid layout. Fully coordinated with Preview, Plan, and Code view switching.

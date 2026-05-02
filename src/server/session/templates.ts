@@ -150,6 +150,38 @@ export function cloneTemplate(templateId: string, newLabel?: string): TemplateEn
 }
 
 /**
+ * Reorder templates by supplying the desired list of IDs.
+ * Any IDs in the current session that are missing from the input are appended in
+ * their existing relative order so a partial list can never drop a template.
+ * Returns true if the order changed (or was applied), false if the session is missing.
+ */
+export function reorderTemplates(templateIds: string[]): boolean {
+  const activeSession = getSession();
+  if (!activeSession) return false;
+  if (!Array.isArray(templateIds) || templateIds.length === 0) return false;
+
+  const byId = new Map(activeSession.templates.map((t) => [t.id, t] as const));
+  const seen = new Set<string>();
+  const next: TemplateEntry[] = [];
+
+  for (const id of templateIds) {
+    const tpl = byId.get(id);
+    if (!tpl || seen.has(id)) continue;
+    next.push(tpl);
+    seen.add(id);
+  }
+  // Keep templates that weren't named in the request at the end, preserving order.
+  for (const tpl of activeSession.templates) {
+    if (!seen.has(tpl.id)) next.push(tpl);
+  }
+
+  if (next.length !== activeSession.templates.length) return false;
+  activeSession.templates = next;
+  activeSession.updatedAt = Date.now();
+  return true;
+}
+
+/**
  * Rename a template's display label.
  */
 export function renameTemplate(templateId: string, newLabel: string): boolean {
