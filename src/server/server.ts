@@ -75,6 +75,7 @@ import {
   handleTemplateActivateRoute,
   handleTemplateRenameRoute,
   handleTemplateCloneRoute,
+  handleTemplateReorderRoute,
   handleModuleLibraryRoute,
   handleAddModuleToTemplateRoute,
   handleBrandAssetsRoute,
@@ -537,6 +538,11 @@ function handleApiRoute(
 
     case "/api/templates/clone":
       if (method === "POST") handleTemplateCloneRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/templates/reorder":
+      if (method === "POST") handleTemplateReorderRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 

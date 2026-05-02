@@ -4,6 +4,21 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## Unreleased
+
+### Page tree context actions ([VIB-232](/VIB/issues/VIB-232))
+
+The Pages tree in the editor sidebar now supports rich management without leaving the editor.
+
+- **Page type icons** — every row shows an inline SVG icon for its `pageType` (landing page, website page, blog post, email, section).
+- **Right-click context menu** with Edit name, Duplicate, Move up, Move down, and Delete actions. The same menu is reachable via a hover-revealed kebab button on each row.
+- **Inline rename** — Edit puts the label into a contenteditable cell with Enter to commit, Esc to cancel.
+- **Drag handle** appears on hover. Drag-and-drop reorders pages with a live drop indicator (above/below the hovered row). Order persists via the new `POST /api/templates/reorder` route + `reorderTemplates()` session helper.
+- **Duplicate** uses the existing `/api/templates/clone` route, prompts for a name, then activates the clone.
+- **Delete** confirms first, removes the page (and its template file) but keeps shared sections in the library.
+
+---
+
 ## v1.3.0 — 2026-04-30
 
 ### Email template generation — Phase 1 ([VIB-158](/VIB/issues/VIB-158))
