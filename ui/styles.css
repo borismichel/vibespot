@@ -6854,3 +6854,134 @@ body { display: flex; }
   color: var(--text-dim);
   font-size: var(--text-xs);
 }
+
+/* ================================================================
+   RESPONSIVE GATE (VIB-211) — shown only at viewports < 768px
+   ================================================================ */
+.responsive-gate {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal, 9999);
+  background: var(--bg);
+  padding: 24px 20px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.responsive-gate__card {
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.responsive-gate__icon {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-tint);
+  color: var(--accent);
+  border-radius: 50%;
+}
+.responsive-gate__title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl, 20px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.responsive-gate__body {
+  color: var(--text-dim);
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+.responsive-gate__hint {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ================================================================
+   MOBILE BREAKPOINT (VIB-211) — < 768px
+   Show the responsive gate and hide the rest of the app to prevent
+   the broken stacked layout / rail-overflow / topbar-clipping.
+   ================================================================ */
+@media (max-width: 767px) {
+  .responsive-gate {
+    display: flex;
+  }
+  body > .project-rail,
+  body > .project-rail__tooltip,
+  body > .app-body {
+    display: none !important;
+  }
+}
+
+/* ================================================================
+   TABLET BREAKPOINT (VIB-211) — 768px to 1024px
+   Force the project rail to icon-only width even when the home
+   screen requests its expanded variant, tighten the chat panel,
+   and keep the topbar from clipping.
+   ================================================================ */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .project-rail--expanded {
+    width: var(--rail-w);
+    min-width: var(--rail-w);
+    align-items: center;
+    padding: 12px 0;
+  }
+  .project-rail--expanded .project-rail__header,
+  .project-rail--expanded .project-rail__settings-label,
+  .project-rail--expanded .project-rail__item-info {
+    display: none;
+  }
+  .project-rail--expanded .project-rail__items {
+    align-items: center;
+    padding: 0;
+    gap: 4px;
+  }
+  .project-rail--expanded .project-rail__item {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    padding: 0;
+    justify-content: center;
+  }
+  .project-rail--expanded .project-rail__add {
+    width: 36px;
+    height: 36px;
+    margin: 0;
+    border-radius: 50%;
+  }
+  .project-rail--expanded .project-rail__footer {
+    align-items: center;
+    padding: 8px 0;
+  }
+  .project-rail--expanded .project-rail__settings-btn {
+    width: 36px;
+    justify-content: center;
+    padding: 8px;
+  }
+
+  .panel--left {
+    width: 280px;
+    min-width: 280px;
+  }
+
+  /* Topbar: hide the full brand name + project pill so workspace tabs
+     and right-side actions never clip on tablet widths. */
+  .topbar { padding: 0 10px; gap: 8px; }
+  .topbar__left { gap: 8px; }
+  .topbar__brand-name,
+  .topbar__project-pill {
+    display: none;
+  }
+  .topbar > .workspace-tabs .workspace-tab {
+    padding: 0 10px;
+  }
+  .topbar > .workspace-tabs .workspace-tab span {
+    display: none;
+  }
+}

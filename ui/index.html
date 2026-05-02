@@ -14,6 +14,20 @@
 <body>
 
   <!-- ============================================================ -->
+  <!-- RESPONSIVE GATE — shown when viewport < 768px                -->
+  <!-- ============================================================ -->
+  <div class="responsive-gate" id="responsive-gate" role="dialog" aria-labelledby="responsive-gate-title">
+    <div class="responsive-gate__card">
+      <div class="responsive-gate__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <h1 class="responsive-gate__title" id="responsive-gate-title">vibeSpot is built for desktop</h1>
+      <p class="responsive-gate__body">The chat &amp; live preview workspace needs more room than a phone screen. Open vibeSpot on a tablet (768&nbsp;px+) or desktop to start building.</p>
+      <p class="responsive-gate__hint">Tip: rotate your device to landscape, or visit on a larger screen.</p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
   <!-- PROJECT RAIL — persistent thin sidebar (Discord-style)       -->
   <!-- ============================================================ -->
   <aside class="project-rail project-rail--expanded" id="project-rail" aria-label="Projects">
