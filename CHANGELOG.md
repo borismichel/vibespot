@@ -4,6 +4,18 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## Unreleased
+
+### Light mode polish ([VIB-228](/VIB/issues/VIB-228))
+
+Tightens light-mode visuals to match HubSpot's light-first ecosystem.
+
+- **Light is the new default** — first-time visitors land in light mode regardless of OS preference; the toggle still persists user choice in `localStorage`.
+- **Stronger card borders in light mode** — `--border` raised from `rgba(0,0,0,0.08)` to `rgba(0,0,0,0.12)` and `--border-hover` from `0.15` to `0.2` for clearer card edges on light panels.
+- **Subtle card shadow** — new `--shadow-card` token, transparent in dark mode and a layered `0 1px 2px / 0 1px 3px` lift in light mode, applied to `.card`, `.setup__recent-card`, `.setup__prompt-card`, `.page-type-card`, `.starter-card`, and `.pipeline-module-card`.
+
+---
+
 ## v1.3.0 — 2026-04-30
 
 ### Email template generation — Phase 1 ([VIB-158](/VIB/issues/VIB-158))
