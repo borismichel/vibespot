@@ -4297,12 +4297,13 @@ body { display: flex; }
 
 .chat__input-wrapper {
   display: flex;
-  align-items: flex-end;
-  gap: var(--space-2);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   transition: border-color var(--duration-fast) var(--ease-default);
 }
 .chat__input-wrapper:focus-within {
@@ -4311,7 +4312,7 @@ body { display: flex; }
 }
 
 .chat__input {
-  flex: 1;
+  width: 100%;
   resize: none;
   border: none;
   background: transparent;
@@ -4319,17 +4320,28 @@ body { display: flex; }
   font-family: var(--font);
   font-size: var(--text-md);
   line-height: var(--leading-normal);
-  max-height: 150px;
+  /* 3 rows default, auto-grow up to 6 rows (line-height 1.5 × font-size 14px = 21px/row) */
+  min-height: calc(var(--text-md) * var(--leading-normal) * 3);
+  max-height: calc(var(--text-md) * var(--leading-normal) * 6);
   outline: none;
-  padding: var(--space-2) 0;
+  padding: var(--space-1) 0;
 }
 .chat__input::placeholder { color: var(--text-muted); }
+
+.chat__input-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
 
 .chat__input-actions {
   display: flex;
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .chat__input-icon {
@@ -4351,8 +4363,8 @@ body { display: flex; }
 }
 
 .chat__send {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4361,11 +4373,13 @@ body { display: flex; }
   border-radius: var(--radius);
   color: var(--text-on-accent);
   cursor: pointer;
-  transition: filter var(--duration-fast);
+  transition: filter var(--duration-fast), transform var(--duration-fast);
   flex-shrink: 0;
+  margin-left: 2px;
 }
-.chat__send:hover { filter: brightness(1.15); }
-.chat__send:disabled { opacity: 0.4; cursor: default; }
+.chat__send:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.chat__send:active { transform: translateY(0); }
+.chat__send:disabled { opacity: 0.4; cursor: default; transform: none; }
 
 /* ================================================================
    PREVIEW (browser chrome wrapper)
@@ -6216,6 +6230,31 @@ body { display: flex; }
   align-items: center;
   justify-content: flex-start;
   padding: 0 4px 8px;
+}
+
+/* Compact "chip" variant rendered inside the chat input footer. */
+.plan-toggle--chip {
+  padding: 3px 8px 3px 4px !important;
+  gap: 6px !important;
+  font-size: var(--text-xs) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+.plan-toggle--chip:hover {
+  background: var(--bg-elevated) !important;
+  border-color: var(--border) !important;
+}
+.plan-toggle--chip .plan-toggle__indicator {
+  width: 18px;
+  height: 18px;
+}
+.plan-toggle--chip .plan-toggle__label {
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+.plan-toggle--chip .plan-toggle__state {
+  font-size: var(--text-xs);
+  padding: 1px 6px;
 }
 
 .plan-toggle {
