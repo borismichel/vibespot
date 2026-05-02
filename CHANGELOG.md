@@ -6,6 +6,15 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### HubSpot visual language ([VIB-219](/VIB/issues/VIB-219))
+
+Make vibeSpot read as a HubSpot CMS companion rather than a generic dark IDE.
+
+- **Always-visible HubSpot portal indicator in the topbar** — new `#topbar-portal-indicator` pill renders in both Project Home and Editor modes, polled from `/api/settings/status`. Connected state shows portal name + ID with a green dot; disconnected state links to Settings. Re-polled every 30s and on every account switch / WS init.
+- **HubSpot Light theme preset** — third theme variant (`data-theme="hubspot"`) using HubSpot-adjacent tokens: `#ff5c35` accent, `#2d3e50` ink, `#cbd6e2` borders, `#f5f8fa` panels, `#00bda5` success, `#0091ae` info. The topbar theme toggle now cycles dark → light → HubSpot Light with a per-state icon + tooltip.
+- **HubL trust badges in the code editor** — module `module.html` files render an inline `HubL` pill, `fields.json` files render a `HubSpot fields` pill so HubSpot devs can see at a glance that the output is real CMS template code, not generic web boilerplate.
+- **HubSpot-style IA section break in the project rail** — added a "Resources" caps-label divider above the Coffee/Docs/Settings cluster to mirror HubSpot's stacked left-rail sections.
+
 ### Fixes
 
 - **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restore `.starter-grid__group/heading/section` CSS rules and wrap each section in `.starter-grid__group` so the dynamic starter render keeps its grouped grid layout in both dark and light modes. Add explicit `background: var(--bg)` to `.project-home` / `.project-home .setup__main` and declare `color-scheme: dark/light` alongside the data-theme tokens so native form widgets, scrollbars, and any flex/scroll overflow follow the active theme.

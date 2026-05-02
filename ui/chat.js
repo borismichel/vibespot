@@ -241,6 +241,7 @@ function handleWsMessage(msg) {
 
       statusEngine.textContent = msg.engine || "";
       fetchHsAccountStatus();
+      if (typeof refreshPortalIndicator === "function") refreshPortalIndicator();
 
       // Populate chat header
       const chatHeaderTitle = document.getElementById("chat-header-title");

@@ -1,17 +1,97 @@
 /* Theme init — runs synchronously before DOM to prevent flash */
+const VIBESPOT_THEMES = ["dark", "light", "hubspot"];
+const VIBESPOT_THEME_LABELS = {
+  dark: "Dark",
+  light: "Light",
+  hubspot: "HubSpot Light",
+};
 (function initTheme() {
   const stored = localStorage.getItem("vibespot-theme");
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const theme = stored || (prefersDark ? "dark" : "light");
+  const fallback = prefersDark ? "dark" : "light";
+  const theme = VIBESPOT_THEMES.includes(stored) ? stored : fallback;
   document.documentElement.setAttribute("data-theme", theme);
 })();
 
+function syncThemeToggleLabel() {
+  const btn = document.querySelector(".theme-toggle");
+  if (!btn) return;
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  const idx = VIBESPOT_THEMES.indexOf(current);
+  const next = VIBESPOT_THEMES[(idx + 1) % VIBESPOT_THEMES.length];
+  const label = `Theme: ${VIBESPOT_THEME_LABELS[current] || current} — switch to ${VIBESPOT_THEME_LABELS[next] || next}`;
+  btn.setAttribute("title", label);
+  btn.setAttribute("aria-label", label);
+}
+document.addEventListener("DOMContentLoaded", syncThemeToggleLabel);
+
 function toggleTheme() {
   const current = document.documentElement.getAttribute("data-theme") || "dark";
-  const next = current === "dark" ? "light" : "dark";
+  const idx = VIBESPOT_THEMES.indexOf(current);
+  const next = VIBESPOT_THEMES[((idx === -1 ? 0 : idx) + 1) % VIBESPOT_THEMES.length];
   document.documentElement.setAttribute("data-theme", next);
   localStorage.setItem("vibespot-theme", next);
+  syncThemeToggleLabel();
 }
+
+/* ---------------------------------------------------------------------------
+ * HubSpot portal indicator (topbar) — visible in both Project Home and Editor
+ * Reads /api/settings/status and reflects the active HubSpot portal's
+ * connection state. Clicking opens Settings (HubSpot tab).
+ * ------------------------------------------------------------------------- */
+async function refreshPortalIndicator() {
+  const link = document.getElementById("topbar-portal-indicator");
+  const label = document.getElementById("topbar-portal-label");
+  if (!link || !label) return;
+  try {
+    const res = await fetch("/api/settings/status");
+    const data = await res.json();
+    const hs = data && data.environment && data.environment.tools && data.environment.tools.hubspot;
+    if (hs && hs.authenticated && hs.portalName) {
+      const portal = hs.portalId ? `${hs.portalName} (${hs.portalId})` : hs.portalName;
+      link.classList.add("portal-indicator--connected");
+      link.classList.remove("portal-indicator--disconnected");
+      link.setAttribute("title", `Connected to HubSpot portal ${portal}`);
+      link.setAttribute("aria-label", `Connected to HubSpot portal ${portal}`);
+      label.textContent = portal;
+    } else {
+      link.classList.remove("portal-indicator--connected");
+      link.classList.add("portal-indicator--disconnected");
+      link.setAttribute("title", "No HubSpot portal connected — open Settings to add one");
+      link.setAttribute("aria-label", "No HubSpot portal connected — open Settings to add one");
+      label.textContent = "Not connected";
+    }
+  } catch {
+    // Server unreachable — leave the disconnected state in place.
+  }
+}
+
+function bindPortalIndicator() {
+  const link = document.getElementById("topbar-portal-indicator");
+  if (!link || link.dataset.bound === "1") return;
+  link.dataset.bound = "1";
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    // In Editor mode, the workspace tab "settings" exists; otherwise the
+    // Project Home settings button opens the same overlay.
+    const editorTab = document.getElementById("ws-tab-settings");
+    const setupBtn = document.getElementById("btn-setup-settings");
+    const appBody = document.getElementById("app-body");
+    const isEditor = appBody && appBody.getAttribute("data-mode") === "editor";
+    const target = isEditor ? editorTab : setupBtn;
+    if (target && typeof target.click === "function") target.click();
+    else if (editorTab) editorTab.click();
+    else if (setupBtn) setupBtn.click();
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  bindPortalIndicator();
+  refreshPortalIndicator();
+});
+
+// Re-poll occasionally so a freshly-saved PAT shows up without reload.
+setInterval(() => { refreshPortalIndicator(); }, 30000);
 
 /**
  * Setup screen — onboarding flow in the browser.
