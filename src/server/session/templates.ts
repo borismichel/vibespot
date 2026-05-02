@@ -5,7 +5,7 @@
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { ModuleFiles } from "../../ai/engine.js";
-import type { VibeSession, TemplateEntry, PageType } from "./types.js";
+import type { VibeSession, TemplateEntry, PageType, ContentMode } from "./types.js";
 import { getSession } from "./store.js";
 import { syncFlatFieldsFromTemplate } from "./state.js";
 
@@ -71,7 +71,7 @@ export function setActiveTemplate(templateId: string): boolean {
 /**
  * Create a new template entry and add it to the session.
  */
-export function addTemplate(pageType: PageType, label: string): TemplateEntry {
+export function addTemplate(pageType: PageType, label: string, contentMode?: ContentMode): TemplateEntry {
   const activeSession = getSession();
   if (!activeSession) throw new Error("No active session");
 
@@ -80,7 +80,9 @@ export function addTemplate(pageType: PageType, label: string): TemplateEntry {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-  const prefix = pageType === "blog_post" ? "bp" :
+  const isEmail = contentMode === "email";
+  const prefix = isEmail ? "email" :
+                 pageType === "blog_post" ? "bp" :
                  pageType === "website_page" ? "wp" :
                  pageType === "module_only" ? "mo" : "lp";
   const id = `${prefix}-${slug}`;
@@ -89,7 +91,8 @@ export function addTemplate(pageType: PageType, label: string): TemplateEntry {
     id,
     label,
     pageType,
-    templateFile: pageType === "module_only" ? "" : `templates/${id}.html`,
+    contentMode,
+    templateFile: isEmail ? `templates/email.html` : pageType === "module_only" ? "" : `templates/${id}.html`,
     modules: [],
     moduleOrder: [],
     sharedCss: "",
