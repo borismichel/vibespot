@@ -1028,9 +1028,6 @@ function showAppDirect(themeName) {
   document.getElementById("project-rail")?.classList.remove("project-rail--expanded");
   document.getElementById("theme-name").textContent = themeName;
 
-  const urlEl = document.getElementById("browser-url");
-  if (urlEl) urlEl.textContent = themeName + ".vibespot.app";
-
   currentAppTheme = themeName;
   const target = "#/app/" + encodeURIComponent(themeName);
   if (location.hash !== target) {
