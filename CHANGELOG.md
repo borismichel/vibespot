@@ -12,6 +12,7 @@ All notable changes to vibeSpot are documented here.
 
 ### Fixes
 
+- **Editor preview empty state** ([VIB-213](/VIB/issues/VIB-213)) — replace the blank white preview rectangle with a designed empty state inside `.browser-chrome` (vibeSpot sparkle mark, "Your page will appear here as you build it" headline, and a chat-input hint). Built on existing tokens (`--accent`, `--bg-panel-solid`, `--accent-tint`, `--accent-glow`, `--text-dim`); auto-hides when generation begins (`showGeneratingPreview`) or when the iframe finishes loading any `[data-module]`.
 - **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restore `.starter-grid__group/heading/section` CSS rules and wrap each section in `.starter-grid__group` so the dynamic starter render keeps its grouped grid layout in both dark and light modes. Add explicit `background: var(--bg)` to `.project-home` / `.project-home .setup__main` and declare `color-scheme: dark/light` alongside the data-theme tokens so native form widgets, scrollbars, and any flex/scroll overflow follow the active theme.
 
 ---
