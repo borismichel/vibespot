@@ -1870,10 +1870,16 @@ async function refreshHistoryTimeline() {
 function updateHistoryTimelineNavState() {
   const undoBtn = document.getElementById("history-timeline-undo");
   const redoBtn = document.getElementById("history-timeline-redo");
+  const topbarUndo = document.getElementById("btn-undo");
+  const topbarRedo = document.getElementById("btn-redo");
   const max = historyTimelineEntries.length - 1;
   const busy = historyTimelineRestoring || (typeof isStreaming !== "undefined" && isStreaming);
-  if (undoBtn) undoBtn.disabled = busy || historyTimelineCursor >= max;
-  if (redoBtn) redoBtn.disabled = busy || historyTimelineCursor <= 0;
+  const undoDisabled = busy || !historyGitAvailable || historyTimelineCursor >= max;
+  const redoDisabled = busy || !historyGitAvailable || historyTimelineCursor <= 0;
+  if (undoBtn) undoBtn.disabled = undoDisabled;
+  if (redoBtn) redoBtn.disabled = redoDisabled;
+  if (topbarUndo) topbarUndo.disabled = undoDisabled;
+  if (topbarRedo) topbarRedo.disabled = redoDisabled;
 }
 
 async function restoreToTimelineIndex(idx) {
@@ -2004,6 +2010,13 @@ function hideTimelineTooltip() {
 
   if (undoBtn) undoBtn.addEventListener("click", timelineUndo);
   if (redoBtn) redoBtn.addEventListener("click", timelineRedo);
+
+  // Topbar undo/redo buttons mirror the timeline strip controls so the action
+  // is discoverable without opening the history panel.
+  const topbarUndo = document.getElementById("btn-undo");
+  const topbarRedo = document.getElementById("btn-redo");
+  if (topbarUndo) topbarUndo.addEventListener("click", timelineUndo);
+  if (topbarRedo) topbarRedo.addEventListener("click", timelineRedo);
 
   // Global Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z keyboard shortcuts. Skip when the
   // user is editing text so we never hijack native undo in inputs/editors.
