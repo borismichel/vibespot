@@ -178,6 +178,39 @@
                 <span class="setup__type-card-label">From Template</span>
                 <span class="setup__type-card-desc">Browse pre-built starters</span>
               </button>
+              <button class="setup__type-card setup__type-card--import" type="button" role="listitem" data-asset-type="import" aria-label="Import an existing design">
+                <span class="setup__type-card-icon" aria-hidden="true">&#128229;</span>
+                <span class="setup__type-card-label">Import</span>
+                <span class="setup__type-card-desc">Bring in an existing design</span>
+              </button>
+            </div>
+
+            <!-- Import source picker (hidden until Import card click) -->
+            <div class="setup__import-sources hidden" id="setup-import-sources" role="group" aria-label="Choose import source">
+              <button class="setup__prompt-back" id="setup-import-back" type="button" aria-label="Back to asset types">
+                <span aria-hidden="true">&#8592;</span>
+                <span>Back</span>
+              </button>
+              <h2 class="setup__import-heading">Where would you like to import from?</h2>
+              <div class="setup__import-grid">
+                <button class="setup__import-btn" type="button" data-action="download">
+                  <span class="setup__import-btn-icon" aria-hidden="true">&#8595;</span>
+                  <span class="setup__import-btn-label">HubSpot</span>
+                  <span class="setup__import-btn-desc">Download an existing HubSpot theme</span>
+                </button>
+                <button class="setup__import-btn" type="button" data-action="figma">
+                  <span class="setup__import-btn-icon" aria-hidden="true">&#9670;</span>
+                  <span class="setup__import-btn-label">Figma</span>
+                  <span class="setup__import-btn-desc">Extract design from a Figma URL</span>
+                  <span class="setup__action-badge">Beta</span>
+                </button>
+                <button class="setup__import-btn" type="button" data-action="convert">
+                  <span class="setup__import-btn-icon" aria-hidden="true">&#8634;</span>
+                  <span class="setup__import-btn-label">React</span>
+                  <span class="setup__import-btn-desc">Convert a React project to HubSpot</span>
+                  <span class="setup__action-badge">Beta</span>
+                </button>
+              </div>
             </div>
 
             <!-- Returning users: rich recent project cards (page count + recency) -->
