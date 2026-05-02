@@ -253,7 +253,7 @@ body { display: flex; }
 
 .setup__container {
   width: 100%;
-  max-width: 620px;
+  max-width: 680px;
   text-align: center;
 }
 
@@ -279,7 +279,40 @@ body { display: flex; }
 .setup__subtitle {
   color: var(--text-dim);
   font-size: var(--text-md);
-  margin-bottom: 32px;
+  margin-bottom: var(--space-8);
+}
+
+/* Section hierarchy on Project Home */
+.setup__hero {
+  margin-bottom: var(--space-8);
+  text-align: left;
+}
+.setup__templates {
+  margin-bottom: var(--space-8);
+  text-align: left;
+}
+.setup__section-heading {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+  margin: 0 0 var(--space-2);
+}
+.setup__section-sub {
+  font-size: var(--text-md);
+  color: var(--text-dim);
+  margin: 0 0 var(--space-4);
+  line-height: var(--leading-normal);
+}
+.setup__section-label {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 0 0 var(--space-3);
 }
 
 .setup__alerts { margin-bottom: 16px; }
@@ -368,7 +401,8 @@ body { display: flex; }
 
 /* "Continue where you left off" — recent projects card list */
 .setup__recent {
-  margin-bottom: 28px;
+  margin-bottom: var(--space-8);
+  text-align: left;
 }
 .setup__recent-header {
   display: flex;
@@ -447,32 +481,36 @@ body { display: flex; }
   color: var(--text-muted);
 }
 
-/* Primary "describe-it" prompt card */
+/* Primary "describe-it" prompt card — hero element */
 .setup__prompt-card {
   position: relative;
   display: flex;
   flex-direction: column;
   background: var(--bg-input);
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent-glow);
   border-radius: var(--radius-lg);
-  padding: 14px 14px 10px;
-  margin-bottom: 14px;
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  box-shadow: 0 0 0 1px var(--accent-tint), 0 8px 32px rgba(0, 0, 0, 0.18);
   transition: border-color var(--duration-normal), box-shadow var(--duration-normal);
 }
+.setup__prompt-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-glow), 0 10px 36px rgba(0, 0, 0, 0.22);
+}
 .setup__prompt-card:focus-within {
-  border-color: var(--accent-glow);
-  box-shadow: 0 0 0 3px var(--accent-tint);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 12px 40px rgba(0, 0, 0, 0.24);
 }
 .setup__prompt-input {
   width: 100%;
-  min-height: 72px;
+  min-height: 112px;
   resize: vertical;
   background: transparent;
   border: 0;
   outline: none;
   color: var(--text);
   font-family: var(--font);
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
   line-height: 1.5;
   padding: 0;
 }
@@ -481,8 +519,8 @@ body { display: flex; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
 }
 .setup__prompt-hint {
   font-size: var(--text-sm);
@@ -491,16 +529,21 @@ body { display: flex; }
 .setup__prompt-submit {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  font-size: var(--text-base);
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  min-height: 48px;
+  border-radius: var(--radius);
+  box-shadow: 0 6px 20px var(--accent-glow);
 }
 .setup__prompt-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 .setup__prompt-submit-icon {
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   line-height: 1;
   transform: rotate(90deg);
   display: inline-block;
@@ -508,7 +551,7 @@ body { display: flex; }
 
 /* Secondary "Start from Template" path */
 .setup__secondary {
-  margin-bottom: 18px;
+  margin-bottom: var(--space-4);
 }
 .setup__secondary-btn {
   display: flex;

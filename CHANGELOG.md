@@ -37,6 +37,7 @@ Hover-activated toolbar over module sections in the preview pane. When hovering 
 
 ### Enhancements
 
+- **Project Home visual hierarchy** ([VIB-221](/VIB/issues/VIB-221)) — hero prompt section with "Start building" heading, enlarged prompt card with accent-glow border, promoted Build button to `btn--lg`, demoted template entry under "Or start from a template" label, standardised vertical rhythm.
 - **CSS token system** ([VIB-185](/VIB/issues/VIB-185)) — comprehensive design token system: spacing scale (`--space-0..10`), typography (`--text-xs..display`, `--weight-*`, `--leading-*`), z-index (`--z-base..confirm`), transitions (`--duration-fast/normal/slow`, `--ease-*`), icons, layout, and status/badge colors. 270 font-size, 48 border-radius, and 109 transition declarations migrated to tokens.
 - **Component CSS library** ([VIB-186](/VIB/issues/VIB-186)) — spec-compliant base classes for Button, IconButton, Input, Textarea, Card, Badge, Toggle, Tabs, Toast, Modal, ChatBubble, EmptyState, Spinner, ProgressBar — all referencing design tokens. Existing BEM classes aliased for compatibility.
 - **Brand tab visual preview** ([VIB-226](/VIB/issues/VIB-226)) — live brand preview card above the brand kit form: color swatches for primary/secondary/accent, sample heading + body text rendered with configured fonts, and a logo thumbnail. Form fields grouped into Colors / Fonts / Logo cards with `max-width: 480px`.
