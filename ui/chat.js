@@ -2586,11 +2586,25 @@ document.getElementById("responsive-toggle").addEventListener("click", (e) => {
 });
 
 // ---------------------------------------------------------------------------
-// HubSpot account status pill
+// HubSpot portal connection indicator (topbar pill, both modes)
 // ---------------------------------------------------------------------------
 
+function renderHsPortalIndicator(state, label, title) {
+  const pill = document.getElementById("hs-portal-indicator");
+  const labelEl = document.getElementById("hs-portal-indicator-label");
+  if (!pill || !labelEl) return;
+  pill.classList.remove(
+    "topbar__portal-pill--connected",
+    "topbar__portal-pill--disconnected",
+    "topbar__portal-pill--unknown"
+  );
+  pill.classList.add(`topbar__portal-pill--${state}`);
+  labelEl.textContent = label;
+  if (title) pill.title = title;
+}
+
 async function fetchHsAccountStatus() {
-  const pill = document.getElementById("status-hs-account");
+  const pill = document.getElementById("hs-portal-indicator");
   if (!pill) return;
 
   try {
@@ -2599,16 +2613,38 @@ async function fetchHsAccountStatus() {
     const hs = data.environment?.tools?.hubspot;
 
     if (hs && hs.authenticated && hs.portalName) {
-      pill.innerHTML = `<span class="statusbar__dot statusbar__dot--ok"></span>${hs.portalName}${hs.portalId ? " (" + hs.portalId + ")" : ""}`;
-      pill.classList.add("statusbar__pill--visible");
+      const idSuffix = hs.portalId ? ` (${hs.portalId})` : "";
+      renderHsPortalIndicator(
+        "connected",
+        `Connected to ${hs.portalName}${idSuffix}`,
+        `Connected to ${hs.portalName}${idSuffix} — click to manage`
+      );
     } else {
-      pill.textContent = "";
-      pill.classList.remove("statusbar__pill--visible");
+      renderHsPortalIndicator(
+        "disconnected",
+        "Not connected",
+        "No HubSpot portal connected — click to open settings"
+      );
     }
   } catch {
-    // Silently ignore
+    renderHsPortalIndicator(
+      "disconnected",
+      "Not connected",
+      "Unable to reach HubSpot status — click to open settings"
+    );
   }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  const pill = document.getElementById("hs-portal-indicator");
+  if (pill && !pill.dataset.bound) {
+    pill.dataset.bound = "1";
+    pill.addEventListener("click", () => {
+      if (typeof openSettings === "function") openSettings("hubspot");
+    });
+  }
+  fetchHsAccountStatus();
+});
 
 // ---------------------------------------------------------------------------
 // Topbar theme-name rename (double-click)

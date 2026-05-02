@@ -4,6 +4,16 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## Unreleased
+
+### HubSpot portal connection indicator ([VIB-220](/VIB/issues/VIB-220))
+
+- New ambient portal pill in the topbar — visible in both Project Home and Editor modes — showing the connected portal name + ID with a green dot, or `Not connected` with a gray dot.
+- Click opens the HubSpot tab of Settings (manage account / connect a new portal).
+- Replaces the editor-only `status-hs-account` pill in the statusbar.
+
+---
+
 ## v1.3.0 — 2026-04-30
 
 ### Email template generation — Phase 1 ([VIB-158](/VIB/issues/VIB-158))

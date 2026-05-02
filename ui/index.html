@@ -86,6 +86,11 @@
       </nav>
 
       <div class="topbar__right">
+        <!-- HubSpot portal connection indicator (visible in both modes) -->
+        <button class="topbar__portal-pill topbar__portal-pill--unknown" id="hs-portal-indicator" type="button" title="HubSpot portal connection" aria-label="HubSpot portal connection">
+          <span class="topbar__portal-dot" aria-hidden="true"></span>
+          <span class="topbar__portal-label" id="hs-portal-indicator-label">Connecting…</span>
+        </button>
         <!-- Project Home: Feedback as labeled pill -->
         <button class="btn btn--ghost btn--sm topbar__mode topbar__mode--project-home" id="feedback-btn" type="button" title="Submit feedback" onclick="vibeFeedback()">
           <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -810,7 +815,6 @@
 
     <footer class="statusbar" role="contentinfo">
       <span id="status-text">Ready</span>
-      <span class="statusbar__pill" id="status-hs-account"></span>
       <span id="status-engine" class="statusbar__engine"></span>
     </footer>
 

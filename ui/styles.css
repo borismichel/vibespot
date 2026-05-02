@@ -1691,6 +1691,60 @@ body { display: flex; }
   flex: 0 0 auto;
 }
 
+/* HubSpot portal connection indicator (visible in both modes) */
+.topbar__portal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-panel-solid);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  max-width: 240px;
+}
+.topbar__portal-pill:hover {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+}
+.topbar__portal-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.topbar__portal-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar__portal-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  box-shadow: 0 0 0 2px transparent;
+}
+.topbar__portal-pill--connected .topbar__portal-dot {
+  background: var(--success);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--success) 25%, transparent);
+}
+.topbar__portal-pill--disconnected {
+  color: var(--text-dim);
+}
+.topbar__portal-pill--disconnected .topbar__portal-dot {
+  background: var(--text-muted);
+}
+.topbar__portal-pill--unknown {
+  color: var(--text-dim);
+}
+
 
 /* ================================================================
    COMPONENT LIBRARY (per VIB-184 spec)
