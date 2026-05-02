@@ -4505,12 +4505,12 @@ body { display: flex; }
 }
 
 .browser-chrome__bar {
-  height: 22px;
+  height: 36px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 0 8px;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 12px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -5462,18 +5462,18 @@ body { display: flex; }
   display: block;
 }
 
-/* ---- Browser-chrome bar hosts the responsive + interact toggles, slim ---- */
-.browser-chrome__bar .responsive-toggle { padding: 1px; }
-.browser-chrome__bar .responsive-btn { width: 22px; height: 18px; }
-.browser-chrome__bar .responsive-btn .icon { width: 12px; height: 12px; }
+/* ---- Browser-chrome bar hosts the responsive + interact toggles ---- */
+.browser-chrome__bar .responsive-toggle { padding: 2px; }
+.browser-chrome__bar .responsive-btn { width: 30px; height: 26px; }
+.browser-chrome__bar .responsive-btn .icon { width: 16px; height: 16px; }
 .browser-chrome__bar .interact-mode-toggle {
-  height: 20px;
-  padding: 0 8px;
+  height: 28px;
+  padding: 0 10px;
   margin-left: 0;
-  font-size: var(--text-xs, 11px);
-  gap: 4px;
+  font-size: var(--text-sm, 13px);
+  gap: 5px;
 }
-.browser-chrome__bar .interact-mode-toggle .icon { width: 12px; height: 12px; }
+.browser-chrome__bar .interact-mode-toggle .icon { width: 14px; height: 14px; }
 
 /* ---- Icon size utilities (VIB-187 standardization) -------------- */
 .icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
