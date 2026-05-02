@@ -346,6 +346,10 @@ function handleWsMessage(msg) {
       if (msg.modules) {
         updateModuleList(msg.modules);
       }
+      if (msg.templates) {
+        if (msg.templateId) currentTemplateId = msg.templateId;
+        renderPageTabs(msg.templates, currentTemplateId);
+      }
       if (highlightOnNextModulesUpdated) {
         highlightOnNextModulesUpdated = false;
         flushChangeHighlights(msg.modules || []);
@@ -2063,6 +2067,8 @@ function updateModuleList(moduleNames) {
 
   if (barCountEl) barCountEl.textContent = moduleNames.length;
   if (slideoutCountEl) slideoutCountEl.textContent = moduleNames.length;
+  const pageTreeCountEl = document.getElementById("page-tree-module-count");
+  if (pageTreeCountEl) pageTreeCountEl.textContent = moduleNames.length;
 
   // Preserve which items were marked as recently changed across re-renders so
   // the dots survive the per-module `modules_updated` events that happen
@@ -2180,6 +2186,7 @@ function clearModuleListChanged() {
 
 function openModuleSlideout() {
   const slideout = document.getElementById("module-slideout");
+  slideout.classList.remove("hidden");
   document.getElementById("module-list-view").classList.remove("hidden");
   document.getElementById("module-editor-view").classList.add("hidden");
   slideout.classList.add("open");
@@ -2190,9 +2197,11 @@ function closeModuleSlideout() {
 }
 
 function showEditorView(moduleName) {
+  const slideout = document.getElementById("module-slideout");
+  slideout.classList.remove("hidden");
   document.getElementById("module-list-view").classList.add("hidden");
   document.getElementById("module-editor-view").classList.remove("hidden");
-  document.getElementById("module-slideout").classList.add("open");
+  slideout.classList.add("open");
 }
 
 function showModuleListView() {
@@ -2272,6 +2281,16 @@ async function addModuleFromLibrary(moduleName) {
     console.error("Failed to add module:", err);
   }
 }
+
+// Toggle module slideout from page-tree header
+document.getElementById("btn-toggle-modules")?.addEventListener("click", () => {
+  const slideout = document.getElementById("module-slideout");
+  if (slideout.classList.contains("open")) {
+    closeModuleSlideout();
+  } else {
+    openModuleSlideout();
+  }
+});
 
 // Add module button (inside slideout)
 document.getElementById("btn-add-module").addEventListener("click", toggleModuleLibraryDropdown);
