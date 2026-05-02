@@ -140,11 +140,12 @@ export async function runFigmaConversion(
 
   const durationMs = Date.now() - startTime;
   const durationSec = Math.round(durationMs / 1000);
+  const assistantMessage = `Imported ${finalModules.length} modules from Figma design "${extraction.fileName}" in ${durationSec}s.`;
 
   if (failedNames.length > 0) {
     onEvent({ type: "pipeline_partial", succeeded: finalModules.map((m) => m.moduleName), failed: failedNames, durationMs });
   } else {
-    onEvent({ type: "pipeline_complete", modulesGenerated: finalModules.length, modulesUnchanged: 0, durationMs });
+    onEvent({ type: "pipeline_complete", modulesGenerated: finalModules.length, modulesUnchanged: 0, durationMs, assistantMessage });
   }
 
   return {
@@ -152,7 +153,7 @@ export async function runFigmaConversion(
     moduleOrder,
     sharedCss,
     sharedJs,
-    assistantMessage: `Imported ${finalModules.length} modules from Figma design "${extraction.fileName}" in ${durationSec}s.`,
+    assistantMessage,
     stats: {
       modulesGenerated: finalModules.length,
       modulesUnchanged: 0,

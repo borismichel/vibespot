@@ -366,6 +366,7 @@ export async function runAgentPipeline(
       modulesGenerated,
       modulesUnchanged,
       durationMs,
+      assistantMessage,
     });
   }
 
@@ -571,6 +572,15 @@ async function runMultiPageFlow(
 
   const durationMs = Date.now() - startTime;
 
+  const assistantMessage = buildMultiPageAssistantMessage(
+    pages,
+    generatedModules.length,
+    failedModules,
+    durationMs,
+    siteBlueprint.narrative,
+    validationIssues,
+  );
+
   if (failedModules.length > 0) {
     onEvent({
       type: "pipeline_partial",
@@ -584,17 +594,9 @@ async function runMultiPageFlow(
       modulesGenerated: generatedModules.length,
       modulesUnchanged: 0,
       durationMs,
+      assistantMessage,
     });
   }
-
-  const assistantMessage = buildMultiPageAssistantMessage(
-    pages,
-    generatedModules.length,
-    failedModules,
-    durationMs,
-    siteBlueprint.narrative,
-    validationIssues,
-  );
 
   // Return PipelineResult with multiPage data attached for the handler
   const result: PipelineResult & { multiPage?: MultiPagePipelineResult } = {

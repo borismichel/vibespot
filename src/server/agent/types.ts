@@ -136,6 +136,7 @@ export type PipelineEvent =
       modulesUnchanged: number;
       durationMs: number;
       answer?: string;
+      assistantMessage?: string;
     }
   | {
       type: "pipeline_partial";

@@ -773,7 +773,12 @@ function handlePipelineComplete(msg) {
     answerEl.className = "pipeline-answer";
     answerEl.textContent = msg.answer;
     bubble.appendChild(answerEl);
+  } else if (msg.assistantMessage) {
+    streamBuffer = msg.assistantMessage;
   }
+
+  clearStreamStatus();
+  finishStreaming();
 
   const stats = document.createElement("div");
   stats.className = "pipeline-stats";
@@ -787,9 +792,6 @@ function handlePipelineComplete(msg) {
     }
   }
   bubble.appendChild(stats);
-
-  clearStreamStatus();
-  finishStreaming();
 
   resetPipelineState();
 }
@@ -810,14 +812,14 @@ function handlePipelinePartial(msg) {
 
   const bubble = streamingMsgEl || pipelineBubbleEl;
 
+  clearStreamStatus();
+  finishStreaming();
+
   const stats = document.createElement("div");
   stats.className = "pipeline-stats pipeline-stats--partial";
   const duration = formatDuration(msg.durationMs);
   stats.textContent = `${msg.succeeded.length} modules succeeded, ${msg.failed.length} failed in ${duration}`;
   bubble.appendChild(stats);
-
-  clearStreamStatus();
-  finishStreaming();
 
   resetPipelineState();
 }
