@@ -6,6 +6,10 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### UX
+
+- **Project Home visual hierarchy** ([VIB-221](/VIB/issues/VIB-221)) — Make the describe-it prompt the undeniable hero of Project Home. Wrap the prompt in a labelled `setup__hero` section ("Start building" in Space Grotesk `--text-xl`, supporting copy in `--text-md`), enlarge the prompt card (taller textarea, `--text-lg` input, accent-glow border + soft shadow), and promote the Build button to `btn--lg` with a 48 px tap target and accent shadow. Demote the template entry under an "Or start from a template" `setup__section-label` heading and standardise vertical rhythm to `--space-8` between major sections so the page no longer feels cramped.
+
 ### Fixes
 
 - **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restore `.starter-grid__group/heading/section` CSS rules and wrap each section in `.starter-grid__group` so the dynamic starter render keeps its grouped grid layout in both dark and light modes. Add explicit `background: var(--bg)` to `.project-home` / `.project-home .setup__main` and declare `color-scheme: dark/light` alongside the data-theme tokens so native form widgets, scrollbars, and any flex/scroll overflow follow the active theme.

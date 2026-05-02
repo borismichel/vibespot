@@ -158,33 +158,40 @@
               <div class="setup__recent-list recent-grid" id="setup-recent-list" role="list"></div>
             </section>
 
-            <!-- Primary path: describe-it prompt -->
-            <div class="setup__prompt-card" id="setup-prompt-card">
-              <label class="visually-hidden" for="setup-prompt-input">Describe the landing page you want to build</label>
-              <textarea
-                class="setup__prompt-input"
-                id="setup-prompt-input"
-                rows="3"
-                placeholder="Describe the landing page you want to build..."
-                aria-label="Describe the landing page you want to build"
-              ></textarea>
-              <div class="setup__prompt-row">
-                <span class="setup__prompt-hint" id="setup-prompt-hint">Press <span id="setup-prompt-shortcut">&#8984;&#8629;</span> or click Build to start</span>
-                <button class="btn btn--primary setup__prompt-submit" id="setup-prompt-submit" type="button" disabled>
-                  <span class="setup__prompt-submit-icon" aria-hidden="true">&#9650;</span>
-                  <span>Build</span>
-                </button>
+            <!-- Primary path: describe-it prompt (hero) -->
+            <section class="setup__hero" aria-labelledby="setup-hero-heading">
+              <h2 class="setup__section-heading" id="setup-hero-heading">Start building</h2>
+              <p class="setup__section-sub">Describe what you want, and vibeSpot will build it.</p>
+              <div class="setup__prompt-card" id="setup-prompt-card">
+                <label class="visually-hidden" for="setup-prompt-input">Describe the landing page you want to build</label>
+                <textarea
+                  class="setup__prompt-input"
+                  id="setup-prompt-input"
+                  rows="4"
+                  placeholder="Describe the landing page you want to build..."
+                  aria-label="Describe the landing page you want to build"
+                ></textarea>
+                <div class="setup__prompt-row">
+                  <span class="setup__prompt-hint" id="setup-prompt-hint">Press <span id="setup-prompt-shortcut">&#8984;&#8629;</span> or click Build to start</span>
+                  <button class="btn btn--primary btn--lg setup__prompt-submit" id="setup-prompt-submit" type="button" disabled>
+                    <span class="setup__prompt-submit-icon" aria-hidden="true">&#9650;</span>
+                    <span>Build</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            </section>
 
             <!-- Secondary path: pick a template -->
-            <div class="setup__secondary">
-              <button class="setup__secondary-btn" data-action="starter" type="button">
-                <span class="setup__secondary-icon" aria-hidden="true">&#9733;</span>
-                <span class="setup__secondary-label">Start from Template</span>
-                <span class="setup__secondary-meta">Browse pre-built starters</span>
-              </button>
-            </div>
+            <section class="setup__templates" aria-labelledby="setup-templates-heading">
+              <h3 class="setup__section-label" id="setup-templates-heading">Or start from a template</h3>
+              <div class="setup__secondary">
+                <button class="setup__secondary-btn" data-action="starter" type="button">
+                  <span class="setup__secondary-icon" aria-hidden="true">&#9733;</span>
+                  <span class="setup__secondary-label">Start from Template</span>
+                  <span class="setup__secondary-meta">Browse pre-built starters</span>
+                </button>
+              </div>
+            </section>
 
             <!-- Starter template panel -->
             <div class="setup__panel" id="panel-starter">
