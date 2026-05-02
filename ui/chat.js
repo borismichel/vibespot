@@ -34,6 +34,10 @@ const inputEl = document.getElementById("chat-input");
 const sendBtn = document.getElementById("chat-send");
 const statusText = document.getElementById("status-text");
 const statusEngine = document.getElementById("status-engine");
+const statusTheme = document.getElementById("status-theme");
+const statusLastSaved = document.getElementById("status-last-saved");
+
+let lastSavedAt = 0;
 
 // Snapshot the welcome section before any init can destroy it
 const _welcomeHtml = document.getElementById("chat-welcome")?.outerHTML || "";
@@ -568,6 +572,10 @@ function handleWsMessage(msg) {
       currentSessionId = msg.sessionId || "";
       currentTemplateId = msg.templateId || "";
       document.getElementById("theme-name").textContent = msg.themeName || "—";
+      setStatusTheme(msg.themeName);
+      lastSavedAt = typeof msg.updatedAt === "number" ? msg.updatedAt : 0;
+      renderLastSaved();
+      if (msg.engine) statusEngine.textContent = msg.engine;
 
       // Clear previous project's chat and module list
       messagesEl.innerHTML = "";
@@ -690,6 +698,7 @@ function handleWsMessage(msg) {
       } else {
         refreshPreview();
       }
+      markSaved(msg.updatedAt);
       break;
 
     case "version_created":
@@ -697,6 +706,7 @@ function handleWsMessage(msg) {
       // New generation: reset timeline cursor to head and refresh.
       historyTimelineCursor = 0;
       refreshHistoryTimeline();
+      markSaved(msg.updatedAt);
       break;
 
     case "parse_warning":
@@ -2005,6 +2015,46 @@ function setStatus(text) {
   statusText.textContent = text;
 }
 
+function setStatusTheme(name) {
+  if (!statusTheme) return;
+  const value = (name || "").trim();
+  statusTheme.textContent = value && value !== "—" ? value : "";
+}
+
+function formatRelativeSaved(ts) {
+  if (!ts) return "";
+  const diff = Math.max(0, Date.now() - ts);
+  const sec = Math.round(diff / 1000);
+  if (sec < 10) return "just now";
+  if (sec < 60) return `${sec} sec ago`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr} hr ago`;
+  const day = Math.round(hr / 24);
+  return `${day} day${day === 1 ? "" : "s"} ago`;
+}
+
+function renderLastSaved() {
+  if (!statusLastSaved) return;
+  if (!lastSavedAt) {
+    statusLastSaved.textContent = "";
+    statusLastSaved.title = "";
+    return;
+  }
+  statusLastSaved.textContent = formatRelativeSaved(lastSavedAt);
+  try {
+    statusLastSaved.title = new Date(lastSavedAt).toLocaleString();
+  } catch { /* ignore */ }
+}
+
+function markSaved(ts) {
+  lastSavedAt = typeof ts === "number" && ts > 0 ? ts : Date.now();
+  renderLastSaved();
+}
+
+setInterval(renderLastSaved, 30000);
+
 // ---------------------------------------------------------------------------
 // Restored / system messages
 // ---------------------------------------------------------------------------
@@ -3147,11 +3197,10 @@ async function fetchHsAccountStatus() {
     const hs = data.environment?.tools?.hubspot;
 
     if (hs && hs.authenticated && hs.portalName) {
-      pill.innerHTML = `<span class="statusbar__dot statusbar__dot--ok"></span>${hs.portalName}${hs.portalId ? " (" + hs.portalId + ")" : ""}`;
-      pill.classList.add("statusbar__pill--visible");
+      const idSuffix = hs.portalId ? ` (${hs.portalId})` : "";
+      pill.innerHTML = `<span class="statusbar__dot statusbar__dot--ok"></span><span class="statusbar__item-text">${escapeHtml(hs.portalName)}${escapeHtml(idSuffix)}</span>`;
     } else {
       pill.textContent = "";
-      pill.classList.remove("statusbar__pill--visible");
     }
   } catch {
     // Silently ignore
@@ -3197,6 +3246,7 @@ document.getElementById("theme-name")?.addEventListener("dblclick", () => {
       .then((data) => {
         if (data.ok) {
           el.textContent = data.newName;
+          setStatusTheme(data.newName);
           if (typeof currentAppTheme !== "undefined") currentAppTheme = data.newName;
           window.location.hash = "#/app/" + encodeURIComponent(data.newName);
           // Update rail item
