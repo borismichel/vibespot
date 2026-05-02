@@ -77,7 +77,18 @@ function renderCodeFileList(files) {
       const itemEl = document.createElement("div");
       itemEl.className = "code-view__file-item";
       itemEl.dataset.fileId = f.id;
-      itemEl.innerHTML = (FILE_ICONS[f.lang] || "") + '<span class="code-view__file-name">' + f.label + "</span>";
+      // HubSpot-familiar trust signals: HubL on the templated module HTML,
+      // HubSpot fields schema on fields.json. These tell HubSpot devs "this
+      // is real CMS output, not generic web code".
+      let badge = "";
+      if (f.fileType === "html") {
+        badge = ' <span class="code-view__file-tag code-view__file-tag--hubl" title="Renders HubL — HubSpot CMS templating language">HubL</span>';
+      } else if (f.fileType === "fields") {
+        badge = ' <span class="code-view__file-tag code-view__file-tag--fields" title="HubSpot module field schema">HubSpot fields</span>';
+      }
+      itemEl.innerHTML = (FILE_ICONS[f.lang] || "")
+        + '<span class="code-view__file-name">' + f.label + "</span>"
+        + badge;
       itemEl.addEventListener("click", () => openCodeFile(f));
       groupEl.appendChild(itemEl);
     }
