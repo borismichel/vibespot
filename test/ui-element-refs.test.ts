@@ -90,68 +90,84 @@ function extractDynamicIds(source: string): Set<string> {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
-const html = readFileSync(HTML_PATH, "utf-8");
-const htmlIds = extractHtmlIds(html);
+function validate(): { errors: string[]; warnings: string[]; totalRefs: number; jsFileCount: number; htmlIdCount: number } {
+  const html = readFileSync(HTML_PATH, "utf-8");
+  const htmlIds = extractHtmlIds(html);
 
-const jsFiles = readdirSync(UI_DIR).filter((f) => f.endsWith(".js"));
+  const jsFiles = readdirSync(UI_DIR).filter((f) => f.endsWith(".js"));
 
-let errors: string[] = [];
-let warnings: string[] = [];
-let totalRefs = 0;
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  let totalRefs = 0;
 
-for (const jsFile of jsFiles) {
-  const filePath = join(UI_DIR, jsFile);
-  const source = readFileSync(filePath, "utf-8");
-  const refs = extractJsRefs(filePath, source);
-  const dynamicIds = extractDynamicIds(source);
+  for (const jsFile of jsFiles) {
+    const filePath = join(UI_DIR, jsFile);
+    const source = readFileSync(filePath, "utf-8");
+    const refs = extractJsRefs(filePath, source);
+    const dynamicIds = extractDynamicIds(source);
 
-  totalRefs += refs.length;
+    totalRefs += refs.length;
 
-  for (const ref of refs) {
-    const existsInHtml = htmlIds.has(ref.id);
-    const isDynamic = dynamicIds.has(ref.id);
+    for (const ref of refs) {
+      const existsInHtml = htmlIds.has(ref.id);
+      const isDynamic = dynamicIds.has(ref.id);
 
-    if (!existsInHtml && !isDynamic) {
-      if (ref.hasNullGuard) {
-        warnings.push(
-          `  WARN  ${ref.file}:${ref.line} — "#${ref.id}" not in HTML (null-guarded, won't crash but is dead code)`
-        );
-      } else {
-        errors.push(
-          `  FAIL  ${ref.file}:${ref.line} — "#${ref.id}" not in HTML and NO null guard → will crash if reached`
-        );
+      if (!existsInHtml && !isDynamic) {
+        if (ref.hasNullGuard) {
+          warnings.push(
+            `  WARN  ${ref.file}:${ref.line} — "#${ref.id}" not in HTML (null-guarded, won't crash but is dead code)`
+          );
+        } else {
+          errors.push(
+            `  FAIL  ${ref.file}:${ref.line} — "#${ref.id}" not in HTML and NO null guard → will crash if reached`
+          );
+        }
       }
-    } else if (existsInHtml && !ref.hasNullGuard) {
-      // Element exists now, but no null guard. Not an error, but fragile.
-      // We only flag these as info, not as errors.
     }
   }
+
+  return { errors, warnings, totalRefs, jsFileCount: jsFiles.length, htmlIdCount: htmlIds.size };
 }
 
-// ─── Report ─────────────────────────────────────────────────────────────────
+// ─── Vitest / Standalone mode ───────────────────────────────────────────────
 
-console.log("\n  UI Element Reference Validator");
-console.log("  ─────────────────────────────\n");
-console.log(`  Scanned ${jsFiles.length} JS files, ${totalRefs} element references, ${htmlIds.size} HTML IDs\n`);
+if (process.env.VITEST) {
+  const { describe, it, expect } = await import("vitest");
+  describe("UI Element Reference Validator", () => {
+    it("all JS element references point to existing HTML IDs", () => {
+      const { errors, warnings } = validate();
+      if (warnings.length > 0) {
+        console.log("Warnings (dead code):", warnings);
+      }
+      expect(errors, errors.join("\n")).toHaveLength(0);
+    });
+  });
+} else {
+  const { errors, warnings, totalRefs, jsFileCount, htmlIdCount } = validate();
 
-if (errors.length > 0) {
-  console.log("  ERRORS (will crash at runtime):\n");
-  for (const e of errors) console.log(e);
-  console.log();
+  console.log("\n  UI Element Reference Validator");
+  console.log("  ─────────────────────────────\n");
+  console.log(`  Scanned ${jsFileCount} JS files, ${totalRefs} element references, ${htmlIdCount} HTML IDs\n`);
+
+  if (errors.length > 0) {
+    console.log("  ERRORS (will crash at runtime):\n");
+    for (const e of errors) console.log(e);
+    console.log();
+  }
+
+  if (warnings.length > 0) {
+    console.log("  WARNINGS (dead code — element not in HTML but null-guarded):\n");
+    for (const w of warnings) console.log(w);
+    console.log();
+  }
+
+  if (errors.length === 0 && warnings.length === 0) {
+    console.log("  ✓ All element references are valid\n");
+  }
+
+  const exitCode = errors.length > 0 ? 1 : 0;
+  console.log(`  Result: ${errors.length} errors, ${warnings.length} warnings`);
+  console.log(`  Exit code: ${exitCode}\n`);
+
+  process.exit(exitCode);
 }
-
-if (warnings.length > 0) {
-  console.log("  WARNINGS (dead code — element not in HTML but null-guarded):\n");
-  for (const w of warnings) console.log(w);
-  console.log();
-}
-
-if (errors.length === 0 && warnings.length === 0) {
-  console.log("  ✓ All element references are valid\n");
-}
-
-const exitCode = errors.length > 0 ? 1 : 0;
-console.log(`  Result: ${errors.length} errors, ${warnings.length} warnings`);
-console.log(`  Exit code: ${exitCode}\n`);
-
-process.exit(exitCode);
