@@ -17,6 +17,7 @@ All notable changes to vibeSpot are documented here.
 ### Changes
 
 - **Deduplicate template surfaces** ([VIB-231](/VIB/issues/VIB-231)) — chat welcome no longer shows the page-template grid; it now offers three conversation starters ("Describe your page", "Upload a Figma design", "Import from HubSpot"). Page templates live on the Library tab and are reachable via the templates icon in the chat input area, which now switches to that tab.
+- **Align UI terminology with HubSpot vocabulary** ([VIB-233](/VIB/issues/VIB-233)) — user-facing copy now uses HubSpot's canonical terms (Module, Module Library, Brand Kit) instead of the legacy "section" phrasing. Internal code already used `module`; the UI was the inconsistency. Where vibeSpot keeps a different concept (e.g. Project &harr; Theme), the HubSpot equivalent is shown in tooltips on the project rail and Brand / Library workspace tabs. Adds a "HubSpot Terminology" reference section to `ui/docs/index.html` with a vibeSpot &rarr; HubSpot mapping table. Touched `ui/index.html`, `ui/chat.js`, `ui/dashboard.js`, `ui/inline-edit.js`, `ui/field-editor.js`, `ui/settings.js`, `ui/docs/index.html`.
 
 ### Fixes
 

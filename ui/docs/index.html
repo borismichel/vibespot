@@ -110,6 +110,7 @@
     <a class="doc-nav__link doc-nav__link--sub" href="#settings-hubspot">HubSpot Tab</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#settings-figma">Figma Tab</a>
     <a class="doc-nav__link" href="#cli-commands">CLI Commands</a>
+    <a class="doc-nav__link" href="#hubspot-glossary">HubSpot Terminology</a>
     <a class="doc-nav__link" href="#shortcuts">Shortcuts</a>
     <a class="doc-nav__link" href="#troubleshooting">Troubleshooting</a>
   </div>
@@ -1381,6 +1382,32 @@ vibespot</code></pre>
       <p>Reports on: Node.js version (requires 18+), Git installation, HubSpot CLI status, available AI CLI tools (Claude Code, Gemini CLI, Codex CLI), whether API keys are configured (Anthropic, OpenAI, Gemini &mdash; checks presence, not validity), active AI engine, and last-used theme path.</p>
     </div>
   </div>
+</div>
+
+<!-- ============================================================
+     Section 10b: HubSpot Glossary
+     ============================================================ -->
+<div class="doc-section" id="hubspot-glossary">
+  <h2 id="hubspot-glossary-heading">HubSpot Terminology <a href="#hubspot-glossary" class="doc-anchor">#</a></h2>
+  <p>vibeSpot generates native HubSpot CMS assets, so most things in the UI map 1:1 to a HubSpot concept. Where a vibeSpot label differs from HubSpot's official vocabulary, this glossary calls it out so you know what to look for inside HubSpot.</p>
+
+  <table>
+    <thead>
+      <tr><th>vibeSpot label</th><th>HubSpot term</th><th>What it is</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Project</td><td><strong>Theme</strong></td><td>One vibeSpot project produces one HubSpot theme. The theme name in the topbar pill is the folder uploaded to HubSpot's Design Manager.</td></tr>
+      <tr><td>Module / Modules</td><td><strong>Module</strong></td><td>A reusable building block (hero, CTA, pricing table, etc.) with its own <code>fields.json</code>, <code>module.html</code>, and CSS. Earlier vibeSpot copy called these &ldquo;sections&rdquo; &mdash; this is the same thing.</td></tr>
+      <tr><td>Module Library</td><td><strong>Module library</strong> (theme)</td><td>All reusable modules in the active theme. In HubSpot's Design Manager this is the <code>modules/</code> folder.</td></tr>
+      <tr><td>Module Only (page type)</td><td><strong>Section template</strong> / standalone module</td><td>A single-module template &mdash; useful for building one reusable section (e.g. a hero) that can be dropped into any page.</td></tr>
+      <tr><td>Pages</td><td><strong>Templates &amp; Pages</strong></td><td>Each entry under Pages is a HubSpot template (Landing Page, Website Page, Blog Post). Once deployed, you can spin up multiple HubSpot pages from one template.</td></tr>
+      <tr><td>Brand &rarr; Brand Kit</td><td><strong>Brand Kit</strong></td><td>Colors, fonts, and logo applied to every generated module. Mirrors HubSpot's Brand Kit in the portal.</td></tr>
+      <tr><td>Library tab</td><td><strong>Module library</strong></td><td>The Library workspace tab shows reusable modules across all pages of the active theme.</td></tr>
+      <tr><td>Marketplace</td><td><strong>HubSpot Marketplace</strong></td><td>Validates the theme against marketplace requirements before publication.</td></tr>
+      <tr><td>Fields</td><td><strong>Module fields</strong></td><td>The editable inputs on a module (text, image, choice, etc.) backed by <code>fields.json</code>.</td></tr>
+      <tr><td>Deploy</td><td><strong>Upload theme</strong></td><td>Pushes the theme folder to HubSpot's Design Manager via the CMS API.</td></tr>
+    </tbody>
+  </table>
 </div>
 
 <!-- ============================================================

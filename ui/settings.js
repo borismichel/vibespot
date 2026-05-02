@@ -114,7 +114,7 @@ function renderAITab(body, data) {
   // Engine selector
   const section = el("section", "settings__section");
   section.appendChild(sectionTitle("Engine"));
-  section.appendChild(desc("Choose which AI engine generates your HubSpot sections. API engines need an API key. CLI engines need the tool installed on your system."));
+  section.appendChild(desc("Choose which AI engine generates your HubSpot modules. API engines need an API key. CLI engines need the tool installed on your system."));
 
   const selectEl = el("div", "settings__engine-select");
   const allEngines = [
@@ -190,9 +190,9 @@ function renderAITab(body, data) {
   const agenticMode = config.agenticMode;
 
   if (isCli) {
-    agenticSection.appendChild(desc("Decompose AI generation into specialized agents with per-section parallel calls. Better quality and structured output enforcement. CLI engines use subprocess calls — may be slower than API engines."));
+    agenticSection.appendChild(desc("Decompose AI generation into specialized agents with per-module parallel calls. Better quality and structured output enforcement. CLI engines use subprocess calls — may be slower than API engines."));
   } else {
-    agenticSection.appendChild(desc("Decompose AI generation into specialized agents with per-section parallel calls. Better quality and structured output enforcement."));
+    agenticSection.appendChild(desc("Decompose AI generation into specialized agents with per-module parallel calls. Better quality and structured output enforcement."));
   }
 
   const toggleRow = el("div", "settings__toggle-row");
@@ -203,7 +203,7 @@ function renderAITab(body, data) {
 
   const sub = el("div", "settings__toggle-label-sub");
   if (agenticMode === true) {
-    sub.textContent = "Active — multi-stage pipeline with parallel section generation";
+    sub.textContent = "Active — multi-stage pipeline with parallel module generation";
     sub.style.color = "var(--success)";
   } else if (agenticMode === false) {
     sub.textContent = "Disabled — using single-call mode";
