@@ -225,8 +225,14 @@ export function startServer(opts: ServerOptions): Promise<{ port: number; close:
 
   const server = createServer((req, res) => handleRequest(req, res, uiDir));
 
-  // WebSocket server — upgrade on the same HTTP server
-  const wss = new WebSocketServer({ server });
+  // WebSocket server — origin-verified upgrade
+  const wss = new WebSocketServer({
+    server,
+    verifyClient: ({ origin }) => {
+      if (!origin) return true; // non-browser clients (curl, CLI) don't send Origin
+      return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    },
+  });
   wss.on("connection", (ws) => handleWsConnection(ws));
 
   return new Promise((resolve, reject) => {
@@ -276,7 +282,11 @@ function handleRequest(req: IncomingMessage, res: ServerResponse, uiDir: string)
   // Preview route — returns rendered preview HTML
   if (url.pathname === "/preview") {
     const html = buildPreviewHtml();
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Security-Policy": "default-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; style-src 'unsafe-inline'",
+      "Cross-Origin-Opener-Policy": "same-origin",
+    });
     res.end(html);
     return;
   }
@@ -285,8 +295,11 @@ function handleRequest(req: IncomingMessage, res: ServerResponse, uiDir: string)
   if (url.pathname === "/module-preview") {
     const moduleName = url.searchParams.get("module") || "";
     const html = buildModulePreviewHtml(moduleName);
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(html || "<!-- module not found -->");
+    res.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Security-Policy": "default-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; style-src 'unsafe-inline'",
+      "Cross-Origin-Opener-Policy": "same-origin",
+    });
     return;
   }
 
@@ -324,7 +337,8 @@ function handleApiRoute(
 ): void {
   // CORS — restrict to localhost origins only
   const origin = req.headers.origin || "";
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+  const isLocalhostOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  if (isLocalhostOrigin) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -333,6 +347,14 @@ function handleApiRoute(
   if (method === "OPTIONS") {
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  // Block cross-origin state-changing requests (CSRF/DNS-rebinding protection).
+  // Non-browser clients (curl, CLI) don't send Origin — allowed through.
+  if ((method === "POST" || method === "PUT" || method === "DELETE") && origin && !isLocalhostOrigin) {
+    res.writeHead(403, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Origin not allowed" }));
     return;
   }
 

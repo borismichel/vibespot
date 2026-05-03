@@ -330,16 +330,21 @@ function resolveExpressions(tpl: string, context: RenderContext): string {
 
     let value = resolvePath(context, path);
 
-    // Apply basic filters
+    // Track whether |safe was applied (skip HTML escaping)
+    let markedSafe = false;
     for (let i = 1; i < filterParts.length; i++) {
-      value = applyFilter(value, filterParts[i].trim());
+      const f = filterParts[i].trim();
+      if (f === "safe") { markedSafe = true; continue; }
+      value = applyFilter(value, f);
     }
 
     if (value === null || value === undefined) return "";
     if (typeof value === "object") return JSON.stringify(value);
-    // Strip literal \n sequences that AI sometimes puts in field defaults
     let str = String(value);
     str = str.replace(/\\n/g, " ").replace(/\n/g, " ");
+    if (!markedSafe) {
+      str = str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
     return str;
   });
 }

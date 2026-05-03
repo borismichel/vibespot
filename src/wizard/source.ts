@@ -1,6 +1,6 @@
 import { readdirSync, statSync } from "node:fs";
 import { join, basename, extname } from "node:path";
-import { run } from "../utils/shell.js";
+import { run, runGit } from "../utils/shell.js";
 import { fileExists, readFile } from "../utils/fs.js";
 import * as ui from "../prompts/prompter.js";
 import { theme } from "../cli/theme.js";
@@ -196,7 +196,7 @@ export function analyzeSource(input: string): SourceAnalysis {
     sourceDir = join(process.cwd(), "workspace", repoName);
 
     if (!fileExists(sourceDir)) {
-      const result = run(`git clone --depth 1 "${input}" "${sourceDir}"`);
+      const result = runGit(["clone", "--depth", "1", input, sourceDir]);
       if (!result.success) {
         throw new Error(`Failed to clone ${input}: ${result.stderr}`);
       }
@@ -255,7 +255,7 @@ export async function setupSource(): Promise<SourceAnalysis> {
       const s = await ui.spinner();
       s.start("Cloning repository...");
 
-      const result = run(`git clone --depth 1 "${input}" "${sourceDir}"`);
+      const result = runGit(["clone", "--depth", "1", input, sourceDir]);
       if (!result.success) {
         s.stop("Clone failed");
         ui.logError(

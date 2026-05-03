@@ -34,7 +34,7 @@ async function openFieldEditor(moduleName) {
     const fields = JSON.parse(mod.fieldsJson);
     renderFieldForm(fields, moduleName);
   } catch (err) {
-    editorContent.innerHTML = `<p>Error: ${err.message}</p>`;
+    editorContent.innerHTML = `<p>Error: ${escHtml(err.message)}</p>`;
   }
 }
 

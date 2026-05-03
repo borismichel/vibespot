@@ -4,7 +4,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, readdirSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, basename, resolve } from "node:path";
 import { homedir } from "node:os";
 import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 
@@ -340,6 +340,14 @@ export function handleSetupOpenRoute(req: IncomingMessage, res: ServerResponse):
       }
       if (!existsSync(fullPath)) {
         jsonResponse(res, 400, { error: `Theme folder not found: ${themePath}` });
+        return;
+      }
+
+      // Restrict to workspace directory to prevent arbitrary filesystem access
+      const resolved = resolve(fullPath);
+      const workspace = resolve(WORKSPACE_DIR);
+      if (!resolved.startsWith(workspace + "/") && resolved !== workspace) {
+        jsonResponse(res, 403, { error: "Path outside workspace" });
         return;
       }
 
