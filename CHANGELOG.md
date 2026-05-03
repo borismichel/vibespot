@@ -4,7 +4,7 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
-## Unreleased
+## v1.3.0 — 2026-05-03
 
 ### Multi-page sites ([VIB-159](/VIB/issues/VIB-159))
 
@@ -36,6 +36,9 @@ Hover-activated toolbar over module sections in the preview pane. When hovering 
 - **Page tree sidebar** ([VIB-174](/VIB/issues/VIB-174)) — replaces horizontal page tabs with a vertical tree showing all templates with type badges (LP, Blog, Web, Sec), labels, and module counts. Always visible; includes inline page creation form with type selector.
 - **Editor mode simplification** ([VIB-175](/VIB/issues/VIB-175)) — unified Interact mode, Plan as a resizable sidebar (coexists with preview), per-module code viewer tabs (Fields/Code) in the field editor, and Version History as a collapsible bottom panel.
 - **Email option in page type dropdown** ([VIB-199](/VIB/issues/VIB-199)) — email generation is now reachable from the web UI page type dropdown (not just the `vibespot email` CLI), setting `contentMode` to `"email"` and scaffolding the email template.
+- **Project assets browser** ([VIB-288](/VIB/issues/VIB-288)) — Library tab now shows project asset files (images, fonts, scripts) instead of starter templates. Browse, preview, and reference assets directly from the workspace.
+- **Material Design SVG icons** ([VIB-289](/VIB/issues/VIB-289)) — replaced all UI emoji glyphs with crisp Material Design SVG icons for consistent cross-platform rendering.
+- **Brand kit font picker with styleguide sync** ([VIB-292](/VIB/issues/VIB-292)) — font picker dropdowns now sync available fonts from the design styleguide. Custom font option inserts correctly before optgroups.
 
 ### Enhancements
 
@@ -66,12 +69,14 @@ Hover-activated toolbar over module sections in the preview pane. When hovering 
 - **Theme robustness on project home** ([VIB-214](/VIB/issues/VIB-214)) — restored starter grid CSS rules and added explicit background/color-scheme declarations for dark/light parity.
 - **Scrollable project rail** ([VIB-181](/VIB/issues/VIB-181)) — project rail items now scroll instead of overflowing the container.
 - **Dead code cleanup and QC tooling** ([VIB-191](/VIB/issues/VIB-191)) — removed 6 dead event listeners from the VIB-187 restructure. Added `ui-element-refs.test.ts` validator and `PRE-MERGE-QC.md` checklist.
+- **Session module preservation** ([VIB-286](/VIB/issues/VIB-286)) — modules in the library and active session now survive page refresh. WebSocket reconnects on dashboard load so pages and chat persist across navigations. Module library refreshes when the Library workspace tab is activated.
+- **Unique AI design output** ([VIB-281](/VIB/issues/VIB-281)) — AI now generates unique color palettes and font choices per project instead of repeating defaults. Design-guide recipes feed into the design system when no brand kit is set.
+- **Chat message display after pipeline** ([VIB-279](/VIB/issues/VIB-279)) — assistant chat messages now display correctly after the agentic pipeline completes.
+- **Extract button crash** ([VIB-276](/VIB/issues/VIB-276)) — extract button no longer crashes on wrong selector after generation.
+- **Responsive preview controls** ([VIB-278](/VIB/issues/VIB-278)) — enlarged and centered responsive preview controls for better usability.
+- **Empty page tree after generation** ([VIB-277](/VIB/issues/VIB-277)) — page tree and module slideout now populate correctly after generation completes.
 
----
-
-## v1.3.0 — 2026-04-30
-
-### Email template generation — Phase 1 ([VIB-158](/VIB/issues/VIB-158))
+### Email template generation ([VIB-158](/VIB/issues/VIB-158))
 
 Full email template generation built on the VIB-154 spike. vibeSpot can now create, iterate, and upload HubSpot email templates alongside landing pages.
 

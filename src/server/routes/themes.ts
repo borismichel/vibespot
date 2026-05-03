@@ -76,6 +76,10 @@ export function handleDeleteLocalThemeRoute(req: IncomingMessage, res: ServerRes
         jsonResponse(res, 400, { error: "Theme name is required" });
         return;
       }
+      if (/[\/\\]|\.\./.test(themeName) || themeName === "." || !themeName.replace(/[^a-z0-9]/gi, "")) {
+        jsonResponse(res, 400, { error: "Invalid theme name" });
+        return;
+      }
       const themePath = join(WORKSPACE_DIR, themeName);
       if (!existsSync(themePath)) {
         jsonResponse(res, 404, { error: "Theme not found on disk" });

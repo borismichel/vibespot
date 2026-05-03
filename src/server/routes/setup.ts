@@ -114,6 +114,11 @@ export function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse
         .replace(/-+/g, "-")
         .replace(/^-|-$/g, "");
 
+      if (!themeName) {
+        jsonResponse(res, 400, { error: "Theme name must contain at least one alphanumeric character" });
+        return;
+      }
+
       const themePath = join(WORKSPACE_DIR, themeName);
       ensureDir(WORKSPACE_DIR);
 
