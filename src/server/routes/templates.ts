@@ -388,8 +388,13 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
         ensureDir(assetDir);
         writeFile(join(assetDir, filename), content);
 
+        let syncedKit: import("../session/types.js").BrandKit | null = null;
+        if (assetKey === "styleguide") {
+          syncedKit = syncBrandKitFromStyleguide(session, content);
+        }
+
         saveSession();
-        jsonResponse(res, 200, { ok: true });
+        jsonResponse(res, 200, { ok: true, brandKit: syncedKit });
       } catch (err) {
         jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
       }
@@ -426,6 +431,153 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
   }
 
   jsonResponse(res, 405, { error: "Method not allowed" });
+}
+
+// ---------------------------------------------------------------------------
+// Curated font list — system-safe + popular web fonts grouped by category
+// ---------------------------------------------------------------------------
+
+const FONT_LIST: { name: string; stack: string; category: string }[] = [
+  // System
+  { name: "System Default", stack: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", category: "system" },
+  // Sans-serif
+  { name: "Inter", stack: "Inter, system-ui, sans-serif", category: "sans-serif" },
+  { name: "DM Sans", stack: "'DM Sans', system-ui, sans-serif", category: "sans-serif" },
+  { name: "Open Sans", stack: "'Open Sans', system-ui, sans-serif", category: "sans-serif" },
+  { name: "Roboto", stack: "Roboto, system-ui, sans-serif", category: "sans-serif" },
+  { name: "Lato", stack: "Lato, system-ui, sans-serif", category: "sans-serif" },
+  { name: "Montserrat", stack: "Montserrat, system-ui, sans-serif", category: "sans-serif" },
+  { name: "Poppins", stack: "Poppins, system-ui, sans-serif", category: "sans-serif" },
+  { name: "Nunito", stack: "Nunito, system-ui, sans-serif", category: "sans-serif" },
+  { name: "Raleway", stack: "Raleway, system-ui, sans-serif", category: "sans-serif" },
+  { name: "Work Sans", stack: "'Work Sans', system-ui, sans-serif", category: "sans-serif" },
+  { name: "Source Sans 3", stack: "'Source Sans 3', system-ui, sans-serif", category: "sans-serif" },
+  { name: "Manrope", stack: "Manrope, system-ui, sans-serif", category: "sans-serif" },
+  { name: "Plus Jakarta Sans", stack: "'Plus Jakarta Sans', system-ui, sans-serif", category: "sans-serif" },
+  { name: "Outfit", stack: "Outfit, system-ui, sans-serif", category: "sans-serif" },
+  { name: "Space Grotesk", stack: "'Space Grotesk', system-ui, sans-serif", category: "sans-serif" },
+  { name: "Albert Sans", stack: "'Albert Sans', system-ui, sans-serif", category: "sans-serif" },
+  { name: "Figtree", stack: "Figtree, system-ui, sans-serif", category: "sans-serif" },
+  { name: "Helvetica", stack: "Helvetica, Arial, sans-serif", category: "sans-serif" },
+  { name: "Arial", stack: "Arial, Helvetica, sans-serif", category: "sans-serif" },
+  { name: "Verdana", stack: "Verdana, Geneva, sans-serif", category: "sans-serif" },
+  // Serif
+  { name: "Georgia", stack: "Georgia, 'Times New Roman', serif", category: "serif" },
+  { name: "Playfair Display", stack: "'Playfair Display', Georgia, serif", category: "serif" },
+  { name: "Merriweather", stack: "Merriweather, Georgia, serif", category: "serif" },
+  { name: "Lora", stack: "Lora, Georgia, serif", category: "serif" },
+  { name: "PT Serif", stack: "'PT Serif', Georgia, serif", category: "serif" },
+  { name: "Libre Baskerville", stack: "'Libre Baskerville', Georgia, serif", category: "serif" },
+  { name: "Source Serif 4", stack: "'Source Serif 4', Georgia, serif", category: "serif" },
+  { name: "Cormorant Garamond", stack: "'Cormorant Garamond', Garamond, serif", category: "serif" },
+  { name: "Times New Roman", stack: "'Times New Roman', Times, serif", category: "serif" },
+  // Display
+  { name: "Sora", stack: "Sora, system-ui, sans-serif", category: "display" },
+  { name: "Clash Display", stack: "'Clash Display', system-ui, sans-serif", category: "display" },
+  { name: "Cabinet Grotesk", stack: "'Cabinet Grotesk', system-ui, sans-serif", category: "display" },
+  { name: "Satoshi", stack: "Satoshi, system-ui, sans-serif", category: "display" },
+  { name: "General Sans", stack: "'General Sans', system-ui, sans-serif", category: "display" },
+  // Monospace
+  { name: "JetBrains Mono", stack: "'JetBrains Mono', 'Fira Code', monospace", category: "monospace" },
+  { name: "Fira Code", stack: "'Fira Code', 'Courier New', monospace", category: "monospace" },
+  { name: "Source Code Pro", stack: "'Source Code Pro', monospace", category: "monospace" },
+  { name: "Courier New", stack: "'Courier New', Courier, monospace", category: "monospace" },
+];
+
+export function handleFontsRoute(_req: IncomingMessage, res: ServerResponse): void {
+  jsonResponse(res, 200, FONT_LIST);
+}
+
+// ---------------------------------------------------------------------------
+// Parse brand tokens from styleguide markdown
+// ---------------------------------------------------------------------------
+
+const HEX_RE = /#[0-9a-fA-F]{6}\b/g;
+const FONT_FAMILY_RE = /font[- ]?famil(?:y|ies)\s*[:=]\s*([^\n]+)/gi;
+
+function parseStyleguideTokens(markdown: string): { colors: string[]; fonts: string[] } {
+  const colors: string[] = [];
+  const fonts: string[] = [];
+
+  const lines = markdown.split("\n");
+  let inColorSection = false;
+  let inTypographySection = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (/^##\s+color/i.test(trimmed)) { inColorSection = true; inTypographySection = false; continue; }
+    if (/^##\s+typography/i.test(trimmed)) { inTypographySection = true; inColorSection = false; continue; }
+    if (/^##\s+/.test(trimmed) && !(/color/i.test(trimmed) || /typography/i.test(trimmed))) {
+      inColorSection = false; inTypographySection = false; continue;
+    }
+
+    if (inColorSection) {
+      const hexMatches = trimmed.match(HEX_RE);
+      if (hexMatches) {
+        for (const h of hexMatches) {
+          if (!colors.includes(h.toLowerCase())) colors.push(h.toLowerCase());
+        }
+      }
+    }
+
+    if (inTypographySection) {
+      const fontMatch = FONT_FAMILY_RE.exec(trimmed);
+      FONT_FAMILY_RE.lastIndex = 0;
+      if (fontMatch) {
+        const raw = fontMatch[1].trim().replace(/['"`]/g, "").split(",")[0].trim();
+        if (raw && !fonts.includes(raw)) fonts.push(raw);
+      }
+
+      if (/\bheading|body|display|monospace\b/i.test(trimmed) && !fontMatch) {
+        const colonPart = trimmed.split(":").slice(1).join(":").trim();
+        if (colonPart) {
+          const raw = colonPart.replace(/['"`*]/g, "").split(",")[0].trim().split("(")[0].trim();
+          if (raw && raw.length < 60 && !/^\d/.test(raw) && !fonts.includes(raw)) fonts.push(raw);
+        }
+      }
+    }
+  }
+
+  return { colors: colors.slice(0, 6), fonts: fonts.slice(0, 4) };
+}
+
+function syncBrandKitFromStyleguide(
+  session: NonNullable<ReturnType<typeof getSession>>,
+  styleguide: string,
+): import("../session/types.js").BrandKit | null {
+  const { colors, fonts } = parseStyleguideTokens(styleguide);
+  if (colors.length === 0 && fonts.length === 0) return null;
+
+  if (!session.brandAssets) session.brandAssets = {};
+  const kit: import("../session/types.js").BrandKit = session.brandAssets.brandKit || {};
+
+  if (colors.length > 0) {
+    if (!kit.colors) kit.colors = {};
+    if (colors[0]) kit.colors.primary = colors[0];
+    if (colors[1]) kit.colors.secondary = colors[1];
+    if (colors[2]) kit.colors.accent = colors[2];
+  }
+
+  if (fonts.length > 0) {
+    if (!kit.fonts) kit.fonts = {};
+    const matchFont = (name: string) => {
+      const lower = name.toLowerCase();
+      const match = FONT_LIST.find((f) => f.name.toLowerCase() === lower);
+      return match ? match.stack : name;
+    };
+    if (fonts[0]) kit.fonts.heading = matchFont(fonts[0]);
+    if (fonts[1]) kit.fonts.body = matchFont(fonts[1]);
+    else if (fonts[0]) kit.fonts.body = matchFont(fonts[0]);
+  }
+
+  session.brandAssets.brandKit = kit;
+
+  const assetDir = join(session.themePath, ".vibespot");
+  ensureDir(assetDir);
+  writeFile(join(assetDir, "brand-kit.json"), JSON.stringify(kit, null, 2));
+
+  return kit;
 }
 
 // ---------------------------------------------------------------------------
@@ -591,8 +743,13 @@ export function handleDesignExtractRoute(req: IncomingMessage, res: ServerRespon
             extracted[types[i]] = content;
           }
 
+          let syncedKit: import("../session/types.js").BrandKit | null = null;
+          if (extracted.styleguide) {
+            syncedKit = syncBrandKitFromStyleguide(session, extracted.styleguide);
+          }
+
           saveSession();
-          jsonResponse(res, 200, { ok: true, type: "all", extracted });
+          jsonResponse(res, 200, { ok: true, type: "all", extracted, brandKit: syncedKit });
           return;
         }
 
@@ -608,8 +765,12 @@ export function handleDesignExtractRoute(req: IncomingMessage, res: ServerRespon
         }
 
         saveBrandAsset(session, type, content);
+        let syncedKit: import("../session/types.js").BrandKit | null = null;
+        if (type === "styleguide") {
+          syncedKit = syncBrandKitFromStyleguide(session, content);
+        }
         saveSession();
-        jsonResponse(res, 200, { ok: true, type, content });
+        jsonResponse(res, 200, { ok: true, type, content, brandKit: syncedKit });
       } catch (err) {
         jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
       }
