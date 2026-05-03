@@ -743,7 +743,7 @@ function renderIntroProgress(stepIndex, totalSteps) {
   let html = "";
   for (let i = 0; i < totalSteps; i++) {
     const cls = i === stepIndex ? "active" : i < stepIndex ? "done" : "";
-    html += `<div class="walkthrough__step-dot ${cls}">${i < stepIndex ? "&#10003;" : i + 1}</div>`;
+    html += `<div class="walkthrough__step-dot ${cls}">${i < stepIndex ? vsIcon("check", {size: "sm"}) : i + 1}</div>`;
     if (i < totalSteps - 1) html += `<div class="walkthrough__step-line"></div>`;
   }
   return html;
@@ -1603,7 +1603,7 @@ function initDlAccountSwitch(accounts, activeId) {
     let html = '<div style="display:flex;flex-direction:column;gap:6px">';
     for (const acct of accounts) {
       const isActive = acct.portalId === activeId;
-      html += `<button class="btn btn--${isActive ? "primary" : "secondary"} dl-acct-btn" data-portal="${esc(acct.portalId)}" style="text-align:left;padding:6px 12px;font-size:13px">${esc(acct.portalName || acct.portalId)} (${esc(acct.portalId)})${isActive ? " ✓" : ""}</button>`;
+      html += `<button class="btn btn--${isActive ? "primary" : "secondary"} dl-acct-btn" data-portal="${esc(acct.portalId)}" style="text-align:left;padding:6px 12px;font-size:13px">${esc(acct.portalName || acct.portalId)} (${esc(acct.portalId)})${isActive ? ' <span class="vs-icon-inline">' + vsIcon("check", {size: "sm"}) + '</span>' : ""}</button>`;
     }
     html += `<button class="btn btn--secondary dl-acct-btn" data-portal="__new" style="text-align:left;padding:6px 12px;font-size:13px">+ Add another account</button>`;
     html += '</div>';

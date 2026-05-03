@@ -249,7 +249,7 @@ function confirmUpload(portalName, portalId) {
         let html = '<div style="display:flex;flex-direction:column;gap:6px">';
         for (const acct of accounts) {
           const isActive = acct.portalId === activeId;
-          html += `<button class="btn btn--${isActive ? "primary" : "secondary"} confirm-acct-btn" data-portal="${esc(acct.portalId)}" style="text-align:left;padding:6px 12px;font-size:13px">${esc(acct.portalName || acct.portalId)} (${esc(acct.portalId)})${isActive ? " ✓" : ""}</button>`;
+          html += `<button class="btn btn--${isActive ? "primary" : "secondary"} confirm-acct-btn" data-portal="${esc(acct.portalId)}" style="text-align:left;padding:6px 12px;font-size:13px">${esc(acct.portalName || acct.portalId)} (${esc(acct.portalId)})${isActive ? ' <span class="vs-icon-inline">' + vsIcon("check", {size: "sm"}) + '</span>' : ""}</button>`;
         }
         html += `<button class="btn btn--secondary confirm-acct-btn" data-portal="__new" style="text-align:left;padding:6px 12px;font-size:13px">+ Add another account</button>`;
         html += '</div>';
@@ -326,7 +326,7 @@ function setUploadState(state, data) {
 
     case "success":
       panel.classList.add("upload-panel--success");
-      statusEl.innerHTML = '<span class="upload-status-icon">&#10003;</span> Upload complete!';
+      statusEl.innerHTML = '<span class="upload-status-icon">' + vsIcon("check-circle", {size: "sm"}) + '</span> Upload complete!';
       if (uploadBtn) {
         uploadBtn.textContent = "Deploy";
         uploadBtn.disabled = false;
@@ -351,7 +351,7 @@ function setUploadState(state, data) {
 
     case "failed":
       panel.classList.add("upload-panel--error");
-      statusEl.innerHTML = '<span class="upload-status-icon">&#10007;</span> Upload failed';
+      statusEl.innerHTML = '<span class="upload-status-icon">' + vsIcon("x-circle", {size: "sm"}) + '</span> Upload failed';
       if (uploadBtn) {
         uploadBtn.textContent = "Deploy";
         uploadBtn.disabled = false;
@@ -387,7 +387,7 @@ function setUploadState(state, data) {
 
     case "fix_done":
       panel.classList.add("upload-panel--fixing");
-      statusEl.innerHTML = '<span class="upload-status-icon">&#10003;</span> AI fixes applied';
+      statusEl.innerHTML = '<span class="upload-status-icon">' + vsIcon("check-circle", {size: "sm"}) + '</span> AI fixes applied';
       if (uploadBtn) {
         uploadBtn.textContent = "Deploy";
         uploadBtn.disabled = false;
@@ -554,7 +554,7 @@ function showDeploySuccessPopup(portalId, dataCenter, themeName) {
   overlay.className = "confirm-overlay";
   overlay.innerHTML = `
     <div class="deploy-success">
-      <div class="deploy-success__icon">&#127881;</div>
+      <div class="deploy-success__icon">${vsIcon("rocket", {size: "md"})}</div>
       <h2 class="deploy-success__title">Theme deployed!</h2>
       <p class="deploy-success__subtitle">"${esc(name)}" is now live on HubSpot.</p>
       <div class="deploy-success__steps">

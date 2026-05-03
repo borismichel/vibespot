@@ -2614,7 +2614,7 @@ function updateModuleList(moduleNames) {
       <span class="module-item__drag">⠿</span>
       <span class="module-item__changed-dot" aria-hidden="true"></span>
       <span class="module-item__name">${escapeHtml(name)}</span>
-      <span class="module-item__edit" title="Edit fields">⚙</span>
+      <span class="module-item__edit" title="Edit fields">${vsIcon("settings", {size: "sm"})}</span>
       <span class="module-item__delete" title="Delete section">&times;</span>
     `;
 
