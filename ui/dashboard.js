@@ -751,7 +751,8 @@ function selectFontValue(selectEl, value) {
   const custom = document.createElement("option");
   custom.value = value;
   custom.textContent = value.split(",")[0].replace(/['"]/g, "").trim() + " (custom)";
-  selectEl.insertBefore(custom, selectEl.options[1]);
+  const firstOptgroup = selectEl.querySelector("optgroup");
+  selectEl.insertBefore(custom, firstOptgroup || selectEl.options[1]);
   selectEl.value = value;
 }
 
