@@ -3110,20 +3110,12 @@ window.prefillChatInput = function (text) {
 // Conversation starter buttons in chat welcome
 document.getElementById("conversation-starters")?.addEventListener("click", handleConversationStarterClick);
 
-// Page Template buttons in the Library tab — send the prompt and surface the chat
-document.getElementById("library-template-starters")?.addEventListener("click", (e) => {
-  const btn = e.target.closest(".starter-btn");
-  if (!btn || !btn.dataset.prompt) return;
-  document.getElementById("ws-tab-pages")?.click();
-  sendMessage(btn.dataset.prompt);
-});
-
-// Templates icon in input area — switch to Library tab where templates live
+// Templates icon in input area — switch to Library tab where project assets live
 document.getElementById("btn-starter-templates")?.addEventListener("click", () => {
   const libraryTab = document.getElementById("ws-tab-library");
   if (libraryTab) {
     libraryTab.click();
-    document.getElementById("library-page-templates")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("library-project-assets")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 });
 
