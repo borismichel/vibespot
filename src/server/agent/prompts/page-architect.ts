@@ -11,6 +11,7 @@
 
 import type { SystemPromptBlock } from "../engine-adapter.js";
 import type { BrandKit } from "../../session/types.js";
+import { getDesignGuide } from "../../../ai/prompts.js";
 
 // ---------------------------------------------------------------------------
 // Stage 2a: Design System
@@ -143,12 +144,10 @@ Use system font stacks that approximate the desired aesthetic. Pick TWO stacks:
   }
 
   if (!hasBrandKit && !brandAssets?.styleguide) {
-    parts.push(`\n\n## No Brand Provided — Be Creative
-No brand colors, fonts, or styleguide have been set for this project. You MUST:
-1. **Invent a completely original color palette** inspired by the topic, industry, and audience described in the user's request. Do NOT fall back to generic blue-on-white or any memorized default palette.
-2. **Choose a font pairing** (display + body) that matches the mood. Don't always pick the same stack — vary between editorial serif, modern sans, geometric, warm humanist, or monospace/tech based on what fits.
-3. **Make bold aesthetic choices.** The user expects a unique design, not a template. Surprise them with a palette and style they wouldn't have picked themselves but that perfectly fits their content.
-4. **Never reuse colors from previous generations.** Each project deserves its own identity.`);
+    parts.push(`\n\n## No Brand Provided — Follow the Generation Recipe
+No brand colors, fonts, or styleguide have been set. You MUST follow these rules to create a unique design:
+
+${getNoBrandDesignRecipe()}`);
   }
 
   return parts.join("");
@@ -209,12 +208,10 @@ export function buildDesignSystemPromptBlocks(
   }
 
   if (!hasBrandKit && !brandAssets?.styleguide) {
-    dynamicParts.push(`## No Brand Provided — Be Creative
-No brand colors, fonts, or styleguide have been set for this project. You MUST:
-1. **Invent a completely original color palette** inspired by the topic, industry, and audience described in the user's request. Do NOT fall back to generic blue-on-white or any memorized default palette.
-2. **Choose a font pairing** (display + body) that matches the mood. Don't always pick the same stack — vary between editorial serif, modern sans, geometric, warm humanist, or monospace/tech based on what fits.
-3. **Make bold aesthetic choices.** The user expects a unique design, not a template. Surprise them with a palette and style they wouldn't have picked themselves but that perfectly fits their content.
-4. **Never reuse colors from previous generations.** Each project deserves its own identity.`);
+    dynamicParts.push(`## No Brand Provided — Follow the Generation Recipe
+No brand colors, fonts, or styleguide have been set. You MUST follow these rules to create a unique design:
+
+${getNoBrandDesignRecipe()}`);
   }
 
   if (dynamicParts.length > 0) {
@@ -383,6 +380,95 @@ export function buildPageArchitectPrompt(
 }
 
 // ---------------------------------------------------------------------------
+// No-brand design recipe — loaded when no brand kit or styleguide is set
+// ---------------------------------------------------------------------------
+
+function getNoBrandDesignRecipe(): string {
+  const designGuide = getDesignGuide();
+
+  // Extract the Color System section (§4) and Font Pairing table from the design guide asset
+  const colorSection = extractSection(designGuide, "## 4. Color System", "## 5.");
+  const fontSection = extractSection(designGuide, "### Recommended Font Pairings", "### Typography Scale");
+
+  const parts: string[] = [];
+
+  parts.push(`### Step 1: Derive the aesthetic from the content
+Read the user's request carefully. What industry? What audience? What mood?
+Map it to ONE of these aesthetic directions — then commit fully:
+
+| Business Type | Aesthetic | Color Direction | Font Mood |
+|--------------|-----------|----------------|-----------|
+| SaaS / Tech startup | Cool minimal or Bold tech | Blues, teals, electric purples, neon greens — COOL tones | Geometric sans or monospace |
+| Restaurant / Food | Warm editorial | Deep greens, burgundy, cream, terracotta — WARM but rich | Serif display + clean body |
+| Agency / Consultancy | Bold confident | Black + a single bold accent (red, orange, electric blue) | Strong geometric display |
+| E-commerce / DTC | Playful or Premium | Depends on product: pastels for beauty, dark for luxury, bright for fun | Varies — match the product vibe |
+| Finance / Legal | Dark luxury or Classic | Navy, charcoal, forest green, gold — DARK and authoritative | Classic serif or refined sans |
+| Health / Wellness | Soft organic | Sage, lavender, soft sky, warm sand — MUTED and calming | Rounded sans or warm serif |
+| Education / Non-profit | Warm and approachable | Warm blues, soft greens, sunny yellows — FRIENDLY | Humanist sans, readable |
+| Real estate / Architecture | Minimal luxe | Off-whites, charcoal, muted golds — MINIMAL | Thin geometric or editorial serif |
+| Developer tools / Data | Dark mode tech | Near-black bg, neon accent (cyan, lime, pink) — HIGH CONTRAST | Monospace display + clean sans body |
+| Creative / Portfolio | Expressive | Unexpected: magenta + teal, black + coral, deep purple + lime — BOLD | Anything distinctive |
+| Events / Entertainment | Energetic | Vibrant saturated colors, gradients OK — HIGH ENERGY | Bold display, fun pairings |
+| Local service / Trades | Trustworthy practical | Navy, forest green, or deep red with clean white — SOLID | Clean readable sans |
+
+### Step 2: Pick ORIGINAL colors
+Do NOT copy any palette you've seen before. Generate new hex values by:
+1. Pick a background hue that fits the aesthetic (dark? warm white? cool gray? tinted?)
+2. Pick a primary that CONTRASTS with the bg and matches the industry mood
+3. Pick an accent that complements the primary (analogous, split-complementary, or triadic)
+4. Derive surface, text, muted, border colors from these three anchors
+5. Verify contrast: body text ≥ 4.5:1, large text ≥ 3:1 against their backgrounds
+
+**BANNED combinations** (too common, feels like a template):
+- White bg + blue primary + light blue accent
+- White bg + purple/violet primary
+- Cream/beige bg + brown/orange primary + gold accent
+- Any combination you've generated in the last 10 sessions`);
+
+  if (fontSection) {
+    parts.push(`### Step 3: Choose fonts from the design guide
+These are ideal web font pairings. Since HubSpot CMS uses system fonts, pick the CLOSEST system font stack that matches the mood of the ideal pairing:
+
+${fontSection}
+
+**System font mapping** — use these to approximate the above:
+- Serif display (Playfair, Cormorant, Fraunces) → Georgia, Cambria, "Times New Roman", serif
+- Clean body serif (Source Serif) → Georgia, "Times New Roman", serif
+- Geometric sans (Satoshi, Outfit, Cabinet) → Futura, "Century Gothic", "Trebuchet MS", sans-serif
+- Modern sans (DM Sans, Plus Jakarta, General Sans) → system-ui, -apple-system, "Segoe UI", sans-serif
+- Humanist sans (Libre Franklin, Nunito) → Optima, Candara, "Noto Sans", sans-serif
+- Monospace (Space Mono, JetBrains) → "SF Mono", "Cascadia Code", "Fira Code", monospace
+- Bold display (Archivo Black, Bebas Neue, Syne) → Impact, "Arial Black", sans-serif
+- Classic serif (Book Antiqua) → "Book Antiqua", Palatino, "Palatino Linotype", serif
+
+Choose the pairing that matches the MOOD of the content, not the same one every time.`);
+  }
+
+  if (colorSection) {
+    parts.push(`### Reference: Design Guide Color Philosophy
+${colorSection}`);
+  }
+
+  parts.push(`### Step 4: Verify uniqueness
+Before finalizing, ask yourself:
+- Would this palette look DIFFERENT from a page I just designed for a different topic?
+- Is the primary color something other than blue, brown, or purple?
+- Would the user be surprised (pleasantly) by this color choice?
+- Does the font pairing match the industry, not just "safe defaults"?
+
+If any answer is "no," go bolder. The user wants personality, not safety.`);
+
+  return parts.join("\n\n");
+}
+
+function extractSection(text: string, startMarker: string, endMarker: string): string {
+  const startIdx = text.indexOf(startMarker);
+  if (startIdx === -1) return "";
+  const endIdx = text.indexOf(endMarker, startIdx);
+  return endIdx === -1 ? text.slice(startIdx) : text.slice(startIdx, endIdx).trim();
+}
+
+// ---------------------------------------------------------------------------
 // Guide summaries (shared by both prompts)
 // ---------------------------------------------------------------------------
 
@@ -420,25 +506,18 @@ letter-spacing: -0.02em to -0.04em for large headings (tighter = more premium)
 ### Color Palettes
 Pick a dominant (70%), secondary (25%), accent (5%). Ensure WCAG AA contrast (4.5:1 body, 3:1 large text).
 
-**CRITICAL: Invent a UNIQUE color palette for every page.** Do NOT reuse the same colors across projects. Derive your palette from the topic, industry, audience, and mood:
-- A yoga studio might use sage greens and warm sand tones
-- A fintech app might use deep navy with electric teal accents
-- A bakery might use warm cream with burnt sienna and dusty rose
-- A cybersecurity firm might use charcoal with acid green highlights
+**CRITICAL: Every project MUST have a unique palette derived from its specific content.** The palette should feel inevitable for the topic — like a designer hand-picked it for this exact business.
 
-Palette directions to explore (pick one and create ORIGINAL hex values):
-- **Dark luxury**: near-black bg, muted metallic primary, warm accent
-- **Warm earth**: off-white bg with warm undertones, organic primary, earthy accent
-- **Cool minimal**: clean light bg, saturated primary, complementary accent
-- **Nature**: deep green/blue bg, vibrant green primary, analogous accent
-- **Editorial**: warm paper bg, bold red/orange primary, warm accent
-- **Monochrome**: true black bg, white primary, mid-gray accent
-- **Bold pop**: vibrant bg, contrasting primary, playful accent
-- **Sunset warm**: warm gradient-inspired bg, coral/amber primary, pink accent
-- **Ocean**: deep blue bg, cyan/teal primary, seafoam accent
-- **Industrial**: concrete gray bg, amber/orange primary, steel accent
+Derive colors from the CONTENT, not from defaults:
+- Read the topic/industry from the user's request
+- Think about what colors that industry evokes (coffee → deep browns; ocean resort → teals; cybersecurity → dark + neon)
+- Pick a bg, primary, and accent that tell that specific story
+- Never default to warm beige/brown/orange — that's only right for earthy/organic topics
 
-Never copy hex values from previous generations or examples. Generate fresh values every time based on the specific content.
+**BANNED default combinations** (too commonly generated):
+- Cream/beige bg (#faf7f2 etc.) + brown primary + gold/orange accent — unless the topic is explicitly earthy (coffee, bakery, farmhouse)
+- White bg + blue primary + light blue accent — unless the topic is explicitly corporate/finance
+- Any palette with all warm tones (beige + brown + orange + gold) — mix temperature
 
 ### Layout Patterns
 1. **Split hero**: Content left, visual right (50/50 or 60/40)
