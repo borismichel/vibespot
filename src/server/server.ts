@@ -82,6 +82,7 @@ import {
   handleBrandKitRoute,
   handleDesignExtractRoute,
   handleReferenceImportRoute,
+  handleFontsRoute,
 } from "./routes/templates.js";
 import {
   handleSessionRoute,
@@ -557,6 +558,11 @@ function handleApiRoute(
 
     case "/api/brand-kit":
       handleBrandKitRoute(method, req, res);
+      break;
+
+    case "/api/fonts":
+      if (method === "GET") handleFontsRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
     case "/api/brand-assets/extract":

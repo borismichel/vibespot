@@ -89,6 +89,7 @@ async function refreshDashboard() {
     renderProjectAssets(data.templates || []);
     renderModuleLibrary(data.moduleLibrary || []);
     renderBrandAssets(data.brandAssets || {});
+    await loadFontList();
     renderBrandKit(data.brandAssets?.brandKit || null);
     const pathEl = document.getElementById("dashboard-theme-path-text");
     if (data.themePath && pathEl) {
@@ -631,9 +632,14 @@ async function extractBrandAsset(type, card) {
     });
     const data = await res.json();
     if (data.ok && data.content) {
+      if (data.brandKit) {
+        await loadFontList();
+        renderBrandKit(data.brandKit);
+      }
       await refreshDashboard();
+      const msg = data.brandKit ? `${ASSET_LABELS[type]} extracted. Brand kit updated from styleguide.` : `${ASSET_LABELS[type]} extracted.`;
       const view = await vibeConfirm(
-        `${ASSET_LABELS[type]} extracted.`,
+        msg,
         "Would you like to view it?",
         { confirmLabel: "View", confirmClass: "btn--primary" },
       );
@@ -674,6 +680,39 @@ document.getElementById("dashboard-brand-assets")?.addEventListener("change", (e
 // Brand kit
 // ---------------------------------------------------------------------------
 
+let _fontList = [];
+
+async function loadFontList() {
+  if (_fontList.length > 0) return;
+  try {
+    const res = await fetch("/api/fonts");
+    _fontList = await res.json();
+  } catch { _fontList = []; }
+  populateFontSelects();
+}
+
+function populateFontSelects() {
+  for (const id of ["bk-font-heading", "bk-font-body"]) {
+    const sel = document.getElementById(id);
+    if (!sel || sel.options.length > 1) continue;
+
+    const categories = ["system", "sans-serif", "serif", "display", "monospace"];
+    const catLabels = { system: "System", "sans-serif": "Sans-Serif", serif: "Serif", display: "Display", monospace: "Monospace" };
+    for (const cat of categories) {
+      const group = document.createElement("optgroup");
+      group.label = catLabels[cat] || cat;
+      for (const f of _fontList.filter((x) => x.category === cat)) {
+        const opt = document.createElement("option");
+        opt.value = f.stack;
+        opt.textContent = f.name;
+        opt.style.fontFamily = f.stack;
+        group.appendChild(opt);
+      }
+      sel.appendChild(group);
+    }
+  }
+}
+
 function renderBrandKit(brandKit) {
   const fields = {
     primary: { color: "bk-color-primary", hex: "bk-hex-primary" },
@@ -689,14 +728,32 @@ function renderBrandKit(brandKit) {
     if (hexInput) hexInput.value = val;
   }
 
-  const headingInput = document.getElementById("bk-font-heading");
-  const bodyInput = document.getElementById("bk-font-body");
+  const headingSelect = document.getElementById("bk-font-heading");
+  const bodySelect = document.getElementById("bk-font-body");
   const logoInput = document.getElementById("bk-logo-url");
-  if (headingInput) headingInput.value = brandKit?.fonts?.heading || "";
-  if (bodyInput) bodyInput.value = brandKit?.fonts?.body || "";
+
+  if (headingSelect) selectFontValue(headingSelect, brandKit?.fonts?.heading || "");
+  if (bodySelect) selectFontValue(bodySelect, brandKit?.fonts?.body || "");
   if (logoInput) logoInput.value = brandKit?.logoUrl || "";
 
   updateBrandPreview();
+}
+
+function selectFontValue(selectEl, value) {
+  if (!value) { selectEl.value = ""; return; }
+  const lower = value.toLowerCase().trim();
+  for (const opt of selectEl.options) {
+    if (opt.value.toLowerCase().trim() === lower) {
+      selectEl.value = opt.value;
+      return;
+    }
+  }
+  const custom = document.createElement("option");
+  custom.value = value;
+  custom.textContent = value.split(",")[0].replace(/['"]/g, "").trim() + " (custom)";
+  const firstOptgroup = selectEl.querySelector("optgroup");
+  selectEl.insertBefore(custom, firstOptgroup || selectEl.options[1]);
+  selectEl.value = value;
 }
 
 function updateBrandPreview() {
@@ -717,8 +774,8 @@ function updateBrandPreview() {
     }
   }
 
-  const headingFont = document.getElementById("bk-font-heading")?.value?.trim();
-  const bodyFont = document.getElementById("bk-font-body")?.value?.trim();
+  const headingFont = document.getElementById("bk-font-heading")?.value || "";
+  const bodyFont = document.getElementById("bk-font-body")?.value || "";
   const headingPreview = document.getElementById("brand-preview-heading");
   const bodyPreview = document.getElementById("brand-preview-body");
   if (headingPreview) headingPreview.style.fontFamily = headingFont || "Georgia, serif";
@@ -752,12 +809,15 @@ function updateBrandPreview() {
 for (const id of [
   "bk-hex-primary", "bk-hex-secondary", "bk-hex-accent",
   "bk-color-primary", "bk-color-secondary", "bk-color-accent",
-  "bk-font-heading", "bk-font-body", "bk-logo-url",
+  "bk-logo-url",
 ]) {
   document.getElementById(id)?.addEventListener("input", updateBrandPreview);
 }
+for (const id of ["bk-font-heading", "bk-font-body"]) {
+  document.getElementById(id)?.addEventListener("change", updateBrandPreview);
+}
 
-document.addEventListener("DOMContentLoaded", () => updateBrandPreview());
+document.addEventListener("DOMContentLoaded", () => { loadFontList(); updateBrandPreview(); });
 
 function collectBrandKit() {
   const kit = {};
@@ -771,8 +831,8 @@ function collectBrandKit() {
   if (accent && hexRe.test(accent)) colors.accent = accent;
   if (Object.keys(colors).length > 0) kit.colors = colors;
 
-  const heading = document.getElementById("bk-font-heading")?.value?.trim();
-  const body = document.getElementById("bk-font-body")?.value?.trim();
+  const heading = document.getElementById("bk-font-heading")?.value || "";
+  const body = document.getElementById("bk-font-body")?.value || "";
   const fonts = {};
   if (heading) fonts.heading = heading;
   if (body) fonts.body = body;
@@ -975,6 +1035,10 @@ async function handleBrandFileSelected(type, file) {
       await vibeAlert(data.error, "Error");
       return;
     }
+    if (data.brandKit) {
+      await loadFontList();
+      renderBrandKit(data.brandKit);
+    }
     refreshDashboard();
   } catch (err) {
     await vibeAlert("Failed to upload: " + err.message, "Error");
@@ -1053,13 +1117,18 @@ document.getElementById("btn-extract-all")?.addEventListener("click", async () =
     });
     const data = await res.json();
     if (data.ok) {
+      if (data.brandKit) {
+        await loadFontList();
+        renderBrandKit(data.brandKit);
+      }
       await refreshDashboard();
       const extracted = data.extracted || {};
       const names = Object.entries(extracted)
         .filter(([, v]) => v)
         .map(([k]) => ASSET_LABELS[k] || k);
       if (names.length > 0) {
-        await vibeAlert(`Extracted: ${names.join(", ")}`, "Done");
+        const suffix = data.brandKit ? " Brand kit updated from styleguide." : "";
+        await vibeAlert(`Extracted: ${names.join(", ")}.${suffix}`, "Done");
       } else {
         await vibeAlert("Nothing to extract \u2014 generate some modules first.", "Info");
       }
