@@ -58,6 +58,13 @@ async function showDashboard(themeName) {
 
   // Load dashboard data
   await refreshDashboard();
+
+  // Establish WebSocket so the page tree (populated via WS init message)
+  // and chat input work immediately — without this, a browser refresh
+  // leaves the page tree empty and the chat send button inert.
+  if (typeof connectWebSocket === "function") {
+    connectWebSocket();
+  }
 }
 
 function hideDashboard() {

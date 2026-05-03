@@ -22,6 +22,7 @@ import {
   saveSession,
   loadSession,
   listSessions,
+  writeModulesToDisk,
 } from "../session.js";
 import { isGenerating } from "../ai-handler.js";
 import { detectEnvironment } from "../../utils/detect.js";
@@ -130,6 +131,7 @@ export function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse
 
       if (starterId && typeof starterId === "string") {
         bootstrapFromStarter(themePath, themeName, starterId);
+        writeModulesToDisk();
       }
 
       saveSession();
