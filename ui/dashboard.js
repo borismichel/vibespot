@@ -86,6 +86,7 @@ async function refreshDashboard() {
       return;
     }
     renderTemplateList(data.templates || []);
+    renderProjectAssets(data.templates || []);
     renderModuleLibrary(data.moduleLibrary || []);
     renderBrandAssets(data.brandAssets || {});
     renderBrandKit(data.brandAssets?.brandKit || null);
@@ -379,6 +380,70 @@ function startTemplateRename(labelEl, templateId) {
       labelEl.blur();
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Project assets (Library tab)
+// ---------------------------------------------------------------------------
+
+const ASSET_TYPE_LABELS = {
+  landing_page: "Landing Page",
+  blog_post: "Blog Post",
+  website_page: "Website Page",
+  module_only: "Module Only",
+  email: "Email",
+};
+
+function renderProjectAssets(templates) {
+  const container = document.getElementById("library-assets-list");
+  if (!container) return;
+
+  if (!templates || templates.length === 0) {
+    container.innerHTML = `<p class="dashboard__empty-state">Assets will appear here as you create pages and emails.</p>`;
+    return;
+  }
+
+  const pages = templates.filter((t) => t.pageType !== "email");
+  const emails = templates.filter((t) => t.pageType === "email");
+
+  let html = "";
+
+  if (pages.length > 0) {
+    html += `<div class="library-assets__group">`;
+    html += `<h3 class="library-assets__group-title">Pages <span class="library-assets__count">${pages.length}</span></h3>`;
+    for (const tpl of pages) {
+      html += renderAssetCard(tpl);
+    }
+    html += `</div>`;
+  }
+
+  if (emails.length > 0) {
+    html += `<div class="library-assets__group">`;
+    html += `<h3 class="library-assets__group-title">Emails <span class="library-assets__count">${emails.length}</span></h3>`;
+    for (const tpl of emails) {
+      html += renderAssetCard(tpl);
+    }
+    html += `</div>`;
+  }
+
+  container.innerHTML = html;
+
+  container.onclick = (e) => {
+    const card = e.target.closest(".library-asset-card");
+    if (!card) return;
+    const templateId = card.dataset.id;
+    if (templateId) openTemplate(templateId);
+  };
+}
+
+function renderAssetCard(tpl) {
+  const typeLabel = ASSET_TYPE_LABELS[tpl.pageType] || tpl.pageType;
+  return `
+    <div class="library-asset-card" data-id="${esc(tpl.id)}" role="button" tabindex="0">
+      <span class="dashboard__template-badge dashboard__template-badge--${esc(tpl.pageType)}">${esc(PAGE_TYPE_LABELS[tpl.pageType] || typeLabel)}</span>
+      <span class="library-asset-card__label">${esc(tpl.label)}</span>
+      <span class="library-asset-card__meta">${tpl.moduleCount} module${tpl.moduleCount !== 1 ? "s" : ""}</span>
+    </div>`;
 }
 
 // ---------------------------------------------------------------------------
