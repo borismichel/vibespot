@@ -1152,6 +1152,9 @@ function switchWorkspaceTab(tabName) {
   if (tabName === "settings" && typeof refreshSettings === "function") {
     refreshSettings();
   }
+  if (tabName === "library") {
+    refreshDashboard();
+  }
 }
 
 document.querySelectorAll(".workspace-tab").forEach((btn) => {
