@@ -42,8 +42,26 @@ export function syncFlatFieldsToTemplate(): void {
   let tpl = getActiveTemplate();
   if (!tpl) {
     if (activeSession.modules.length === 0) return;
+    // addTemplate() calls syncFlatFieldsFromTemplate() which wipes flat fields
+    // to the new (empty) template. Save and restore so existing modules survive.
+    const saved = {
+      modules: activeSession.modules,
+      moduleOrder: activeSession.moduleOrder,
+      sharedCss: activeSession.sharedCss,
+      sharedJs: activeSession.sharedJs,
+      template: activeSession.template,
+      messages: activeSession.messages,
+      plan: activeSession.brandAssets?.plan,
+    };
     tpl = addTemplate("landing_page", `${activeSession.themeName} Landing Page`);
     activeSession.activeTemplateId = tpl.id;
+    activeSession.modules = saved.modules;
+    activeSession.moduleOrder = saved.moduleOrder;
+    activeSession.sharedCss = saved.sharedCss;
+    activeSession.sharedJs = saved.sharedJs;
+    activeSession.template = saved.template;
+    activeSession.messages = saved.messages;
+    if (activeSession.brandAssets) activeSession.brandAssets.plan = saved.plan;
   }
   tpl.modules = activeSession.modules;
   tpl.moduleOrder = activeSession.moduleOrder;

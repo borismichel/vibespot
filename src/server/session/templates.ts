@@ -292,5 +292,12 @@ export function getModuleLibrary(): Array<{ module: ModuleFiles; usedIn: string[
     }
   }
 
+  // Fallback: include flat session.modules not yet synced to any template
+  for (const mod of activeSession.modules) {
+    if (!map.has(mod.moduleName)) {
+      map.set(mod.moduleName, { module: mod, usedIn: [] });
+    }
+  }
+
   return Array.from(map.values());
 }

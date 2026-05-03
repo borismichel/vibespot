@@ -682,6 +682,8 @@ function handleWsMessage(msg) {
       // The next `modules_updated` is the terminal one for this run — let it
       // fire the change-highlight pass on the preview iframe.
       highlightOnNextModulesUpdated = true;
+      // Refresh the Library tab's module list so it stays in sync
+      if (typeof refreshDashboard === "function") refreshDashboard();
       break;
 
     case "modules_updated":
