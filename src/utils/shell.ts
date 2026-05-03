@@ -1,4 +1,8 @@
-import { execSync, type ExecSyncOptions } from "node:child_process";
+import {
+  execSync,
+  execFileSync,
+  type ExecSyncOptions,
+} from "node:child_process";
 
 export interface ShellResult {
   stdout: string;
@@ -18,6 +22,33 @@ export function run(
       ...options,
     }).trim();
     return { stdout, stderr: "", success: true };
+  } catch (err: unknown) {
+    const e = err as { stdout?: Buffer | string; stderr?: Buffer | string };
+    const stdout = (e.stdout ?? "").toString().trim();
+    const stderr = (e.stderr ?? "").toString().trim();
+    return { stdout, stderr, success: false };
+  }
+}
+
+/**
+ * Run `git` with arguments passed as an array — never via a shell.
+ * Use this for any git operation that takes user-controlled input
+ * (commit messages, refs, file paths, URLs). Each entry in `args`
+ * is forwarded as a literal argv to git, so shell metacharacters
+ * cannot be interpreted.
+ */
+export function runGit(
+  args: string[],
+  options: ExecSyncOptions = {}
+): ShellResult {
+  try {
+    const out = execFileSync("git", args, {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 120_000,
+      ...options,
+    });
+    return { stdout: out.toString().trim(), stderr: "", success: true };
   } catch (err: unknown) {
     const e = err as { stdout?: Buffer | string; stderr?: Buffer | string };
     const stdout = (e.stdout ?? "").toString().trim();

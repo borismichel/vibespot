@@ -1,9 +1,25 @@
 import { readdirSync, statSync } from "node:fs";
 import { join, basename, extname } from "node:path";
-import { run } from "../utils/shell.js";
+import { runGit } from "../utils/shell.js";
 import { fileExists, readFile } from "../utils/fs.js";
 import * as ui from "../prompts/prompter.js";
 import { theme } from "../cli/theme.js";
+
+/**
+ * Accept only http(s) URLs and `git@host:path` SSH URLs.
+ * Reject anything containing shell metacharacters or other schemes
+ * (e.g. `file://`, `ext::`, `ssh://...|cmd`) so a hostile URL cannot
+ * smuggle a command through git's transport handlers.
+ */
+export function isValidGitSource(input: string): boolean {
+  if (typeof input !== "string" || input.length === 0 || input.length > 2048) return false;
+  // Defense-in-depth: reject shell metacharacters even though we no
+  // longer pass the URL through a shell.
+  if (/[\s;&|`$()<>\\]/.test(input)) return false;
+  if (/^https?:\/\/[^\s]+$/.test(input)) return true;
+  if (/^git@[\w.-]+:[\w./~+-]+$/.test(input)) return true;
+  return false;
+}
 
 export interface ComponentInfo {
   name: string;
@@ -190,13 +206,19 @@ export function analyzeSource(input: string): SourceAnalysis {
   let wasCloned = false;
 
   if (input.startsWith("http") || input.startsWith("git@")) {
+    if (!isValidGitSource(input)) {
+      throw new Error(
+        `Refusing to clone unsafe source URL: ${input}. ` +
+          `Only http(s):// and git@host:path URLs without shell metacharacters are allowed.`
+      );
+    }
     wasCloned = true;
     const repoName =
       basename(input.replace(/\.git$/, "")) || "react-source";
     sourceDir = join(process.cwd(), "workspace", repoName);
 
     if (!fileExists(sourceDir)) {
-      const result = run(`git clone --depth 1 "${input}" "${sourceDir}"`);
+      const result = runGit(["clone", "--depth", "1", "--", input, sourceDir]);
       if (!result.success) {
         throw new Error(`Failed to clone ${input}: ${result.stderr}`);
       }
@@ -242,6 +264,12 @@ export async function setupSource(): Promise<SourceAnalysis> {
   let wasCloned = false;
 
   if (input.startsWith("http") || input.startsWith("git@")) {
+    if (!isValidGitSource(input)) {
+      ui.logError(
+        `Refusing to clone unsafe source URL. Only http(s):// and git@host:path URLs without shell metacharacters are allowed.`
+      );
+      process.exit(1);
+    }
     wasCloned = true;
     // Clone from GitHub
     const repoName =
@@ -255,7 +283,7 @@ export async function setupSource(): Promise<SourceAnalysis> {
       const s = await ui.spinner();
       s.start("Cloning repository...");
 
-      const result = run(`git clone --depth 1 "${input}" "${sourceDir}"`);
+      const result = runGit(["clone", "--depth", "1", "--", input, sourceDir]);
       if (!result.success) {
         s.stop("Clone failed");
         ui.logError(

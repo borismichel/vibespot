@@ -6,7 +6,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { run } from "../utils/shell.js";
+import { runGit } from "../utils/shell.js";
 
 export interface GitCommitInfo {
   hash: string;       // short hash (7 chars)
@@ -22,16 +22,21 @@ export interface GitCommitInfo {
 // Git availability (cached)
 // ---------------------------------------------------------------------------
 
-/** Validate a git hash to prevent shell injection — must be hex only. */
+/** Validate a git hash — must be hex only. */
 function isValidHash(hash: string): boolean {
   return /^[0-9a-f]{4,40}$/i.test(hash);
+}
+
+/** Bound history limits so untrusted input cannot run an unbounded `git log`. */
+function isValidLogLimit(limit: number): boolean {
+  return Number.isInteger(limit) && limit > 0 && limit < 1000;
 }
 
 let gitAvailableCache: boolean | null = null;
 
 export function isGitAvailable(): boolean {
   if (gitAvailableCache !== null) return gitAvailableCache;
-  const result = run("git --version");
+  const result = runGit(["--version"]);
   gitAvailableCache = result.success;
   return gitAvailableCache;
 }
@@ -55,7 +60,7 @@ export function ensureGitRepo(themePath: string): boolean {
   }
 
   // Init repo
-  const init = run("git init", { cwd: themePath });
+  const init = runGit(["init"], { cwd: themePath });
   if (!init.success) {
     console.warn(`[project-git] git init failed in ${themePath}: ${init.stderr}`);
     return false;
@@ -68,8 +73,8 @@ export function ensureGitRepo(themePath: string): boolean {
   ensureVibeSpotDir(themePath);
 
   // Initial commit
-  run("git add -A", { cwd: themePath });
-  run('git commit -m "Initial theme"', { cwd: themePath });
+  runGit(["add", "-A"], { cwd: themePath });
+  runGit(["commit", "-m", "Initial theme"], { cwd: themePath });
 
   return true;
 }
@@ -98,10 +103,10 @@ export function commitThemeState(themePath: string, message: string): string | n
   if (!existsSync(join(themePath, ".git"))) return null;
 
   // Stage everything
-  run("git add -A", { cwd: themePath });
+  runGit(["add", "-A"], { cwd: themePath });
 
   // Check if there are staged changes
-  const diff = run("git diff --cached --quiet", { cwd: themePath });
+  const diff = runGit(["diff", "--cached", "--quiet"], { cwd: themePath });
   if (diff.success) return null; // exit 0 = nothing staged
 
   // Truncate message to 72 chars
@@ -109,15 +114,15 @@ export function commitThemeState(themePath: string, message: string): string | n
     ? message.slice(0, 69) + "..."
     : message;
 
-  // Commit (use -- to prevent message from being interpreted as flags)
-  const commitResult = run(`git commit -m "${truncated.replace(/"/g, '\\"')}"`, { cwd: themePath });
+  // Commit — message passed as argv, never via shell.
+  const commitResult = runGit(["commit", "-m", truncated], { cwd: themePath });
   if (!commitResult.success) {
     console.warn(`[project-git] commit failed: ${commitResult.stderr}`);
     return null;
   }
 
   // Get short hash
-  const hashResult = run("git rev-parse --short HEAD", { cwd: themePath });
+  const hashResult = runGit(["rev-parse", "--short", "HEAD"], { cwd: themePath });
   return hashResult.success ? hashResult.stdout : null;
 }
 
@@ -138,12 +143,12 @@ export function commitTemplateState(
   for (const fp of filePaths) {
     const fullPath = join(themePath, fp);
     if (existsSync(fullPath)) {
-      run(`git add "${fp}"`, { cwd: themePath });
+      runGit(["add", "--", fp], { cwd: themePath });
     }
   }
 
   // Check if there are staged changes
-  const diff = run("git diff --cached --quiet", { cwd: themePath });
+  const diff = runGit(["diff", "--cached", "--quiet"], { cwd: themePath });
   if (diff.success) return null; // nothing staged
 
   // Build prefixed message: [templateId] user message
@@ -154,13 +159,13 @@ export function commitTemplateState(
     : message;
   const fullMessage = prefix + truncated;
 
-  const commitResult = run(`git commit -m "${fullMessage.replace(/"/g, '\\"')}"`, { cwd: themePath });
+  const commitResult = runGit(["commit", "-m", fullMessage], { cwd: themePath });
   if (!commitResult.success) {
     console.warn(`[project-git] template commit failed: ${commitResult.stderr}`);
     return null;
   }
 
-  const hashResult = run("git rev-parse --short HEAD", { cwd: themePath });
+  const hashResult = runGit(["rev-parse", "--short", "HEAD"], { cwd: themePath });
   return hashResult.success ? hashResult.stdout : null;
 }
 
@@ -218,9 +223,16 @@ function parseLogWithNames(stdout: string): GitCommitInfo[] {
 export function getHistory(themePath: string, limit: number = 50): GitCommitInfo[] {
   if (!isGitAvailable()) return [];
   if (!existsSync(join(themePath, ".git"))) return [];
+  if (!isValidLogLimit(limit)) return [];
 
-  const result = run(
-    `git log --name-only --pretty=format:"COMMIT|%h|%H|%s|%at" -n ${limit}`,
+  const result = runGit(
+    [
+      "log",
+      "--name-only",
+      "--pretty=format:COMMIT|%h|%H|%s|%at",
+      "-n",
+      String(limit),
+    ],
     { cwd: themePath }
   );
   if (!result.success || !result.stdout.trim()) return [];
@@ -238,10 +250,20 @@ export function getTemplateHistory(
 ): GitCommitInfo[] {
   if (!isGitAvailable()) return [];
   if (!existsSync(join(themePath, ".git"))) return [];
+  if (!isValidLogLimit(limit)) return [];
 
-  const escapedId = templateId.replace(/[[\]\\]/g, "\\$&");
-  const result = run(
-    `git log --grep="\\[${escapedId}\\]" --name-only --pretty=format:"COMMIT|%h|%H|%s|%at" -n ${limit}`,
+  // Escape regex metacharacters so the templateId is matched literally
+  // by --grep (which interprets its argument as a POSIX BRE).
+  const literal = templateId.replace(/[\\.*+?^${}()|[\]/]/g, "\\$&");
+  const result = runGit(
+    [
+      "log",
+      `--grep=\\[${literal}\\]`,
+      "--name-only",
+      "--pretty=format:COMMIT|%h|%H|%s|%at",
+      "-n",
+      String(limit),
+    ],
     { cwd: themePath }
   );
   if (!result.success || !result.stdout.trim()) return [];
@@ -268,24 +290,24 @@ export function rollbackToCommit(
   if (!isValidHash(commitHash)) return { success: false, error: "Invalid commit hash" };
 
   // Verify commit exists
-  const verify = run(`git cat-file -t ${commitHash}`, { cwd: themePath });
+  const verify = runGit(["cat-file", "-t", commitHash], { cwd: themePath });
   if (!verify.success || verify.stdout.trim() !== "commit") {
     return { success: false, error: `Commit ${commitHash} not found` };
   }
 
   // Get original commit message
-  const msgResult = run(`git log --format="%s" -1 ${commitHash}`, { cwd: themePath });
+  const msgResult = runGit(["log", "--format=%s", "-1", commitHash], { cwd: themePath });
   const origMessage = msgResult.success ? msgResult.stdout : commitHash;
 
   // Restore all files from that commit
-  const checkout = run(`git checkout ${commitHash} -- .`, { cwd: themePath });
+  const checkout = runGit(["checkout", commitHash, "--", "."], { cwd: themePath });
   if (!checkout.success) {
     return { success: false, error: `Checkout failed: ${checkout.stderr}` };
   }
 
   // Commit the rollback
   const rollbackMsg = `Rollback to: ${origMessage}`.slice(0, 72);
-  run(`git commit -m "${rollbackMsg.replace(/"/g, '\\"')}"`, { cwd: themePath });
+  runGit(["commit", "-m", rollbackMsg], { cwd: themePath });
 
   return { success: true };
 }
@@ -306,19 +328,19 @@ export function rollbackTemplateToCommit(
   if (!isValidHash(commitHash)) return { success: false, error: "Invalid commit hash" };
 
   // Verify commit exists
-  const verify = run(`git cat-file -t ${commitHash}`, { cwd: themePath });
+  const verify = runGit(["cat-file", "-t", commitHash], { cwd: themePath });
   if (!verify.success || verify.stdout.trim() !== "commit") {
     return { success: false, error: `Commit ${commitHash} not found` };
   }
 
   // Get original commit message
-  const msgResult = run(`git log --format="%s" -1 ${commitHash}`, { cwd: themePath });
+  const msgResult = runGit(["log", "--format=%s", "-1", commitHash], { cwd: themePath });
   const origMessage = msgResult.success ? msgResult.stdout : commitHash;
 
   // Restore only the specified paths from that commit
   let restored = 0;
   for (const fp of filePaths) {
-    const checkout = run(`git checkout ${commitHash} -- "${fp}"`, { cwd: themePath });
+    const checkout = runGit(["checkout", commitHash, "--", fp], { cwd: themePath });
     if (checkout.success) restored++;
     // Skip paths that didn't exist at that commit (git errors silently ignored)
   }
@@ -328,10 +350,10 @@ export function rollbackTemplateToCommit(
   }
 
   // Stage and commit the scoped rollback
-  run("git add -A", { cwd: themePath });
+  runGit(["add", "-A"], { cwd: themePath });
   const prefix = `[${templateId}] `;
   const rollbackMsg = `${prefix}Rollback to: ${origMessage}`.slice(0, 72);
-  run(`git commit -m "${rollbackMsg.replace(/"/g, '\\"')}"`, { cwd: themePath });
+  runGit(["commit", "-m", rollbackMsg], { cwd: themePath });
 
   return { success: true };
 }
