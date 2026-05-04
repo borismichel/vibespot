@@ -24,6 +24,7 @@ import {
   listSessions,
   writeModulesToDisk,
 } from "../session.js";
+import { addTemplate } from "../session/templates.js";
 import { isGenerating } from "../ai-handler.js";
 import { detectEnvironment } from "../../utils/detect.js";
 import { saveConfig } from "../../utils/config.js";
@@ -102,7 +103,7 @@ export function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse
   readBody(req, (body) => {
     try {
       if (isGenerating()) { jsonResponse(res, 409, { error: "Cannot switch projects while AI is generating.", generating: true }); return; }
-      const { name, starterId } = JSON.parse(body);
+      const { name, starterId, assetType } = JSON.parse(body);
       if (!name || typeof name !== "string") {
         jsonResponse(res, 400, { error: "Theme name is required" });
         return;
@@ -137,6 +138,9 @@ export function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse
       if (starterId && typeof starterId === "string") {
         bootstrapFromStarter(themePath, themeName, starterId);
         writeModulesToDisk();
+      } else if (assetType === "email") {
+        addTemplate("module_only", "Email", "email");
+        addEmailTemplateToTheme(themePath, themeName);
       }
 
       saveSession();
