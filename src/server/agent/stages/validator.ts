@@ -329,6 +329,8 @@ function fixCssPrefix(
 
 /**
  * Auto-fix class references in HTML to match prefixed CSS classes.
+ * Splits class attribute values by HubL tags first so keywords inside
+ * {% %} and {{ }} blocks are never mistaken for CSS class names.
  */
 function fixHtmlClassPrefix(
   html: string,
@@ -340,23 +342,39 @@ function fixHtmlClassPrefix(
 
   const prefix = themeName + "-";
 
-  // Find all class="..." attributes and check for unprefixed classes
   const classAttrRe = /class="([^"]*)"/g;
   let anyFixed = false;
 
   const fixed = html.replace(classAttrRe, (fullMatch, classValue: string) => {
-    const classes = classValue.split(/\s+/);
+    const hublRe = /(\{%[-~]?[\s\S]*?[-~]?%\}|\{\{[\s\S]*?\}\})/g;
+    const segments = classValue.split(hublRe);
     let changed = false;
-    const newClasses = classes.map((cls: string) => {
-      if (cls && !cls.startsWith(prefix) && !shouldSkipClass(cls) && /^[a-zA-Z][\w-]*$/.test(cls)) {
-        changed = true;
-        return prefix + cls;
-      }
-      return cls;
-    });
+
+    const processed = segments
+      .map((seg, i) => {
+        if (i % 2 === 1) return seg;
+        return seg
+          .split(/(\s+)/)
+          .map((token) => {
+            if (/^\s*$/.test(token)) return token;
+            if (
+              token &&
+              !token.startsWith(prefix) &&
+              !shouldSkipClass(token) &&
+              /^[a-zA-Z][\w-]*$/.test(token)
+            ) {
+              changed = true;
+              return prefix + token;
+            }
+            return token;
+          })
+          .join("");
+      })
+      .join("");
+
     if (changed) {
       anyFixed = true;
-      return `class="${newClasses.join(" ")}"`;
+      return `class="${processed}"`;
     }
     return fullMatch;
   });
@@ -384,6 +402,35 @@ function fixHublSyntax(
 ): string {
   if (!html) return html;
   let fixed = html;
+
+  // Strip CSS-class prefixes that leaked onto HubL keywords inside {% %} tags.
+  // E.g. {% theme-name-if ... theme-name-is ... %} → {% if ... is ... %}
+  const HUBL_KW = [
+    "if", "elif", "else", "endif", "for", "endfor", "set", "do",
+    "block", "endblock", "macro", "endmacro", "call", "endcall",
+    "filter", "endfilter", "raw", "endraw", "include", "import",
+    "from", "extends", "print", "unless", "endunless",
+    "is", "not", "and", "or", "in",
+  ];
+  const kwAlt = HUBL_KW.join("|");
+  const prefixedKwToken = new RegExp(`\\b[a-zA-Z][\\w-]*-(${kwAlt})\\b(?!-)`, "g");
+  const hublTagRe = /(\{%[-~]?[\s\S]*?[-~]?%\})/g;
+  let kwStripped = false;
+  fixed = fixed.replace(hublTagRe, (tag) => {
+    const cleaned = tag.replace(prefixedKwToken, (_match, kw) => {
+      kwStripped = true;
+      return kw;
+    });
+    return cleaned;
+  });
+  if (kwStripped) {
+    issues.push({
+      module: moduleName,
+      field: "moduleHtml",
+      message: "Stripped CSS-class prefix from HubL keywords inside {% %} tags",
+      autoFixed: true,
+    });
+  }
 
   // Two-pass approach to handle unbalanced HubL tags:
   // Pass 1: collect all tags in order to find orphans
