@@ -1084,12 +1084,7 @@ document.querySelectorAll(".page-type-card").forEach((card) => {
   });
 });
 
-// Deploy button (topbar)
-document.getElementById("btn-upload")?.addEventListener("click", () => {
-  if (typeof startUpload === "function") {
-    startUpload();
-  }
-});
+// Deploy button — handled by chat.js (single listener to avoid duplicate overlays)
 
 // Library tab — add page / add email
 document.getElementById("library-add-page")?.addEventListener("click", () => createTemplateFromPageType("landing_page"));

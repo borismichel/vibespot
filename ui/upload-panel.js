@@ -8,6 +8,7 @@ let lastUploadErrors = [];
 let lastUploadPortalId = "";
 let lastUploadDataCenter = "na1";
 let lastUploadThemeName = "";
+let lastUploadContentMode = "page";
 const MAX_UPLOAD_ATTEMPTS = 3;
 
 async function startUpload() {
@@ -337,13 +338,16 @@ function setUploadState(state, data) {
       dismissBtn.addEventListener("click", () => setUploadState("idle"));
       actions.appendChild(dismissBtn);
 
-      // Show the Create Page button
       if (lastUploadPortalId) {
+        const isEmail = lastUploadContentMode === "email";
         const createBtn = document.createElement("button");
         createBtn.className = "upload-action-btn upload-action-btn--primary";
-        createBtn.textContent = "Create Page in HubSpot";
+        createBtn.textContent = isEmail ? "Create Email in HubSpot" : "Create Page in HubSpot";
         createBtn.addEventListener("click", () => {
-          window.open(buildHubSpotPagesUrl(lastUploadPortalId, lastUploadDataCenter), "_blank");
+          const url = isEmail
+            ? buildHubSpotEmailUrl(lastUploadPortalId, lastUploadDataCenter)
+            : buildHubSpotPagesUrl(lastUploadPortalId, lastUploadDataCenter);
+          window.open(url, "_blank");
         });
         actions.insertBefore(createBtn, dismissBtn);
       }
@@ -490,12 +494,13 @@ function handleUploadWsMessage(msg) {
       break;
 
     case "upload_complete":
+      lastUploadContentMode = msg.contentMode || "page";
       setUploadState("success");
       // Update status bar
       const statusText = document.getElementById("status-text");
       if (statusText) statusText.textContent = "Upload complete!";
       // Show celebration popup
-      showDeploySuccessPopup(msg.portalId, msg.dataCenter || "na1", msg.themeName);
+      showDeploySuccessPopup(msg.portalId, msg.dataCenter || "na1", msg.themeName, lastUploadContentMode);
       break;
 
     case "upload_failed":
@@ -538,32 +543,54 @@ function buildHubSpotPagesUrl(portalId, dataCenter) {
   return `https://${host}/page-ui/${portalId}/management/pages/landing`;
 }
 
-function showDeploySuccessPopup(portalId, dataCenter, themeName) {
+function buildHubSpotEmailUrl(portalId, dataCenter) {
+  const host = dataCenter === "eu1" ? "app-eu1.hubspot.com" : "app.hubspot.com";
+  return `https://${host}/email/${portalId}`;
+}
+
+function showDeploySuccessPopup(portalId, dataCenter, themeName, contentMode) {
   lastUploadPortalId = portalId || "";
   lastUploadDataCenter = dataCenter || "na1";
   lastUploadThemeName = themeName || "";
 
   const name = themeName || "your theme";
-  const lpLabel = `${name} Landing Page`;
-  const pagesUrl = portalId ? buildHubSpotPagesUrl(portalId, dataCenter) : "";
+  const isEmail = contentMode === "email";
 
   // Spawn confetti
   spawnConfetti();
+
+  let stepsHtml, actionUrl, actionLabel;
+  if (isEmail) {
+    actionUrl = portalId ? buildHubSpotEmailUrl(portalId, dataCenter) : "";
+    actionLabel = "Create Email in HubSpot";
+    stepsHtml = `
+      <div class="deploy-success__step"><span class="deploy-success__num">1</span> Go to <strong>Marketing &rarr; Email</strong></div>
+      <div class="deploy-success__step"><span class="deploy-success__num">2</span> Click <strong>"Create email"</strong></div>
+      <div class="deploy-success__step"><span class="deploy-success__num">3</span> Select your <strong>"${esc(name)}"</strong> template</div>
+    `;
+  } else {
+    const lpLabel = `${name} Landing Page`;
+    actionUrl = portalId ? buildHubSpotPagesUrl(portalId, dataCenter) : "";
+    actionLabel = "Create Page in HubSpot";
+    stepsHtml = `
+      <div class="deploy-success__step"><span class="deploy-success__num">1</span> Go to <strong>Content &rarr; Landing Pages</strong></div>
+      <div class="deploy-success__step"><span class="deploy-success__num">2</span> Click <strong>"Create" &rarr; "Landing page"</strong></div>
+      <div class="deploy-success__step"><span class="deploy-success__num">3</span> Select the <strong>"${esc(lpLabel)}"</strong> template</div>
+    `;
+  }
 
   const overlay = document.createElement("div");
   overlay.className = "confirm-overlay";
   overlay.innerHTML = `
     <div class="deploy-success">
       <div class="deploy-success__icon">${vsIcon("rocket", {size: "md"})}</div>
-      <h2 class="deploy-success__title">Theme deployed!</h2>
+      <h2 class="deploy-success__title">${isEmail ? "Email template deployed!" : "Theme deployed!"}</h2>
       <p class="deploy-success__subtitle">"${esc(name)}" is now live on HubSpot.</p>
       <div class="deploy-success__steps">
-        <div class="deploy-success__step"><span class="deploy-success__num">1</span> Go to <strong>Content &rarr; Landing Pages</strong></div>
-        <div class="deploy-success__step"><span class="deploy-success__num">2</span> Click <strong>"Create" &rarr; "Landing page"</strong></div>
-        <div class="deploy-success__step"><span class="deploy-success__num">3</span> Select the <strong>"${esc(lpLabel)}"</strong> template</div>
+        ${stepsHtml}
       </div>
       <div class="deploy-success__actions">
-        ${pagesUrl ? `<a href="${pagesUrl}" target="_blank" class="btn btn--primary deploy-success__link">Create Page in HubSpot &rarr;</a>` : ""}
+        ${actionUrl ? `<a href="${actionUrl}" target="_blank" class="btn btn--primary deploy-success__link">${actionLabel} &rarr;</a>` : ""}
         <button class="btn btn--secondary" id="deploy-success-dismiss">Close</button>
       </div>
     </div>
