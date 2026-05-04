@@ -330,7 +330,7 @@ function setUploadState(state, data) {
       statusEl.innerHTML = '<span class="upload-status-icon">' + vsIcon("check-circle", {size: "sm"}) + '</span> Upload complete!';
       if (uploadBtn) {
         uploadBtn.textContent = "Deploy";
-        uploadBtn.disabled = false;
+        uploadBtn.disabled = true;
       }
       const dismissBtn = document.createElement("button");
       dismissBtn.className = "upload-action-btn";
@@ -358,7 +358,7 @@ function setUploadState(state, data) {
       statusEl.innerHTML = '<span class="upload-status-icon">' + vsIcon("x-circle", {size: "sm"}) + '</span> Upload failed';
       if (uploadBtn) {
         uploadBtn.textContent = "Deploy";
-        uploadBtn.disabled = false;
+        uploadBtn.disabled = true;
       }
 
       const retryBtn = document.createElement("button");
@@ -394,7 +394,7 @@ function setUploadState(state, data) {
       statusEl.innerHTML = '<span class="upload-status-icon">' + vsIcon("check-circle", {size: "sm"}) + '</span> AI fixes applied';
       if (uploadBtn) {
         uploadBtn.textContent = "Deploy";
-        uploadBtn.disabled = false;
+        uploadBtn.disabled = true;
       }
 
       const redeployBtn = document.createElement("button");
