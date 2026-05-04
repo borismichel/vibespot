@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { ModuleFiles } from "../../ai/engine.js";
-import type { ChatMessage, TemplateEntry, PageType } from "./types.js";
+import type { ChatMessage, ContentMode, TemplateEntry, PageType } from "./types.js";
 import { getSession } from "./store.js";
 import { getOrderedModules, syncFlatFieldsFromTemplate, syncFlatFieldsToTemplate, loadChatFromTheme } from "./state.js";
 import { getActiveTemplate, migrateSession } from "./templates.js";
@@ -54,6 +54,7 @@ interface ParsedTemplate {
   id: string;
   label: string;
   pageType: PageType;
+  contentMode?: ContentMode;
   moduleNames: string[];
   templateContent: string;
   filename: string;
@@ -72,9 +73,16 @@ function parseTemplateFile(filePath: string, filename: string): ParsedTemplate |
   // Infer ID from filename (strip .html)
   const id = filename.replace(/\.html$/, "");
 
-  // Infer pageType from prefix
+  // Detect email templates from the HubL annotation
+  const isEmail = /templateType:\s*email\b/i.test(content);
+
+  // Infer pageType from prefix or annotation
   let pageType: PageType = "landing_page";
-  if (id.startsWith("bp-")) pageType = "blog_post";
+  let contentMode: ContentMode | undefined;
+  if (isEmail) {
+    pageType = "module_only";
+    contentMode = "email";
+  } else if (id.startsWith("bp-")) pageType = "blog_post";
   else if (id.startsWith("wp-")) pageType = "website_page";
   else if (id.startsWith("mo-")) pageType = "module_only";
 
@@ -89,7 +97,7 @@ function parseTemplateFile(filePath: string, filename: string): ParsedTemplate |
   // instance names before the path attribute.
   const moduleNames = extractLocalModuleRefsFromTemplate(content);
 
-  return { id, label, pageType, moduleNames, templateContent: content, filename };
+  return { id, label, pageType, contentMode, moduleNames, templateContent: content, filename };
 }
 
 /**
@@ -132,11 +140,12 @@ function scanTemplateFiles(
       id: parsed.id,
       label: parsed.label,
       pageType: parsed.pageType,
+      contentMode: parsed.contentMode,
       templateFile: `templates/${parsed.filename}`,
       modules: templateModules,
       moduleOrder: templateOrder,
-      sharedCss,
-      sharedJs,
+      sharedCss: parsed.contentMode === "email" ? "" : sharedCss,
+      sharedJs: parsed.contentMode === "email" ? "" : sharedJs,
       template: parsed.templateContent,
       messages: entries.length === 0 ? [...chatMessages] : [], // chat history goes to first template
     });
@@ -365,7 +374,19 @@ export function writeModulesToDisk(): void {
 
   if (activeSession.templates.length > 0) {
     for (const tpl of activeSession.templates) {
-      if (tpl.pageType === "module_only") continue; // No template for module-only
+      // Email templates get their own generator — they use a standalone
+      // email-safe HTML shell with dnd_section/dnd_module blocks so
+      // HubSpot's email DnD editor shows the modules pre-placed.
+      if (tpl.contentMode === "email") {
+        if (tpl.modules.length === 0) continue;
+        const emailContent = generateEmailTemplateForEntry(tpl);
+        const filename = tpl.templateFile ? tpl.templateFile.replace("templates/", "") : "email.html";
+        writeFileSync(join(templatesDir, filename), emailContent, "utf-8");
+        activeTemplateFiles.add(filename);
+        continue;
+      }
+
+      if (tpl.pageType === "module_only") continue;
       if (tpl.modules.length === 0) continue;
 
       const templateContent = tpl.template || generateTemplateForEntry(tpl);
@@ -595,6 +616,64 @@ ${sections}
 
 {% block footer %}
 {% endblock footer %}
+`;
+}
+
+/**
+ * Build a standalone HubSpot email template with dnd_section/dnd_module
+ * blocks so the email DnD editor shows modules pre-placed instead of blank.
+ */
+function generateEmailTemplateForEntry(tpl: TemplateEntry): string {
+  const ordered = getOrderedModulesFrom(tpl);
+
+  const sections = ordered.map((mod) => {
+    return `        {% dnd_section %}
+          {% dnd_module path="../modules/${mod.moduleName}.module" %}
+          {% end_dnd_module %}
+        {% end_dnd_section %}`;
+  }).join("\n\n");
+
+  return `<!--
+  templateType: email
+  isAvailableForNewContent: true
+  label: "${tpl.label}"
+  screenshotPath: ../images/template-previews/email.png
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:AllowPNG/>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+  {{ standard_header_includes }}
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f4f4f4;">
+    <tr>
+      <td align="center" style="padding:20px 0;">
+        {% dnd_area "email_body"
+          label="Email Content"
+        %}
+
+${sections}
+
+        {% end_dnd_area %}
+      </td>
+    </tr>
+  </table>
+  {{ standard_footer_includes }}
+</body>
+</html>
 `;
 }
 
