@@ -1137,10 +1137,12 @@ async function startFromPrompt() {
   showLoading("Creating theme...");
 
   try {
+    const createBody = { name: themeName };
+    if (window.__pendingAssetType) createBody.assetType = window.__pendingAssetType;
     const res = await fetch("/api/setup/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: themeName }),
+      body: JSON.stringify(createBody),
     });
     const data = await res.json();
 
