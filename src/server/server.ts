@@ -233,7 +233,7 @@ export function startServer(opts: ServerOptions): Promise<{ port: number; close:
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") {
         // Try next port
-        server.listen(port + 1, () => {
+        server.listen(port + 1, "0.0.0.0", () => {
           resolve({
             port: port + 1,
             close: () => { server.close(); wss.close(); },
@@ -244,7 +244,7 @@ export function startServer(opts: ServerOptions): Promise<{ port: number; close:
       }
     });
 
-    server.listen(port, () => {
+    server.listen(port, "0.0.0.0", () => {
       resolve({
         port,
         close: () => { server.close(); wss.close(); },
@@ -322,9 +322,9 @@ function handleApiRoute(
   req: IncomingMessage,
   res: ServerResponse
 ): void {
-  // CORS — restrict to localhost origins only
+  // CORS — allow localhost and private/Tailscale IPs
   const origin = req.headers.origin || "";
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|100\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -1042,6 +1042,7 @@ function handleWsConnection(ws: WebSocket): void {
                 portalId: acct?.portalId || "",
                 dataCenter: acct?.dataCenter || "na1",
                 themeName: session.themeName,
+                contentMode: getServerContentMode(),
               }));
             } else {
               const errors = parseApiErrors(result.errors);
@@ -1082,6 +1083,7 @@ function handleWsConnection(ws: WebSocket): void {
                   portalId: auth.portalId || "",
                   dataCenter: dc,
                   themeName: session.themeName,
+                  contentMode: getServerContentMode(),
                 }));
               } else {
                 const errors = parseUploadErrors(job.output);
