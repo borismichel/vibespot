@@ -900,6 +900,7 @@ async function createTemplateFromPageType(pageType) {
     blog_post: "Blog Post",
     website_page: "Website Page",
     module_only: "Module",
+    email: "Email",
   };
 
   const label = await vibePrompt("Template name", defaultLabels[pageType] || "New Template");
@@ -1089,6 +1090,10 @@ document.getElementById("btn-upload")?.addEventListener("click", () => {
     startUpload();
   }
 });
+
+// Library tab — add page / add email
+document.getElementById("library-add-page")?.addEventListener("click", () => createTemplateFromPageType("landing_page"));
+document.getElementById("library-add-email")?.addEventListener("click", () => createTemplateFromPageType("email"));
 
 // Extract All button
 document.getElementById("btn-extract-all")?.addEventListener("click", async () => {

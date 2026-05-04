@@ -1157,6 +1157,12 @@ body { display: flex; }
   color: var(--text-dim);
 }
 
+.dashboard__section-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
 .dashboard__template-count {
   background: var(--bg-hover);
   color: var(--text-dim);
