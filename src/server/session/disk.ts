@@ -661,7 +661,7 @@ function generateEmailTemplateForEntry(tpl: TemplateEntry): string {
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f4f4f4;">
     <tr>
       <td align="center" style="padding:20px 0;">
-        {% dnd_area "email_body"
+        {% dnd_area "main"
           label="Email Content"
         %}
 
