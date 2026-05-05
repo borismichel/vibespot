@@ -404,6 +404,17 @@ function populateRecentProjects(info) {
       `<span class="setup__recent-card-meta">${esc(meta)}</span>` +
       `</span>`;
 
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "setup__recent-card-delete";
+    delBtn.innerHTML = "&times;";
+    delBtn.title = "Delete project";
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      confirmDeleteProject(p);
+    });
+    card.appendChild(delBtn);
+
     card.addEventListener("click", () => {
       if (typeof isStreaming !== "undefined" && isStreaming) {
         showError("Cannot switch projects while AI is generating.");
@@ -1540,6 +1551,17 @@ function populateContinuePanel() {
     const pill = document.createElement("button");
     pill.className = "setup__pill";
     pill.innerHTML = `<span>${esc(name)}</span>${meta ? `<span class="setup__pill__meta">${esc(meta)}</span>` : ""}`;
+
+    const delBtn = document.createElement("span");
+    delBtn.className = "setup__pill-delete";
+    delBtn.innerHTML = "&times;";
+    delBtn.title = "Delete project";
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      confirmDeleteProject({ name, sessionId });
+    });
+    pill.appendChild(delBtn);
+
     pill.addEventListener("click", () => {
       if (sessionId) {
         resumeSession(sessionId);
