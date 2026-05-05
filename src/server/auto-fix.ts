@@ -28,6 +28,7 @@ export function parseApiErrors(apiErrors: { file: string; status: number; messag
     if (/hubdb|do not have access/i.test(msg)) fixable = true;
     if (/invalid default value|link.*invalid|deserializ/i.test(msg)) fixable = true;
     if (/color.*invalid/i.test(msg)) fixable = true;
+    if (/dnd.area.*only.*have.*name.*main/i.test(msg)) fixable = true;
 
     errors.push({
       file: err.file || "unknown",
@@ -102,6 +103,14 @@ export function parseUploadErrors(output: string): UploadError[] {
     });
   }
 
+  if (/dnd.area.*only.*have.*name.*main/i.test(output)) {
+    errors.push({
+      file: "templates/email.html",
+      message: 'Dnd area can only have name "main"',
+      fixable: true,
+    });
+  }
+
   return errors;
 }
 
@@ -114,6 +123,7 @@ export function applyAutoFixes(themePath: string): string[] {
   if (fixLinkFieldDefaults(themePath)) fixes.push('Fixed link field defaults');
   if (fixColorFieldDefaults(themePath)) fixes.push('Fixed rgba/invalid color values → hex');
   if (fixCdnImports(themePath)) fixes.push('Stripped CDN @import statements');
+  if (fixEmailDndAreaName(themePath)) fixes.push('dnd_area → "main" in email templates');
   return fixes;
 }
 
@@ -126,6 +136,8 @@ export function autoFixError(themePath: string, error: UploadError): boolean {
     return fixLinkFieldDefaults(themePath);
   if (error.message.includes("invalid format") && error.message.includes("color"))
     return fixColorFieldDefaults(themePath);
+  if (error.message.includes("dnd") || error.message.includes("Dnd area"))
+    return fixEmailDndAreaName(themePath);
   return false;
 }
 
@@ -371,6 +383,32 @@ function convertToHex(color: string): { hex: string; opacity?: number } | null {
   }
 
   return null;
+}
+
+/**
+ * HubSpot email templates require the dnd_area to be named "main".
+ * Any other name (e.g. "email_body", "main_content") is rejected.
+ */
+export function fixEmailDndAreaName(themePath: string): boolean {
+  let fixed = false;
+  const templatesDir = join(themePath, "templates");
+  if (!fileExists(templatesDir)) return false;
+
+  for (const file of readdirSync(templatesDir)) {
+    if (!file.endsWith(".html")) continue;
+    const filePath = join(templatesDir, file);
+    const content = readFile(filePath);
+    if (!/templateType:\s*email/i.test(content)) continue;
+    const replaced = content.replace(
+      /\{%\s*dnd_area\s+"(?!main")([^"]+)"/g,
+      '{% dnd_area "main"',
+    );
+    if (replaced !== content) {
+      writeFile(filePath, replaced);
+      fixed = true;
+    }
+  }
+  return fixed;
 }
 
 function fixLinkFieldsRecursive(fields: unknown[]): boolean {
