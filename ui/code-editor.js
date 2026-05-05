@@ -368,6 +368,7 @@ function enterSplitView() {
   const previewEl = document.getElementById("preview-container");
   const codeEl = document.getElementById("code-view");
 
+  document.querySelector(".right-split").classList.remove("hidden");
   panelRight.classList.add("split-active");
   previewEl.classList.remove("hidden");
   codeEl.classList.remove("hidden");
@@ -400,10 +401,11 @@ document.querySelectorAll(".view-toggle__btn").forEach((btn) => {
     if (view === "split") {
       enterSplitView();
     } else if (view === "code") {
-      previewEl.classList.add("hidden");
+      document.querySelector(".right-split").classList.add("hidden");
       codeEl.classList.remove("hidden");
       loadCodeFiles();
     } else {
+      document.querySelector(".right-split").classList.remove("hidden");
       codeEl.classList.add("hidden");
       previewEl.classList.remove("hidden");
       if (codeSavedSinceSwitch && typeof refreshPreview === "function") {
