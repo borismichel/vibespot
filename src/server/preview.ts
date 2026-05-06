@@ -68,6 +68,7 @@ function extractThemeColors(sharedCss: string | undefined): {
  * so the inline editor can map clicks back to field paths.
  */
 function annotateFieldRefs(template: string, fields: FieldDef[]): string {
+  if (!Array.isArray(fields)) return template;
   const typeMap = new Map<string, string>();
   for (const f of fields) typeMap.set(f.name, f.type);
 
@@ -144,7 +145,8 @@ export function buildPreviewHtml(): string {
     let context: { module: Record<string, unknown> };
     let fields: FieldDef[] = [];
     try {
-      fields = JSON.parse(mod.fieldsJson);
+      const parsed = JSON.parse(mod.fieldsJson);
+      fields = Array.isArray(parsed) ? parsed : [];
       context = { module: buildContextFromFields(fields) };
     } catch {
       context = { module: {} };
@@ -272,7 +274,8 @@ export function buildModulePreviewHtml(moduleName: string): string {
   let context: { module: Record<string, unknown> };
   let fields: FieldDef[] = [];
   try {
-    fields = JSON.parse(mod.fieldsJson);
+    const parsed = JSON.parse(mod.fieldsJson);
+    fields = Array.isArray(parsed) ? parsed : [];
     context = { module: buildContextFromFields(fields) };
   } catch {
     context = { module: {} };
@@ -307,7 +310,8 @@ function buildEmailPreviewHtml(
     let context: { module: Record<string, unknown> };
     let fields: FieldDef[] = [];
     try {
-      fields = JSON.parse(mod.fieldsJson);
+      const parsed = JSON.parse(mod.fieldsJson);
+      fields = Array.isArray(parsed) ? parsed : [];
       context = { module: buildContextFromFields(fields) };
     } catch {
       context = { module: {} };
