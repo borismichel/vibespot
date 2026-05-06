@@ -257,6 +257,57 @@ export async function runAgentPipeline(
       snapshot.brandAssets?.brandKit,
     );
 
+    // Retry modules whose fieldsJson was reset due to invalid JSON
+    const modulesNeedingRetry = validationResults
+      .filter((r) => r.issues.some((i) => i.field === "fieldsJson" && i.message.includes("reset to empty")))
+      .map((r) => r.module.moduleName);
+
+    if (modulesNeedingRetry.length > 0) {
+      const retrySpecs = modulesNeedingRetry
+        .map((name) => moduleSpecs.find((s) => s.name === name))
+        .filter((s): s is ModuleSpec => s != null);
+
+      if (retrySpecs.length > 0) {
+        log.info("pipeline", `Retrying ${retrySpecs.length} module(s) with broken fieldsJson: ${retrySpecs.map((s) => s.name).join(", ")}`);
+        onEvent({
+          type: "agent_decision",
+          step: "quality_check",
+          decision: `Regenerating ${retrySpecs.length} module(s) with invalid fields JSON...`,
+        });
+
+        const retryResults = await runModuleDeveloper(
+          userMessage,
+          retrySpecs,
+          sharedCss,
+          snapshot.themeName,
+          engine,
+          apiKey,
+          model,
+          effectiveConcurrency,
+          onEvent,
+          plan.guidesNeeded,
+          snapshot.brandAssets,
+          plan.contentType,
+        );
+
+        for (const r of retryResults) {
+          if (r.module) {
+            const idx = generatedModules.findIndex((m) => m.moduleName === r.moduleName);
+            if (idx >= 0) generatedModules[idx] = r.module;
+          }
+        }
+
+        // Re-validate after retry
+        validationResults = validateModules(
+          generatedModules,
+          snapshot.themeName,
+          onEvent,
+          plan.contentType,
+          snapshot.brandAssets?.brandKit,
+        );
+      }
+    }
+
     // Replace generated modules with validated/auto-fixed versions
     generatedModules = validationResults.map((r) => r.module);
 
@@ -503,13 +554,64 @@ async function runMultiPageFlow(
   let validationIssues: { module: string; message: string; autoFixed: boolean }[] = [];
 
   if (generatedModules.length > 0) {
-    const validationResults = validateModules(
+    let validationResults = validateModules(
       generatedModules,
       snapshot.themeName,
       onEvent,
       plan.contentType,
       snapshot.brandAssets?.brandKit,
     );
+
+    // Retry modules whose fieldsJson was reset due to invalid JSON
+    const modulesNeedingRetry = validationResults
+      .filter((r) => r.issues.some((i) => i.field === "fieldsJson" && i.message.includes("reset to empty")))
+      .map((r) => r.module.moduleName);
+
+    if (modulesNeedingRetry.length > 0) {
+      const retrySpecs = modulesNeedingRetry
+        .map((name) => allSpecs.find((s) => s.name === name))
+        .filter((s): s is ModuleSpec => s != null);
+
+      if (retrySpecs.length > 0) {
+        log.info("pipeline", `Retrying ${retrySpecs.length} module(s) with broken fieldsJson`);
+        onEvent({
+          type: "agent_decision",
+          step: "quality_check",
+          decision: `Regenerating ${retrySpecs.length} module(s) with invalid fields JSON...`,
+        });
+
+        const retryResults = await runModuleDeveloper(
+          userMessage,
+          retrySpecs,
+          sharedCss,
+          snapshot.themeName,
+          engine,
+          apiKey,
+          model,
+          concurrency,
+          onEvent,
+          plan.guidesNeeded,
+          snapshot.brandAssets,
+          plan.contentType,
+        );
+
+        for (const r of retryResults) {
+          if (r.module) {
+            const idx = generatedModules.findIndex((m) => m.moduleName === r.moduleName);
+            if (idx >= 0) generatedModules[idx] = r.module;
+          }
+        }
+
+        validationResults = validateModules(
+          generatedModules,
+          snapshot.themeName,
+          onEvent,
+          plan.contentType,
+          snapshot.brandAssets?.brandKit,
+        );
+      }
+    }
+
     validatedModules = validationResults.map((r) => r.module);
     validationIssues = validationResults.flatMap((r) => r.issues);
 
