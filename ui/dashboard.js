@@ -918,8 +918,12 @@ async function createTemplateFromPageType(pageType) {
       return;
     }
 
-    // Open the newly created template in chat
-    openTemplate(data.template.id);
+    // Navigate to the editor with the new asset selected
+    await openTemplate(data.template.id);
+
+    // Focus the chat input so the user can start describing their page
+    const chatInput = document.getElementById("chat-input");
+    if (chatInput) setTimeout(() => chatInput.focus(), 100);
   } catch (err) {
     await vibeAlert("Failed to create template: " + err.message, "Error");
   }
@@ -1062,6 +1066,8 @@ function showChat(themeName, templateId) {
     history.pushState(null, "", target);
   }
 
+  switchWorkspaceTab("pages");
+
   // Connect WebSocket (defined in chat.js)
   if (typeof connectWebSocket === "function") {
     connectWebSocket();
@@ -1071,6 +1077,8 @@ function showChat(themeName, templateId) {
   if (typeof refreshPreview === "function") {
     refreshPreview();
   }
+
+  setTimeout(() => document.getElementById("chat-input")?.focus(), 100);
 }
 
 // ---------------------------------------------------------------------------
