@@ -102,6 +102,9 @@ export interface SessionIndexEntry {
   updatedAt: number;
   moduleCount: number;
   templateCount: number;
+  pageCount: number;
+  emailCount: number;
+  hasBrandAssets: boolean;
   isImported?: boolean;
 }
 

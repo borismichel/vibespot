@@ -339,6 +339,9 @@ function deduplicateProjects(info) {
         updatedAt: s.updatedAt,
         moduleCount: s.moduleCount ?? null,
         templateCount: s.templateCount ?? null,
+        pageCount: s.pageCount ?? 0,
+        emailCount: s.emailCount ?? 0,
+        hasBrandAssets: s.hasBrandAssets ?? false,
       });
     }
   }
@@ -354,6 +357,9 @@ function deduplicateProjects(info) {
         updatedAt: null,
         moduleCount: typeof t === "object" ? t.moduleCount ?? null : null,
         templateCount: null,
+        pageCount: 0,
+        emailCount: 0,
+        hasBrandAssets: false,
       });
     }
   }
@@ -366,6 +372,7 @@ function deduplicateProjects(info) {
 // ---------------------------------------------------------------------------
 
 const RECENT_PROJECTS_LIMIT = 4;
+let _allProjects = [];
 
 function populateRecentProjects(info) {
   const section = document.getElementById("setup-recent");
@@ -375,6 +382,7 @@ function populateRecentProjects(info) {
 
   const projects = deduplicateProjects(info);
   if (projects.length === 0) {
+    _allProjects = [];
     section.classList.add("hidden");
     section.dataset.hasItems = "0";
     list.innerHTML = "";
@@ -386,6 +394,7 @@ function populateRecentProjects(info) {
   const withTime = projects.filter((p) => p.updatedAt).sort((a, b) => b.updatedAt - a.updatedAt);
   const withoutTime = projects.filter((p) => !p.updatedAt);
   const ordered = [...withTime, ...withoutTime];
+  _allProjects = ordered;
   const top = ordered.slice(0, RECENT_PROJECTS_LIMIT);
 
   list.innerHTML = "";
@@ -1532,45 +1541,68 @@ function populateContinuePanel() {
   const empty = document.getElementById("continue-empty");
   if (!container) return;
 
-  // Gather projects from the rail
-  const railItems = document.querySelectorAll(".project-rail__item");
-  if (railItems.length === 0) {
+  const projects = _allProjects;
+  if (!projects || projects.length === 0) {
     container.innerHTML = "";
-    empty.classList.remove("hidden");
+    if (empty) empty.classList.remove("hidden");
     return;
   }
 
-  empty.classList.add("hidden");
-  container.innerHTML = "";
+  if (empty) empty.classList.add("hidden");
 
-  railItems.forEach((item) => {
-    const name = item.dataset.name || item.querySelector(".project-rail__name")?.textContent || "";
-    const sessionId = item.dataset.sessionId || "";
-    const meta = item.querySelector(".project-rail__meta")?.textContent || "";
+  const table = document.createElement("table");
+  table.className = "projects-table";
+  table.innerHTML = `<thead><tr>
+    <th>Name</th>
+    <th>Pages</th>
+    <th>Emails</th>
+    <th>Modules</th>
+    <th>Brand Assets</th>
+    <th></th>
+  </tr></thead>`;
 
-    const pill = document.createElement("button");
-    pill.className = "setup__pill";
-    pill.innerHTML = `<span>${esc(name)}</span>${meta ? `<span class="setup__pill__meta">${esc(meta)}</span>` : ""}`;
+  const tbody = document.createElement("tbody");
+  for (const p of projects) {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td class="projects-table__name">${esc(p.name)}</td>` +
+      `<td>${p.pageCount ?? 0}</td>` +
+      `<td>${p.emailCount ?? 0}</td>` +
+      `<td>${p.moduleCount ?? 0}</td>` +
+      `<td>${p.hasBrandAssets ? "✓" : "—"}</td>` +
+      `<td class="projects-table__actions"></td>`;
 
-    const delBtn = document.createElement("span");
-    delBtn.className = "setup__pill-delete";
-    delBtn.innerHTML = "&times;";
-    delBtn.title = "Delete project";
-    delBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      confirmDeleteProject({ name, sessionId });
-    });
-    pill.appendChild(delBtn);
+    const actionsCell = tr.querySelector(".projects-table__actions");
 
-    pill.addEventListener("click", () => {
-      if (sessionId) {
-        resumeSession(sessionId);
-      } else {
-        openTheme(name);
+    const openBtn = document.createElement("button");
+    openBtn.type = "button";
+    openBtn.className = "btn btn--sm btn--primary";
+    openBtn.textContent = "Open";
+    openBtn.addEventListener("click", () => {
+      if (typeof isStreaming !== "undefined" && isStreaming) {
+        showError("Cannot switch projects while AI is generating.");
+        return;
       }
+      if (p.sessionId) resumeSession(p.sessionId);
+      else openTheme(p.name);
     });
-    container.appendChild(pill);
-  });
+    actionsCell.appendChild(openBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "btn btn--sm btn--danger";
+    delBtn.textContent = "Delete";
+    delBtn.addEventListener("click", () => {
+      confirmDeleteProject(p);
+    });
+    actionsCell.appendChild(delBtn);
+
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+
+  container.innerHTML = "";
+  container.appendChild(table);
 }
 
 async function loadDownloadPanel() {
