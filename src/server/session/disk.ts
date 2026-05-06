@@ -656,6 +656,7 @@ function generateEmailTemplateForEntry(tpl: TemplateEntry): string {
   </noscript>
   <![endif]-->
   {{ standard_header_includes }}
+  {{ dnd_area_stylesheet }}
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f4f4f4;">

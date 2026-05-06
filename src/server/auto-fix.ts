@@ -124,6 +124,7 @@ export function applyAutoFixes(themePath: string): string[] {
   if (fixColorFieldDefaults(themePath)) fixes.push('Fixed rgba/invalid color values → hex');
   if (fixCdnImports(themePath)) fixes.push('Stripped CDN @import statements');
   if (fixEmailDndAreaName(themePath)) fixes.push('dnd_area → "main" in email templates');
+  if (fixEmailDndAreaStylesheet(themePath)) fixes.push('Added {{ dnd_area_stylesheet }} to email templates');
   return fixes;
 }
 
@@ -138,6 +139,8 @@ export function autoFixError(themePath: string, error: UploadError): boolean {
     return fixColorFieldDefaults(themePath);
   if (error.message.includes("dnd") || error.message.includes("Dnd area"))
     return fixEmailDndAreaName(themePath);
+  if (error.message.includes("dnd_area_stylesheet"))
+    return fixEmailDndAreaStylesheet(themePath);
   return false;
 }
 
@@ -402,6 +405,29 @@ export function fixEmailDndAreaName(themePath: string): boolean {
     const replaced = content.replace(
       /\{%\s*dnd_area\s+"(?!main")([^"]+)"/g,
       '{% dnd_area "main"',
+    );
+    if (replaced !== content) {
+      writeFile(filePath, replaced);
+      fixed = true;
+    }
+  }
+  return fixed;
+}
+
+export function fixEmailDndAreaStylesheet(themePath: string): boolean {
+  let fixed = false;
+  const templatesDir = join(themePath, "templates");
+  if (!fileExists(templatesDir)) return false;
+
+  for (const file of readdirSync(templatesDir)) {
+    if (!file.endsWith(".html")) continue;
+    const filePath = join(templatesDir, file);
+    const content = readFile(filePath);
+    if (!/templateType:\s*email/i.test(content)) continue;
+    if (content.includes("dnd_area_stylesheet")) continue;
+    const replaced = content.replace(
+      /(\{\{\s*standard_header_includes\s*\}\})/,
+      "$1\n  {{ dnd_area_stylesheet }}",
     );
     if (replaced !== content) {
       writeFile(filePath, replaced);

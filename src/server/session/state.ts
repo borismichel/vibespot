@@ -121,7 +121,10 @@ function isSimilarModuleName(a: string, b: string): boolean {
   const nb = normalizeForSimilarity(b);
   if (na === nb) return true;
   if (na.length < 4 || nb.length < 4) return false;
-  return na.includes(nb) || nb.includes(na);
+  const shorter = na.length <= nb.length ? na : nb;
+  const longer = na.length <= nb.length ? nb : na;
+  if (!longer.includes(shorter)) return false;
+  return shorter.length / longer.length >= 0.8;
 }
 
 /**

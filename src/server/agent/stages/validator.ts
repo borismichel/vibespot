@@ -176,8 +176,12 @@ function validateAndFixJson(
     issues.push({
       module: moduleName,
       field,
-      message: `Invalid JSON in ${field}`,
-      autoFixed: false,
+      message: `Invalid JSON in ${field} — reset to empty`,
+      autoFixed: true,
+    });
+    return field === "fieldsJson" ? "[]" : JSON.stringify({
+      host_template_types: [isEmail ? "EMAIL" : isBlog ? "BLOG_POST" : "PAGE"],
+      is_available_for_new_content: true,
     });
   }
   return jsonStr;
