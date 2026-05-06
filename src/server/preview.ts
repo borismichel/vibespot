@@ -347,7 +347,7 @@ function buildEmailPreviewHtml(
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <title>Email Preview</title>
 <style>
-  html, body { margin: 0; padding: 0; }
+  html, body { margin: 0; padding: 0; overflow-x: hidden; }
   body {
     background-color: #e8e8e8;
     font-family: Arial, Helvetica, sans-serif;
@@ -361,6 +361,14 @@ function buildEmailPreviewHtml(
   .vibespot-module { margin: 0 auto; max-width: 600px; }
   .vibespot-module--pending table { opacity: 0.6; }
   html { scroll-behavior: smooth; }
+  img { max-width: 100% !important; height: auto !important; }
+  table { max-width: 100% !important; }
+  td { word-break: break-word; }
+  @media screen and (max-width: 620px) {
+    .vibespot-email-wrapper { padding: 10px 8px; }
+    table[width] { width: 100% !important; }
+    img[width] { width: 100% !important; height: auto !important; }
+  }
 </style>
 </head>
 <body>
