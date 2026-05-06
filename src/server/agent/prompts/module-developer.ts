@@ -45,6 +45,7 @@ You produce a single module with these fields:
 - Use "type": "text" (NEVER "textarea" — it's deprecated)
 - NEVER use "name": "name" (reserved) — use "item_name" instead
 - NEVER use "name": "label" (reserved) — use "section_label" instead
+- NEVER use "name": "body" (reserved) — use "body_text" instead
 - NEVER put literal \\n in field defaults
 - Wrap style fields in a "styles" group with "tab": "STYLE"
 - Color fields: type "color", default { "color": "#hex", "opacity": 100 }

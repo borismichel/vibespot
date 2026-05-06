@@ -182,6 +182,7 @@ NEVER respond with only a text summary. The vibespot-modules JSON block is manda
 - All assets must be self-contained — no external HTTP requests in CSS or HTML
 - Use "type": "text" (NEVER "textarea" — it's deprecated)
 - NEVER use "name": "name" (reserved) — use "item_name" instead
+- NEVER use "name": "body" (reserved) — use "body_text" instead
 - NEVER put literal \\n newline sequences in field default values — use plain text without line breaks
 - Wrap style fields in a "styles" group with "tab": "STYLE"
 - All CSS classes must use a unique prefix "${themeName}-" to avoid theme conflicts
@@ -277,6 +278,7 @@ NEVER respond with only a text summary. The vibespot-modules JSON block is manda
 - All assets must be self-contained — no external HTTP requests in CSS or HTML
 - Use "type": "text" (NEVER "textarea" — it's deprecated)
 - NEVER use "name": "name" (reserved) — use "item_name" instead
+- NEVER use "name": "body" (reserved) — use "body_text" instead
 - NEVER put literal \\n newline sequences in field default values — use plain text without line breaks
 - Wrap style fields in a "styles" group with "tab": "STYLE"
 - All CSS classes must use a unique prefix "${themeName}-" to avoid theme conflicts

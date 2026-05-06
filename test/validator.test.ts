@@ -74,6 +74,22 @@ describe("validator — reserved field names", () => {
     const results = run([makeModule({ fieldsJson: fields })]);
     expect(results[0].module.fieldsJson).toContain('"section_label"');
   });
+
+  it('renames "name": "body" → "body_text"', () => {
+    const fields = JSON.stringify([{ name: "body", type: "text", default: "" }]);
+    const results = run([makeModule({ fieldsJson: fields })]);
+    expect(results[0].module.fieldsJson).toContain('"body_text"');
+    expect(results[0].module.fieldsJson).not.toMatch(/"name"\s*:\s*"body"/);
+    expect(results[0].issues.some((i) => i.message.includes("body_text"))).toBe(true);
+  });
+
+  it("updates module.html HubL references when renaming fields", () => {
+    const fields = JSON.stringify([{ name: "body", type: "text", default: "" }]);
+    const html = "<div>{{ module.body }}</div>";
+    const results = run([makeModule({ fieldsJson: fields, moduleHtml: html })]);
+    expect(results[0].module.moduleHtml).toContain("module.body_text");
+    expect(results[0].module.moduleHtml).not.toContain("module.body }}");
+  });
 });
 
 // ---------------------------------------------------------------------------
