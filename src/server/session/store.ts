@@ -50,6 +50,9 @@ function rebuildIndex(): SessionIndexEntry[] {
         updatedAt: data.updatedAt,
         moduleCount: templates.reduce((n: number, t: any) => n + (t.modules?.length || 0), 0),
         templateCount: templates.length,
+        pageCount: templates.filter((t: any) => t.contentMode !== "email").length,
+        emailCount: templates.filter((t: any) => t.contentMode === "email").length,
+        hasBrandAssets: !!(data.brandAssets && (data.brandAssets.styleguide || data.brandAssets.brandvoice || data.brandAssets.brandKit)),
         isImported: !!data.isImported,
       });
     } catch { /* skip corrupt files */ }
@@ -68,6 +71,9 @@ function upsertIndex(session: VibeSession): void {
     updatedAt: session.updatedAt,
     moduleCount: templates.reduce((n, t) => n + (t.modules?.length || 0), 0),
     templateCount: templates.length,
+    pageCount: templates.filter((t) => t.contentMode !== "email").length,
+    emailCount: templates.filter((t) => t.contentMode === "email").length,
+    hasBrandAssets: !!(session.brandAssets && (session.brandAssets.styleguide || session.brandAssets.brandvoice || session.brandAssets.brandKit)),
     isImported: !!session.isImported,
   };
   const idx = entries.findIndex((e) => e.id === session.id);

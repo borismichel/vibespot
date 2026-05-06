@@ -76,8 +76,7 @@ export function handleSetupInfoRoute(res: ServerResponse): void {
   } catch { /* not installed */ }
 
   const sessions = listSessions()
-    .sort((a, b) => b.updatedAt - a.updatedAt)
-    .slice(0, 10);
+    .sort((a, b) => b.updatedAt - a.updatedAt);
 
   const localThemes = getLocalThemes();
 
