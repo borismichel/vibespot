@@ -1066,6 +1066,8 @@ function showChat(themeName, templateId) {
     history.pushState(null, "", target);
   }
 
+  switchWorkspaceTab("pages");
+
   // Connect WebSocket (defined in chat.js)
   if (typeof connectWebSocket === "function") {
     connectWebSocket();
@@ -1075,6 +1077,8 @@ function showChat(themeName, templateId) {
   if (typeof refreshPreview === "function") {
     refreshPreview();
   }
+
+  setTimeout(() => document.getElementById("chat-input")?.focus(), 100);
 }
 
 // ---------------------------------------------------------------------------
