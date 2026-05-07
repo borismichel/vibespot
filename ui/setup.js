@@ -1536,6 +1536,8 @@ function togglePanel(action) {
   if (action === "continue") populateContinuePanel();
 }
 
+let _bulkSelected = new Set();
+
 function populateContinuePanel() {
   const container = document.getElementById("continue-projects");
   const empty = document.getElementById("continue-empty");
@@ -1544,15 +1546,26 @@ function populateContinuePanel() {
   const projects = _allProjects;
   if (!projects || projects.length === 0) {
     container.innerHTML = "";
+    _bulkSelected.clear();
     if (empty) empty.classList.remove("hidden");
     return;
   }
 
   if (empty) empty.classList.add("hidden");
+  _bulkSelected.clear();
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "projects-bulk-toolbar hidden";
+  toolbar.id = "projects-bulk-toolbar";
+  toolbar.innerHTML =
+    `<span class="projects-bulk-toolbar__count" id="bulk-count">0 selected</span>` +
+    `<button type="button" class="btn btn--sm btn--secondary" id="bulk-duplicate">Duplicate</button>` +
+    `<button type="button" class="btn btn--sm btn--danger" id="bulk-delete">Delete</button>`;
 
   const table = document.createElement("table");
   table.className = "projects-table";
   table.innerHTML = `<thead><tr>
+    <th class="projects-table__th-check"><input type="checkbox" id="bulk-select-all" class="projects-table__checkbox" title="Select all" /></th>
     <th>Name</th>
     <th>Pages</th>
     <th>Emails</th>
@@ -1564,15 +1577,41 @@ function populateContinuePanel() {
   const tbody = document.createElement("tbody");
   for (const p of projects) {
     const tr = document.createElement("tr");
-    tr.innerHTML =
-      `<td class="projects-table__name">${esc(p.name)}</td>` +
-      `<td>${p.pageCount ?? 0}</td>` +
-      `<td>${p.emailCount ?? 0}</td>` +
-      `<td>${p.moduleCount ?? 0}</td>` +
-      `<td>${p.hasBrandAssets ? "✓" : "—"}</td>` +
-      `<td class="projects-table__actions"></td>`;
+    tr.dataset.projectName = p.name;
 
-    const actionsCell = tr.querySelector(".projects-table__actions");
+    const checkTd = document.createElement("td");
+    checkTd.className = "projects-table__td-check";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "projects-table__checkbox";
+    cb.dataset.projectName = p.name;
+    cb.addEventListener("change", () => {
+      if (cb.checked) _bulkSelected.add(p.name);
+      else _bulkSelected.delete(p.name);
+      tr.classList.toggle("projects-table__row--selected", cb.checked);
+      syncBulkToolbar();
+    });
+    checkTd.appendChild(cb);
+    tr.appendChild(checkTd);
+
+    const nameTd = document.createElement("td");
+    nameTd.className = "projects-table__name";
+    nameTd.textContent = p.name;
+    tr.appendChild(nameTd);
+
+    for (const val of [p.pageCount ?? 0, p.emailCount ?? 0, p.moduleCount ?? 0]) {
+      const td = document.createElement("td");
+      td.textContent = String(val);
+      tr.appendChild(td);
+    }
+
+    const brandTd = document.createElement("td");
+    brandTd.textContent = p.hasBrandAssets ? "✓" : "—";
+    tr.appendChild(brandTd);
+
+    const actionsCell = document.createElement("td");
+    actionsCell.className = "projects-table__actions";
+    tr.appendChild(actionsCell);
 
     const openBtn = document.createElement("button");
     openBtn.type = "button";
@@ -1602,7 +1641,120 @@ function populateContinuePanel() {
   table.appendChild(tbody);
 
   container.innerHTML = "";
+  container.appendChild(toolbar);
   container.appendChild(table);
+
+  const selectAll = document.getElementById("bulk-select-all");
+  selectAll.addEventListener("change", () => {
+    const cbs = container.querySelectorAll("tbody .projects-table__checkbox");
+    cbs.forEach((c) => {
+      c.checked = selectAll.checked;
+      const name = c.dataset.projectName;
+      const row = c.closest("tr");
+      if (selectAll.checked) _bulkSelected.add(name);
+      else _bulkSelected.delete(name);
+      if (row) row.classList.toggle("projects-table__row--selected", selectAll.checked);
+    });
+    syncBulkToolbar();
+  });
+
+  document.getElementById("bulk-delete").addEventListener("click", () => bulkDeleteProjects());
+  document.getElementById("bulk-duplicate").addEventListener("click", () => bulkDuplicateProjects());
+}
+
+function syncBulkToolbar() {
+  const toolbar = document.getElementById("projects-bulk-toolbar");
+  const countEl = document.getElementById("bulk-count");
+  const selectAll = document.getElementById("bulk-select-all");
+  if (!toolbar) return;
+
+  const n = _bulkSelected.size;
+  toolbar.classList.toggle("hidden", n === 0);
+  if (countEl) countEl.textContent = `${n} selected`;
+
+  if (selectAll) {
+    const total = document.querySelectorAll("#continue-projects tbody .projects-table__checkbox").length;
+    selectAll.checked = n > 0 && n === total;
+    selectAll.indeterminate = n > 0 && n < total;
+  }
+}
+
+function bulkDeleteProjects() {
+  if (_bulkSelected.size === 0) return;
+  const names = [..._bulkSelected];
+  const projects = _allProjects.filter((p) => names.includes(p.name));
+
+  const overlay = document.createElement("div");
+  overlay.className = "confirm-overlay";
+  overlay.innerHTML = `
+    <div class="confirm-dialog">
+      <div class="confirm-dialog__title">Delete ${projects.length} project${projects.length > 1 ? "s" : ""}?</div>
+      <div class="confirm-dialog__detail">${projects.map((p) => `<strong>${esc(p.name)}</strong>`).join(", ")}</div>
+      <label class="confirm-dialog__check">
+        <input type="checkbox" id="confirm-bulk-delete-files" checked />
+        <span>Also delete local files</span>
+      </label>
+      <p class="confirm-dialog__warn">Deleting local files cannot be undone.</p>
+      <div class="confirm-dialog__actions">
+        <button class="btn btn--secondary" id="confirm-bulk-cancel">Cancel</button>
+        <button class="btn btn--danger" id="confirm-bulk-delete">Delete</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById("confirm-bulk-cancel").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+  document.getElementById("confirm-bulk-delete").addEventListener("click", async () => {
+    const deleteFiles = document.getElementById("confirm-bulk-delete-files").checked;
+    overlay.remove();
+
+    for (const p of projects) {
+      try {
+        if (p.sessionId) {
+          await fetch("/api/themes", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId: p.sessionId, deleteFiles }),
+          });
+        } else if (deleteFiles) {
+          await fetch("/api/themes/delete-local", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ themeName: p.name }),
+          });
+        }
+      } catch { /* continue deleting others */ }
+    }
+    _bulkSelected.clear();
+    await initSetup();
+    populateContinuePanel();
+  });
+}
+
+async function bulkDuplicateProjects() {
+  if (_bulkSelected.size === 0) return;
+  const names = [..._bulkSelected];
+  const projects = _allProjects.filter((p) => names.includes(p.name) && p.sessionId);
+
+  if (projects.length === 0) {
+    showError("Only saved projects can be duplicated.");
+    return;
+  }
+
+  for (const p of projects) {
+    try {
+      await fetch("/api/themes/duplicate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: p.sessionId }),
+      });
+    } catch { /* continue */ }
+  }
+  _bulkSelected.clear();
+  await initSetup();
+  populateContinuePanel();
 }
 
 async function loadDownloadPanel() {

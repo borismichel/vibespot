@@ -12,6 +12,7 @@ import {
   loadSession,
   deleteSession,
   renameSession,
+  duplicateSession,
   saveSession,
 } from "../session.js";
 import { WORKSPACE_DIR } from "./setup.js";
@@ -109,6 +110,26 @@ export function handleRenameThemeRoute(req: IncomingMessage, res: ServerResponse
       const result = renameSession(sessionId, sanitized);
       if (result.ok) {
         jsonResponse(res, 200, { ok: true, newName: sanitized });
+      } else {
+        jsonResponse(res, 400, { error: result.error });
+      }
+    } catch (err) {
+      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
+export function handleDuplicateThemeRoute(req: IncomingMessage, res: ServerResponse): void {
+  readBody(req, (body) => {
+    try {
+      const { sessionId } = JSON.parse(body);
+      if (!sessionId) {
+        jsonResponse(res, 400, { error: "sessionId is required" });
+        return;
+      }
+      const result = duplicateSession(sessionId);
+      if (result.ok) {
+        jsonResponse(res, 200, { ok: true, newName: result.newName, newSessionId: result.newSessionId });
       } else {
         jsonResponse(res, 400, { error: result.error });
       }

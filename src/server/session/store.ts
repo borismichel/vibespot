@@ -2,7 +2,7 @@
  * Session CRUD, index management, and the global activeSession variable.
  */
 
-import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, rmSync, renameSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, rmSync, renameSync, cpSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { ensureGitRepo } from "../project-git.js";
@@ -294,4 +294,55 @@ export function renameSession(sessionId: string, newName: string): { ok: boolean
   rebuildIndex();
 
   return { ok: true };
+}
+
+export function duplicateSession(sessionId: string): { ok: boolean; newName?: string; newSessionId?: string; error?: string } {
+  const filePath = join(SESSIONS_DIR, sessionId + ".json");
+  if (!existsSync(filePath)) return { ok: false, error: "Session not found" };
+
+  let original: VibeSession;
+  try {
+    original = JSON.parse(readFileSync(filePath, "utf-8"));
+  } catch {
+    return { ok: false, error: "Failed to read session" };
+  }
+
+  const baseName = original.themeName.replace(/-copy(-\d+)?$/, "");
+  const parentDir = dirname(original.themePath);
+
+  let newName = `${baseName}-copy`;
+  let attempt = 1;
+  while (existsSync(join(parentDir, newName))) {
+    attempt++;
+    newName = `${baseName}-copy-${attempt}`;
+  }
+
+  const newPath = join(parentDir, newName);
+
+  if (existsSync(original.themePath)) {
+    try {
+      cpSync(original.themePath, newPath, { recursive: true });
+    } catch (err) {
+      return { ok: false, error: `Failed to copy files: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  } else {
+    mkdirSync(newPath, { recursive: true });
+  }
+
+  const newId = generateId();
+  const clone: VibeSession = {
+    ...JSON.parse(JSON.stringify(original)),
+    id: newId,
+    themeName: newName,
+    themePath: newPath,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    messages: [],
+  };
+
+  mkdirSync(SESSIONS_DIR, { recursive: true });
+  writeFileSync(join(SESSIONS_DIR, `${newId}.json`), JSON.stringify(clone, null, 2), "utf-8");
+  upsertIndex(clone);
+
+  return { ok: true, newName, newSessionId: newId };
 }

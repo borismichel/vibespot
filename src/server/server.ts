@@ -67,6 +67,7 @@ import {
   handleThemeSwitchRoute,
   handleDeleteLocalThemeRoute,
   handleRenameThemeRoute,
+  handleDuplicateThemeRoute,
 } from "./routes/themes.js";
 import {
   handleDashboardRoute,
@@ -504,6 +505,11 @@ function handleApiRoute(
 
     case "/api/themes/rename":
       if (method === "POST") handleRenameThemeRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/themes/duplicate":
+      if (method === "POST") handleDuplicateThemeRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
