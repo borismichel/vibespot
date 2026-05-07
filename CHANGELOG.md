@@ -10,6 +10,7 @@ All notable changes to vibeSpot are documented here.
 
 - **Project overview table** ([VIB-326](/VIB/issues/VIB-326)) — Project Home now shows a sortable table with columns for Name, Pages, Emails, Modules, and Brand Assets. Replaces the card-based "View All" list with a scannable overview that surfaces project health at a glance.
 - **Bulk operations** ([VIB-326](/VIB/issues/VIB-326)) — Select multiple projects via checkboxes and apply bulk actions: Duplicate or Delete. A floating toolbar shows the selection count and action buttons. Bulk delete includes a file-deletion confirmation dialog.
+- **Email client preview** — Preview email templates as they render in Gmail, Outlook Desktop, and Apple Mail. Tab-based overlay applies client-specific heuristics and shows rendering notes per client.
 
 ### Fixes
 
