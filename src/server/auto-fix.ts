@@ -178,6 +178,11 @@ export function fixReservedNames(themePath: string): boolean {
       writeFile(fieldsPath, content);
       fixed = true;
     }
+    if (/"name":\s*"body"/g.test(content)) {
+      content = content.replace(/"name":\s*"body"/g, '"name": "body_text"');
+      writeFile(fieldsPath, content);
+      fixed = true;
+    }
   }
   return fixed;
 }

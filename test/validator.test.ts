@@ -36,13 +36,14 @@ describe("validator — JSON checks", () => {
     expect(results[0].valid).toBe(true);
   });
 
-  it("flags invalid fieldsJson", () => {
+  it("auto-fixes invalid fieldsJson by resetting to empty array", () => {
     const results = run([makeModule({ fieldsJson: "{broken" })]);
     const jsonIssue = results[0].issues.find(
       (i) => i.field === "fieldsJson" && i.message.includes("Invalid JSON"),
     );
     expect(jsonIssue).toBeDefined();
-    expect(jsonIssue!.autoFixed).toBe(false);
+    expect(jsonIssue!.autoFixed).toBe(true);
+    expect(results[0].module.fieldsJson).toBe("[]");
   });
 
   it("auto-generates metaJson when empty", () => {
@@ -73,6 +74,22 @@ describe("validator — reserved field names", () => {
     const fields = JSON.stringify([{ name: "label", type: "text", default: "" }]);
     const results = run([makeModule({ fieldsJson: fields })]);
     expect(results[0].module.fieldsJson).toContain('"section_label"');
+  });
+
+  it('renames "name": "body" → "body_text"', () => {
+    const fields = JSON.stringify([{ name: "body", type: "text", default: "" }]);
+    const results = run([makeModule({ fieldsJson: fields })]);
+    expect(results[0].module.fieldsJson).toContain('"body_text"');
+    expect(results[0].module.fieldsJson).not.toMatch(/"name"\s*:\s*"body"/);
+    expect(results[0].issues.some((i) => i.message.includes("body_text"))).toBe(true);
+  });
+
+  it("updates module.html HubL references when renaming fields", () => {
+    const fields = JSON.stringify([{ name: "body", type: "text", default: "" }]);
+    const html = "<div>{{ module.body }}</div>";
+    const results = run([makeModule({ fieldsJson: fields, moduleHtml: html })]);
+    expect(results[0].module.moduleHtml).toContain("module.body_text");
+    expect(results[0].module.moduleHtml).not.toContain("module.body }}");
   });
 });
 
