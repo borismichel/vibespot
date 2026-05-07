@@ -60,6 +60,7 @@
     <a class="doc-nav__link" href="#editor">The Editor</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#editor-layout">Layout</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#workspace-tabs">Workspace Tabs</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#project-overview">Project Overview</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#chat-panel">Chat</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#preview-panel">Preview</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#code-editor">Code Editor</a>
@@ -71,6 +72,11 @@
     <a class="doc-nav__link doc-nav__link--sub" href="#multi-page">Multi-Page Sites</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#templates">Templates</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#module-library">Module Library</a>
+    <a class="doc-nav__link" href="#first-generation">Your First Generation</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#first-gen-page">Page Workflow</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#first-gen-email">Email Workflow</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#first-gen-editing">Editing with Module Overview</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#first-gen-publish">Publishing to HubSpot</a>
   </div>
 
   <div class="doc-nav__section">
@@ -372,7 +378,7 @@ vibespot</code></pre>
   <ul>
     <li><strong>Pages</strong> &mdash; Create new pages and manage existing templates. The page tree sidebar shows all templates with type badges (LP, Blog, Web, Sec), labels, and module counts.</li>
     <li><strong>Brand</strong> &mdash; Brand kit (colors, fonts, logo URL) with a live visual preview card showing color swatches, sample text, and logo thumbnail. Also surfaces import analysis results for themes fetched from HubSpot.</li>
-    <li><strong>Library</strong> &mdash; The shared module library across all pages of the active theme. Browse, preview, and add reusable modules to any template.</li>
+    <li><strong>Library</strong> &mdash; Project assets browser showing images, fonts, and scripts in the active theme. Also provides access to the shared module library for adding reusable modules to any template.</li>
     <li><strong>Marketplace</strong> &mdash; Marketplace validation and listing metadata editor.</li>
     <li><strong>Settings</strong> &mdash; Quick access to AI, HubSpot, Figma, GitHub, and vibeSpot configuration.</li>
   </ul>
@@ -382,6 +388,30 @@ vibespot</code></pre>
   <img class="doc-screenshot" src="screenshots/editor-full-layout.png" alt="The full editor layout showing chat panel on the left, live preview on the right, and workspace tabs in the topbar">
 
   <p>The topbar provides access to theme settings, upload, version history, responsive viewport toggle, and the settings gear.</p>
+
+  <h3 id="project-overview">Project Overview Table</h3>
+  <p>When you have multiple projects, the Project Home shows a <strong>sortable table</strong> that gives you a bird's-eye view of every project in your workspace:</p>
+  <table>
+    <thead>
+      <tr><th>Column</th><th>What it shows</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Name</strong></td><td>The project (theme) name. Click to open it in the editor.</td></tr>
+      <tr><td><strong>Pages</strong></td><td>Number of page templates (landing pages, website pages, blog posts).</td></tr>
+      <tr><td><strong>Emails</strong></td><td>Number of email templates in the project.</td></tr>
+      <tr><td><strong>Modules</strong></td><td>Total module count across all templates.</td></tr>
+      <tr><td><strong>Brand Assets</strong></td><td>Whether a brand kit is configured (checkmark or dash).</td></tr>
+    </tbody>
+  </table>
+
+  <h4 id="bulk-operations">Bulk Operations</h4>
+  <p>Select multiple projects using the checkboxes in the leftmost column, or click the header checkbox to select all. A floating toolbar appears with the selection count and two actions:</p>
+  <ul>
+    <li><strong>Duplicate</strong> &mdash; Copies all selected projects (only available for projects with saved sessions).</li>
+    <li><strong>Delete</strong> &mdash; Removes all selected projects. A confirmation dialog asks whether to also delete local theme files from disk.</li>
+  </ul>
+
+  <img class="doc-screenshot" src="screenshots/project-overview-table.png" alt="Project overview table showing multiple projects with pages, emails, modules, and brand asset columns, with two rows selected and the bulk toolbar visible">
 
   <h3 id="chat-panel">Chat Panel</h3>
   <p>The chat panel is your primary way to interact with the AI. Type a message describing what you want and press <kbd>Enter</kbd> to send. Use <kbd>Shift</kbd>+<kbd>Enter</kbd> to insert a new line without sending.</p>
@@ -396,7 +426,9 @@ vibespot</code></pre>
   <p>Drag and drop files onto the chat input, or click the attachment button to browse.</p>
 
   <h4 id="starter-templates">Starter Templates</h4>
-  <p>For quick starts, the Library tab offers six starter templates that bootstrap a new theme with pre-built modules, shared CSS/JS, and module order &mdash; instant preview with no AI wait:</p>
+  <p>For quick starts, click <strong>From Template</strong> on the Project Home screen (or use the templates icon in the chat input area). Nine starter templates bootstrap a new theme with pre-built modules, shared CSS/JS, and module order &mdash; instant preview with no AI wait:</p>
+
+  <p><strong>Page starters:</strong></p>
   <ul>
     <li><strong>SaaS Landing Page</strong> &mdash; Hero, features grid, pricing, testimonials, CTA, footer</li>
     <li><strong>Portfolio</strong> &mdash; About section, project gallery, skills, contact form</li>
@@ -404,6 +436,13 @@ vibespot</code></pre>
     <li><strong>Event / Conference</strong> &mdash; Event hero with date, speakers, schedule, sponsors, registration CTA</li>
     <li><strong>Coming Soon</strong> &mdash; Countdown hero, email signup, teaser content</li>
     <li><strong>Blog Content Hub</strong> &mdash; 8-module blog layout with post body, author bio, related posts, sidebar, and navigation</li>
+  </ul>
+
+  <p><strong>Email starters:</strong></p>
+  <ul>
+    <li><strong>Welcome Email</strong> &mdash; Logo header, greeting, onboarding steps, CTA button, footer</li>
+    <li><strong>Announcement Email</strong> &mdash; Header, announcement body, feature highlights, CTA</li>
+    <li><strong>Newsletter Email</strong> &mdash; Header, content sections, article cards, footer</li>
   </ul>
 
   <h4 id="smart-suggestions">Smart Chat Suggestions</h4>
@@ -516,14 +555,17 @@ vibespot</code></pre>
     </div>
   </div>
 
-  <p>The setup screen presents five options:</p>
+  <p>The Project Home screen greets you with a time-of-day message ("Good morning / afternoon / evening") and six <strong>asset-type cards</strong>. Each card scopes the prompt and pipeline to the right content type:</p>
   <ul>
-    <li><strong>New Theme</strong> &mdash; Creates a fresh HubSpot theme directory at <code>~/vibespot-themes/your-theme-name</code>. Initializes the standard folder structure (<code>modules/</code>, <code>templates/</code>, <code>css/</code>, <code>js/</code>) and a git repository for version tracking.</li>
-    <li><strong>Continue (Resume)</strong> &mdash; Reopens an existing project from the sidebar list. Your chat history, modules, and all templates are preserved exactly where you left off.</li>
-    <li><strong>From HubSpot (Fetch)</strong> &mdash; Downloads an existing theme from your HubSpot portal. vibeSpot scans the fetched modules and imports them into a session so you can modify them with AI or by hand.</li>
-    <li><strong>From Figma (Beta)</strong> &mdash; Paste a Figma URL and vibeSpot extracts design tokens, section structure, copy, and image assets, then translates each section into a HubSpot module. See the dedicated <a href="#figma-import">Figma Import</a> section for the full walkthrough.</li>
-    <li><strong>From React (Beta)</strong> &mdash; Clones a React or Lovable project from a Git URL and converts its components into native HubSpot modules. The conversion uses the built-in conversion guide to map React patterns to HubL equivalents.</li>
+    <li><strong>Landing Page</strong> &mdash; Full-width marketing pages with standard HubSpot CMS modules.</li>
+    <li><strong>Email</strong> &mdash; Table-based email templates with inline CSS and MSO/VML conditional structure.</li>
+    <li><strong>Website</strong> &mdash; Standard website pages (About, Contact, Services).</li>
+    <li><strong>Blog Post</strong> &mdash; Blog templates with HubSpot blog variables.</li>
+    <li><strong>From Template</strong> &mdash; Opens the starter template grid (SaaS, Portfolio, Restaurant, Event, Coming Soon, Blog, plus three email starters).</li>
+    <li><strong>Import</strong> &mdash; Shows a source picker: HubSpot (fetch existing theme), Figma (translate a design), or React (convert a project).</li>
   </ul>
+  <p>Clicking an asset-type card reveals a scoped prompt input with an eyebrow label (e.g. "Landing Page") and a per-type placeholder. Enter a project name and your description, then vibeSpot creates the theme directory and opens the editor.</p>
+  <p>You can also reach your existing projects from the sidebar list (&ldquo;Continue&rdquo;) or the <a href="#project-overview">project overview table</a> when you have multiple projects.</p>
 
   <h3 id="onboarding">Onboarding Walkthrough</h3>
   <p>On first launch (no projects, no local themes), vibeSpot shows a <strong>3-step onboarding walkthrough</strong> on the Project Home screen:</p>
@@ -558,10 +600,10 @@ vibespot</code></pre>
   <p>vibeSpot supports three content types, each with its own pipeline prompts, validation rules, and starter templates:</p>
   <ul>
     <li><strong>Landing Page</strong> &mdash; The default. Full-width marketing pages with standard HubSpot CMS modules.</li>
-    <li><strong>Email</strong> &mdash; HubSpot email templates with table-based layout, inline CSS design tokens, and MSO/VML conditional structure for Outlook compatibility. Select "Email" from the page type dropdown in the web UI, or use <code>vibespot email</code> from the CLI. The pipeline routes through email-specific prompts at every stage (architect, module developer, validator).</li>
+    <li><strong>Email</strong> &mdash; HubSpot email templates with table-based layout, inline CSS design tokens, and MSO/VML conditional structure for Outlook compatibility. Select the <strong>Email</strong> card on the Project Home screen, choose "Email" from the page type dropdown, or use <code>vibespot email</code> from the CLI. The pipeline routes through email-specific prompts at every stage (architect, module developer, validator). A dedicated <strong>email client preview</strong> (envelope icon in the topbar) renders your email as it appears in Gmail, Outlook Desktop, and Apple Mail.</li>
     <li><strong>Blog</strong> &mdash; Blog templates with HubSpot blog variables (<code>content.post_body</code>, <code>content.author</code>, <code>blog_recent_posts</code>, etc.). Blog-specific prompts, validator auto-fix, and a pre-built Blog Content Hub starter template with 8 modules.</li>
   </ul>
-  <p>The intent analyzer detects the content type from your prompt (e.g. "create a welcome email" triggers the email pipeline). You can also set it explicitly via the page type dropdown.</p>
+  <p>The intent analyzer detects the content type from your prompt (e.g. "create a welcome email" triggers the email pipeline). You can also set it explicitly via the asset-type cards on the Project Home screen or the page type dropdown.</p>
 
   <img class="doc-screenshot" src="screenshots/content-type-dropdown.png" alt="Page type dropdown showing Landing Page, Email, Website, and Blog Post options">
 
@@ -607,11 +649,181 @@ vibespot</code></pre>
 </div>
 
 <!-- ============================================================
+     Section 4b: Your First Generation
+     ============================================================ -->
+<div class="doc-section" id="first-generation">
+  <h2 id="first-generation-heading">Your First Generation <a href="#first-generation" class="doc-anchor">#</a></h2>
+  <p class="doc-subtitle">Step-by-step walkthroughs for generating your first landing page, your first email template, editing with the module overview, and publishing to HubSpot.</p>
+
+  <h3 id="first-gen-page">Page Workflow: Landing Page from Scratch</h3>
+  <p>This walkthrough creates a complete landing page and deploys it to HubSpot. Estimated time: 5&ndash;10 minutes.</p>
+  <ol class="doc-steps">
+    <li>
+      <strong>Launch vibeSpot.</strong> Run <code>npx vibespot</code> in your terminal. The web UI opens at <code>localhost:4200</code>.
+    </li>
+    <li>
+      <strong>Pick an asset type.</strong> On Project Home you see six asset-type cards. Click <strong>Landing Page</strong>. A prompt input appears with the eyebrow "Landing Page" and a placeholder hint.
+      <img class="doc-screenshot" src="screenshots/asset-type-cards.png" alt="Six asset-type cards on the Project Home screen: Landing Page, Email, Website, Blog Post, From Template, and Import">
+    </li>
+    <li>
+      <strong>Name your project.</strong> Type a kebab-case name (e.g. <code>acme-launch</code>) and press Enter. vibeSpot creates a theme directory at <code>~/vibespot-themes/acme-launch</code> and opens the editor.
+    </li>
+    <li>
+      <strong>Describe the page.</strong> In the chat panel, write a detailed prompt. Include the page purpose, sections, headlines, and design preferences. Example:
+      <pre><code>Build a SaaS landing page for Acme — a project management tool.
+Use a dark navy (#0f172a) and white palette with orange (#f97316) accents.
+Sections: hero with headline "Ship Projects Faster" and a CTA button,
+3-column features grid with icons, pricing table (Free / Pro / Enterprise),
+testimonial carousel, and a minimal footer with social links.</code></pre>
+    </li>
+    <li>
+      <strong>Watch the pipeline.</strong> The four-stage pipeline runs:
+      <ul>
+        <li><strong>Intent Analyzer</strong> &mdash; classifies your request as <code>create</code> and plans which modules to build.</li>
+        <li><strong>Page Architect</strong> &mdash; creates a CSS design system (<code>:root</code> variables, shared styles) and plans module specs.</li>
+        <li><strong>Module Developer</strong> &mdash; generates all modules in parallel. Each module card in the chat panel shows its status: <em>queued</em> &rarr; <em>generating</em> &rarr; <em>complete</em>.</li>
+        <li><strong>Quality Check</strong> &mdash; validates HubL syntax, field names, and meta.json fields; auto-fixes any issues.</li>
+      </ul>
+      The live preview populates incrementally as modules finish. Skeleton placeholders hold the position of modules still generating.
+      <img class="doc-screenshot" src="screenshots/pipeline-progress.png" alt="Pipeline progress cards in the chat panel showing Intent Analyzer complete, Page Architect complete, and Module Developer generating modules in parallel">
+    </li>
+    <li>
+      <strong>Review in the preview.</strong> Once the pipeline completes, the full page renders in the preview panel. Use the responsive toggles (desktop / tablet / mobile) to check the layout at different breakpoints.
+    </li>
+    <li>
+      <strong>Refine with follow-up prompts.</strong> Send targeted messages to iterate:
+      <ul>
+        <li><em>"Change the hero background to a gradient from #0f172a to #1e293b"</em></li>
+        <li><em>"Add a FAQ section with 5 questions after the pricing table"</em></li>
+        <li><em>"Remove the testimonial carousel"</em></li>
+      </ul>
+      The pipeline only regenerates the affected modules; everything else stays intact.
+    </li>
+    <li>
+      <strong>Deploy.</strong> Click the orange <strong>Deploy</strong> button in the topbar. Select your HubSpot account, monitor the upload progress, and click the link in the celebration screen to create a page in HubSpot. See <a href="#first-gen-publish">Publishing to HubSpot</a> below for the full flow.
+    </li>
+  </ol>
+
+  <h3 id="first-gen-email">Email Workflow: Marketing Email from Scratch</h3>
+  <p>vibeSpot generates HubSpot email templates with table-based layout, inline CSS, and Outlook-compatible MSO/VML conditionals. Estimated time: 5&ndash;10 minutes.</p>
+  <ol class="doc-steps">
+    <li>
+      <strong>Choose Email.</strong> On Project Home, click the <strong>Email</strong> asset-type card. The prompt input shows the eyebrow "Email" and a placeholder: <em>"Describe the email you want to create&hellip;"</em>
+    </li>
+    <li>
+      <strong>Name and describe.</strong> Enter a project name (e.g. <code>acme-welcome</code>), then describe the email:
+      <pre><code>Create a welcome email for Acme. Include:
+- Logo header with brand colors
+- Greeting with the recipient's first name
+- 3-step onboarding guide with icons
+- A large "Get Started" CTA button
+- Footer with unsubscribe link and social icons</code></pre>
+    </li>
+    <li>
+      <strong>Pipeline generates email modules.</strong> The same four-stage pipeline runs, but with email-specific prompts at every stage:
+      <ul>
+        <li>The <strong>Email Architect</strong> plans table-based layouts with inline CSS tokens and MSO conditional structure.</li>
+        <li>The <strong>Module Developer</strong> generates email-safe HubL &mdash; no floats, no flexbox, table cells with inline styles.</li>
+        <li>The <strong>Validator</strong> sets <code>host_template_types: ["EMAIL"]</code> in meta.json and skips CSS-prefix fixes (not needed for email).</li>
+      </ul>
+    </li>
+    <li>
+      <strong>Preview across email clients.</strong> Click the <strong>envelope icon</strong> in the topbar to open the email client preview. This renders your email as it would appear in Gmail, Outlook Desktop, and Apple Mail, with heuristic notes for each client (e.g. "Outlook ignores <code>border-radius</code>").
+      <img class="doc-screenshot" src="screenshots/email-client-preview.png" alt="Email client preview overlay showing Gmail, Outlook Desktop, and Apple Mail tabs with the rendered email and rendering notes">
+    </li>
+    <li>
+      <strong>Iterate.</strong> Use the same chat-based workflow to modify sections: <em>"Make the CTA button larger"</em> or <em>"Add a product screenshot below the onboarding steps."</em>
+    </li>
+    <li>
+      <strong>Deploy to HubSpot.</strong> Click <strong>Deploy</strong>. Email templates upload to your HubSpot portal under the theme&rsquo;s <code>templates/</code> directory. In HubSpot, go to <strong>Marketing &rarr; Email &rarr; Create email</strong> and select your template from the theme.
+    </li>
+  </ol>
+
+  <div class="doc-callout doc-callout--tip">
+    <div class="doc-callout__label">Email starter templates</div>
+    <p>For a faster start, pick <strong>From Template</strong> on the Project Home screen. Three email starters are available: Welcome, Announcement, and Newsletter. Each is a pre-built email bundle you can customize immediately.</p>
+  </div>
+
+  <h3 id="first-gen-editing">Editing with the Module Overview</h3>
+  <p>After generation, the <strong>Module Overview</strong> (click the grid icon at the top of the left panel) is your central hub for reviewing and editing every module on the page. Here is a step-by-step editing workflow using the module overview:</p>
+  <ol class="doc-steps">
+    <li>
+      <strong>Open the module overview.</strong> Click the <strong>Modules</strong> button (grid icon with a count badge) at the top of the left panel. The slideout opens, listing every module in page order.
+      <img class="doc-screenshot" src="screenshots/module-overview-slideout.png" alt="Module overview slideout showing a list of modules (Hero, Features Grid, Pricing, Footer) with drag handles, gear icons, and delete buttons">
+    </li>
+    <li>
+      <strong>Reorder modules.</strong> Grab a module by its drag handle (&#x2837;) and move it up or down. The preview updates instantly to reflect the new page order. Recommended flow for landing pages: Navigation &rarr; Hero &rarr; Features &rarr; Social Proof &rarr; Pricing/CTA &rarr; Footer.
+    </li>
+    <li>
+      <strong>Edit fields.</strong> Click the <strong>gear icon</strong> (&#9881;) on any module to open its field editor. The slideout switches to a form generated from the module's <code>fields.json</code>:
+      <ul>
+        <li><strong>Text fields</strong> &mdash; edit headlines, body copy, button labels directly.</li>
+        <li><strong>Color pickers</strong> &mdash; change background colors, text colors, accents.</li>
+        <li><strong>Image fields</strong> &mdash; swap image URLs.</li>
+        <li><strong>Number fields</strong> &mdash; adjust spacing, font sizes.</li>
+        <li><strong>Boolean toggles</strong> &mdash; show/hide optional elements.</li>
+        <li><strong>Choice dropdowns</strong> &mdash; select from predefined options.</li>
+        <li><strong>Groups</strong> &mdash; expand nested field sets (e.g. "Style" groups for padding and colors).</li>
+      </ul>
+      All changes are <strong>debounced at 300ms</strong> and the preview refreshes automatically. No save button needed.
+    </li>
+    <li>
+      <strong>Delete a module.</strong> Click the <strong>&times;</strong> icon on a module and confirm. The module is removed from the current template. If the module is used in other templates, it stays in the library.
+    </li>
+    <li>
+      <strong>Add from library.</strong> Click the <strong>+</strong> button in the module overview header to browse the module library. Select any existing module to add it to the current template without regenerating it.
+    </li>
+  </ol>
+  <p>This workflow works identically for pages and emails. For emails, the module list shows email-specific modules (email-header, email-body, email-footer, etc.) and the preview renders with table-based layout.</p>
+
+  <h3 id="first-gen-publish">Publishing to HubSpot</h3>
+  <p>Once your page or email looks right in the preview, deploy it to your HubSpot portal. This walkthrough covers the full flow from vibeSpot to a live HubSpot page.</p>
+  <ol class="doc-steps">
+    <li>
+      <strong>Connect your HubSpot account (one-time).</strong> Open <strong>Settings &rarr; HubSpot</strong> and click <strong>Add Account</strong>. Paste a Personal Access Key (PAK) from your HubSpot portal (Settings &rarr; Integrations &rarr; Private Apps &rarr; create a key with <strong>CMS</strong> scope). vibeSpot validates the key and detects your portal ID and data center.
+    </li>
+    <li>
+      <strong>Click Deploy.</strong> The orange <strong>Deploy</strong> button is in the top-right of the topbar. vibeSpot writes all files to disk, runs auto-fix on any known HubSpot compatibility issues, then uploads the entire theme: folder structure, shared CSS/JS, all modules, and templates.
+      <img class="doc-screenshot" src="screenshots/deploy-progress.png" alt="Deploy progress panel showing file upload progress bar at 72% with auto-fix log entries and per-file upload status">
+    </li>
+    <li>
+      <strong>Monitor progress.</strong> A progress panel shows:
+      <ul>
+        <li>A progress bar with file count (e.g. "36/50 files")</li>
+        <li>Auto-fix log entries (e.g. "textarea &rarr; text in Hero/fields.json")</li>
+        <li>Per-file upload status with checkmarks</li>
+      </ul>
+      API mode (default) uploads modules in parallel. CLI mode uploads sequentially.
+    </li>
+    <li>
+      <strong>Celebration screen.</strong> On success, a screen with confetti shows a direct link to your HubSpot portal. Click it to jump straight into creating a page.
+    </li>
+    <li>
+      <strong>Create a page in HubSpot.</strong>
+      <ul>
+        <li><strong>For landing pages:</strong> Go to <strong>Content &rarr; Landing Pages &rarr; Create</strong>. Select your vibeSpot theme, pick the template, and you'll see all your modules pre-configured in HubSpot's page editor. Edit content using HubSpot's native editor, then publish.</li>
+        <li><strong>For emails:</strong> Go to <strong>Marketing &rarr; Email &rarr; Create email</strong>. Choose your vibeSpot email template. Modules appear in HubSpot's drag-and-drop email editor with all fields editable. Customize and send.</li>
+      </ul>
+    </li>
+  </ol>
+
+  <div class="doc-callout doc-callout--warning">
+    <div class="doc-callout__label">Upload errors</div>
+    <p>If the upload fails, vibeSpot's auto-fix system scans for known issues (deprecated field types, reserved names, CDN imports) and retries up to 3 times. If auto-fix cannot resolve the error, click <strong>"Fix with AI"</strong> to let the AI diagnose and repair the issue. See <a href="#auto-fix">Auto-Fix</a> for the full list of handled issues.</p>
+  </div>
+
+  <div class="doc-callout doc-callout--info">
+    <div class="doc-callout__label">Email deploy differences</div>
+    <p>Email templates upload the same way as page themes, but the template file includes HubSpot email-specific metadata: <code>templateType: email</code>, MSO/VML namespaces, and <code>dnd_area</code> references so modules appear in HubSpot's email drag-and-drop editor.</p>
+  </div>
+</div>
+
+<!-- ============================================================
      Section 5: AI Generation
      ============================================================ -->
 <div class="doc-section" id="ai-generation">
   <h2 id="ai-generation-heading">AI Generation <a href="#ai-generation" class="doc-anchor">#</a></h2>
-  <p>vibeSpot offers two generation modes: a simpler single-call mode and a more powerful agentic pipeline. The agentic pipeline is the default and recommended mode.</p>
+  <p>vibeSpot offers two generation modes: a simpler single-call mode and a multi-stage agentic pipeline. The agentic pipeline is the default and recommended mode.</p>
 
   <h3 id="single-call">Single-Call Mode</h3>
   <p>In single-call mode, the AI generates all modules in a single API request. The response contains a <code>vibespot-modules</code> JSON code block with all module definitions. This mode is simpler but less reliable for complex pages because the AI must produce all modules in one shot.</p>
@@ -1010,16 +1222,27 @@ vibespot</code></pre>
   </ol>
   <p>This is especially useful for HubL syntax errors, invalid field configurations, or template rendering issues that rule-based auto-fix cannot handle.</p>
 
-  <h3 id="creating-page-hubspot">Creating a Page in HubSpot</h3>
-  <p>After a successful upload, follow these steps in HubSpot to create a live landing page:</p>
+  <h3 id="creating-page-hubspot">Creating a Page or Email in HubSpot</h3>
+  <p>After a successful upload, follow these steps in HubSpot:</p>
+
+  <h4>Landing Pages &amp; Website Pages</h4>
   <ol class="doc-steps">
-    <li><strong>Go to Content &rarr; Landing Pages</strong> in your HubSpot portal.</li>
-    <li><strong>Click "Create"</strong> and select "Landing Page."</li>
+    <li><strong>Go to Content &rarr; Landing Pages</strong> (or Website Pages) in your HubSpot portal.</li>
+    <li><strong>Click "Create"</strong> and select the page type.</li>
     <li><strong>Choose your theme</strong> from the template selector. Your vibeSpot theme appears under your portal's themes.</li>
     <li><strong>Select a template</strong> from the templates you created in vibeSpot.</li>
     <li><strong>Drag modules</strong> from the sidebar into the page layout, or use the pre-configured module order from vibeSpot.</li>
     <li><strong>Edit content</strong> using HubSpot's native content editor. All the fields you configured in vibeSpot are editable here.</li>
     <li><strong>Publish</strong> when ready. Your page is live.</li>
+  </ol>
+
+  <h4>Email Templates</h4>
+  <ol class="doc-steps">
+    <li><strong>Go to Marketing &rarr; Email</strong> in your HubSpot portal.</li>
+    <li><strong>Click "Create email"</strong> and choose Regular or Automated.</li>
+    <li><strong>Select your vibeSpot email template</strong> from the template picker. Your email modules are pre-loaded in the HubSpot drag-and-drop email editor.</li>
+    <li><strong>Edit content</strong> &mdash; text, images, CTAs, and all fields you defined in vibeSpot are editable in HubSpot's email editor.</li>
+    <li><strong>Configure recipients, subject line, and send settings</strong>, then send or schedule.</li>
   </ol>
 
   <h3 id="multi-account">Multi-Account Support</h3>

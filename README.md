@@ -36,8 +36,10 @@ Opens a browser with:
 - **Project sidebar** — create, open, resume, or delete projects; page tree shows all templates with type badges and module counts
 - **Module management** — reorder via drag-and-drop, edit fields, delete modules from module list or module library
 - **Starter templates** — SaaS, Portfolio, Restaurant, Event, Coming Soon, Blog — pre-built page bundles for instant preview with no AI wait
-- **Content types** — landing pages, email templates, and blog templates all supported from the UI page type dropdown
+- **Content types** — landing pages, email templates, and blog templates all supported from asset-type cards and the page type dropdown
+- **Email client preview** — renders your email in Gmail, Outlook Desktop, and Apple Mail with per-client rendering notes
 - **Split-pane view** — preview + code editor side by side in a 50/50 layout
+- **Project overview table** — sortable table with page, email, module, and brand asset counts per project, plus bulk duplicate/delete
 - **Brand kit enforcement** — colors, fonts, and logo are injected as constraints into AI generation; validator warns on off-brand values
 - **Interact mode** — unified mode that auto-detects whether you're editing content inline or referencing modules in chat
 - **Undo/redo** — Ctrl+Z / Ctrl+Y step through version history; a compact timeline strip shows every generation step
@@ -170,6 +172,7 @@ Once your modules are ready:
 
 ```bash
 vibespot              # Vibe coding web UI (default)
+vibespot email        # Start in email template mode
 vibespot wizard       # Classic CLI wizard
 vibespot init         # Check and install required tools
 vibespot convert      # Convert a React project (no upload)
@@ -196,20 +199,27 @@ Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, Figma, GitH
 
 ## What's New
 
-### Unreleased
+### v1.3.1
+- **Project overview table** — sortable table view for all projects with page, email, module, and brand asset counts
+- **Bulk operations** — select multiple projects for bulk duplicate or delete
+- **Email client preview** — preview emails as they render in Gmail, Outlook Desktop, and Apple Mail
+- **Pipeline robustness** — auto-regenerate modules with broken fieldsJson; tightened similarity checks
+- **Email deploy fixes** — correct dnd_area naming, module references for drag-and-drop editor, deploy UX improvements
+- **Security hardening** — eliminated shell injection in git operations, path-traversal guards on theme routes
+
+### v1.3.0
+- **Email template generation** — full pipeline support for HubSpot email templates: email-specific prompts, table-based layout, MSO/VML compatibility, 3 email starters, 5 email plan templates, and email validator auto-fix
 - **Multi-page sites** — create full HubSpot sites from a single prompt with shared modules, page tree sidebar, and cross-page navigation validation
 - **Inline WYSIWYG editing** — click text, images, and links directly in the live preview to edit inline
 - **Per-section visual controls** — hover toolbar with color pickers, spacing sliders, image swap, and font size controls
 - **Blog template generation** — blog as a content type with HubSpot blog variable support and a Blog Content Hub starter template
 - **Split-pane view** — preview + code editor side by side
 - **Brand kit enforcement** — colors, fonts, and logo injected as AI constraints with off-brand warnings
-- **Workspace tab navigation** — Pages, Brand, Library, Marketplace, Settings tabs replace the flat dashboard
+- **Workspace tab navigation** — Pages, Brand, Library, Marketplace, Settings tabs
+- **Guided entry with asset-type cards** — Landing Page, Email, Website, Blog Post, From Template, and Import
 - **First-visit onboarding** — 3-step walkthrough for new users
-- **CSS token system** — comprehensive design tokens for spacing, typography, z-index, transitions, and component library
-- **HubSpot terminology alignment** — UI copy uses HubSpot's canonical terms (Module, Module Library, Brand Kit)
-
-### v1.3.0
-- **Email template generation** — full pipeline support for HubSpot email templates: email-specific prompts, table-based layout, MSO/VML compatibility, 3 email starters, 5 email plan templates, and email validator auto-fix
+- **Material Design SVG icons** — replaced UI emoji glyphs with crisp SVG icons
+- **Project assets browser** — Library tab shows project files (images, fonts, scripts) instead of starter templates
 
 ### v1.2.0
 - **Inverse pipeline (HubSpot → vibeSpot)** — reverse-engineer imported HubSpot themes: design token extraction, module graph, field schema flags, and round-trip risk detection

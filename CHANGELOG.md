@@ -4,6 +4,37 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.3.1 — 2026-05-07
+
+### Features
+
+- **Project overview table** ([VIB-326](/VIB/issues/VIB-326)) — Project Home now shows a sortable table with columns for Name, Pages, Emails, Modules, and Brand Assets. Replaces the card-based "View All" list with a scannable overview that surfaces project health at a glance.
+- **Bulk operations** ([VIB-326](/VIB/issues/VIB-326)) — Select multiple projects via checkboxes and apply bulk actions: Duplicate or Delete. A floating toolbar shows the selection count and action buttons. Bulk delete includes a file-deletion confirmation dialog.
+- **Email client preview** — Preview email templates as they render in Gmail, Outlook Desktop, and Apple Mail. Tab-based overlay applies client-specific heuristics and shows rendering notes per client.
+
+### Fixes
+
+- **Pipeline robustness** ([VIB-325](/VIB/issues/VIB-325)) — Modules with broken `fieldsJson` are now auto-regenerated instead of silently carried forward. Module similarity check tightened to prevent false reuse. Email templates gain a `dnd_area_stylesheet` reference for HubSpot drag-and-drop editor compatibility. `annotateFieldRefs` guards against non-array fields to prevent preview crashes.
+- **Email template `dnd_area` naming** ([VIB-313](/VIB/issues/VIB-313)) — Email templates now use `"main"` as the `dnd_area` name, matching HubSpot's expected default. Includes an auto-fix for existing email templates created before this change.
+- **Email module references** ([VIB-312](/VIB/issues/VIB-312)) — Email templates now generate with module references so modules appear in HubSpot's drag-and-drop email editor.
+- **Email deploy UX** ([VIB-310](/VIB/issues/VIB-310)) — Deploy button disables while the upload panel shows post-upload actions (preventing double-upload). Server binds to `0.0.0.0` for remote access. Fixed double-overlay during upload.
+- **Email asset library wiring** ([VIB-309](/VIB/issues/VIB-309)) — Email asset type now flows through the full setup path: asset-type card → content mode → email starters and pipeline. Library tab buttons wired for email projects.
+- **HubL keyword prefix protection** ([VIB-311](/VIB/issues/VIB-311)) — CSS class prefixer no longer corrupts HubL keywords like `module_asset_url` or `get_asset_url` when adding theme-scoped prefixes.
+- **Delete theme button** ([VIB-317](/VIB/issues/VIB-317)) — Restored the delete button on the Project Home screen after it was lost during a UI restructure.
+- **Asset creation navigation** ([VIB-327](/VIB/issues/VIB-327)) — Creating an asset in the Library tab now switches to the editor panel and focuses the chat input, instead of leaving the user on the Library view.
+- **Shell injection in git operations** ([VIB-300](/VIB/issues/VIB-300)) — Eliminated shell injection vectors in git commit and tag operations by switching from string interpolation to argument arrays.
+- **Path traversal in theme routes** — Theme create and delete routes now guard against path-traversal payloads.
+- **Row checkbox listeners** ([VIB-333](/VIB/issues/VIB-333)) — Project table checkboxes and bulk toolbar now survive table re-renders after bulk operations complete.
+
+### Documentation
+
+- Updated CHANGELOG, README, and `ui/docs/index.html` with all v1.3.1 features and fixes.
+- Added "Your First Generation" walkthrough section for both page and email workflows.
+- Added project overview table and bulk operations documentation.
+- Expanded HubSpot publishing workflow with email-specific deploy guidance.
+
+---
+
 ## v1.3.0 — 2026-05-03
 
 ### Multi-page sites ([VIB-159](/VIB/issues/VIB-159))
