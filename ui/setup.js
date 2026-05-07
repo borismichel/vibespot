@@ -1594,15 +1594,24 @@ function populateContinuePanel() {
     checkTd.appendChild(cb);
     tr.appendChild(checkTd);
 
-    tr.innerHTML +=
-      `<td class="projects-table__name">${esc(p.name)}</td>` +
-      `<td>${p.pageCount ?? 0}</td>` +
-      `<td>${p.emailCount ?? 0}</td>` +
-      `<td>${p.moduleCount ?? 0}</td>` +
-      `<td>${p.hasBrandAssets ? "✓" : "—"}</td>` +
-      `<td class="projects-table__actions"></td>`;
+    const nameTd = document.createElement("td");
+    nameTd.className = "projects-table__name";
+    nameTd.textContent = p.name;
+    tr.appendChild(nameTd);
 
-    const actionsCell = tr.querySelector(".projects-table__actions");
+    for (const val of [p.pageCount ?? 0, p.emailCount ?? 0, p.moduleCount ?? 0]) {
+      const td = document.createElement("td");
+      td.textContent = String(val);
+      tr.appendChild(td);
+    }
+
+    const brandTd = document.createElement("td");
+    brandTd.textContent = p.hasBrandAssets ? "✓" : "—";
+    tr.appendChild(brandTd);
+
+    const actionsCell = document.createElement("td");
+    actionsCell.className = "projects-table__actions";
+    tr.appendChild(actionsCell);
 
     const openBtn = document.createElement("button");
     openBtn.type = "button";
@@ -1719,7 +1728,8 @@ function bulkDeleteProjects() {
       } catch { /* continue deleting others */ }
     }
     _bulkSelected.clear();
-    initSetup();
+    await initSetup();
+    populateContinuePanel();
   });
 }
 
@@ -1743,7 +1753,8 @@ async function bulkDuplicateProjects() {
     } catch { /* continue */ }
   }
   _bulkSelected.clear();
-  initSetup();
+  await initSetup();
+  populateContinuePanel();
 }
 
 async function loadDownloadPanel() {
