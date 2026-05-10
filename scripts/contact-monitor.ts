@@ -20,7 +20,7 @@ const HUBSPOT_API = "https://api.hubapi.com";
 const LOOKBACK_MS = 6 * 60 * 60 * 1000;
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 const VIB_7_ID = "881f2c94-b720-4a5a-b37f-89bc2a7f7272";
-const VIB_366_ID = "d5d6a7e9-fcb6-489a-b11d-a81f9a03de47";
+const SUMMARY_ISSUE_ID = process.env.PAPERCLIP_TASK_ID ?? "d5d6a7e9-fcb6-489a-b11d-a81f9a03de47";
 const CRO_AGENT_ID = "55312333-40cb-46a9-ba6b-29e5d959a473";
 
 const CONTACT_PROPERTIES = [
@@ -305,7 +305,7 @@ async function postSummary(contacts: HubSpotContact[], agencySignals: AgencySign
       : []),
   ].join("\n");
 
-  const resp = await fetch(`${apiUrl}/api/issues/${VIB_366_ID}/comments`, {
+  const resp = await fetch(`${apiUrl}/api/issues/${SUMMARY_ISSUE_ID}/comments`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -321,7 +321,7 @@ async function postSummary(contacts: HubSpotContact[], agencySignals: AgencySign
     const text = await resp.text().catch(() => "");
     console.error(`Failed to post VIB-366 summary (${resp.status}): ${text.slice(0, 300)}`);
   } else {
-    console.log("Posted summary to VIB-366");
+    console.log(`Posted summary to ${SUMMARY_ISSUE_ID}`);
   }
 }
 
