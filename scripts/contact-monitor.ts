@@ -4,7 +4,8 @@
  * Logs contact details, alerts CRO on VIB-7 if agency indicators found.
  *
  * Usage: npx tsx scripts/contact-monitor.ts
- * Env:   PAPERCLIP_API_URL, PAPERCLIP_API_KEY, PAPERCLIP_COMPANY_ID
+ * Env:   HUBSPOT_ACCESS_TOKEN (or falls back to ~/.vibespot/config.json PAK)
+ *        PAPERCLIP_API_URL, PAPERCLIP_API_KEY, PAPERCLIP_COMPANY_ID
  */
 
 import { readFileSync } from "node:fs";
@@ -19,6 +20,8 @@ const HUBSPOT_API = "https://api.hubapi.com";
 const LOOKBACK_MS = 6 * 60 * 60 * 1000;
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 const VIB_7_ID = "881f2c94-b720-4a5a-b37f-89bc2a7f7272";
+const VIB_366_ID = "d5d6a7e9-fcb6-489a-b11d-a81f9a03de47";
+const CRO_AGENT_ID = "55312333-40cb-46a9-ba6b-29e5d959a473";
 
 const CONTACT_PROPERTIES = [
   "firstname",
@@ -28,6 +31,8 @@ const CONTACT_PROPERTIES = [
   "jobtitle",
   "hs_analytics_source",
   "lifecyclestage",
+  "hs_lead_status",
+  "recent_conversion_event_name",
   "createdate",
   "phone",
   "website",
@@ -45,7 +50,7 @@ const AGENCY_COMPANY_TERMS = /\b(agency|agencies|consulting|consultancy|digital\
 const AGENCY_TITLE_TERMS = /\b(agency|founder|co-?founder|ceo|cmo|coo|managing\s+director|vp|vice\s+president|partner|consultant|strategist|account\s+(manager|director|executive))\b/i;
 
 // ---------------------------------------------------------------------------
-// HubSpot auth (mirrors src/hubspot/api.ts pattern)
+// HubSpot auth — prefers HUBSPOT_ACCESS_TOKEN env, falls back to PAK exchange
 // ---------------------------------------------------------------------------
 
 interface CachedToken {
@@ -75,10 +80,15 @@ function loadPak(): string {
   return acct.personalAccessKey;
 }
 
-async function getAccessToken(pak: string): Promise<string> {
+async function getAccessToken(): Promise<string> {
+  const envToken = process.env.HUBSPOT_ACCESS_TOKEN;
+  if (envToken) return envToken;
+
   if (cachedToken && cachedToken.expiresAt - Date.now() > TOKEN_REFRESH_BUFFER_MS) {
     return cachedToken.accessToken;
   }
+
+  const pak = loadPak();
 
   const resp = await fetch(`${HUBSPOT_API}/localdevauth/v1/auth/refresh`, {
     method: "POST",
@@ -115,8 +125,8 @@ interface SearchResponse {
   paging?: { next?: { after: string } };
 }
 
-async function searchRecentContacts(pak: string): Promise<HubSpotContact[]> {
-  const token = await getAccessToken(pak);
+async function searchRecentContacts(): Promise<HubSpotContact[]> {
+  const token = await getAccessToken();
   const cutoff = new Date(Date.now() - LOOKBACK_MS).toISOString();
   const all: HubSpotContact[] = [];
   let after: string | undefined;
@@ -226,7 +236,7 @@ async function alertOnVib7(signals: AgencySignal[]): Promise<void> {
     "",
     ...lines,
     "",
-    "CRO: review these contacts for outreach prioritization.",
+    `@agent:${CRO_AGENT_ID} — review these contacts for outreach prioritization.`,
   ].join("\n");
 
   const resp = await fetch(`${apiUrl}/api/issues/${VIB_7_ID}/comments`, {
@@ -250,6 +260,72 @@ async function alertOnVib7(signals: AgencySignal[]): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Summary comment on VIB-366
+// ---------------------------------------------------------------------------
+
+async function postSummary(contacts: HubSpotContact[], agencySignals: AgencySignal[]): Promise<void> {
+  const apiUrl = process.env.PAPERCLIP_API_URL;
+  const apiKey = process.env.PAPERCLIP_API_KEY;
+
+  if (!apiUrl || !apiKey) {
+    console.warn("Paperclip env vars not set, skipping VIB-366 summary");
+    return;
+  }
+
+  const contactLines = contacts.map((c) => {
+    const p = c.properties;
+    const name = [p.firstname, p.lastname].filter(Boolean).join(" ") || "(no name)";
+    return `| ${name} | ${p.email ?? "—"} | ${p.company ?? "—"} | ${p.jobtitle ?? "—"} | ${p.lifecyclestage ?? "—"} |`;
+  });
+
+  const body = [
+    `## Contact monitor run — ${new Date().toISOString()}`,
+    "",
+    `**New contacts (last 6h):** ${contacts.length}`,
+    `**Agency indicators:** ${agencySignals.length}`,
+    "",
+    ...(contacts.length > 0
+      ? [
+          "| Name | Email | Company | Title | Stage |",
+          "|------|-------|---------|-------|-------|",
+          ...contactLines,
+        ]
+      : ["No new contacts."]),
+    ...(agencySignals.length > 0
+      ? [
+          "",
+          "**Agency-flagged contacts:**",
+          ...agencySignals.map((s) => {
+            const p = s.contact.properties;
+            return `- ${p.email ?? "?"} — ${s.reasons.join(", ")}`;
+          }),
+          "",
+          `CRO alert posted to [VIB-7](/VIB/issues/VIB-7).`,
+        ]
+      : []),
+  ].join("\n");
+
+  const resp = await fetch(`${apiUrl}/api/issues/${VIB_366_ID}/comments`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      body,
+      agentId: process.env.PAPERCLIP_AGENT_ID,
+    }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    console.error(`Failed to post VIB-366 summary (${resp.status}): ${text.slice(0, 300)}`);
+  } else {
+    console.log("Posted summary to VIB-366");
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -257,14 +333,12 @@ async function main() {
   console.log(`[contact-monitor] Starting at ${new Date().toISOString()}`);
   console.log(`[contact-monitor] Lookback: 6 hours`);
 
-  const pak = loadPak();
-  console.log(`[contact-monitor] Using HubSpot PAK: ${pak.slice(0, 7)}...${pak.slice(-4)}`);
-
-  const contacts = await searchRecentContacts(pak);
+  const contacts = await searchRecentContacts();
   console.log(`[contact-monitor] Found ${contacts.length} contacts created in last 6h`);
 
   if (contacts.length === 0) {
     console.log("[contact-monitor] No new contacts. Done.");
+    await postSummary([], []);
     return;
   }
 
@@ -285,6 +359,7 @@ async function main() {
     await alertOnVib7(agencySignals);
   }
 
+  await postSummary(contacts, agencySignals);
   console.log("[contact-monitor] Done.");
 }
 
