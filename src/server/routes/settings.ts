@@ -215,6 +215,8 @@ export function handleSettingsStatusRoute(res: ServerResponse): void {
     codexCliModel: config.codexCliModel || null,
     geminiCliModel: config.geminiCliModel || null,
     geminiApiModel: config.geminiApiModel || null,
+    langdockApiModel: config.langdockApiModel || null,
+    langdockBaseUrl: config.langdockBaseUrl || null,
     hubspotUploadMode: config.hubspotUploadMode || "api",
     hubspotAccounts: (config.hubspotAccounts || []).map((a: HubSpotAccountConfig) => ({
       portalId: a.portalId,
@@ -264,7 +266,7 @@ export function handleSettingsEngineRoute(req: IncomingMessage, res: ServerRespo
       const { engine, model } = JSON.parse(body);
 
       const validEngines: AIEngineType[] = [
-        "claude-code", "anthropic-api", "claude-oauth", "openai-api", "gemini-cli", "gemini-api", "codex-cli",
+        "claude-code", "anthropic-api", "claude-oauth", "openai-api", "gemini-cli", "gemini-api", "codex-cli", "langdock-api",
       ];
       if (!validEngines.includes(engine)) {
         jsonResponse(res, 400, { error: `Invalid engine: ${engine}` });
@@ -292,6 +294,9 @@ export function handleSettingsEngineRoute(req: IncomingMessage, res: ServerRespo
             break;
           case "gemini-api":
             configUpdate.geminiApiModel = model;
+            break;
+          case "langdock-api":
+            configUpdate.langdockApiModel = model;
             break;
         }
       }

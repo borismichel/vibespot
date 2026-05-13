@@ -160,6 +160,7 @@ export async function runPreflight(): Promise<PreflightResult> {
     "gemini-api": "Gemini API",
     "gemini-cli": "Gemini CLI",
     "codex-cli": "OpenAI Codex",
+    "langdock-api": "Langdock (EU)",
   };
 
   const hasOAuth = hasValidOAuthToken();

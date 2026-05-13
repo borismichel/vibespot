@@ -248,6 +248,9 @@ export function resolveAgenticEngine(config: ReturnType<typeof loadConfig>): {
     case "gemini-api":
       model = config.geminiApiModel || "gemini-2.5-pro";
       break;
+    case "langdock-api":
+      model = config.langdockApiModel || "claude-sonnet-4-20250514";
+      break;
     case "claude-code":
       model = config.claudeCodeModel || "";
       break;
