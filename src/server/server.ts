@@ -288,6 +288,14 @@ function handleRequest(req: IncomingMessage, res: ServerResponse, uiDir: string)
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 
+  // Health check — used by Docker HEALTHCHECK, CI smoke tests, and load
+  // balancers. Returns 200 with a tiny JSON body and is unauthenticated.
+  if (url.pathname === "/healthz") {
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ status: "ok" }));
+    return;
+  }
+
   // API routes
   if (url.pathname.startsWith("/api/")) {
     handleApiRoute(method, url.pathname, req, res);

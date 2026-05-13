@@ -1,0 +1,112 @@
+# docker-compose bundle for the single-customer EU hosted vibespot deployment.
+#
+# Usage:
+#   cp .env.example .env   # fill in the secrets
+#   docker compose up -d
+#
+# This compose file is intentionally batteries-included: Caddy terminates TLS
+# and reverse-proxies to vibespot, postgres is available for the hosted
+# storage adapter, and oauth2-proxy is wired in as a placeholder so the
+# upstream auth gate (separate issue under VIB-446) can drop in without a
+# topology change.
+
+x-restart: &restart unless-stopped
+
+services:
+  vibespot:
+    image: ghcr.io/borismichel/vibespot:${VIBESPOT_IMAGE_TAG:-latest}
+    # Uncomment to build locally instead of pulling from GHCR:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    container_name: vibespot
+    restart: *restart
+    environment:
+      VIBESPOT_PORT: "4200"
+      VIBESPOT_NO_OPEN: "1"
+      NODE_ENV: production
+      # AI provider keys — at least one must be set for end-to-end generation.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Hosted storage adapter — leave empty to use the filesystem default.
+      VIBESPOT_STORAGE: ${VIBESPOT_STORAGE:-filesystem}
+      DATABASE_URL: postgres://vibespot:${POSTGRES_PASSWORD:-vibespot}@postgres:5432/vibespot
+    volumes:
+      - vibespot-config:/home/vibespot/.vibespot
+      - vibespot-workspace:/workspace
+    expose:
+      - "4200"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4200/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: vibespot-postgres
+    restart: *restart
+    environment:
+      POSTGRES_USER: vibespot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vibespot}
+      POSTGRES_DB: vibespot
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vibespot -d vibespot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Auth gate placeholder. The actual SSO/OIDC configuration lands in a
+  # sibling issue under VIB-446; until then this service stays disabled
+  # via the `disabled` profile so `docker compose up` is a no-op for it.
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    container_name: vibespot-oauth2-proxy
+    restart: *restart
+    profiles: ["auth"]
+    environment:
+      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
+      OAUTH2_PROXY_UPSTREAMS: "http://vibespot:4200"
+      OAUTH2_PROXY_PROVIDER: ${OAUTH2_PROVIDER:-oidc}
+      OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_CLIENT_ID:-}
+      OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:-}
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_COOKIE_SECRET:-}
+      OAUTH2_PROXY_EMAIL_DOMAINS: ${OAUTH2_EMAIL_DOMAINS:-*}
+      OAUTH2_PROXY_REDIRECT_URL: ${OAUTH2_REDIRECT_URL:-}
+      OAUTH2_PROXY_OIDC_ISSUER_URL: ${OAUTH2_ISSUER_URL:-}
+    depends_on:
+      - vibespot
+    expose:
+      - "4180"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: vibespot-caddy
+    restart: *restart
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      VIBESPOT_DOMAIN: ${VIBESPOT_DOMAIN:-localhost}
+      VIBESPOT_TLS_EMAIL: ${VIBESPOT_TLS_EMAIL:-}
+      VIBESPOT_UPSTREAM: ${VIBESPOT_UPSTREAM:-vibespot:4200}
+    volumes:
+      - ./compose/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - vibespot
+
+volumes:
+  vibespot-config:
+  vibespot-workspace:
+  postgres-data:
+  caddy-data:
+  caddy-config:

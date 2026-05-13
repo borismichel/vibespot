@@ -14,7 +14,8 @@ hubvibes-blog-project.json
 vibespot-blog-project.json
 .issues
 .redesign.md
-docs/
+docs/*
+!docs/docker.md
 !ui/docs/
 .superpowers/
 .references/

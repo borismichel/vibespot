@@ -155,6 +155,18 @@ The browser opens automatically. Enter your API key in the setup screen, create 
 
 Open **Settings → HubSpot** and add your account with a Personal Access Key (PAK). vibeSpot connects directly via the HubSpot API — no CLI installation needed. You can also switch to legacy CLI mode if you prefer.
 
+### Run with Docker
+
+Prefer not to install Node.js? Pull the published image instead:
+
+```bash
+docker run --rm -p 4200:4200 \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  ghcr.io/borismichel/vibespot:latest
+```
+
+Or use the bundled `docker-compose.yml` (Caddy + Postgres + auth-gate slot) for production deployments. See [docs/docker.md](docs/docker.md) for the full guide.
+
 ## After Building Your Page
 
 Once your modules are ready:

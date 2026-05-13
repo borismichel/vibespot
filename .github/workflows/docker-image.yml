@@ -1,0 +1,119 @@
+name: docker-image
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  smoke:
+    name: build + smoke test (amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (load into local docker)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: vibespot:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Boot container
+        run: |
+          docker run -d --name vibespot-smoke -p 4200:4200 vibespot:ci
+          echo "::group::wait for /healthz"
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4200/healthz > /tmp/healthz.json; then
+              echo "healthz ok after ${i}s"
+              cat /tmp/healthz.json
+              echo
+              break
+            fi
+            sleep 1
+            if [ "$i" = "30" ]; then
+              echo "healthz never came up"
+              docker logs vibespot-smoke
+              exit 1
+            fi
+          done
+          echo "::endgroup::"
+
+      - name: Verify bundled assets via /api/starters
+        run: |
+          curl -fsS http://127.0.0.1:4200/api/starters > /tmp/starters.json
+          count=$(jq '.starters | length' /tmp/starters.json 2>/dev/null || echo 0)
+          echo "starters count: $count"
+          if [ "$count" -lt 5 ]; then
+            echo "Expected at least 5 starter templates, got $count"
+            jq '.' /tmp/starters.json || cat /tmp/starters.json
+            docker logs vibespot-smoke
+            exit 1
+          fi
+
+      - name: Container logs (on failure)
+        if: failure()
+        run: docker logs vibespot-smoke || true
+
+      - name: Tear down
+        if: always()
+        run: docker rm -f vibespot-smoke || true
+
+  publish:
+    name: build + publish multi-arch
+    needs: smoke
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/borismichel/vibespot
+          # `latest` only on tagged releases; main pushes get `main` + SHA.
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

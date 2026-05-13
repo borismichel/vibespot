@@ -4,6 +4,14 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## Unreleased
+
+### Features
+
+- **Docker image + compose bundle** ([VIB-450](/VIB/issues/VIB-450)) — vibespot now ships as a multi-stage `node:22-alpine` Docker image published to GHCR (`ghcr.io/borismichel/vibespot`) for `linux/amd64` and `linux/arm64`. A `docker-compose.yml` bundles the app with Caddy (TLS + reverse proxy), Postgres (for the hosted storage adapter), and an `oauth2-proxy` slot for the upcoming auth gate. New `/healthz` endpoint backs the container `HEALTHCHECK` and the CI smoke test. `.env.example` documents every supported env var. See [docs/docker.md](docs/docker.md) for the full guide. Parent: [VIB-446](/VIB/issues/VIB-446).
+
+---
+
 ## v1.3.1 — 2026-05-07
 
 ### Features
