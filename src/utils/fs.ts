@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runtimeRootPath } from "./runtime-root.js";
 
 const __owndir = dirname(fileURLToPath(import.meta.url));
 
@@ -25,13 +26,14 @@ export function resolveAsset(name: string): string {
   // In built package, assets/ is at the package root
   // During dev, it's relative to the project root
   const paths = [
+    runtimeRootPath("assets", name),
     join(__owndir, "../../assets", name),
     join(__owndir, "../assets", name),
     join(process.cwd(), "assets", name),
   ];
 
   for (const p of paths) {
-    if (existsSync(p)) return p;
+    if (p && existsSync(p)) return p;
   }
 
   throw new Error(`Asset not found: ${name}`);
@@ -42,12 +44,13 @@ let _version = "";
 export function getVersion(): string {
   if (_version) return _version;
   const candidates = [
+    runtimeRootPath("package.json"),
     join(__owndir, "../../package.json"),
     join(__owndir, "../package.json"),
     join(process.cwd(), "package.json"),
   ];
   for (const p of candidates) {
-    if (existsSync(p)) {
+    if (p && existsSync(p)) {
       try {
         const pkg = JSON.parse(readFileSync(p, "utf-8"));
         if (pkg.name === "vibespot" && pkg.version) {
@@ -66,12 +69,13 @@ let _changelog = "";
 export function getChangelog(): string {
   if (_changelog) return _changelog;
   const candidates = [
+    runtimeRootPath("CHANGELOG.md"),
     join(__owndir, "../../CHANGELOG.md"),
     join(__owndir, "../CHANGELOG.md"),
     join(process.cwd(), "CHANGELOG.md"),
   ];
   for (const p of candidates) {
-    if (existsSync(p)) {
+    if (p && existsSync(p)) {
       try {
         _changelog = readFileSync(p, "utf-8");
         return _changelog;

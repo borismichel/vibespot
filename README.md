@@ -155,9 +155,20 @@ The browser opens automatically. Enter your API key in the setup screen, create 
 
 Open **Settings → HubSpot** and add your account with a Personal Access Key (PAK). vibeSpot connects directly via the HubSpot API — no CLI installation needed. You can also switch to legacy CLI mode if you prefer.
 
-### Run with Docker
+### Run without installing Node
 
-Prefer not to install Node.js? Pull the published image instead:
+Two no-Node options — pick what fits your setup:
+
+**Single-file binary** (~70–100 MB, no runtime needed):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/borismichel/vibespot/main/scripts/install.sh | bash
+vibespot
+```
+
+The installer detects your OS/arch and drops a `vibespot` executable into `/usr/local/bin`. Binaries for macOS (arm64/x64), Linux (x64/arm64), and Windows (x64) are published with each release. See [docs/install.md](docs/install.md) for manual download links, Gatekeeper/SmartScreen tips, and the `VIBESPOT_INSTALL_DIR`/`VIBESPOT_VERSION` overrides.
+
+**Docker**:
 
 ```bash
 docker run --rm -p 4200:4200 \

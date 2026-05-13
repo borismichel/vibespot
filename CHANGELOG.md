@@ -8,6 +8,7 @@ All notable changes to vibeSpot are documented here.
 
 ### Features
 
+- **Cross-platform single-file binaries** ([VIB-451](/VIB/issues/VIB-451)) — vibespot now publishes standalone executables for macOS (arm64/x64), Linux (x64/arm64), and Windows (x64) on every tagged release, built with `bun build --compile`. Binaries embed the Bun runtime plus all packaged assets (UI, starters, plan templates, guides, CHANGELOG) and self-extract to `~/.vibespot/runtime-assets/<version>/` on first run. A `curl | bash` install script (`scripts/install.sh`) detects the host platform and drops the binary into `/usr/local/bin`. New `binaries.yml` workflow matrix-builds on each tag, runs a `--version` + `/healthz` smoke test, and uploads each binary as a Release asset. See [docs/install.md](docs/install.md). Parent: [VIB-446](/VIB/issues/VIB-446).
 - **Docker image + compose bundle** ([VIB-450](/VIB/issues/VIB-450)) — vibespot now ships as a multi-stage `node:22-alpine` Docker image published to GHCR (`ghcr.io/borismichel/vibespot`) for `linux/amd64` and `linux/arm64`. A `docker-compose.yml` bundles the app with Caddy (TLS + reverse proxy), Postgres (for the hosted storage adapter), and an `oauth2-proxy` slot for the upcoming auth gate. New `/healthz` endpoint backs the container `HEALTHCHECK` and the CI smoke test. `.env.example` documents every supported env var. See [docs/docker.md](docs/docker.md) for the full guide. Parent: [VIB-446](/VIB/issues/VIB-446).
 
 ---
