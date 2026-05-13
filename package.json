@@ -17,7 +17,6 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsup",
-    "build:binaries": "bun scripts/build-binaries.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "npm run build"

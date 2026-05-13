@@ -13,7 +13,6 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runtimeRootPath } from "../utils/runtime-root.js";
 
 const __owndir = dirname(fileURLToPath(import.meta.url));
 
@@ -85,13 +84,12 @@ function templatesDir(): string | null {
   // null if no directory exists rather than throwing, so the rest of the
   // app keeps working.
   const candidates = [
-    runtimeRootPath("assets/plan-templates"),
     join(__owndir, "../../assets/plan-templates"),
     join(__owndir, "../assets/plan-templates"),
     join(process.cwd(), "assets/plan-templates"),
   ];
   for (const dir of candidates) {
-    if (dir && existsSync(dir)) return dir;
+    if (existsSync(dir)) return dir;
   }
   return null;
 }
