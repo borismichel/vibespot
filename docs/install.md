@@ -94,6 +94,21 @@ xattr -d com.apple.quarantine ./vibespot
 Windows SmartScreen will show a similar prompt — click **More info → Run
 anyway**.
 
+### Icon and platform metadata
+
+The Windows `.exe` carries the vibeSpot icon plus product/publisher/
+version metadata in its PE resource section (Bun's `--windows-icon` and
+friends, applied only to the windows-x64 target). The source asset lives at
+`assets/icon/vibespot.png` (512×512 RGBA); `assets/icon/vibespot.ico` is the
+multi-resolution Windows container generated from it (16/32/48/64/128/256).
+
+macOS and Linux ELF/Mach-O binaries can't carry icons natively — those need
+`.app` (with `Info.plist` + `Icon.icns`) and `.desktop`
+(plus `/usr/share/icons/`) wrappers, respectively. Native installers are
+deferred per the [packaging analysis](/VIB/issues/VIB-446). When the bare
+binary is run from a terminal, the icon doesn't apply; it only matters once
+the binary is wrapped in `.app` / `.desktop`.
+
 ### Building binaries locally
 
 ```bash
@@ -104,6 +119,9 @@ bun scripts/build-binaries.ts linux-x64  # one target
 
 The script regenerates `scripts/.generated/runtime-manifest.ts` (a static
 list of every embedded asset) before each build. Output goes to `dist-bin/`.
+The `--windows-icon` flag is honored only when the build host is Windows
+(Bun limitation); CI's `windows-2022` runner handles this in
+`binaries.yml`.
 
 ### Runtime cache
 
