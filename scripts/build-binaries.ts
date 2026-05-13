@@ -36,6 +36,7 @@ const DIST_BIN = join(REPO_ROOT, "dist-bin");
 const ENTRY = join(REPO_ROOT, "bin", "vibespot-bun-entry.ts");
 const MANIFEST_DIR = join(REPO_ROOT, "scripts", ".generated");
 const MANIFEST_FILE = join(MANIFEST_DIR, "runtime-manifest.ts");
+const WINDOWS_ICON = join(REPO_ROOT, "assets", "icon", "vibespot.ico");
 
 const ALL_TARGETS: Target[] = [
   { key: "darwin-arm64", bunTarget: "bun-darwin-arm64", ext: "" },
@@ -141,7 +142,7 @@ function selectedTargets(): Target[] {
   return out;
 }
 
-function buildOne(target: Target): boolean {
+function buildOne(target: Target, version: string): boolean {
   const outFile = join(DIST_BIN, `vibespot-${target.key}${target.ext}`);
   const args = [
     "build",
@@ -153,6 +154,21 @@ function buildOne(target: Target): boolean {
     "--outfile",
     outFile,
   ];
+
+  // Windows PE resources: icon + version-info block. macOS and Linux binaries
+  // can't carry icons natively — those need `.app` / `.desktop` wrappers,
+  // deferred per VIB-446 (see docs/install.md).
+  if (target.bunTarget === "bun-windows-x64") {
+    args.push("--windows-icon", WINDOWS_ICON);
+    args.push("--windows-title", "vibeSpot");
+    args.push("--windows-publisher", "Boris Michel");
+    args.push("--windows-description", "AI-powered HubSpot CMS landing page builder");
+    args.push("--windows-copyright", `Copyright (c) ${new Date().getFullYear()} Boris Michel`);
+    // --windows-version wants a 4-component dotted quad; pad semver with .0.
+    const fourComponent = /^\d+\.\d+\.\d+$/.test(version) ? `${version}.0` : "0.0.0.0";
+    args.push("--windows-version", fourComponent);
+  }
+
   console.log(`\n→ ${target.bunTarget}  →  ${relative(REPO_ROOT, outFile)}`);
   const result = spawnSync("bun", args, { cwd: REPO_ROOT, stdio: "inherit" });
   if (result.status !== 0) {
@@ -179,7 +195,7 @@ function main(): void {
 
   const failures: string[] = [];
   for (const target of targets) {
-    if (!buildOne(target)) failures.push(target.key);
+    if (!buildOne(target, version)) failures.push(target.key);
   }
 
   if (failures.length > 0) {
