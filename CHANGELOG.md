@@ -8,6 +8,14 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.4.2 — 2026-05-13
+
+### Packaging
+
+- **macOS `.app` bundle** ([VIB-451](/VIB/issues/VIB-451)) — every release now also publishes `vibeSpot-macos.app.zip`, a Finder-friendly universal `.app` bundle with the vibeSpot icon. The binary inside is a **fat Mach-O fused with `lipo`** (arm64 + x86_64), so the same `.app` runs natively on Apple Silicon and Intel Macs. Double-clicking the `.app` launches vibespot in the background (`LSUIElement=true`) and opens the browser; stop it via Activity Monitor. The bundle is ad-hoc signed only — proper Developer ID signing + notarization remains deferred per [VIB-446](/VIB/issues/VIB-446). New `scripts/build-macos-app.ts` orchestrates `lipo` + Info.plist + `ditto` zipping; new `assets/icon/vibespot.icns` (multi-resolution ICNS generated from the source PNG) provides the macOS icon. The `binaries.yml` workflow gains a `package-macos-app` job that runs on `macos-14` after the matrix, smoke-tests the bundled binary against `/healthz`, and uploads the asset to the GitHub Release on tag.
+
+---
+
 ## v1.4.1 — 2026-05-13
 
 ### Packaging

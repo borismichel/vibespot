@@ -123,8 +123,10 @@ jobs:
           }
         shell: pwsh
 
-      - name: Upload artifact (push to main / workflow_dispatch)
-        if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
+      # Always upload artifact so downstream jobs (package-macos-app) can
+      # consume the darwin binaries via download-artifact. On tag pushes the
+      # binary is also attached to the GitHub Release in the next step.
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: vibespot-${{ matrix.target.key }}
@@ -136,4 +138,90 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist-bin/vibespot-${{ matrix.target.key }}${{ matrix.target.ext }}
+          fail_on_unmatched_files: true
+
+  package-macos-app:
+    name: package macOS .app bundle
+    needs: build
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Download darwin-arm64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: vibespot-darwin-arm64
+          path: dist-bin
+
+      - name: Download darwin-x64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: vibespot-darwin-x64
+          path: dist-bin
+
+      - name: Make bare binaries executable
+        run: chmod +x dist-bin/vibespot-darwin-arm64 dist-bin/vibespot-darwin-x64
+
+      - name: Package vibeSpot.app (universal, ad-hoc signed, zipped)
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          bun scripts/build-macos-app.ts \
+            --arm64 dist-bin/vibespot-darwin-arm64 \
+            --x64   dist-bin/vibespot-darwin-x64 \
+            --version "$VERSION" \
+            --out   "dist-bin/vibeSpot-macos.app.zip"
+          ls -lh dist-bin/vibeSpot-macos.app.zip
+
+      - name: Smoke — universal Mach-O has both architectures
+        run: |
+          # Pull the universal binary back out of the staging dir created by
+          # the packaging script and confirm `lipo` reports both slices.
+          lipo -archs dist-bin/.macos-stage/vibespot-universal
+          lipo -archs dist-bin/.macos-stage/vibespot-universal | grep -q 'x86_64'
+          lipo -archs dist-bin/.macos-stage/vibespot-universal | grep -q 'arm64'
+
+      - name: Smoke — .app launches and serves /healthz
+        run: |
+          set -eu
+          # Unzip into a clean dir and try to spawn the bundled binary.
+          # macos-14 is arm64 so this exercises the arm64 slice.
+          mkdir -p /tmp/app-smoke && cd /tmp/app-smoke
+          ditto -x -k "$GITHUB_WORKSPACE/dist-bin/vibeSpot-macos.app.zip" .
+          ls -la vibeSpot.app/Contents/MacOS vibeSpot.app/Contents/Resources
+          BIN="$PWD/vibeSpot.app/Contents/MacOS/vibespot"
+          VIBESPOT_NO_OPEN=1 "$BIN" > /tmp/app.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4200/healthz > /tmp/healthz.json; then
+              echo ".app /healthz responded after ${i}s"
+              cat /tmp/healthz.json
+              echo
+              break
+            fi
+            sleep 1
+            if [ "$i" = "30" ]; then
+              echo "no /healthz response after 30s"
+              cat /tmp/app.log || true
+              exit 1
+            fi
+          done
+
+      - name: Upload .app.zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibeSpot-macos.app
+          path: dist-bin/vibeSpot-macos.app.zip
+          retention-days: 14
+
+      - name: Attach .app.zip to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-bin/vibeSpot-macos.app.zip
           fail_on_unmatched_files: true
