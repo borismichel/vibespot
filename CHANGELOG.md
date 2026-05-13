@@ -8,6 +8,15 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## v1.4.1 — 2026-05-13
+
+### Packaging
+
+- **Windows binary now carries the vibeSpot icon and PE metadata** ([VIB-451](/VIB/issues/VIB-451)) — `vibespot-windows-x64.exe` is built with `--windows-icon` plus product / publisher / version / description / copyright resources, so the executable shows the brand mark in Explorer and the taskbar and exposes proper metadata in the file Properties dialog. Source asset: `assets/icon/vibespot.png` (512×512); compiled multi-resolution container: `assets/icon/vibespot.ico` (16/32/48/64/128/256). macOS Mach-O and Linux ELF binaries can't carry icons natively — those still need `.app` / `.desktop` wrappers, deferred per [VIB-446](/VIB/issues/VIB-446).
+- **CI runner fix** ([VIB-451](/VIB/issues/VIB-451)) — `binaries.yml` builds `darwin-x64` on `macos-14` (Apple Silicon, cross-compile) instead of the starved `macos-13` hosted pool. The native smoke check is skipped for the cross-compiled target.
+
+---
+
 ## v1.4.0 — 2026-05-13
 
 ### Features
