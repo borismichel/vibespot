@@ -11,6 +11,7 @@ export type AIEngineType =
   | "gemini-cli"
   | "gemini-api"
   | "codex-cli"
+  | "langdock-api"
   // Legacy value — migrated to "anthropic-api" on load
   | "api";
 
@@ -33,6 +34,11 @@ export interface VibeSpotConfig {
   codexCliModel?: string;
   geminiCliModel?: string;
   geminiApiModel?: string;
+  // Langdock — EU-hosted gateway, Anthropic-compatible endpoint by default.
+  // `langdockBaseUrl` is overridable for self-hosted / private-cloud deployments.
+  langdockApiKey?: string;
+  langdockApiModel?: string;
+  langdockBaseUrl?: string;
   lastThemePath?: string;
   lastSourcePath?: string;
   // HubSpot account management
@@ -86,6 +92,8 @@ export function getApiKeyForEngine(engine: AIEngineType, config?: VibeSpotConfig
       return c.openaiApiKey || process.env.OPENAI_API_KEY;
     case "gemini-api":
       return c.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+    case "langdock-api":
+      return c.langdockApiKey || process.env.LANGDOCK_API_KEY;
     default:
       return undefined;
   }

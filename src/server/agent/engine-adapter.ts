@@ -79,9 +79,19 @@ export type AgentEngine =
   | "claude-oauth"
   | "openai-api"
   | "gemini-api"
+  | "langdock-api"
   | "claude-code"
   | "gemini-cli"
   | "codex-cli";
+
+/**
+ * Langdock — EU-hosted (Frankfurt) AI gateway with a GDPR-native DPA covering
+ * OpenAI, Anthropic, Mistral, and Google models behind a single contract. We
+ * route Claude requests through their Anthropic-compatible endpoint so prompt
+ * caching, tool_use structured output, and extended thinking all work unchanged.
+ * Override `langdockBaseUrl` in config for self-hosted / private-cloud installs.
+ */
+const LANGDOCK_DEFAULT_BASE_URL = "https://api.langdock.com/anthropic";
 
 // ---------------------------------------------------------------------------
 // Rate limit retry delays (shared with ai-engines.ts pattern)
@@ -155,11 +165,13 @@ async function callAnthropic(
   opts: AgentCallOptions,
   extraHeaders?: Record<string, string>,
   systemPrefix?: string,
+  baseURL?: string,
 ): Promise<AgentCallResult> {
   const AnthropicSDK = await getAnthropicSDK();
   const client = new AnthropicSDK({
     apiKey,
     ...(extraHeaders ? { defaultHeaders: extraHeaders } : {}),
+    ...(baseURL ? { baseURL } : {}),
   });
 
   const messages =
@@ -747,7 +759,13 @@ function summarizeToolUse(name: string, input: Record<string, unknown> | undefin
 // Unified entry points
 // ---------------------------------------------------------------------------
 
-const API_ENGINES = new Set(["anthropic-api", "claude-oauth", "openai-api", "gemini-api"]);
+const API_ENGINES = new Set([
+  "anthropic-api",
+  "claude-oauth",
+  "openai-api",
+  "gemini-api",
+  "langdock-api",
+]);
 
 /**
  * Call an AI agent via API with optional structured output enforcement.
@@ -780,6 +798,11 @@ export async function callAgentAPI(
       return callOpenAI(apiKey, model, opts);
     case "gemini-api":
       return callGemini(apiKey, model, opts);
+    case "langdock-api": {
+      const cfg = loadConfig();
+      const baseURL = cfg.langdockBaseUrl || LANGDOCK_DEFAULT_BASE_URL;
+      return callAnthropic(apiKey, model, opts, undefined, undefined, baseURL);
+    }
     default:
       throw new Error(`Unsupported API engine: ${engine}`);
   }
@@ -816,7 +839,15 @@ export async function callAgent(
  * feature; we don't try to emulate it on other engines.
  */
 export function resolveThinkingBudget(engine: AgentEngine): number {
-  if (engine !== "anthropic-api" && engine !== "claude-oauth") return 0;
+  // Extended thinking is an Anthropic feature; supported on engines that route
+  // through Anthropic's API surface (direct, OAuth, or Langdock gateway).
+  if (
+    engine !== "anthropic-api" &&
+    engine !== "claude-oauth" &&
+    engine !== "langdock-api"
+  ) {
+    return 0;
+  }
   const cfg = loadConfig();
   if (!cfg.extendedThinking) return 0;
   switch (cfg.extendedThinkingBudget) {
@@ -843,6 +874,7 @@ export function isAgenticCapable(
     engine === "claude-oauth" ||
     engine === "openai-api" ||
     engine === "gemini-api" ||
+    engine === "langdock-api" ||
     engine === "claude-code" ||
     engine === "gemini-cli" ||
     engine === "codex-cli"
