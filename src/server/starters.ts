@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const __owndir = dirname(fileURLToPath(import.meta.url));
 import type { ModuleFiles } from "../ai/engine.js";
+import { runtimeRootPath } from "../utils/runtime-root.js";
 
 export interface StarterTemplate {
   id: string;
@@ -30,12 +31,13 @@ let _cache: StarterTemplate[] | null = null;
 
 function resolveStartersDir(): string | null {
   const candidates = [
+    runtimeRootPath("starters"),
     join(__owndir, "../../starters"),
     join(__owndir, "../starters"),
     join(process.cwd(), "starters"),
   ];
   for (const p of candidates) {
-    if (existsSync(p)) return p;
+    if (p && existsSync(p)) return p;
   }
   return null;
 }

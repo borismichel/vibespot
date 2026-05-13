@@ -1,0 +1,135 @@
+name: binaries
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.target.key }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { key: linux-x64,     bun: bun-linux-x64,     ext: "",     runner: ubuntu-22.04,    can_run: true  }
+          - { key: linux-arm64,   bun: bun-linux-arm64,   ext: "",     runner: ubuntu-22.04,    can_run: false }
+          - { key: darwin-arm64,  bun: bun-darwin-arm64,  ext: "",     runner: macos-14,        can_run: true  }
+          - { key: darwin-x64,    bun: bun-darwin-x64,    ext: "",     runner: macos-13,        can_run: true  }
+          - { key: windows-x64,   bun: bun-windows-x64,   ext: ".exe", runner: windows-2022,    can_run: true  }
+    runs-on: ${{ matrix.target.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Install dependencies
+        # Bun reads package-lock.json directly; no separate bun.lock is
+        # committed since the project's source-of-truth lockfile is npm's.
+        run: bun install --no-save
+        shell: bash
+
+      - name: Build ${{ matrix.target.key }} binary
+        run: bun scripts/build-binaries.ts ${{ matrix.target.key }}
+        shell: bash
+
+      - name: Smoke — verify --version matches package.json (POSIX)
+        if: matrix.target.can_run && runner.os != 'Windows'
+        run: |
+          set -eu
+          BIN="dist-bin/vibespot-${{ matrix.target.key }}${{ matrix.target.ext }}"
+          chmod +x "$BIN"
+          EXPECTED=$(node -p "require('./package.json').version")
+          GOT=$("$BIN" --version)
+          echo "expected=$EXPECTED got=$GOT"
+          test "$EXPECTED" = "$GOT"
+        shell: bash
+
+      - name: Smoke — verify --version matches package.json (Windows)
+        if: matrix.target.can_run && runner.os == 'Windows'
+        run: |
+          $bin = "dist-bin/vibespot-${{ matrix.target.key }}${{ matrix.target.ext }}"
+          $expected = (Get-Content package.json | ConvertFrom-Json).version
+          $got = & $bin --version
+          Write-Host "expected=$expected got=$got"
+          if ($expected -ne $got) { exit 1 }
+        shell: pwsh
+
+      - name: Smoke — start server, hit /healthz (POSIX)
+        if: matrix.target.can_run && runner.os != 'Windows'
+        env:
+          VIBESPOT_NO_OPEN: "1"
+        run: |
+          set -eu
+          BIN="dist-bin/vibespot-${{ matrix.target.key }}${{ matrix.target.ext }}"
+          "$BIN" > /tmp/vibespot.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4200/healthz > /tmp/healthz.json; then
+              echo "/healthz responded after ${i}s"
+              cat /tmp/healthz.json
+              echo
+              break
+            fi
+            sleep 1
+            if [ "$i" = "30" ]; then
+              echo "no /healthz response after 30s"
+              cat /tmp/vibespot.log || true
+              exit 1
+            fi
+          done
+        shell: bash
+
+      - name: Smoke — start server, hit /healthz (Windows)
+        if: matrix.target.can_run && runner.os == 'Windows'
+        env:
+          VIBESPOT_NO_OPEN: "1"
+        run: |
+          $bin = "dist-bin/vibespot-${{ matrix.target.key }}${{ matrix.target.ext }}"
+          $proc = Start-Process -FilePath $bin -RedirectStandardOutput vibespot.log -RedirectStandardError vibespot.err.log -PassThru -NoNewWindow
+          try {
+            $ok = $false
+            for ($i = 1; $i -le 30; $i++) {
+              try {
+                $resp = Invoke-WebRequest -Uri "http://127.0.0.1:4200/healthz" -UseBasicParsing -TimeoutSec 5
+                if ($resp.StatusCode -eq 200) {
+                  Write-Host "/healthz responded after ${i}s"
+                  Write-Host $resp.Content
+                  $ok = $true
+                  break
+                }
+              } catch { Start-Sleep -Seconds 1 }
+            }
+            if (-not $ok) {
+              Write-Host "no /healthz response after 30s"
+              Get-Content vibespot.log -ErrorAction SilentlyContinue
+              Get-Content vibespot.err.log -ErrorAction SilentlyContinue
+              exit 1
+            }
+          } finally {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          }
+        shell: pwsh
+
+      - name: Upload artifact (push to main / workflow_dispatch)
+        if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: vibespot-${{ matrix.target.key }}
+          path: dist-bin/vibespot-${{ matrix.target.key }}${{ matrix.target.ext }}
+          retention-days: 14
+
+      - name: Attach binary to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-bin/vibespot-${{ matrix.target.key }}${{ matrix.target.ext }}
+          fail_on_unmatched_files: true

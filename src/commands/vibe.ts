@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import chalk from "chalk";
 import { startServer } from "../server/server.js";
 import { saveSession } from "../server/session.js";
+import { runtimeRootPath } from "../utils/runtime-root.js";
 
 const DEFAULT_PORT = 4200;
 
@@ -76,13 +77,14 @@ export async function vibeCommand(): Promise<void> {
 
 function resolveUiDir(): string | null {
   const candidates = [
+    runtimeRootPath("ui"),
     join(__owndir, "../../ui"),
     join(__owndir, "../ui"),
     join(process.cwd(), "ui"),
   ];
 
   for (const dir of candidates) {
-    if (existsSync(join(dir, "index.html"))) return dir;
+    if (dir && existsSync(join(dir, "index.html"))) return dir;
   }
 
   return null;

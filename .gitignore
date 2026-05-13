@@ -1,5 +1,8 @@
 node_modules/
 dist/
+dist-bin/
+scripts/.generated/
+bun.lock
 *.tgz
 .DS_Store
 LPAGE.md
@@ -16,6 +19,7 @@ vibespot-blog-project.json
 .redesign.md
 docs/*
 !docs/docker.md
+!docs/install.md
 !ui/docs/
 .superpowers/
 .references/
