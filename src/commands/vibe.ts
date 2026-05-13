@@ -30,24 +30,29 @@ export async function vibeCommand(): Promise<void> {
     process.exit(1);
   }
 
+  const envPort = Number.parseInt(process.env.VIBESPOT_PORT || "", 10);
+  const startPort = Number.isFinite(envPort) && envPort > 0 ? envPort : DEFAULT_PORT;
+  const skipOpen = process.env.VIBESPOT_NO_OPEN === "1" || !process.stdout.isTTY;
+
   try {
-    const { port, close } = await startServer({ port: DEFAULT_PORT, uiDir });
+    const { port, close } = await startServer({ port: startPort, uiDir });
     const url = `http://localhost:${port}`;
 
     console.log(accent(`  v ${url}`));
     console.log(dim("  Press Ctrl+C to stop\n"));
 
-    // Auto-open browser
-    try {
-      if (process.platform === "darwin") {
-        execFileSync("open", [url], { stdio: "ignore" });
-      } else if (process.platform === "win32") {
-        execFileSync("cmd", ["/c", "start", "", url], { stdio: "ignore" });
-      } else {
-        execFileSync("xdg-open", [url], { stdio: "ignore" });
+    if (!skipOpen) {
+      try {
+        if (process.platform === "darwin") {
+          execFileSync("open", [url], { stdio: "ignore" });
+        } else if (process.platform === "win32") {
+          execFileSync("cmd", ["/c", "start", "", url], { stdio: "ignore" });
+        } else {
+          execFileSync("xdg-open", [url], { stdio: "ignore" });
+        }
+      } catch {
+        // Browser open failed — user can open manually
       }
-    } catch {
-      // Browser open failed — user can open manually
     }
 
     // Keep running until Ctrl+C

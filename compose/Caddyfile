@@ -1,0 +1,26 @@
+# Caddyfile for the vibespot compose bundle.
+#
+# - `localhost` triggers Caddy's local-only mode (no Let's Encrypt).
+# - A real public domain in $VIBESPOT_DOMAIN automatically gets a
+#   Let's Encrypt certificate when $VIBESPOT_TLS_EMAIL is set.
+
+{
+	email {$VIBESPOT_TLS_EMAIL}
+}
+
+{$VIBESPOT_DOMAIN} {
+	encode zstd gzip
+
+	@websockets {
+		header Connection *Upgrade*
+		header Upgrade websocket
+	}
+	reverse_proxy @websockets {$VIBESPOT_UPSTREAM}
+
+	reverse_proxy {$VIBESPOT_UPSTREAM} {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

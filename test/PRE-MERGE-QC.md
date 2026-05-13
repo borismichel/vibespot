@@ -15,6 +15,27 @@ npx tsx test/ui-element-refs.test.ts
 npm run build && npx tsx test/validate.ts
 ```
 
+## Docker Checks (required if Dockerfile / compose / workflow changed)
+
+```bash
+# 1. Image builds cleanly
+docker build -t vibespot:dev .
+
+# 2. Container boots and /healthz responds within 30s
+docker run -d --name vibespot-qc -p 4200:4200 vibespot:dev
+for i in $(seq 1 30); do
+  curl -fsS http://127.0.0.1:4200/healthz && break || sleep 1
+done
+
+# 3. Bundled assets resolve inside the image
+curl -fsS http://127.0.0.1:4200/api/starters | jq '.starters | length'   # must be >= 5
+
+docker rm -f vibespot-qc
+```
+
+The `.github/workflows/docker-image.yml` CI job runs the same smoke test on
+every push, so a green CI run is acceptable in place of a local repro.
+
 ## Manual Checks (required for HTML/JS restructuring)
 
 - [ ] Every `getElementById("x")` in ui/*.js either targets an ID in `ui/index.html` or a dynamically-created element

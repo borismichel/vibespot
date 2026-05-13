@@ -1,0 +1,51 @@
+# Keep the build context lean and reproducible.
+.git
+.gitignore
+.github
+.claude
+.superpowers
+.references
+.paperclip-pending
+.issues
+.redesign.md
+.DS_Store
+
+# Build / dependency outputs (rebuilt inside the image).
+node_modules
+dist
+*.tgz
+*.zip
+
+# Local-only dev artifacts.
+workspace
+_validation_workspace
+boris-test
+hubvibes-blog-project.json
+vibespot-blog-project.json
+
+# Tests and QA artifacts (not needed at runtime; the builder stage doesn't run them).
+test
+screenshots
+screenshots-*
+qa-*
+vib*-qa*.cjs
+vib*-screenshots
+vib*-screenshots/
+*-screenshots/
+*-screenshots
+*.cjs
+
+# Editor / OS noise.
+*.swp
+*.log
+npm-debug.log*
+.idea
+.vscode
+
+# Container-related files don't need to ship inside the image.
+Dockerfile
+docker-compose.yml
+.dockerignore
+.env
+.env.*
+!.env.example
