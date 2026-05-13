@@ -19,7 +19,11 @@ jobs:
           - { key: linux-x64,     bun: bun-linux-x64,     ext: "",     runner: ubuntu-22.04,    can_run: true  }
           - { key: linux-arm64,   bun: bun-linux-arm64,   ext: "",     runner: ubuntu-22.04,    can_run: false }
           - { key: darwin-arm64,  bun: bun-darwin-arm64,  ext: "",     runner: macos-14,        can_run: true  }
-          - { key: darwin-x64,    bun: bun-darwin-x64,    ext: "",     runner: macos-13,        can_run: true  }
+          # darwin-x64 cross-compiles on the Apple Silicon runner; smoke is
+          # skipped because the produced x86_64 Mach-O can't run natively on
+          # arm64. The macos-13 hosted pool starved out during v1.4.0 (job
+          # sat queued >25 min with no runner assigned).
+          - { key: darwin-x64,    bun: bun-darwin-x64,    ext: "",     runner: macos-14,        can_run: false }
           - { key: windows-x64,   bun: bun-windows-x64,   ext: ".exe", runner: windows-2022,    can_run: true  }
     runs-on: ${{ matrix.target.runner }}
     steps:
