@@ -19,7 +19,8 @@
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "contact-monitor": "tsx scripts/contact-monitor.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.0",
