@@ -23,7 +23,7 @@
     "contact-monitor": "tsx scripts/contact-monitor.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.92.0",
+    "@anthropic-ai/sdk": "^0.96.0",
     "@clack/prompts": "^1.3.0",
     "@codemirror/lang-css": "^6.3.1",
     "@codemirror/lang-html": "^6.4.11",
