@@ -65,18 +65,47 @@ const CONFIG_DIR = join(homedir(), ".vibespot");
 const CONFIG_PATH = join(CONFIG_DIR, "config.json");
 
 export function loadConfig(): VibeSpotConfig {
-  if (!fileExists(CONFIG_PATH)) return {};
+  let config: VibeSpotConfig = {};
 
-  try {
-    const raw = JSON.parse(readFile(CONFIG_PATH));
-    // Migrate legacy "api" engine type
-    if (raw.aiEngine === "api") {
-      raw.aiEngine = "anthropic-api";
+  if (fileExists(CONFIG_PATH)) {
+    try {
+      config = JSON.parse(readFile(CONFIG_PATH));
+      if (config.aiEngine === "api") {
+        config.aiEngine = "anthropic-api";
+      }
+    } catch {
+      config = {};
     }
-    return raw;
-  } catch {
-    return {};
   }
+
+  // Environment variable overrides — Docker / server deployments can
+  // configure everything via env without touching config.json.
+  if (process.env.VIBESPOT_AI_ENGINE && !config.aiEngine) {
+    config.aiEngine = process.env.VIBESPOT_AI_ENGINE as AIEngineType;
+  }
+  if (process.env.ANTHROPIC_API_KEY && !config.anthropicApiKey) {
+    config.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+  }
+  if (process.env.OPENAI_API_KEY && !config.openaiApiKey) {
+    config.openaiApiKey = process.env.OPENAI_API_KEY;
+  }
+  if ((process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY) && !config.geminiApiKey) {
+    config.geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+  }
+  if (process.env.LANGDOCK_API_KEY && !config.langdockApiKey) {
+    config.langdockApiKey = process.env.LANGDOCK_API_KEY;
+  }
+  if (process.env.LANGDOCK_BASE_URL && !config.langdockBaseUrl) {
+    config.langdockBaseUrl = process.env.LANGDOCK_BASE_URL;
+  }
+  if (process.env.FIGMA_TOKEN && !config.figmaToken) {
+    config.figmaToken = process.env.FIGMA_TOKEN;
+  }
+  if (process.env.VIBESPOT_AGENTIC_MODE !== undefined && config.agenticMode === undefined) {
+    config.agenticMode = process.env.VIBESPOT_AGENTIC_MODE === "true";
+  }
+
+  return config;
 }
 
 /**
@@ -187,7 +216,7 @@ export function setActiveHubSpotAccount(portalId: string): void {
 
 export function getHubSpotPak(): string | null {
   const acct = getActiveHubSpotAccount();
-  return acct?.personalAccessKey || null;
+  return acct?.personalAccessKey || process.env.HUBSPOT_PERSONAL_ACCESS_KEY || null;
 }
 
 // ---------------------------------------------------------------------------

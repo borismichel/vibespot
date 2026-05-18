@@ -220,7 +220,6 @@ This is where React props become HubSpot-editable fields. Every piece of text, i
 |-------|-------|-----|
 | `"type": "textarea"` | `'unknown' is not a valid field type` | Use `"type": "text"` instead — `textarea` is deprecated |
 | `"name": "name"` | `missing field name` | `name` is reserved — use `item_name`, `link_label`, etc. |
-| `"name": "body"` | `field name cannot be 'body'` | `body` is reserved — use `body_text` instead |
 | `{% module %}` in module.html | `'module' is disabled in this context` | Cannot nest modules — use `{% form %}` for forms |
 | `{{ now() }}` | `Could not resolve function 'now'` | Use `{{ local_dt }}` for current date/time |
 | Partially uploaded module | Re-upload still fails | Run `hs cms delete <path>` first, then re-upload |

@@ -112,6 +112,12 @@
     <a class="doc-nav__link doc-nav__link--sub" href="#auto-fix">Auto-Fix</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#creating-page-hubspot">Creating a Page</a>
     <a class="doc-nav__link" href="#zip-download">ZIP Download</a>
+    <a class="doc-nav__link" href="#docker-deployment">Docker Deployment</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#docker-quick-start">Quick Start</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#docker-https">HTTPS with Caddy</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#docker-env-vars">Environment Variables</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#docker-persistence">Persistence</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#docker-reverse-proxy">Reverse Proxy &amp; k8s</a>
     <a class="doc-nav__link" href="#marketplace">Marketplace</a>
     <a class="doc-nav__link" href="#version-history">Version History</a>
   </div>
@@ -342,7 +348,7 @@ vibespot</code></pre>
   </table>
 
   <h3 id="env-vars">Environment Variables</h3>
-  <p>API keys can also be set as environment variables. The config file takes precedence &mdash; environment variables are used as fallbacks when no key is set in the config:</p>
+  <p>API keys and server settings can be set as environment variables. The config file takes precedence &mdash; environment variables are used as fallbacks when no key is set in the config. In Docker deployments, env vars are the primary configuration method (see <a href="#docker-deployment">Docker Deployment</a>).</p>
   <table>
     <thead>
       <tr><th>Variable</th><th>Description</th></tr>
@@ -352,6 +358,14 @@ vibespot</code></pre>
       <tr><td><code>OPENAI_API_KEY</code></td><td>OpenAI API key for GPT models</td></tr>
       <tr><td><code>GEMINI_API_KEY</code></td><td>Google AI API key for Gemini models</td></tr>
       <tr><td><code>GOOGLE_AI_API_KEY</code></td><td>Alternative name for the Gemini API key (same effect as <code>GEMINI_API_KEY</code>)</td></tr>
+      <tr><td><code>LANGDOCK_API_KEY</code></td><td>Langdock EU gateway key</td></tr>
+      <tr><td><code>LANGDOCK_BASE_URL</code></td><td>Override Langdock endpoint for self-hosted deployments</td></tr>
+      <tr><td><code>HUBSPOT_PERSONAL_ACCESS_KEY</code></td><td>HubSpot PAK &mdash; enables theme upload without configuring through the UI</td></tr>
+      <tr><td><code>FIGMA_TOKEN</code></td><td>Figma personal access token for design import</td></tr>
+      <tr><td><code>VIBESPOT_AI_ENGINE</code></td><td>Default engine: <code>anthropic-api</code>, <code>openai-api</code>, <code>gemini-api</code>, <code>langdock-api</code></td></tr>
+      <tr><td><code>VIBESPOT_AGENTIC_MODE</code></td><td>Set <code>true</code> to enable the multi-stage agentic pipeline</td></tr>
+      <tr><td><code>VIBESPOT_PORT</code></td><td>Override the HTTP server port (default: <code>4200</code>)</td></tr>
+      <tr><td><code>VIBESPOT_NO_OPEN</code></td><td>Set <code>1</code> to suppress auto-opening the browser on startup</td></tr>
     </tbody>
   </table>
 </div>
@@ -1261,6 +1275,76 @@ testimonial carousel, and a minimal footer with social links.</code></pre>
   <div class="doc-callout doc-callout--tip">
     <div class="doc-callout__label">&#10024; When to use ZIP download</div>
     <p>ZIP download is useful when you want to share the theme with a colleague who does not have vibeSpot, back up the theme independently of git, or upload manually through HubSpot's Design Manager.</p>
+  </div>
+</div>
+
+<!-- ============================================================
+     Section: Docker Deployment
+     ============================================================ -->
+<div class="doc-section" id="docker-deployment">
+  <h2 id="docker-deployment-heading">Docker Deployment <a href="#docker-deployment" class="doc-anchor">#</a></h2>
+  <p>Run vibeSpot as a containerised service for your team. The Docker image bundles the server, UI, and all dependencies &mdash; just add an AI API key.</p>
+
+  <h3 id="docker-quick-start">Quick Start (LAN / VPN) <a href="#docker-quick-start" class="doc-anchor">#</a></h3>
+  <pre><code>cp .env.example .env
+# Edit .env &mdash; set at least one AI API key (e.g. ANTHROPIC_API_KEY)
+docker compose up -d</code></pre>
+  <p>Open <code>http://&lt;host-ip&gt;:4200</code> in a browser. All AI keys, engine selection, and HubSpot credentials are configured via the <code>.env</code> file &mdash; no interactive setup needed.</p>
+
+  <h3 id="docker-https">HTTPS with Caddy <a href="#docker-https" class="doc-anchor">#</a></h3>
+  <p>For public or semi-public deployments, activate the Caddy reverse proxy profile. Caddy auto-provisions a TLS certificate from Let&rsquo;s Encrypt.</p>
+  <pre><code>cp .env.example .env
+# Set VIBESPOT_DOMAIN=vibespot.example.com and your AI key
+docker compose --profile https up -d</code></pre>
+  <p>Caddy binds ports 80 and 443. Point your DNS A record at the host, and HTTPS works automatically.</p>
+
+  <h3 id="docker-env-vars">Environment Variables <a href="#docker-env-vars" class="doc-anchor">#</a></h3>
+  <p>The Docker image reads all configuration from environment variables. The <code>.env.example</code> file documents every option.</p>
+
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>VIBESPOT_PORT</code></td><td><code>4200</code></td><td>Port the server listens on inside the container</td></tr>
+      <tr><td><code>VIBESPOT_DOMAIN</code></td><td>&mdash;</td><td>Public domain for the Caddy HTTPS profile</td></tr>
+      <tr><td><code>VIBESPOT_NO_OPEN</code></td><td><code>1</code></td><td>Suppress auto-open browser (set automatically in Docker)</td></tr>
+      <tr><td><code>VIBESPOT_AI_ENGINE</code></td><td>&mdash;</td><td>Default engine: <code>anthropic-api</code>, <code>openai-api</code>, <code>gemini-api</code>, <code>langdock-api</code></td></tr>
+      <tr><td><code>VIBESPOT_AGENTIC_MODE</code></td><td>&mdash;</td><td>Set <code>true</code> to enable the multi-stage agentic pipeline</td></tr>
+      <tr><td><code>ANTHROPIC_API_KEY</code></td><td>&mdash;</td><td>Anthropic Claude API key</td></tr>
+      <tr><td><code>OPENAI_API_KEY</code></td><td>&mdash;</td><td>OpenAI API key</td></tr>
+      <tr><td><code>GEMINI_API_KEY</code></td><td>&mdash;</td><td>Google Gemini API key</td></tr>
+      <tr><td><code>LANGDOCK_API_KEY</code></td><td>&mdash;</td><td>Langdock EU gateway key</td></tr>
+      <tr><td><code>HUBSPOT_PERSONAL_ACCESS_KEY</code></td><td>&mdash;</td><td>HubSpot PAK for theme uploads</td></tr>
+      <tr><td><code>FIGMA_TOKEN</code></td><td>&mdash;</td><td>Figma personal access token for design import</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="docker-persistence">Persistence <a href="#docker-persistence" class="doc-anchor">#</a></h3>
+  <p>Two named Docker volumes keep data across container restarts:</p>
+  <table>
+    <thead>
+      <tr><th>Volume</th><th>Container path</th><th>Contents</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>vibespot-config</code></td><td><code>/home/vibespot/.vibespot</code></td><td>config.json, session data</td></tr>
+      <tr><td><code>vibespot-themes</code></td><td><code>/home/vibespot/vibespot-themes</code></td><td>Generated HubSpot themes</td></tr>
+    </tbody>
+  </table>
+  <p>To back up:</p>
+  <pre><code>docker compose cp vibespot:/home/vibespot/.vibespot ./backup-config
+docker compose cp vibespot:/home/vibespot/vibespot-themes ./backup-themes</code></pre>
+
+  <h3 id="docker-reverse-proxy">Reverse Proxy &amp; Kubernetes <a href="#docker-reverse-proxy" class="doc-anchor">#</a></h3>
+  <p>If you already have a reverse proxy (nginx, Traefik, k8s Ingress), skip the Caddy profile and point your proxy at port 4200. Key requirements:</p>
+  <ul>
+    <li><strong>WebSocket upgrade</strong> &mdash; the chat, pipeline progress, and upload UI all use a persistent WebSocket connection.</li>
+    <li><strong>Timeout &gt; 120s</strong> &mdash; agentic AI generation can run for several minutes. Set read/send timeouts to at least 300s.</li>
+    <li><strong>No buffering</strong> &mdash; for streaming AI responses, disable proxy buffering.</li>
+  </ul>
+  <div class="doc-callout doc-callout--tip">
+    <div class="doc-callout__label">&#128214; Full guide</div>
+    <p>For nginx configs, Kubernetes manifests, security considerations, and troubleshooting, see the complete <a href="https://github.com/borismichel/vibespot/blob/main/docs/docker-deployment.md" target="_blank">Docker Deployment Guide</a>.</p>
   </div>
 </div>
 
