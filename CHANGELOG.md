@@ -12,6 +12,7 @@ All notable changes to vibeSpot are documented here.
 
 ### Documentation
 
+- **Docker + Langdock deployment guide** ([VIB-1747](/VIB/issues/VIB-1747)) — New one-page technical reference at `docs/docker-langdock-deployment.md` covering Docker deployment with Langdock as the AI engine: architecture diagram, how Langdock is consumed (Anthropic-compatible proxy, Frankfurt), minimal network requirements (outbound HTTPS to `api.langdock.com` + `api.hubapi.com` only), env var reference, compose services, firewall rules, and troubleshooting. Also added `LANGDOCK_API_KEY`, `LANGDOCK_BASE_URL`, `VIBESPOT_AI_ENGINE`, and `HUBSPOT_PERSONAL_ACCESS_KEY` to `docker-compose.yml` environment block.
 - **Langdock support in docs** ([VIB-1744](/VIB/issues/VIB-1744)) — Added Langdock to the AI engines comparison table, setup tabs, and config reference in `ui/docs/index.html`. Updated README AI engines table, config section, and aiEngine enum. Langdock setup instructions cover API key configuration, model selection, and self-hosted `langdockBaseUrl` override.
 - **Docker deployment docs** ([VIB-1739](/VIB/issues/VIB-1739)) — Added Docker Deployment section to README with quick-start commands. Added Docker Deployment section to `ui/docs/index.html` with quick start, HTTPS, env vars, persistence, and reverse proxy guidance. Expanded environment variables table in docs with all Docker and integration variables. Added comprehensive deployment guide at `docs/docker-deployment.md` covering LAN, HTTPS, nginx, Kubernetes, backup/restore, and security.
 
