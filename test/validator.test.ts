@@ -36,13 +36,14 @@ describe("validator — JSON checks", () => {
     expect(results[0].valid).toBe(true);
   });
 
-  it("flags invalid fieldsJson", () => {
+  it("auto-fixes invalid fieldsJson by resetting to empty array", () => {
     const results = run([makeModule({ fieldsJson: "{broken" })]);
     const jsonIssue = results[0].issues.find(
       (i) => i.field === "fieldsJson" && i.message.includes("Invalid JSON"),
     );
     expect(jsonIssue).toBeDefined();
-    expect(jsonIssue!.autoFixed).toBe(false);
+    expect(jsonIssue!.autoFixed).toBe(true);
+    expect(results[0].module.fieldsJson).toBe("[]");
   });
 
   it("auto-generates metaJson when empty", () => {
