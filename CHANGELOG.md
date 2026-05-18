@@ -12,6 +12,7 @@ All notable changes to vibeSpot are documented here.
 
 ### Documentation
 
+- **Langdock support in docs** ([VIB-1744](/VIB/issues/VIB-1744)) — Added Langdock to the AI engines comparison table, setup tabs, and config reference in `ui/docs/index.html`. Updated README AI engines table, config section, and aiEngine enum. Langdock setup instructions cover API key configuration, model selection, and self-hosted `langdockBaseUrl` override.
 - **Docker deployment docs** ([VIB-1739](/VIB/issues/VIB-1739)) — Added Docker Deployment section to README with quick-start commands. Added Docker Deployment section to `ui/docs/index.html` with quick start, HTTPS, env vars, persistence, and reverse proxy guidance. Expanded environment variables table in docs with all Docker and integration variables. Added comprehensive deployment guide at `docs/docker-deployment.md` covering LAN, HTTPS, nginx, Kubernetes, backup/restore, and security.
 
 ---
