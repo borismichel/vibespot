@@ -569,7 +569,7 @@ Before deploying any HubSpot CMS code, verify:
 
 - [ ] All module folders end with `.module` suffix
 - [ ] fields.json is a JSON array `[...]` not an object `{...}`
-- [ ] No field names collide with dnd reserved parameters (width, offset, label, path, styles, body)
+- [ ] No field names collide with dnd reserved parameters (width, offset, label, path, styles)
 - [ ] Field names use snake_case, no spaces or dashes
 - [ ] All fields have `default` values (no empty defaults for required fields)
 - [ ] Color field defaults use hex format `{ "color": "#rrggbb", "opacity": 100 }` — no rgba/rgb/named colors

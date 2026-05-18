@@ -24,8 +24,6 @@ const ENGINE_LABELS = {
 // Open / Close
 // ---------------------------------------------------------------------------
 
-let _prevWorkspaceTab = "pages";
-
 function openSettings(tab) {
   if (typeof closeMenu === "function") closeMenu();
   if (tab) {
@@ -34,23 +32,13 @@ function openSettings(tab) {
     tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
   }
   const overlay = document.getElementById("settings-overlay");
-  if (overlay) {
-    overlay.classList.remove("hidden");
-  } else if (typeof switchWorkspaceTab === "function") {
-    const activeWs = document.querySelector(".workspace-tab.active");
-    if (activeWs && activeWs.dataset.wsTab !== "settings") _prevWorkspaceTab = activeWs.dataset.wsTab;
-    switchWorkspaceTab("settings");
-  }
+  if (overlay) overlay.classList.remove("hidden");
   refreshSettings();
 }
 
 function closeSettings() {
   const overlay = document.getElementById("settings-overlay");
-  if (overlay) {
-    overlay.classList.add("hidden");
-  } else if (typeof switchWorkspaceTab === "function") {
-    switchWorkspaceTab(_prevWorkspaceTab || "pages");
-  }
+  if (overlay) overlay.classList.add("hidden");
   Object.keys(activePolls).forEach((id) => {
     clearInterval(activePolls[id]);
     delete activePolls[id];
@@ -1558,9 +1546,15 @@ function escSettings(str) {
 
 document.getElementById("btn-setup-settings")?.addEventListener("click", () => openSettings());
 
+document.getElementById("settings-close")?.addEventListener("click", () => closeSettings());
+
+document.getElementById("settings-overlay")?.addEventListener("click", (e) => {
+  if (e.target.id === "settings-overlay") closeSettings();
+});
+
 document.addEventListener("keydown", (e) => {
-  const settingsTabActive = document.querySelector('.workspace-tab[data-ws-tab="settings"].active');
-  if (e.key === "Escape" && settingsTabActive) {
+  const overlay = document.getElementById("settings-overlay");
+  if (e.key === "Escape" && overlay && !overlay.classList.contains("hidden")) {
     closeSettings();
   }
 });

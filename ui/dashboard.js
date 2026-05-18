@@ -1292,15 +1292,16 @@ if (humanifyCheckbox) {
 // ---------------------------------------------------------------------------
 
 function switchWorkspaceTab(tabName) {
+  if (tabName === "settings") {
+    if (typeof openSettings === "function") openSettings();
+    return;
+  }
   document.querySelectorAll(".workspace-tab").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.wsTab === tabName);
   });
   document.querySelectorAll(".workspace-panel").forEach((panel) => {
     panel.classList.toggle("active", panel.dataset.wsPanel === tabName);
   });
-  if (tabName === "settings" && typeof refreshSettings === "function") {
-    refreshSettings();
-  }
   if (tabName === "library") {
     refreshDashboard();
   }

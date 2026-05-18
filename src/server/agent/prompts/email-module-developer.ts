@@ -138,7 +138,6 @@ Wrap the outer container with MSO conditionals so Outlook desktop respects the 6
 - Use "type": "text" (NEVER "textarea" — it's deprecated)
 - NEVER use "name": "name" (reserved) — use "item_name" instead
 - NEVER use "name": "label" (reserved) — use "section_label" instead
-- NEVER use "name": "body" (reserved) — use "body_text" instead
 - NEVER put literal \\n in field defaults
 - Color fields: type "color", default { "color": "#hex", "opacity": 100 }
 - Link fields: type "link", default { "url": { "href": "#", "type": "EXTERNAL" }, "open_in_new_tab": true, "no_follow": false }

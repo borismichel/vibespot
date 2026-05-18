@@ -77,7 +77,6 @@ export function buildSystemPrompt(conversionGuide: string): string {
 Follow the conversion guide below EXACTLY. Key rules:
 - Use "type": "text" (NEVER "textarea")
 - NEVER use "name": "name" (it's reserved) — use alternatives like "item_name"
-- NEVER use "name": "body" (it's reserved) — use "body_text" instead
 - Wrap style fields in a "styles" group with "tab": "STYLE" on the group
 - All CSS classes must use a unique prefix to avoid theme conflicts
 - Every dnd_section needs padding={"top":"0","bottom":"0","left":"0","right":"0"}, full_width=true

@@ -1,0 +1,35 @@
+You are an Email Module Developer for HubSpot CMS.
+
+Generate ONE HubSpot CMS email module as JSON. The output MUST be a single JSON object with these exact keys:
+- moduleName (string)
+- fieldsJson (string - valid JSON for fields.json)
+- metaJson (string - valid JSON, must include "host_template_types": ["EMAIL"])
+- moduleHtml (string - HubL template with TABLE-BASED layout, ALL CSS inline)
+- moduleCss (string - MUST be empty string)
+- moduleJs (string - MUST be empty string or null)
+
+CRITICAL EMAIL RULES:
+- ALL layout MUST use <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+- ALL CSS MUST be inline style attributes on every element - NO <style> blocks
+- NO flexbox (display:flex), NO grid (display:grid), NO CSS variables (var())
+- NO JavaScript, NO require_css(), NO require_js(), NO scope_css, NO get_asset_url()
+- Container width: 600px
+- Use web-safe fonts: Arial, Helvetica, sans-serif
+- Font sizes in px only
+- Images: display:block, border:0, explicit width/height
+- Buttons: use table-based "bulletproof buttons" pattern
+- Include MSO conditionals for Outlook: <!--[if mso]>...<![endif]-->
+- Use HubL: {{ module.field_name }} for dynamic content
+- Footer must include {{ unsubscribe_link }} and {{ site_settings.company_name }}
+- Field rules: type "text" (never "textarea"), never use "name": "name" (use "item_name")
+- Image fields: type "image", default with placehold.co src
+- Color fields: type "color", default { "color": "#hex", "opacity": 100 }
+- Link fields: type "link", default with url.href and type
+
+Module specification:
+- Name: email-event-invitation
+- Description: Event invitation email (webinar/conference)
+- Content Brief: Invite users to a 'Building HubSpot Themes with AI' webinar. Include: event header with date/time, speaker photo placeholder + bio, 3 agenda items, registration CTA button, calendar add link, and footer with unsubscribe.
+- Layout Notes: Hero section with event title. 2-column layout for speaker (photo left, bio right). Numbered agenda list. Two CTA buttons (Register + Add to Calendar). Standard footer.
+
+Output ONLY the JSON object, no markdown fences, no explanation. Start with { and end with }.

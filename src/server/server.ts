@@ -220,34 +220,14 @@ export function getServerContentMode(): "page" | "email" {
   return serverContentMode;
 }
 
-function refererOrigin(referer: string | undefined): string {
-  if (!referer) return "";
-  try {
-    return new URL(referer).origin;
-  } catch {
-    return "";
-  }
-}
-
-const LOCALHOST_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
-const PRIVATE_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1|100\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/;
-
 export function startServer(opts: ServerOptions): Promise<{ port: number; close: () => void }> {
   const { port, uiDir } = opts;
   serverContentMode = opts.contentMode || "page";
 
   const server = createServer((req, res) => handleRequest(req, res, uiDir));
 
-  // WebSocket server — upgrade on the same HTTP server. Reject browser-origin
-  // upgrades that don't come from localhost; non-browser clients (no Origin
-  // header) are allowed.
-  const wss = new WebSocketServer({
-    server,
-    verifyClient: ({ origin }) => {
-      if (!origin) return true;
-      return LOCALHOST_ORIGIN_RE.test(origin);
-    },
-  });
+  // WebSocket server — upgrade on the same HTTP server
+  const wss = new WebSocketServer({ server });
   wss.on("connection", (ws) => handleWsConnection(ws));
 
   return new Promise((resolve, reject) => {
@@ -353,7 +333,7 @@ function handleApiRoute(
 ): void {
   // CORS — allow localhost and private/Tailscale IPs
   const origin = req.headers.origin || "";
-  if (PRIVATE_ORIGIN_RE.test(origin)) {
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|100\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -363,16 +343,6 @@ function handleApiRoute(
     res.writeHead(204);
     res.end();
     return;
-  }
-
-  // Origin enforcement for state-changing methods. CLI/curl clients omit
-  // Origin entirely and are allowed; browser clients must come from localhost.
-  if (method === "POST" || method === "PUT" || method === "DELETE") {
-    const candidate = origin || refererOrigin(req.headers.referer);
-    if (candidate && !LOCALHOST_ORIGIN_RE.test(candidate)) {
-      jsonResponse(res, 403, { error: "Origin not allowed" });
-      return;
-    }
   }
 
   switch (path) {

@@ -180,6 +180,26 @@ Once your modules are ready:
 7. Edit text, images, and colors in the page editor
 8. Preview and publish!
 
+## Docker Deployment
+
+Run vibeSpot as a containerised service for your team — LAN, VPN, or HTTPS.
+
+```bash
+cp .env.example .env        # set at least one AI API key
+docker compose up -d         # plain HTTP on port 4200
+```
+
+For public HTTPS with automatic TLS via Caddy:
+
+```bash
+# In .env, set VIBESPOT_DOMAIN=vibespot.example.com
+docker compose --profile https up -d
+```
+
+All AI keys, engine selection, and integrations are configurable via environment variables — see `.env.example` for the full list. Themes and config persist across container restarts via named Docker volumes.
+
+For reverse proxy configs (nginx, Traefik, k8s Ingress), Kubernetes manifests, backup/restore, and security guidance, see the full **[Docker Deployment Guide](docs/docker-deployment.md)**.
+
 ## Commands
 
 ```bash
@@ -209,7 +229,13 @@ Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, Figma, GitH
 - `figmaToken` — Figma Personal Access Token for design import
 - `enabledCLITools` — Which CLI tools to detect on settings load
 
+All settings can also be provided via environment variables for headless/Docker deployments — see [Docker Deployment](docs/docker-deployment.md) and `.env.example` for the full list.
+
 ## What's New
+
+### Unreleased
+- **Docker deployment** — run vibeSpot as a containerised service with `docker compose up -d`. Includes Caddy auto-HTTPS, env var configuration for all AI keys/integrations, named volume persistence, health check endpoint, and deployment docs for nginx/k8s
+- **Langdock AI adapter** — EU-hosted AI engine via Langdock gateway
 
 ### v1.3.1
 - **Project overview table** — sortable table view for all projects with page, email, module, and brand asset counts

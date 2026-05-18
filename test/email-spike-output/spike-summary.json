@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-04-30T19:03:58.054Z",
+  "results": [
+    {
+      "name": "email-welcome",
+      "criticalPassed": 0,
+      "criticalTotal": 12,
+      "overallPass": false,
+      "failedChecks": []
+    },
+    {
+      "name": "email-product-announcement",
+      "criticalPassed": 0,
+      "criticalTotal": 12,
+      "overallPass": false,
+      "failedChecks": []
+    },
+    {
+      "name": "email-event-invitation",
+      "criticalPassed": 0,
+      "criticalTotal": 12,
+      "overallPass": false,
+      "failedChecks": []
+    }
+  ],
+  "passRate": 0,
+  "verdict": "NO-GO"
+}

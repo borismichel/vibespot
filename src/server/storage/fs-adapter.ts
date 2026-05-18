@@ -1,0 +1,284 @@
+/**
+ * FileSystemStorageAdapter — wraps current filesystem-based persistence.
+ * Zero behavioral change from existing session/store.ts and session/disk.ts.
+ */
+
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, readdirSync, renameSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { homedir } from "node:os";
+import type { StorageAdapter, FileEntry, ModuleOnDisk } from "./types.js";
+import type { VibeSession, SessionIndexEntry } from "../session/types.js";
+
+const SESSIONS_DIR = join(homedir(), ".vibespot", "sessions");
+const INDEX_PATH = join(SESSIONS_DIR, "_index.json");
+
+export class FileSystemStorageAdapter implements StorageAdapter {
+  // -------------------------------------------------------------------------
+  // Generic file I/O
+  // -------------------------------------------------------------------------
+
+  async read(path: string): Promise<string | null> {
+    try {
+      return readFileSync(path, "utf-8");
+    } catch {
+      return null;
+    }
+  }
+
+  async write(path: string, data: string): Promise<void> {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, data, "utf-8");
+  }
+
+  async delete(path: string): Promise<void> {
+    if (existsSync(path)) {
+      rmSync(path, { recursive: true, force: true });
+    }
+  }
+
+  async list(prefix: string): Promise<FileEntry[]> {
+    if (!existsSync(prefix)) return [];
+    const entries = readdirSync(prefix, { withFileTypes: true });
+    return entries.map((e) => ({
+      path: join(prefix, e.name),
+      isDirectory: e.isDirectory(),
+    }));
+  }
+
+  async exists(path: string): Promise<boolean> {
+    return existsSync(path);
+  }
+
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    renameSync(oldPath, newPath);
+  }
+
+  // -------------------------------------------------------------------------
+  // Session CRUD
+  // -------------------------------------------------------------------------
+
+  async saveSession(session: VibeSession): Promise<void> {
+    mkdirSync(SESSIONS_DIR, { recursive: true });
+    const filePath = join(SESSIONS_DIR, `${session.id}.json`);
+    writeFileSync(filePath, JSON.stringify(session, null, 2), "utf-8");
+    this.upsertIndex(session);
+  }
+
+  async loadSession(sessionId: string): Promise<VibeSession | null> {
+    const filePath = join(SESSIONS_DIR, `${sessionId}.json`);
+    if (!existsSync(filePath)) return null;
+    try {
+      return JSON.parse(readFileSync(filePath, "utf-8"));
+    } catch {
+      return null;
+    }
+  }
+
+  async listSessions(): Promise<SessionIndexEntry[]> {
+    if (!existsSync(SESSIONS_DIR)) return [];
+    return this.readIndex();
+  }
+
+  async deleteSession(sessionId: string, deleteFiles = false): Promise<void> {
+    const filePath = join(SESSIONS_DIR, `${sessionId}.json`);
+    let themeName = "";
+
+    if (existsSync(filePath)) {
+      try {
+        const data = JSON.parse(readFileSync(filePath, "utf-8"));
+        themeName = data.themeName || "";
+        if (deleteFiles && data.themePath && existsSync(data.themePath)) {
+          rmSync(data.themePath, { recursive: true, force: true });
+        }
+      } catch { /* ignore */ }
+      rmSync(filePath, { force: true });
+    }
+
+    if (themeName) {
+      await this.deleteSessionsByTheme(themeName, false);
+    } else {
+      this.removeFromIndex(sessionId);
+    }
+  }
+
+  async deleteSessionsByTheme(themeName: string, deleteFiles = false): Promise<void> {
+    if (!existsSync(SESSIONS_DIR)) return;
+    for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith(".json") && f !== "_index.json")) {
+      try {
+        const data = JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf-8"));
+        if (data.themeName === themeName) {
+          if (deleteFiles && data.themePath && existsSync(data.themePath)) {
+            rmSync(data.themePath, { recursive: true, force: true });
+          }
+          rmSync(join(SESSIONS_DIR, f), { force: true });
+        }
+      } catch { /* ignore */ }
+    }
+    const entries = this.readIndex().filter((e) => e.themeName !== themeName);
+    this.writeIndex(entries);
+  }
+
+  // -------------------------------------------------------------------------
+  // Theme file operations
+  // -------------------------------------------------------------------------
+
+  async readModule(themePath: string, moduleName: string): Promise<ModuleOnDisk | null> {
+    const modDir = join(themePath, "modules", `${moduleName}.module`);
+    if (!existsSync(modDir)) return null;
+
+    const fieldsJson = this.safeRead(join(modDir, "fields.json"));
+    const moduleHtml = this.safeRead(join(modDir, "module.html"));
+    if (!fieldsJson || !moduleHtml) return null;
+
+    return {
+      fieldsJson,
+      metaJson: this.safeRead(join(modDir, "meta.json")),
+      moduleHtml,
+      moduleCss: this.safeRead(join(modDir, "module.css")),
+      moduleJs: this.safeRead(join(modDir, "module.js")) || undefined,
+    };
+  }
+
+  async writeModule(themePath: string, moduleName: string, files: ModuleOnDisk): Promise<void> {
+    const modDir = join(themePath, "modules", `${moduleName}.module`);
+    mkdirSync(modDir, { recursive: true });
+    writeFileSync(join(modDir, "fields.json"), files.fieldsJson, "utf-8");
+    writeFileSync(join(modDir, "meta.json"), files.metaJson, "utf-8");
+    writeFileSync(join(modDir, "module.html"), files.moduleHtml, "utf-8");
+    writeFileSync(join(modDir, "module.css"), files.moduleCss, "utf-8");
+    if (files.moduleJs) {
+      writeFileSync(join(modDir, "module.js"), files.moduleJs, "utf-8");
+    }
+  }
+
+  async deleteModule(themePath: string, moduleName: string): Promise<void> {
+    const modDir = join(themePath, "modules", `${moduleName}.module`);
+    if (existsSync(modDir)) {
+      rmSync(modDir, { recursive: true, force: true });
+    }
+  }
+
+  async listModules(themePath: string): Promise<string[]> {
+    const modulesDir = join(themePath, "modules");
+    if (!existsSync(modulesDir)) return [];
+    return readdirSync(modulesDir, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && e.name.endsWith(".module"))
+      .map((e) => e.name.replace(/\.module$/, ""));
+  }
+
+  async readSharedCss(themePath: string, themeName: string): Promise<string> {
+    const cssDir = join(themePath, "css");
+    if (!existsSync(cssDir)) return "";
+    const files = readdirSync(cssDir).filter((f) => f.endsWith("-theme.css"));
+    if (files.length === 0) return "";
+    return this.safeRead(join(cssDir, files[0]));
+  }
+
+  async writeSharedCss(themePath: string, themeName: string, css: string): Promise<void> {
+    const cssDir = join(themePath, "css");
+    mkdirSync(cssDir, { recursive: true });
+    writeFileSync(join(cssDir, `${themeName}-theme.css`), css, "utf-8");
+  }
+
+  async readSharedJs(themePath: string, themeName: string): Promise<string> {
+    const jsDir = join(themePath, "js");
+    if (!existsSync(jsDir)) return "";
+    const files = readdirSync(jsDir).filter((f) => f.endsWith("-animations.js"));
+    if (files.length === 0) return "";
+    return this.safeRead(join(jsDir, files[0]));
+  }
+
+  async writeSharedJs(themePath: string, themeName: string, js: string): Promise<void> {
+    const jsDir = join(themePath, "js");
+    mkdirSync(jsDir, { recursive: true });
+    writeFileSync(join(jsDir, `${themeName}-animations.js`), js, "utf-8");
+  }
+
+  async readBrandAsset(themePath: string, filename: string): Promise<string | null> {
+    const filePath = join(themePath, ".vibespot", filename);
+    if (!existsSync(filePath)) return null;
+    return this.safeRead(filePath) || null;
+  }
+
+  async writeBrandAsset(themePath: string, filename: string, content: string): Promise<void> {
+    const dir = join(themePath, ".vibespot");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, filename), content, "utf-8");
+  }
+
+  async deleteBrandAsset(themePath: string, filename: string): Promise<void> {
+    const filePath = join(themePath, ".vibespot", filename);
+    if (existsSync(filePath)) rmSync(filePath, { force: true });
+  }
+
+  // -------------------------------------------------------------------------
+  // Private helpers
+  // -------------------------------------------------------------------------
+
+  private safeRead(filePath: string): string {
+    try {
+      return readFileSync(filePath, "utf-8");
+    } catch {
+      return "";
+    }
+  }
+
+  private readIndex(): SessionIndexEntry[] {
+    try {
+      if (!existsSync(INDEX_PATH)) return this.rebuildIndex();
+      return JSON.parse(readFileSync(INDEX_PATH, "utf-8"));
+    } catch {
+      return this.rebuildIndex();
+    }
+  }
+
+  private writeIndex(entries: SessionIndexEntry[]): void {
+    try {
+      mkdirSync(SESSIONS_DIR, { recursive: true });
+      writeFileSync(INDEX_PATH, JSON.stringify(entries), "utf-8");
+    } catch { /* non-critical */ }
+  }
+
+  private rebuildIndex(): SessionIndexEntry[] {
+    if (!existsSync(SESSIONS_DIR)) return [];
+    const entries: SessionIndexEntry[] = [];
+    for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith(".json") && f !== "_index.json")) {
+      try {
+        const data = JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf-8"));
+        const templates = data.templates || [];
+        entries.push({
+          id: data.id,
+          themeName: data.themeName,
+          updatedAt: data.updatedAt,
+          moduleCount: templates.reduce((n: number, t: any) => n + (t.modules?.length || 0), 0),
+          templateCount: templates.length,
+          isImported: !!data.isImported,
+        });
+      } catch { /* skip corrupt files */ }
+    }
+    this.writeIndex(entries);
+    return entries;
+  }
+
+  private upsertIndex(session: VibeSession): void {
+    const entries = this.readIndex();
+    const templates = session.templates || [];
+    const entry: SessionIndexEntry = {
+      id: session.id,
+      themeName: session.themeName,
+      updatedAt: session.updatedAt,
+      moduleCount: templates.reduce((n, t) => n + (t.modules?.length || 0), 0),
+      templateCount: templates.length,
+      isImported: !!session.isImported,
+    };
+    const idx = entries.findIndex((e) => e.id === session.id);
+    if (idx >= 0) entries[idx] = entry;
+    else entries.push(entry);
+    this.writeIndex(entries);
+  }
+
+  private removeFromIndex(sessionId: string): void {
+    const entries = this.readIndex().filter((e) => e.id !== sessionId);
+    this.writeIndex(entries);
+  }
+}

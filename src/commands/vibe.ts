@@ -30,18 +30,17 @@ export async function vibeCommand(): Promise<void> {
     process.exit(1);
   }
 
-  const envPort = Number.parseInt(process.env.VIBESPOT_PORT || "", 10);
-  const startPort = Number.isFinite(envPort) && envPort > 0 ? envPort : DEFAULT_PORT;
-  const skipOpen = process.env.VIBESPOT_NO_OPEN === "1" || !process.stdout.isTTY;
+  const requestedPort = parseInt(process.env.VIBESPOT_PORT || "", 10) || DEFAULT_PORT;
 
   try {
-    const { port, close } = await startServer({ port: startPort, uiDir });
+    const { port, close } = await startServer({ port: requestedPort, uiDir });
     const url = `http://localhost:${port}`;
 
     console.log(accent(`  v ${url}`));
     console.log(dim("  Press Ctrl+C to stop\n"));
 
-    if (!skipOpen) {
+    // Auto-open browser (skip in containers / headless environments)
+    if (!process.env.VIBESPOT_NO_OPEN) {
       try {
         if (process.platform === "darwin") {
           execFileSync("open", [url], { stdio: "ignore" });
