@@ -325,6 +325,7 @@ export function handleSettingsApiKeyRoute(req: IncomingMessage, res: ServerRespo
           case "anthropic": configUpdate.anthropicApiKey = ""; break;
           case "openai": configUpdate.openaiApiKey = ""; break;
           case "gemini": configUpdate.geminiApiKey = ""; break;
+          case "langdock": configUpdate.langdockApiKey = ""; break;
           case "figma": configUpdate.figmaToken = ""; break;
           default:
             jsonResponse(res, 400, { error: `Unknown provider: ${provider}` });
@@ -340,6 +341,7 @@ export function handleSettingsApiKeyRoute(req: IncomingMessage, res: ServerRespo
         case "anthropic": configUpdate.anthropicApiKey = apiKey; break;
         case "openai": configUpdate.openaiApiKey = apiKey; break;
         case "gemini": configUpdate.geminiApiKey = apiKey; break;
+        case "langdock": configUpdate.langdockApiKey = apiKey; break;
         case "figma": configUpdate.figmaToken = apiKey; break;
         default:
           jsonResponse(res, 400, { error: `Unknown provider: ${provider}` });
@@ -355,6 +357,7 @@ export function handleSettingsApiKeyRoute(req: IncomingMessage, res: ServerRespo
           anthropic: "anthropic-api",
           openai: "openai-api",
           gemini: "gemini-api",
+          langdock: "langdock-api",
         };
         const engine = engineMap[provider];
         if (engine) {
