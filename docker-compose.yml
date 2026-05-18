@@ -26,9 +26,14 @@ services:
       VIBESPOT_NO_OPEN: "1"
       NODE_ENV: production
       # AI provider keys — at least one must be set for end-to-end generation.
+      VIBESPOT_AI_ENGINE: ${VIBESPOT_AI_ENGINE:-langdock-api}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      LANGDOCK_API_KEY: ${LANGDOCK_API_KEY:-}
+      LANGDOCK_BASE_URL: ${LANGDOCK_BASE_URL:-}
+      # HubSpot Personal Access Key for theme uploads.
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${HUBSPOT_PERSONAL_ACCESS_KEY:-}
       # Hosted storage adapter — leave empty to use the filesystem default.
       VIBESPOT_STORAGE: ${VIBESPOT_STORAGE:-filesystem}
       DATABASE_URL: postgres://vibespot:${POSTGRES_PASSWORD:-vibespot}@postgres:5432/vibespot

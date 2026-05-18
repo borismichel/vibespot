@@ -16,6 +16,7 @@ vibespot-blog-project.json
 .redesign.md
 docs/*
 !docs/docker.md
+!docs/docker-langdock-deployment.md
 !ui/docs/
 .superpowers/
 .references/
