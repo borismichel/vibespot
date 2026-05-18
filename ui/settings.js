@@ -18,6 +18,7 @@ const ENGINE_LABELS = {
   "gemini-cli": "Gemini CLI",
   "gemini-api": "Gemini API",
   "codex-cli": "OpenAI Codex",
+  "langdock-api": "Langdock",
 };
 
 // ---------------------------------------------------------------------------
@@ -141,6 +142,7 @@ function renderAITab(body, data) {
     { id: "gemini-cli", label: "Gemini CLI" },
     { id: "gemini-api", label: "Gemini API" },
     { id: "codex-cli", label: "Codex CLI" },
+    { id: "langdock-api", label: "Langdock" },
   ];
 
   for (const eng of allEngines) {
@@ -259,6 +261,7 @@ function renderAITab(body, data) {
     { key: "anthropic", name: "Anthropic", placeholder: "sk-ant-api03-..." },
     { key: "openai", name: "OpenAI", placeholder: "sk-..." },
     { key: "gemini", name: "Google AI", placeholder: "AIza..." },
+    { key: "langdock", name: "Langdock", placeholder: "ld-..." },
   ];
 
   for (const prov of providers) {
@@ -1470,6 +1473,14 @@ function getModelsForEngine(engine) {
         { id: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
         { id: "codex-mini-latest", label: "Codex Mini (latest)" },
       ];
+    case "langdock-api":
+      return [
+        { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
+        { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
+        { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
+        { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+        { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+      ];
     default:
       return [];
   }
@@ -1484,6 +1495,7 @@ function getCurrentModel(engine, config) {
     case "codex-cli": return config.codexCliModel || "gpt-5.5";
     case "gemini-cli": return config.geminiCliModel || "gemini-2.5-pro";
     case "gemini-api": return config.geminiApiModel || "gemini-2.5-pro";
+    case "langdock-api": return config.langdockApiModel || "claude-sonnet-4-6";
     default: return null;
   }
 }

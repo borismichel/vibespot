@@ -405,6 +405,7 @@ export function detectEnvironment(): EnvironmentStatus {
   const anthropicKey = keyStatus(config.anthropicApiKey, "ANTHROPIC_API_KEY");
   const openaiKey = keyStatus(config.openaiApiKey, "OPENAI_API_KEY");
   const geminiKey = keyStatus(config.geminiApiKey, "GEMINI_API_KEY", "GOOGLE_AI_API_KEY");
+  const langdockKey = keyStatus(config.langdockApiKey, "LANGDOCK_API_KEY");
 
   // Build available engines — CLI tools must be enabled + authenticated
   const available: AIEngineType[] = [];
@@ -415,6 +416,7 @@ export function detectEnvironment(): EnvironmentStatus {
   if (gemini.found && gemini.authenticated) available.push("gemini-cli");
   if (geminiKey.configured) available.push("gemini-api");
   if (codex.found && codex.authenticated) available.push("codex-cli");
+  if (langdockKey.configured) available.push("langdock-api");
 
   return {
     tools: {
@@ -431,6 +433,7 @@ export function detectEnvironment(): EnvironmentStatus {
       anthropic: anthropicKey,
       openai: openaiKey,
       gemini: geminiKey,
+      langdock: langdockKey,
     },
     activeEngine: config.aiEngine || null,
     availableEngines: available,
