@@ -139,6 +139,7 @@ vibeSpot needs an AI engine to generate code. Use **one** of these:
 | Claude OAuth | Run `claude setup-token` → paste token | Uses your Claude Pro/Max subscription |
 | OpenAI API | No install — just need an API key | Any OpenAI model |
 | Gemini API | No install — just need an API key | Google Gemini models |
+| [Langdock](https://langdock.com) | No install — just need a Langdock API key | EU-hosted gateway (Frankfurt), GDPR-compliant |
 | [Claude Code](https://claude.ai/code) | `npm install -g @anthropic-ai/claude-code` | Uses your Claude subscription |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` | Uses your Google AI account |
 | [OpenAI Codex](https://github.com/openai/codex) | `npm install -g @openai/codex` | Uses your OpenAI account |
@@ -221,8 +222,9 @@ Most users only need `npx vibespot` — the web UI handles everything.
 
 Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, Figma, GitHub, vibeSpot) and saved in `~/.vibespot/config.json`:
 
-- `aiEngine` — Your preferred AI engine (`anthropic-api`, `claude-oauth`, `openai-api`, `gemini-api`, `claude-code`, `gemini-cli`, `codex-cli`)
-- `anthropicApiKey`, `openaiApiKey`, `geminiApiKey` — API keys (stored locally, never sent except to the provider)
+- `aiEngine` — Your preferred AI engine (`anthropic-api`, `claude-oauth`, `openai-api`, `gemini-api`, `langdock-api`, `claude-code`, `gemini-cli`, `codex-cli`)
+- `anthropicApiKey`, `openaiApiKey`, `geminiApiKey`, `langdockApiKey` — API keys (stored locally, never sent except to the provider)
+- `langdockBaseUrl` — Override for self-hosted Langdock deployments (default: `https://api.langdock.com/anthropic`)
 - `hubspotAccounts` — Connected HubSpot accounts (PAK-based auth)
 - `hubspotUploadMode` — `api` (default, direct API) or `cli` (legacy, requires HubSpot CLI)
 - `agenticConcurrency` — Max parallel module generation calls (default: 20)

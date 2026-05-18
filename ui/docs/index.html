@@ -201,7 +201,7 @@ vibespot</code></pre>
     <div class="doc-feature">
       <div class="doc-feature__icon">&#127912;</div>
       <div class="doc-feature__title">Multi-Engine AI</div>
-      <div class="doc-feature__desc">Works with Anthropic, OpenAI, Gemini, Claude Code, Gemini CLI, and Codex CLI.</div>
+      <div class="doc-feature__desc">Works with Anthropic, OpenAI, Gemini, Langdock, Claude Code, Gemini CLI, and Codex CLI.</div>
     </div>
     <div class="doc-feature">
       <div class="doc-feature__icon">&#128338;</div>
@@ -219,7 +219,7 @@ vibespot</code></pre>
   <p>vibeSpot stores its configuration at <code>~/.vibespot/config.json</code>. You can configure everything through the Settings panel in the web UI, or by editing the config file directly.</p>
 
   <h3 id="ai-engines">AI Engines</h3>
-  <p>vibeSpot supports seven AI engines. You only need one to get started. The table below compares them:</p>
+  <p>vibeSpot supports eight AI engines. You only need one to get started. The table below compares them:</p>
 
   <table>
     <thead>
@@ -231,6 +231,7 @@ vibespot</code></pre>
       <tr><td>Claude OAuth</td><td>API</td><td>Run <code>claude setup-token</code>, paste token</td><td>Included in Claude subscription</td><td>Subscribers without API budget</td></tr>
       <tr><td>OpenAI API</td><td>API</td><td>Add <code>OPENAI_API_KEY</code></td><td>Pay-per-token</td><td>GPT-5.5 users, existing OpenAI budget</td></tr>
       <tr><td>Gemini API</td><td>API</td><td>Add <code>GEMINI_API_KEY</code></td><td>Free tier available</td><td>Cost-conscious users, free quota</td></tr>
+      <tr><td>Langdock</td><td>API</td><td>Add <code>LANGDOCK_API_KEY</code></td><td>Pay-per-token (via Langdock)</td><td>EU data residency, GDPR compliance</td></tr>
       <tr><td>Gemini CLI</td><td>CLI</td><td>Install <code>gemini</code> CLI, authenticate</td><td>Free (with Google account)</td><td>Free option without API keys</td></tr>
       <tr><td>Codex CLI</td><td>CLI</td><td>Install <code>codex</code> CLI, authenticate</td><td>Included in OpenAI subscription</td><td>OpenAI subscribers</td></tr>
     </tbody>
@@ -243,6 +244,7 @@ vibespot</code></pre>
       <button class="doc-tabs__tab" data-tab="tab-claude-oauth">Claude OAuth</button>
       <button class="doc-tabs__tab" data-tab="tab-openai">OpenAI API</button>
       <button class="doc-tabs__tab" data-tab="tab-gemini-api">Gemini API</button>
+      <button class="doc-tabs__tab" data-tab="tab-langdock">Langdock</button>
       <button class="doc-tabs__tab" data-tab="tab-gemini-cli">Gemini CLI</button>
       <button class="doc-tabs__tab" data-tab="tab-codex">Codex CLI</button>
     </div>
@@ -290,6 +292,18 @@ vibespot</code></pre>
         <li>Select <strong>Gemini API</strong> as the engine.</li>
       </ol>
     </div>
+    <div class="doc-tabs__panel" id="tab-langdock">
+      <p>Langdock is an EU-hosted AI gateway based in Frankfurt. It routes Claude requests through an Anthropic-compatible endpoint, so all Anthropic features (prompt caching, structured output, extended thinking) work unchanged. Langdock provides a single GDPR-native DPA covering OpenAI, Anthropic, Mistral, and Google models.</p>
+      <ol class="doc-steps">
+        <li>Sign up at <a href="https://langdock.com" target="_blank">langdock.com</a> and generate an API key.</li>
+        <li>In vibeSpot Settings &rarr; AI tab, paste the key into the Langdock API Key field. Or set the environment variable: <code>export LANGDOCK_API_KEY=...</code></li>
+        <li>Select <strong>Langdock</strong> as the engine. The default model is <code>claude-sonnet-4-6</code>. All Claude models are available through the gateway.</li>
+      </ol>
+      <div class="doc-callout doc-callout--info">
+        <div class="doc-callout__label">&#8505; Self-Hosted Deployments</div>
+        <p>For private-cloud or self-hosted Langdock installations, set <code>LANGDOCK_BASE_URL</code> to override the default endpoint (<code>https://api.langdock.com/anthropic</code>). You can also set this in the config file as <code>langdockBaseUrl</code>.</p>
+      </div>
+    </div>
     <div class="doc-tabs__panel" id="tab-gemini-cli">
       <p>The Gemini CLI runs as a local subprocess, similar to Claude Code.</p>
       <ol class="doc-steps">
@@ -331,10 +345,13 @@ vibespot</code></pre>
       <tr><th>Field</th><th>Type</th><th>Description</th></tr>
     </thead>
     <tbody>
-      <tr><td><code>aiEngine</code></td><td>string</td><td>Active AI engine: <code>"anthropic-api"</code>, <code>"claude-code"</code>, <code>"claude-oauth"</code>, <code>"openai-api"</code>, <code>"gemini-api"</code>, <code>"gemini-cli"</code>, <code>"codex-cli"</code></td></tr>
+      <tr><td><code>aiEngine</code></td><td>string</td><td>Active AI engine: <code>"anthropic-api"</code>, <code>"claude-code"</code>, <code>"claude-oauth"</code>, <code>"openai-api"</code>, <code>"gemini-api"</code>, <code>"langdock-api"</code>, <code>"gemini-cli"</code>, <code>"codex-cli"</code></td></tr>
       <tr><td><code>anthropicApiKey</code></td><td>string</td><td>Anthropic API key (starts with <code>sk-ant-</code>)</td></tr>
       <tr><td><code>openaiApiKey</code></td><td>string</td><td>OpenAI API key (starts with <code>sk-</code>)</td></tr>
       <tr><td><code>geminiApiKey</code></td><td>string</td><td>Google AI / Gemini API key</td></tr>
+      <tr><td><code>langdockApiKey</code></td><td>string</td><td>Langdock API key for the EU gateway</td></tr>
+      <tr><td><code>langdockApiModel</code></td><td>string</td><td>Langdock model override (default: <code>claude-sonnet-4-20250514</code>)</td></tr>
+      <tr><td><code>langdockBaseUrl</code></td><td>string</td><td>Override Langdock endpoint for self-hosted/private-cloud deployments (default: <code>https://api.langdock.com/anthropic</code>)</td></tr>
       <tr><td><code>claudeCodeModel</code></td><td>string</td><td>Model override for Claude Code CLI</td></tr>
       <tr><td><code>anthropicApiModel</code></td><td>string</td><td>Anthropic API model (default: <code>claude-sonnet-4-20250514</code>)</td></tr>
       <tr><td><code>openaiApiModel</code></td><td>string</td><td>OpenAI API model (default: <code>gpt-5.5</code>)</td></tr>
