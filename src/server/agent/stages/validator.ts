@@ -63,11 +63,14 @@ export function validateModules(
     );
 
     // --- Reserved field names ---
+    const renameMap: Record<string, string> = {};
     fixedModule.fieldsJson = fixReservedFieldNames(
       fixedModule.fieldsJson,
       fixedModule.moduleName,
       issues,
+      renameMap,
     );
+    fixedModule.moduleHtml = applyFieldRenames(fixedModule.moduleHtml, renameMap);
 
     // --- Deprecated field types ---
     fixedModule.fieldsJson = fixDeprecatedFieldTypes(
@@ -176,44 +179,59 @@ function validateAndFixJson(
     issues.push({
       module: moduleName,
       field,
-      message: `Invalid JSON in ${field}`,
-      autoFixed: false,
+      message: `Invalid JSON in ${field} — reset to empty`,
+      autoFixed: true,
+    });
+    return field === "fieldsJson" ? "[]" : JSON.stringify({
+      host_template_types: [isEmail ? "EMAIL" : isBlog ? "BLOG_POST" : "PAGE"],
+      is_available_for_new_content: true,
     });
   }
   return jsonStr;
 }
 
+const RESERVED_FIELD_RENAMES: [string, string][] = [
+  ["name", "item_name"],
+  ["label", "section_label"],
+  ["body", "body_text"],
+];
+
 function fixReservedFieldNames(
   fieldsJson: string,
   moduleName: string,
   issues: ValidationIssue[],
+  renameMap: Record<string, string>,
 ): string {
   let fixed = fieldsJson;
 
-  // "name": "name" → "name": "item_name"
-  const namePattern = /"name"\s*:\s*"name"/g;
-  if (namePattern.test(fixed)) {
-    issues.push({
-      module: moduleName,
-      field: "fieldsJson",
-      message: '"name" is a reserved field name → renamed to "item_name"',
-      autoFixed: true,
-    });
-    fixed = fixed.replace(/"name"\s*:\s*"name"/g, '"name": "item_name"');
+  for (const [reserved, replacement] of RESERVED_FIELD_RENAMES) {
+    const pattern = new RegExp(`"name"\\s*:\\s*"${reserved}"`, "g");
+    if (pattern.test(fixed)) {
+      issues.push({
+        module: moduleName,
+        field: "fieldsJson",
+        message: `"${reserved}" is a reserved field name → renamed to "${replacement}"`,
+        autoFixed: true,
+      });
+      fixed = fixed.replace(
+        new RegExp(`"name"\\s*:\\s*"${reserved}"`, "g"),
+        `"name": "${replacement}"`,
+      );
+      renameMap[reserved] = replacement;
+    }
   }
 
-  // "name": "label" → "name": "section_label"
-  const labelPattern = /"name"\s*:\s*"label"/g;
-  if (labelPattern.test(fixed)) {
-    issues.push({
-      module: moduleName,
-      field: "fieldsJson",
-      message: '"label" is a reserved field name → renamed to "section_label"',
-      autoFixed: true,
-    });
-    fixed = fixed.replace(/"name"\s*:\s*"label"/g, '"name": "section_label"');
-  }
+  return fixed;
+}
 
+function applyFieldRenames(html: string, renameMap: Record<string, string>): string {
+  let fixed = html;
+  for (const [oldName, newName] of Object.entries(renameMap)) {
+    fixed = fixed.replace(
+      new RegExp(`module\\.${oldName}\\b`, "g"),
+      `module.${newName}`,
+    );
+  }
   return fixed;
 }
 
