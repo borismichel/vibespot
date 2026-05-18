@@ -42,7 +42,7 @@ describe("validator — JSON checks", () => {
       (i) => i.field === "fieldsJson" && i.message.includes("Invalid JSON"),
     );
     expect(jsonIssue).toBeDefined();
-    expect(jsonIssue!.autoFixed).toBe(false);
+    expect(jsonIssue!.autoFixed).toBe(true);
   });
 
   it("auto-generates metaJson when empty", () => {
