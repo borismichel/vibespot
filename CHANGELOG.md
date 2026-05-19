@@ -6,6 +6,14 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+---
+
+## v1.5.0 — 2026-05-19
+
+### Features
+
+- **Langdock in AI Settings UI** ([VIB-1742](/VIB/issues/VIB-1742)) — Langdock is now selectable directly from the AI Settings panel in the web UI, making it easy to switch to the EU-hosted engine without editing config files.
+
 ### Removed
 
 - **Single-file binary distribution** ([VIB-451](/VIB/issues/VIB-451)) — the `bun --compile` binaries (macOS arm64/x64, Linux x64/arm64, Windows x64) and the macOS `.app` bundle introduced in v1.4.0–v1.4.2 are withdrawn. vibespot is a long-running local server backing a browser-based UI, not a Finder/Explorer-clickable desktop app, so packaging it as a bare executable or a `.app` didn't actually improve the experience over Docker. **Docker is now the only no-Node distribution path** — see [docs/docker.md](docs/docker.md). The `binaries.yml` workflow, `scripts/build-binaries.ts`, `scripts/build-macos-app.ts`, `scripts/install.sh`, the `bin/vibespot-bun-entry.ts` runtime entry, the `assets/icon/` set, and the related runtime-root resolver are all removed. The v1.4.0–v1.4.2 git tags still exist (Docker images at `ghcr.io/borismichel/vibespot:1.4.{0,1,2}` continue to work); the binary GitHub Release assets may be deleted separately on request.
