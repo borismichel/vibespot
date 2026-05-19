@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 400" width="1600" height="400">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400&amp;family=Space+Grotesk:wght@700&amp;display=swap');
+    </style>
+    <linearGradient id="star-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e8613a"/>
+      <stop offset="100%" stop-color="#f2825f"/>
+    </linearGradient>
+    <linearGradient id="bar-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#e8613a"/>
+      <stop offset="100%" stop-color="#f2825f"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="75%" cy="10%" r="45%">
+      <stop offset="0%" stop-color="#e8613a" stop-opacity="0.08"/>
+      <stop offset="40%" stop-color="#e8613a" stop-opacity="0.02"/>
+      <stop offset="65%" stop-color="#e8613a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="20%" cy="95%" r="35%">
+      <stop offset="0%" stop-color="#e8613a" stop-opacity="0.06"/>
+      <stop offset="40%" stop-color="#e8613a" stop-opacity="0.01"/>
+      <stop offset="65%" stop-color="#e8613a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1600" height="400" fill="#faf9f7"/>
+  <rect width="1600" height="400" fill="url(#glow1)"/>
+  <rect width="1600" height="400" fill="url(#glow2)"/>
+
+  <!-- Decorative stars -->
+  <g opacity="0.10"><path d="M214 69 C214.6 78.6,221.4 85.4,231 86 C221.4 86.6,214.6 93.4,214 103 C213.4 93.4,206.6 86.6,197 86 C206.6 85.4,213.4 78.6,214 69Z" fill="#e8613a"/></g>
+  <g opacity="0.07"><path d="M149 295 C149.4 301.4,153.6 305.6,160 306 C153.6 306.4,149.4 310.6,149 317 C148.6 310.6,144.4 306.4,138 306 C144.4 305.6,148.6 301.4,149 295Z" fill="#e8613a"/></g>
+  <g opacity="0.09"><path d="M1372 88 C1372.6 97,1378.6 103,1388 103.6 C1378.6 104.2,1372.6 110.2,1372 119.2 C1371.4 110.2,1365.4 104.2,1356 103.6 C1365.4 103,1371.4 97,1372 88Z" fill="#e8613a"/></g>
+  <g opacity="0.06"><path d="M1428 325 C1428.8 337,1437 345.2,1449 346 C1437 346.8,1428.8 355,1428 367 C1427.2 355,1419 346.8,1407 346 C1419 345.2,1427.2 337,1428 325Z" fill="#e8613a"/></g>
+  <g opacity="0.05"><path d="M371 175 C371.3 179.8,374.2 182.7,379 183 C374.2 183.3,371.3 186.2,371 191 C370.7 186.2,367.8 183.3,363 183 C367.8 182.7,370.7 179.8,371 175Z" fill="#e8613a"/></g>
+  <g opacity="0.07"><path d="M413 303 C413.4 310,418 314.6,425 315 C418 315.4,413.4 320,413 327 C412.6 320,408 315.4,401 315 C408 314.6,412.6 310,413 303Z" fill="#e8613a"/></g>
+  <g opacity="0.06"><path d="M1188 57 C1188.3 62.4,1191.6 65.7,1197 66 C1191.6 66.3,1188.3 69.6,1188 75 C1187.7 69.6,1184.4 66.3,1179 66 C1184.4 65.7,1187.7 62.4,1188 57Z" fill="#e8613a"/></g>
+  <g opacity="0.05"><path d="M1172 340 C1172.5 348,1177.8 353.3,1186 353.8 C1177.8 354.3,1172.5 359.6,1172 367.6 C1171.5 359.6,1166.2 354.3,1158 353.8 C1166.2 353.3,1171.5 348,1172 340Z" fill="#e8613a"/></g>
+  <g opacity="0.04"><path d="M1288 326 C1288.2 330,1290.6 332.4,1295 332.6 C1290.6 332.8,1288.2 335.2,1288 339.2 C1287.8 335.2,1285.4 332.8,1281 332.6 C1285.4 332.4,1287.8 330,1288 326Z" fill="#e8613a"/></g>
+  <g opacity="0.04"><path d="M533 138 C533.2 141.6,535.4 143.8,539 144 C535.4 144.2,533.2 146.4,533 150 C532.8 146.4,530.6 144.2,527 144 C530.6 143.8,532.8 141.6,533 138Z" fill="#e8613a"/></g>
+
+  <!-- Logo mark (dark container + star) -->
+  <g transform="translate(680, 128)">
+    <rect width="80" height="80" rx="18" fill="#0c0a09"/>
+    <g transform="translate(15, 15) scale(0.0977)">
+      <path d="M256 28 C260 140, 372 252, 484 256 C372 260, 260 372, 256 484 C252 372, 140 260, 28 256 C140 252, 252 140, 256 28Z" fill="url(#star-grad)"/>
+    </g>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="784" y="183" font-family="'Space Grotesk', system-ui, -apple-system, sans-serif" font-weight="700" font-size="60" fill="#1a1715" letter-spacing="-1.8">vibeSpot</text>
+
+  <!-- Tagline -->
+  <text x="800" y="234" font-family="'DM Sans', system-ui, -apple-system, sans-serif" font-weight="400" font-size="21" fill="#78716c" text-anchor="middle" letter-spacing="0.2">Build HubSpot landing pages with AI</text>
+
+  <!-- Accent bar -->
+  <rect x="776" y="256" width="48" height="3" rx="1.5" fill="url(#bar-grad)" opacity="0.6"/>
+</svg>

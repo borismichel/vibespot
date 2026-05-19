@@ -1,325 +1,123 @@
-# vibeSpot
+<p align="center">
+  <img src="assets/readme/00-hero-banner.svg" alt="vibeSpot — Build HubSpot landing pages with AI" width="100%">
+</p>
 
-AI-powered HubSpot CMS landing page builder — vibe coding & React converter.
+<p align="center">
+  <a href="https://www.npmjs.com/package/vibespot"><img src="https://img.shields.io/npm/v/vibespot?style=flat&color=e8613a&labelColor=1f2937" alt="npm version"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-e8613a?style=flat&labelColor=1f2937" alt="License"></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A518-e8613a?style=flat&labelColor=1f2937" alt="Node 18+">
+  <a href="https://vibespot.letsplaywith.tech"><img src="https://img.shields.io/badge/site-vibespot.letsplaywith.tech-e8613a?style=flat&labelColor=1f2937" alt="Website"></a>
+</p>
 
-```
-  ≋ vibeSpot — Build HubSpot Landing Pages with AI
-```
+<p align="center"><b>Build HubSpot landing pages with AI.</b></p>
 
-**Website:** [vibespot.letsplaywith.tech](https://vibespot.letsplaywith.tech)
-**LinkedIn:** [myvibespot](https://www.linkedin.com/company/myvibespot/)
+<p align="center">
+  Describe what you want in plain English — or paste a Figma URL. vibeSpot generates a native HubSpot theme: editable modules, real fields, your design tokens. Local-first. Your keys, your portal, your code.
+</p>
 
-> **Requirements:** Node.js 18+. That's it — vibeSpot connects to HubSpot directly via API. No HubSpot CLI needed.
+<p align="center">
+  <img src="assets/readme/01-vibe-coding-hero.png" alt="vibeSpot — chat on the left, live preview on the right" width="100%">
+</p>
 
-## What It Does
-
-vibeSpot lets you build HubSpot landing pages by chatting with AI. Describe what you want, and it generates native HubSpot CMS modules — fully editable in the HubSpot page editor. No coding knowledge required.
-
-It also converts existing React landing pages (built with Lovable, v0, Bolt, or any React-based builder) into HubSpot-native modules.
-
-### Vibe Coding Mode (Default)
+## Quickstart
 
 ```bash
 npx vibespot
 ```
 
-Opens a browser with:
-- **Chat on the left** — describe your landing page in natural language
-- **Live preview on the right** — see your page render in real-time, with Split, Plan, and Code views
-- **Agentic pipeline** — multi-stage AI generation with real-time progress
-- **Multi-page sites** — create full HubSpot sites from a single prompt with shared header/footer, per-page layouts, and cross-page navigation validation
-- **Inline WYSIWYG editing** — click text, images, and links directly in the live preview to edit them inline
-- **Per-section visual controls** — hover any module for a floating toolbar with color pickers, spacing sliders, image swap, and font size controls
-- **Plan mode** — toggle on to deliberate before generating: the AI asks elicitation questions, builds a markdown plan in a resizable sidebar, and only generates after you approve. Pre-canned plan templates for common page types skip the cold-start phase.
-- **Onboarding walkthrough** — 3-step intro for first-time users covering what vibeSpot is, how it maps to HubSpot, and a guided first prompt
-- **Workspace tabs** — Pages, Brand, Library, Marketplace, Settings tabs organize the dashboard. Brand tab includes a live visual preview of your brand kit.
-- **Project sidebar** — create, open, resume, or delete projects; page tree shows all templates with type badges and module counts
-- **Module management** — reorder via drag-and-drop, edit fields, delete modules from module list or module library
-- **Starter templates** — SaaS, Portfolio, Restaurant, Event, Coming Soon, Blog — pre-built page bundles for instant preview with no AI wait
-- **Content types** — landing pages, email templates, and blog templates all supported from asset-type cards and the page type dropdown
-- **Email client preview** — renders your email in Gmail, Outlook Desktop, and Apple Mail with per-client rendering notes
-- **Split-pane view** — preview + code editor side by side in a 50/50 layout
-- **Project overview table** — sortable table with page, email, module, and brand asset counts per project, plus bulk duplicate/delete
-- **Brand kit enforcement** — colors, fonts, and logo are injected as constraints into AI generation; validator warns on off-brand values
-- **Interact mode** — unified mode that auto-detects whether you're editing content inline or referencing modules in chat
-- **Undo/redo** — Ctrl+Z / Ctrl+Y step through version history; a compact timeline strip shows every generation step
-- **Smart suggestions** — contextual suggestion chips appear after pipeline completion, filtered by existing modules
-- **From Figma** *(Beta)* — paste a Figma URL to extract design tokens, text, and assets, then generate a full page that translates the design verbatim
-- **From React** *(Beta)* — convert existing React/Lovable projects from a Git URL
-- **From HubSpot** — fetch an existing theme, then run inverse analysis to extract design tokens, module graph, and round-trip risks
-- **Field editor** — tweak text, colors, images directly
-- **File uploads** — attach images and documents via drag-and-drop or paperclip button
-- **Upload to HubSpot** — per-file progress, auto-fix, celebration popup with direct portal link
-- **Version history** — per-template git commits with rollback in a collapsible bottom panel
-- **Light/dark mode** — toggle or auto-detect system preference
-- **Tabbed settings** — AI engines (with extended-thinking toggle), HubSpot accounts, Figma, GitHub, vibeSpot config
-- **Mobile responsive** — tablet breakpoint collapses the rail; sub-768px shows a gate dialog
-- **ZIP download** — export your theme as a ZIP file
+A browser opens. Pick an AI engine, drop in an API key, describe your page. That's the whole product.
 
-### Agentic Pipeline
+Requires Node.js 18+. No HubSpot CLI install needed — vibeSpot talks to HubSpot directly via API.
 
-When you send a message, vibeSpot runs a 4-stage pipeline:
+## The tour
 
-1. **Intent Analyzer** — classifies your request and plans which modules to create, modify, or keep unchanged. Uses conversation history to resolve back-references ("same section") and corrections ("I meant the hero").
-2. **Page Architect** — designs the visual system (CSS variables, shared styles) then plans module specs. Reports font limitations when web fonts are requested.
-3. **Module Developer** — generates all modules in parallel (up to 20 concurrent)
-4. **Quality Check** — auto-fixes common issues (unbalanced HubL tags, reserved field names, deprecated types, CDN imports). Verifies all modules are in the page order.
+### 1. Talk to it. Ship a HubSpot page.
 
-Completed modules appear in the live preview immediately as each finishes, with themed skeleton placeholders for modules still generating.
+<img src="assets/readme/01-vibe-coding-hero.png" alt="Chat-driven page generation with live preview" width="100%">
 
-### Plan Mode
+Type what you want on the left. Watch real HubSpot modules render on the right — Split, Plan, and Code views, all live. A four-stage agentic pipeline (Intent → Architect → Module Developer → Quality Check) generates modules in parallel and auto-fixes common HubL issues before they reach you.
 
-Plan mode is a deliberation phase that runs *before* any code is generated. Toggle it from the prominent **Plan Mode** pill above the chat input. While active:
+### 2. Deliberate before you generate — Plan mode
 
-- The AI asks elicitation questions to surface gaps in your brief: who's the audience, what's the primary CTA, what sections should the page have, what's the brand voice.
-- Each response builds up a markdown plan, persisted to `{theme}/.vibespot/plan.md` and rendered in a dedicated **Plan** tab in the right pane.
-- The AI may emit clickable answer chips for common questions (e.g. "What's your primary goal? [Lead capture] [Sign-ups] [Demo bookings]") to keep the conversation fast.
-- You can **edit the plan inline** (pencil icon → textarea → Save) — refinements without typing chat messages.
-- Generation is **hard-gated**: the agentic pipeline is refused while plan mode is on. The only way to generate is the explicit **Approve plan** button, which prepends the plan to the user message as a design brief and runs the pipeline against the approved spec.
-- **Discard & start over** clears the plan and exits plan mode.
+<img src="assets/readme/02-plan-mode.png" alt="Plan mode: AI asks elicitation questions and builds a markdown plan" width="100%">
 
-Plan mode is ideal when:
-- You're starting from a vague brief and want the AI to help you scope the page.
-- Multiple stakeholders need to review the plan before code is generated.
-- You're generating a high-stakes page and want to control content/structure decisions explicitly.
+Vague brief? Toggle Plan mode. vibeSpot asks the questions a senior designer would — audience, primary CTA, sections, voice — and builds a markdown plan in the right pane. Generation is hard-gated until you approve. Pre-canned templates skip the cold start for common page types.
 
-When plan mode is off, vibeSpot generates immediately — the existing fast path. Mode state persists across sessions.
+### 3. Translate Figma 1:1
 
-### Figma Import (Beta)
+<img src="assets/readme/03-figma-import.png" alt="Figma import: paste a URL, extract design tokens and copy" width="100%">
 
-Translate a Figma design into a HubSpot CMS theme without re-implementing it. The pipeline preserves the design's exact colors, typography, copy, and section order — the AI is only used to translate each section to HubL, not to make creative decisions.
+Paste a Figma URL. vibeSpot extracts the exact design tokens (colors, type, spacing, shadows), the literal copy, and the section structure — then translates each section to HubL. The AI translates; it doesn't invent. What ships matches the Figma file.
 
-**Setup:**
-1. Open **Settings → Figma** and paste a Figma Personal Access Token (generate one in your Figma account settings).
-2. Click **From Figma** on the setup screen and paste a Figma file URL or a specific frame URL.
+### 4. Build whole sites in one prompt
 
-**What the importer extracts:**
-- **Design tokens** — colors (with usage counts), typography styles (family, size, weight per role), spacing scale, effects (shadows, border radii). These map mechanically to `:root` CSS variables — no AI guessing.
-- **Section structure** — top-level frames become modules, in their original Figma order.
-- **Per-section content** — exact headlines, body copy, and CTAs are extracted with role and font-size annotations, fed to the AI as field defaults.
-- **Image assets** — downloaded from Figma's image API as PNGs (2× resolution).
+<img src="assets/readme/04-multi-page-sites.png" alt="Multi-page site with shared header/footer and page tree" width="100%">
 
-**Two image modes (toggle on the import screen):**
-- **Import images as assets** *(default)* — images land in `{theme}/assets/` and are referenced via `get_asset_url()`. The page looks identical to Figma out of the box.
-- **Image fields with placeholders** — modules use HubSpot image fields with placehold.co defaults. Content editors swap in their own images via the HubSpot editor.
+One prompt → multi-page HubSpot site. Shared header and footer, per-page layouts, cross-page navigation validation. The project sidebar shows the page tree with type badges and module counts. Drag to reorder, click to open.
 
-**The conversion pipeline (streamlined):**
-1. **Generate shared CSS** — deterministic mapping of design tokens to CSS variables and utility classes. No AI.
-2. **Map sections to module specs** — each section's exact text and layout becomes a module specification.
-3. **AI translation** — for each module, the AI converts the Figma section into HubL. Parallel, concurrency-limited. The system prompt forbids inventing content; everything comes from Figma.
-4. **Quality check** — the same auto-fix layer used by the agentic pipeline.
+### 5. Edit in the live preview
 
-The result is a HubSpot theme where every color, word, and pixel of spacing matches the original design — fully editable in HubSpot's drag-and-drop editor.
+<img src="assets/readme/05-inline-wysiwyg.png" alt="Inline WYSIWYG editing with per-section hover toolbar" width="100%">
 
-### Classic Wizard Mode
+Click text, images, and links directly in the live preview to edit them inline. Hover any module for a floating toolbar: color picker, spacing slider, image swap, font size. Undo/redo through every generation step.
 
-```bash
-npx vibespot wizard
-```
+### 6. Upload straight to HubSpot
 
-Step-by-step CLI wizard for converting an existing React project to HubSpot modules.
+<img src="assets/readme/06-hubspot-upload.png" alt="Celebration popup after a successful HubSpot upload, with a direct link to the portal" width="100%">
 
-## Setup Guide
+Click Upload. Per-file progress, auto-fix for common errors, celebration popup with a direct link to your HubSpot portal (EU and NA regions auto-detected). From there it's Content → Landing Pages → Create → drop your modules onto the page.
 
-### 1. Check if Node.js is installed
+## Choose your AI engine
 
-```bash
-node -v
-```
-
-If you see `v18.x.x` or higher, you're good. Otherwise install from [nodejs.org](https://nodejs.org).
-
-### 2. Install an AI Engine
-
-vibeSpot needs an AI engine to generate code. Use **one** of these:
+vibeSpot runs the same pipeline across seven engines. Use whichever subscription you already pay for.
 
 | Engine | Install | Notes |
 |--------|---------|-------|
-| Anthropic API | No install — just need an API key | Get one at [console.anthropic.com](https://console.anthropic.com) |
-| Claude OAuth | Run `claude setup-token` → paste token | Uses your Claude Pro/Max subscription |
-| OpenAI API | No install — just need an API key | Any OpenAI model |
-| Gemini API | No install — just need an API key | Google Gemini models |
-| [Langdock](https://langdock.com) | No install — just need a Langdock API key | EU-hosted gateway (Frankfurt), GDPR-compliant |
-| [Claude Code](https://claude.ai/code) | `npm install -g @anthropic-ai/claude-code` | Uses your Claude subscription |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` | Uses your Google AI account |
-| [OpenAI Codex](https://github.com/openai/codex) | `npm install -g @openai/codex` | Uses your OpenAI account |
+| Anthropic API | API key only | [console.anthropic.com](https://console.anthropic.com) |
+| Claude OAuth | `claude setup-token` | Uses your Claude Pro/Max subscription |
+| OpenAI API | API key only | Any OpenAI model |
+| Gemini API | API key only | Google Gemini models |
+| [Claude Code](https://claude.ai/code) | `npm i -g @anthropic-ai/claude-code` | Uses your Claude subscription |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @google/gemini-cli` | Uses your Google AI account |
+| [OpenAI Codex](https://github.com/openai/codex) | `npm i -g @openai/codex` | Uses your OpenAI account |
 
-### 3. Run vibeSpot
+## Setup
 
-```bash
-npx vibespot
-```
-
-The browser opens automatically. Enter your API key in the setup screen, create or open a theme, and start chatting.
-
-### 4. Connect HubSpot
-
-Open **Settings → HubSpot** and add your account with a Personal Access Key (PAK). vibeSpot connects directly via the HubSpot API — no CLI installation needed. You can also switch to legacy CLI mode if you prefer.
-
-### Run with Docker
-
-Prefer not to install Node.js? Pull the published image instead:
-
-```bash
-docker run --rm -p 4200:4200 \
-  -e ANTHROPIC_API_KEY=sk-ant-... \
-  ghcr.io/borismichel/vibespot:latest
-```
-
-Or use the bundled `docker-compose.yml` (Caddy + Postgres + auth-gate slot) for production deployments. See [docs/docker.md](docs/docker.md) for the full guide.
-
-## After Building Your Page
-
-Once your modules are ready:
-
-1. Click **Upload to HubSpot** in the toolbar
-2. Watch per-file upload progress with auto-fix for common errors
-3. The celebration popup shows a direct link to your HubSpot portal (EU and NA regions auto-detected)
-4. In HubSpot: **Content** → **Landing Pages** → **Create**
-5. Choose your uploaded theme
-6. Drag your modules onto the page
-7. Edit text, images, and colors in the page editor
-8. Preview and publish!
-
-## Docker Deployment
-
-Run vibeSpot as a containerised service for your team — LAN, VPN, or HTTPS.
-
-```bash
-cp .env.example .env        # set at least one AI API key
-docker compose up -d         # plain HTTP on port 4200
-```
-
-For public HTTPS with automatic TLS via Caddy:
-
-```bash
-# In .env, set VIBESPOT_DOMAIN=vibespot.example.com
-docker compose --profile https up -d
-```
-
-All AI keys, engine selection, and integrations are configurable via environment variables — see `.env.example` for the full list. Themes and config persist across container restarts via named Docker volumes.
-
-For reverse proxy configs (nginx, Traefik, k8s Ingress), Kubernetes manifests, backup/restore, and security guidance, see the full **[Docker Deployment Guide](docs/docker-deployment.md)**.
+1. **Node 18+** — `node -v` to check, [nodejs.org](https://nodejs.org) to install.
+2. **An AI engine key** — pick one from the table above.
+3. **Run it** — `npx vibespot`. The browser opens.
+4. **Connect HubSpot** — Settings → HubSpot → add a Personal Access Key. vibeSpot connects via the HubSpot API directly. No CLI install.
 
 ## Commands
 
+Most users only need `npx vibespot`. The web UI handles everything else.
+
 ```bash
 vibespot              # Vibe coding web UI (default)
-vibespot email        # Start in email template mode
-vibespot wizard       # Classic CLI wizard
-vibespot init         # Check and install required tools
+vibespot wizard       # Classic CLI wizard for React → HubSpot
 vibespot convert      # Convert a React project (no upload)
-vibespot upload       # Upload theme to HubSpot
-vibespot inverse [--path] [--json] [--apply-tokens]  # Analyze an imported theme (design tokens, module graph, risks)
-vibespot marketplace check [--fix] [--json]   # Audit theme for HubSpot Marketplace submission
-vibespot marketplace edit                     # Edit Marketplace listing metadata (marketplace.json)
+vibespot upload       # Upload a theme to HubSpot
+vibespot inverse      # Reverse-engineer an imported HubSpot theme
 vibespot doctor       # Diagnose environment issues
 ```
 
-Most users only need `npx vibespot` — the web UI handles everything.
+## What's new in v1.3
 
-## Configuration
+- **Email template generation** — full pipeline for HubSpot emails: table layouts, MSO/VML compatibility, email validator auto-fix, 3 email starters.
+- **Multi-page sites** — single prompt → full site with shared header/footer, page tree, navigation validation.
+- **Inline WYSIWYG editing** — edit text, images, and links directly in the live preview with per-section visual controls.
 
-Settings are managed in the **Settings** panel (tabbed: AI, HubSpot, Figma, GitHub, vibeSpot) and saved in `~/.vibespot/config.json`:
-
-- `aiEngine` — Your preferred AI engine (`anthropic-api`, `claude-oauth`, `openai-api`, `gemini-api`, `langdock-api`, `claude-code`, `gemini-cli`, `codex-cli`)
-- `anthropicApiKey`, `openaiApiKey`, `geminiApiKey`, `langdockApiKey` — API keys (stored locally, never sent except to the provider)
-- `langdockBaseUrl` — Override for self-hosted Langdock deployments (default: `https://api.langdock.com/anthropic`)
-- `hubspotAccounts` — Connected HubSpot accounts (PAK-based auth)
-- `hubspotUploadMode` — `api` (default, direct API) or `cli` (legacy, requires HubSpot CLI)
-- `agenticConcurrency` — Max parallel module generation calls (default: 20)
-- `figmaToken` — Figma Personal Access Token for design import
-- `enabledCLITools` — Which CLI tools to detect on settings load
-
-All settings can also be provided via environment variables for headless/Docker deployments — see [Docker Deployment](docs/docker-deployment.md) and `.env.example` for the full list.
-
-## What's New
-
-### Unreleased
-- **Docker deployment** — run vibeSpot as a containerised service with `docker compose up -d`. Includes Caddy auto-HTTPS, env var configuration for all AI keys/integrations, named volume persistence, health check endpoint, and deployment docs for nginx/k8s
-- **Langdock AI adapter** — EU-hosted AI engine via Langdock gateway
-
-### v1.3.1
-- **Project overview table** — sortable table view for all projects with page, email, module, and brand asset counts
-- **Bulk operations** — select multiple projects for bulk duplicate or delete
-- **Email client preview** — preview emails as they render in Gmail, Outlook Desktop, and Apple Mail
-- **Pipeline robustness** — auto-regenerate modules with broken fieldsJson; tightened similarity checks
-- **Email deploy fixes** — correct dnd_area naming, module references for drag-and-drop editor, deploy UX improvements
-- **Security hardening** — eliminated shell injection in git operations, path-traversal guards on theme routes
-
-### v1.3.0
-- **Email template generation** — full pipeline support for HubSpot email templates: email-specific prompts, table-based layout, MSO/VML compatibility, 3 email starters, 5 email plan templates, and email validator auto-fix
-- **Multi-page sites** — create full HubSpot sites from a single prompt with shared modules, page tree sidebar, and cross-page navigation validation
-- **Inline WYSIWYG editing** — click text, images, and links directly in the live preview to edit inline
-- **Per-section visual controls** — hover toolbar with color pickers, spacing sliders, image swap, and font size controls
-- **Blog template generation** — blog as a content type with HubSpot blog variable support and a Blog Content Hub starter template
-- **Split-pane view** — preview + code editor side by side
-- **Brand kit enforcement** — colors, fonts, and logo injected as AI constraints with off-brand warnings
-- **Workspace tab navigation** — Pages, Brand, Library, Marketplace, Settings tabs
-- **Guided entry with asset-type cards** — Landing Page, Email, Website, Blog Post, From Template, and Import
-- **First-visit onboarding** — 3-step walkthrough for new users
-- **Material Design SVG icons** — replaced UI emoji glyphs with crisp SVG icons
-- **Project assets browser** — Library tab shows project files (images, fonts, scripts) instead of starter templates
-
-### v1.2.0
-- **Inverse pipeline (HubSpot → vibeSpot)** — reverse-engineer imported HubSpot themes: design token extraction, module graph, field schema flags, and round-trip risk detection
-- **Simplified setup** — returning users land on a recent projects rail; new users see a chat-style prompt as the primary path
-- **Select mode** — click elements in the live preview to reference them in chat
-- **Undo/redo with visual timeline** — Ctrl+Z / Ctrl+Y step through version history with hover tooltips
-- **Smart chat suggestions** — contextual suggestion chips filtered by existing modules
-- **Plan-mode templates** — 7 pre-canned plan structures that skip cold-start elicitation
-- **Starter templates** — 5 bundled page templates for instant preview with no AI wait
-- **HubSpot Marketplace publication path** — rule-based audit, auto-fix, and listing metadata editor
-
-### v1.1.3
-- **Model selection persists for Codex CLI, Gemini CLI, and Gemini API** — picking a non-default model used to revert because the `/api/settings/engine` route had no cases for those engines, no config fields existed, and `getCurrentModel` returned `null` (so the dropdown reset to the first option). Added the config fields, route persistence, UI lookup, and runtime `--model`/`-m` flag plumbing into the CLI subprocess invocation.
-
-### v1.1.2
-- **Honest model dropdowns** — replaced generic `opus`/`sonnet`/`haiku` aliases in the Claude Code dropdown with specific version IDs (Opus 4.7, Sonnet 4.6, Haiku 4.5, etc.) so picking a version actually pins it. Codex CLI dropdown now lists GPT-5.5, GPT-5.5 Pro, GPT-5.3 Codex, GPT-5.2 Codex, GPT-5.1 Codex Max/Mini, GPT-5.4 Mini/Nano, Codex Mini — no more outdated `o4-mini` / `o3` / `gpt-4o` only.
-- **Live model catalog covers Codex CLI** — when an OpenAI API key is configured, both OpenAI API and Codex CLI dropdowns get populated from `/v1/models` (cached 10 min). New OpenAI releases show up automatically.
-- **Settings dialog opens to AI tab** — fixed a click-handler bug that left the dialog blank on open.
-
-### v1.1.0
-- **Plan mode** — deliberation phase before generation. Prominent toggle above chat input; AI asks elicitation questions, builds a markdown plan in a dedicated tab, only generates after Approve. Plan persists to `.vibespot/plan.md` across sessions.
-- **Streamlined Figma import** — replaces the old agentic-pipeline path with a translation pipeline that preserves Figma's exact design tokens, copy, and section order. Image assets copy into the theme automatically.
-- **Anthropic SDK upgrade** (0.39 → 0.91) — unlocks extended thinking, improved prompt caching, and tool/schema-level cache control.
-- **AI Capabilities settings panel** — toggle Extended Thinking (Anthropic API engines, with Low/Medium/High budget) and Web Search (Anthropic API + Claude Code CLI). Prompt Caching shows as auto-active; Citations is the remaining "coming soon" item. Claude Code engines see honest "Auto (CLI-managed)" badges where the CLI handles the feature internally.
-- **Cache control on tool definitions** — Module Developer's identical tool schema is now cached, saving schema-encoding tokens on every parallel call after the first.
-- **Claude Code stream-json output** — both single-call mode and the agentic CLI path now use `--output-format stream-json --include-partial-messages --verbose`. Tool calls (`Read`, `Edit`, `Bash`, `WebSearch`, `WebFetch`, `Grep`, `Glob`) flow into the pipeline status pane as concrete activity ("Searching: '…'", "Reading hero/module.html") instead of generic rotating placeholders.
-
-### v1.0.x
-- **Figma design import** (v1.0.10) — paste a Figma URL to extract design tokens, text, section structure, and image assets, then generate a full HubSpot page via the agentic pipeline
-- **Template & module deletion** (v1.0.4) — delete templates from disk, option to delete exclusive modules, delete module button in module library preview
-- **Brand assets redesign** (v1.0.2) — hover-expand cards with per-asset Upload/Extract, Extract All, brand voice extractor, cross-template product context sharing via rendered preview HTML
-- **Agentic pipeline** (v1.0.0) — 4-stage AI generation: Intent Analyzer → Page Architect (Design System + Module Planner) → Module Developer (parallel) → Quality Check (auto-fix)
-- **Incremental preview** (v1.0.0) — completed modules appear immediately with themed placeholders for pending ones
-- **Quality Check agent** (v1.0.0) — auto-fixes unbalanced HubL tags, reserved fields, deprecated types, CDN imports
-- **Security hardening** (v0.9.5) — shell injection prevention, CORS restriction, XSS prevention, security headers, API key file permissions
-- **Code editor** (v0.9.3) — CodeMirror 6 with syntax highlighting, file browser, Preview/Code toggle, dark/light theme
-- **Design extraction** (v0.9.3) — AI-powered styleguide generation from existing themes
-- **HubSpot API mode** (v0.9.0) — upload, download, and manage themes without the HubSpot CLI
-- **File uploads** (v0.8.0) — attach images and documents to chat (drag-and-drop or paperclip)
-- **Per-template version history** (v0.7.0) — scoped git commits, filtered history, safe rollback
-- **Light/dark mode** (v0.6.0) — system preference detection, persisted toggle
-
-See [CHANGELOG.md](CHANGELOG.md) for the full history.
-
-## Troubleshooting
-
-**"command not found: node"** — Install Node.js from [nodejs.org](https://nodejs.org) and restart your terminal.
-
-**"vibeSpot has not been built yet"** — Use `npx vibespot` instead, or run `npm run build` first.
-
-**HubSpot upload failing** — Open Settings → HubSpot and verify your account is connected. Run `vibespot doctor` for diagnostics.
-
-**Preview shows default template instead of modules** — Delete the boilerplate modules (button, card, menu, pricing-card, social-follow) using the × button on each module in the sidebar.
+Full history: [CHANGELOG.md](CHANGELOG.md).
 
 ## Links
 
-- **Website:** [vibespot.letsplaywith.tech](https://vibespot.letsplaywith.tech)
-- **LinkedIn:** [myvibespot](https://www.linkedin.com/company/myvibespot/)
-- **npm:** [vibespot](https://www.npmjs.com/package/vibespot)
+- **Website** — [vibespot.letsplaywith.tech](https://vibespot.letsplaywith.tech)
+- **LinkedIn** — [myvibespot](https://www.linkedin.com/company/myvibespot/)
+- **npm** — [vibespot](https://www.npmjs.com/package/vibespot)
+- **Contributing** — [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Code of Conduct** — [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 
 ## License
 
 FSL-1.1-Apache-2.0 — see [LICENSE](LICENSE) for details.
+
