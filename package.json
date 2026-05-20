@@ -20,7 +20,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "npm run build",
-    "contact-monitor": "tsx scripts/contact-monitor.ts"
+    "contact-monitor": "tsx scripts/contact-monitor.ts",
+    "docker:publish": "scripts/docker-publish.sh",
+    "docker:publish:multi": "scripts/docker-publish.sh --multi-arch",
+    "docker:smoke": "scripts/docker-publish.sh --smoke --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
