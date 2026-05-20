@@ -156,8 +156,43 @@ function renderAITab(body, data) {
   }
   section.appendChild(selectEl);
 
-  // Model selector
+  // Langdock provider selector — shown only when Langdock is the active engine
   const activeEngine = config.aiEngine || (env.availableEngines.length > 0 ? env.availableEngines[0] : null);
+  const langdockProvider = config.langdockProvider || "anthropic";
+
+  if (activeEngine === "langdock-api") {
+    const providerRow = el("div", "settings__model-row");
+    const providerLabel = el("span", "settings__card-label");
+    providerLabel.textContent = "Provider";
+    providerRow.appendChild(providerLabel);
+
+    const providerSelect = el("select", "settings__model-select");
+    const providers = [
+      { id: "anthropic", label: "Anthropic (Claude)" },
+      { id: "openai", label: "OpenAI (GPT)" },
+      { id: "google", label: "Google (Gemini)" },
+      { id: "mistral", label: "Mistral" },
+    ];
+    for (const p of providers) {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = p.label;
+      if (p.id === langdockProvider) opt.selected = true;
+      providerSelect.appendChild(opt);
+    }
+    providerSelect.addEventListener("change", async () => {
+      await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ langdockProvider: providerSelect.value }),
+      });
+      refreshSettings();
+    });
+    providerRow.appendChild(providerSelect);
+    section.appendChild(providerRow);
+  }
+
+  // Model selector
   if (activeEngine) {
     const modelRow = el("div", "settings__model-row");
     const modelLabel = el("span", "settings__card-label");
@@ -433,7 +468,10 @@ function renderAICapabilitiesSection(activeEngine, config) {
   section.appendChild(desc("Advanced model features. Some are configurable directly; some auto-engage based on the active engine."));
 
   // Engine classification — different engines have different feature surfaces.
-  const isAnthropicAPI = activeEngine === "anthropic-api" || activeEngine === "claude-oauth";
+  // Langdock inherits capabilities from the selected upstream provider.
+  const ldProv = (config.langdockProvider || "anthropic");
+  const isLangdockAnthropic = activeEngine === "langdock-api" && ldProv === "anthropic";
+  const isAnthropicAPI = activeEngine === "anthropic-api" || activeEngine === "claude-oauth" || isLangdockAnthropic;
   const isClaudeCode = activeEngine === "claude-code";
   const isAnthropicAny = isAnthropicAPI || isClaudeCode;
 
@@ -1473,14 +1511,38 @@ function getModelsForEngine(engine) {
         { id: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
         { id: "codex-mini-latest", label: "Codex Mini (latest)" },
       ];
-    case "langdock-api":
-      return [
-        { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
-        { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
-        { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
-        { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
-        { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
-      ];
+    case "langdock-api": {
+      const ldProvider = (settingsData && settingsData.config && settingsData.config.langdockProvider) || "anthropic";
+      const ldModels = {
+        anthropic: [
+          { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
+          { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
+          { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
+          { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+          { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+        ],
+        openai: [
+          { id: "gpt-4.1", label: "GPT-4.1 (default)" },
+          { id: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+          { id: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
+          { id: "gpt-4o", label: "GPT-4o" },
+          { id: "o3-mini", label: "o3 Mini" },
+        ],
+        google: [
+          { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (default)" },
+          { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+          { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+        ],
+        mistral: [
+          { id: "mistral-large-latest", label: "Mistral Large (default)" },
+          { id: "mistral-medium-latest", label: "Mistral Medium" },
+          { id: "mistral-small-latest", label: "Mistral Small" },
+          { id: "codestral-latest", label: "Codestral" },
+          { id: "pixtral-large-latest", label: "Pixtral Large" },
+        ],
+      };
+      return ldModels[ldProvider] || ldModels.anthropic;
+    }
     default:
       return [];
   }
@@ -1495,7 +1557,11 @@ function getCurrentModel(engine, config) {
     case "codex-cli": return config.codexCliModel || "gpt-5.5";
     case "gemini-cli": return config.geminiCliModel || "gemini-2.5-pro";
     case "gemini-api": return config.geminiApiModel || "gemini-2.5-pro";
-    case "langdock-api": return config.langdockApiModel || "claude-sonnet-4-6";
+    case "langdock-api": {
+      if (config.langdockApiModel) return config.langdockApiModel;
+      const defaults = { anthropic: "claude-sonnet-4-6", openai: "gpt-4.1", google: "gemini-2.5-pro", mistral: "mistral-large-latest" };
+      return defaults[config.langdockProvider || "anthropic"] || "claude-sonnet-4-6";
+    }
     default: return null;
   }
 }

@@ -75,6 +75,36 @@ const STATIC_MODELS: Record<string, ModelEntry[]> = {
   ],
 };
 
+// Langdock per-provider model lists (keyed by provider name, not engine ID)
+const LANGDOCK_PROVIDER_MODELS: Record<string, ModelEntry[]> = {
+  anthropic: [
+    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
+    { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
+    { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
+    { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+    { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+  ],
+  openai: [
+    { id: "gpt-4.1", label: "GPT-4.1 (default)" },
+    { id: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+    { id: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
+    { id: "gpt-4o", label: "GPT-4o" },
+    { id: "o3-mini", label: "o3 Mini" },
+  ],
+  google: [
+    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (default)" },
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+    { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  ],
+  mistral: [
+    { id: "mistral-large-latest", label: "Mistral Large (default)" },
+    { id: "mistral-medium-latest", label: "Mistral Medium" },
+    { id: "mistral-small-latest", label: "Mistral Small" },
+    { id: "codestral-latest", label: "Codestral" },
+    { id: "pixtral-large-latest", label: "Pixtral Large" },
+  ],
+};
+
 // Models we want to surface for OpenAI API + Codex CLI dropdowns.
 // Inclusive of current reasoning/coding families; matches `id` exactly.
 // Supports decimal-versioned variants like gpt-5.5, gpt-4.1.
@@ -198,6 +228,10 @@ async function getModelCatalog(): Promise<Record<string, ModelEntry[]>> {
 
   await Promise.all(jobs);
 
+  // Langdock: use per-provider model list based on config
+  const ldProvider = config.langdockProvider || "anthropic";
+  catalog["langdock-api"] = LANGDOCK_PROVIDER_MODELS[ldProvider] || LANGDOCK_PROVIDER_MODELS.anthropic;
+
   modelCache.data = catalog;
   modelCache.ts = Date.now();
   return catalog;
@@ -217,6 +251,7 @@ export function handleSettingsStatusRoute(res: ServerResponse): void {
     geminiApiModel: config.geminiApiModel || null,
     langdockApiModel: config.langdockApiModel || null,
     langdockBaseUrl: config.langdockBaseUrl || null,
+    langdockProvider: config.langdockProvider || "anthropic",
     hubspotUploadMode: config.hubspotUploadMode || "api",
     hubspotAccounts: (config.hubspotAccounts || []).map((a: HubSpotAccountConfig) => ({
       portalId: a.portalId,
@@ -713,17 +748,36 @@ export function handleSettingsGenericRoute(req: IncomingMessage, res: ServerResp
         "extendedThinking",
         "extendedThinkingBudget",
         "webSearch",
+        "langdockProvider",
       ];
-      // Validate enum
+      // Validate enums
       if (data.extendedThinkingBudget !== undefined &&
           !["low", "medium", "high"].includes(data.extendedThinkingBudget)) {
         jsonResponse(res, 400, { error: "extendedThinkingBudget must be 'low' | 'medium' | 'high'" });
+        return;
+      }
+      if (data.langdockProvider !== undefined &&
+          !["anthropic", "openai", "google", "mistral"].includes(data.langdockProvider)) {
+        jsonResponse(res, 400, { error: "langdockProvider must be 'anthropic' | 'openai' | 'google' | 'mistral'" });
         return;
       }
       const update: Record<string, unknown> = {};
 
       for (const key of allowedKeys) {
         if (key in data) update[key] = data[key];
+      }
+
+      // When Langdock provider changes, reset model to the new provider's default
+      if (update.langdockProvider) {
+        const defaults: Record<string, string> = {
+          anthropic: "claude-sonnet-4-6",
+          openai: "gpt-4.1",
+          google: "gemini-2.5-pro",
+          mistral: "mistral-large-latest",
+        };
+        update.langdockApiModel = defaults[update.langdockProvider as string] || "";
+        // Invalidate model cache so next status fetch returns updated list
+        modelCache.ts = 0;
       }
 
       if (Object.keys(update).length === 0) {

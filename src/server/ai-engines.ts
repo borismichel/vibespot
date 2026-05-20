@@ -152,10 +152,11 @@ export async function streamWithAnthropicAPI(
   onChunk: (chunk: string) => void,
   onStatus?: (status: string) => void,
   onFinish?: (fullResponse: string) => void,
-  fileContexts?: UploadedFileContext[]
+  fileContexts?: UploadedFileContext[],
+  baseURL?: string,
 ): Promise<void> {
   const AnthropicSDK = await getAnthropicSDK();
-  const client = new AnthropicSDK({ apiKey });
+  const client = new AnthropicSDK({ apiKey, ...(baseURL ? { baseURL } : {}) });
   const { messages, systemBlocks } = prepareAnthropicContext(userMessage, themeName, fileContexts);
 
   log.info("anthropic", "API call", {
@@ -220,7 +221,8 @@ export async function streamWithOpenAIAPI(
   onChunk: (chunk: string) => void,
   onStatus?: (status: string) => void,
   onFinish?: (fullResponse: string) => void,
-  fileContexts?: UploadedFileContext[]
+  fileContexts?: UploadedFileContext[],
+  fetchURL?: string,
 ): Promise<void> {
   const conversionGuide = getConversionGuide();
   const editMode = getSession()!.modules.length > 0;
@@ -243,7 +245,8 @@ export async function streamWithOpenAIAPI(
     };
   });
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const url = fetchURL || "https://api.openai.com/v1/chat/completions";
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -262,7 +265,7 @@ export async function streamWithOpenAIAPI(
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`OpenAI API error (${response.status}): ${err}`);
+    throw new Error(`API error (${response.status}): ${err}`);
   }
 
   let statusIndex = 0;
@@ -320,7 +323,9 @@ export async function streamWithGeminiAPI(
   onChunk: (chunk: string) => void,
   onStatus?: (status: string) => void,
   onFinish?: (fullResponse: string) => void,
-  fileContexts?: UploadedFileContext[]
+  fileContexts?: UploadedFileContext[],
+  fetchURL?: string,
+  modelOverride?: string,
 ): Promise<void> {
   const conversionGuide = getConversionGuide();
   const session = getSession()!;
@@ -367,8 +372,8 @@ export async function streamWithGeminiAPI(
   userParts.push({ text: userContent });
   contents.push({ role: "user", parts: userParts });
 
-  const model = "gemini-2.5-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+  const model = modelOverride || "gemini-2.5-flash";
+  const url = fetchURL || `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
   const response = await fetch(url, {
     method: "POST",

@@ -4,7 +4,11 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
-## Unreleased
+## v1.5.1 — 2026-05-20
+
+### Features
+
+- **Langdock multi-provider support** ([VIB-1756](/VIB/issues/VIB-1756)) — Langdock now supports all four upstream providers: Anthropic (Claude), OpenAI (GPT), Google (Gemini), and Mistral. A new provider dropdown in AI Settings lets users switch providers; the model dropdown updates per-provider with the correct model list. AI Capabilities (extended thinking, prompt caching, web search) adapt to the selected provider. Also fixed streaming chat support for Langdock which was missing entirely.
 
 ### Documentation
 

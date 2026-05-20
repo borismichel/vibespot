@@ -126,6 +126,38 @@ export async function handleGenerateStream(
       case "codex-cli":
         await generateWithCLI("codex", userMessage, session.themeName, onChunk, onStatus, finishResponse, fileContexts);
         break;
+      case "langdock-api": {
+        const langdockKey = getApiKeyForEngine("langdock-api", config);
+        if (!langdockKey) throw new Error("Langdock API key not configured. Open Settings to add one.");
+        const provider = config.langdockProvider || "anthropic";
+        const baseUrls: Record<string, string> = {
+          anthropic: "https://api.langdock.com/anthropic",
+          openai: "https://api.langdock.com/openai",
+          google: "https://api.langdock.com/google",
+          mistral: "https://api.langdock.com/mistral",
+        };
+        const base = config.langdockBaseUrl || baseUrls[provider];
+        const ldModel = config.langdockApiModel;
+        switch (provider) {
+          case "openai":
+          case "mistral":
+            await streamWithOpenAIAPI(userMessage, langdockKey, session.themeName,
+              ldModel || "gpt-4.1", onChunk, onStatus, finishResponse, fileContexts,
+              `${base}/v1/chat/completions`);
+            break;
+          case "google":
+            await streamWithGeminiAPI(userMessage, langdockKey, session.themeName, onChunk, onStatus, finishResponse, fileContexts,
+              `${base}/v1beta/models/${ldModel || "gemini-2.5-flash"}:streamGenerateContent?alt=sse`,
+              ldModel);
+            break;
+          case "anthropic":
+          default:
+            await streamWithAnthropicAPI(userMessage, langdockKey, session.themeName,
+              ldModel || "claude-sonnet-4-6", onChunk, onStatus, finishResponse, fileContexts, base);
+            break;
+        }
+        break;
+      }
       default:
         throw new Error(`Unknown AI engine: ${engine}. Open Settings to configure one.`);
     }
@@ -248,9 +280,16 @@ export function resolveAgenticEngine(config: ReturnType<typeof loadConfig>): {
     case "gemini-api":
       model = config.geminiApiModel || "gemini-2.5-pro";
       break;
-    case "langdock-api":
-      model = config.langdockApiModel || "claude-sonnet-4-20250514";
+    case "langdock-api": {
+      const ldDefaults: Record<string, string> = {
+        anthropic: "claude-sonnet-4-6",
+        openai: "gpt-4.1",
+        google: "gemini-2.5-flash",
+        mistral: "mistral-large-latest",
+      };
+      model = config.langdockApiModel || ldDefaults[config.langdockProvider || "anthropic"];
       break;
+    }
     case "claude-code":
       model = config.claudeCodeModel || "";
       break;
