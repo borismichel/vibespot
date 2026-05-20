@@ -117,3 +117,14 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify GHCR package is public
+        run: |
+          visibility=$(gh api /users/borismichel/packages/container/vibespot --jq '.visibility' 2>/dev/null || echo "unknown")
+          if [ "$visibility" != "public" ]; then
+            echo "::warning::GHCR package visibility is '$visibility', expected 'public'. Unauthenticated docker pull will fail. Toggle at: GitHub → Packages → vibespot → Settings → Change visibility → Public"
+          else
+            echo "GHCR package visibility: $visibility ✓"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

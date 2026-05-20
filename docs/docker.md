@@ -28,6 +28,12 @@ docker run --rm -p 4200:4200 \
 
 Open <http://localhost:4200> and the vibe-coding UI loads.
 
+> **Private repo note:** The GitHub repo can be private while the GHCR
+> package is public — GitHub decouples the two. A repo admin must toggle
+> the package to public once (GitHub → Packages → vibespot → Settings →
+> Change visibility → Public). The CI workflow includes a post-publish
+> check that warns if the package reverts to private.
+
 Tags published:
 
 | Trigger              | Tag(s)                                          |
