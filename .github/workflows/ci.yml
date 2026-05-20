@@ -1,10 +1,10 @@
 name: CI
 
+# Automatic triggers disabled until June 1 2025 — GitHub Actions
+# minutes exhausted. See VIB-1759. Restore push/pull_request triggers
+# when minutes reset.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
