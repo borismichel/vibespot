@@ -1300,20 +1300,60 @@ testimonial carousel, and a minimal footer with social links.</code></pre>
      ============================================================ -->
 <div class="doc-section" id="docker-deployment">
   <h2 id="docker-deployment-heading">Docker Deployment <a href="#docker-deployment" class="doc-anchor">#</a></h2>
-  <p>Run vibeSpot as a containerised service for your team. The Docker image bundles the server, UI, and all dependencies &mdash; just add an AI API key.</p>
+  <p>Run vibeSpot as a containerised service for your team. The Docker image bundles the server, UI, and all dependencies &mdash; just add an AI API key. The image is published to the GitHub Container Registry and is <strong>public</strong>, so no login or repository checkout is required to pull it.</p>
+
+  <pre><code>docker pull ghcr.io/borismichel/vibespot:latest</code></pre>
+  <p>Tags: <code>latest</code> (most recent release), <code>1.5.0</code> / <code>1.5</code> (specific version), <code>main</code> (latest commit, may be unstable). Pin a version for production.</p>
 
   <h3 id="docker-quick-start">Quick Start (LAN / VPN) <a href="#docker-quick-start" class="doc-anchor">#</a></h3>
-  <pre><code>cp .env.example .env
-# Edit .env &mdash; set at least one AI API key (e.g. ANTHROPIC_API_KEY)
-docker compose up -d</code></pre>
-  <p>Open <code>http://&lt;host-ip&gt;:4200</code> in a browser. All AI keys, engine selection, and HubSpot credentials are configured via the <code>.env</code> file &mdash; no interactive setup needed.</p>
+  <p>Run the public image directly &mdash; no repository or compose file needed:</p>
+  <pre><code>docker run -d --name vibespot \
+  -p 4200:4200 \
+  -e VIBESPOT_AI_ENGINE=anthropic-api \
+  -e VIBESPOT_AGENTIC_MODE=true \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -v vibespot-config:/home/vibespot/.vibespot \
+  -v vibespot-themes:/home/vibespot/vibespot-themes \
+  ghcr.io/borismichel/vibespot:latest</code></pre>
+  <p>Open <code>http://&lt;host-ip&gt;:4200</code> in a browser. Swap the engine and key for whichever provider you use. The two volumes keep config and generated themes across restarts.</p>
 
   <h3 id="docker-https">HTTPS with Caddy <a href="#docker-https" class="doc-anchor">#</a></h3>
-  <p>For public or semi-public deployments, activate the Caddy reverse proxy profile. Caddy auto-provisions a TLS certificate from Let&rsquo;s Encrypt.</p>
-  <pre><code>cp .env.example .env
-# Set VIBESPOT_DOMAIN=vibespot.example.com and your AI key
-docker compose --profile https up -d</code></pre>
-  <p>Caddy binds ports 80 and 443. Point your DNS A record at the host, and HTTPS works automatically.</p>
+  <p>For public or semi-public deployments, put a <a href="https://caddyserver.com/" target="_blank">Caddy</a> reverse proxy in front to auto-provision a Let&rsquo;s Encrypt TLS certificate. Save a <code>docker-compose.yml</code> and <code>Caddyfile</code> in a directory, then run <code>docker compose up -d</code>.</p>
+  <pre><code># docker-compose.yml
+services:
+  vibespot:
+    image: ghcr.io/borismichel/vibespot:latest
+    restart: unless-stopped
+    environment:
+      VIBESPOT_AI_ENGINE: anthropic-api
+      VIBESPOT_AGENTIC_MODE: "true"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    volumes:
+      - vibespot-config:/home/vibespot/.vibespot
+      - vibespot-themes:/home/vibespot/vibespot-themes
+    expose: ["4200"]
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [vibespot]
+volumes:
+  vibespot-config:
+  vibespot-themes:
+  caddy-data:</code></pre>
+  <pre><code># Caddyfile (set your real domain)
+vibespot.example.com {
+  @websockets {
+    header Connection *Upgrade*
+    header Upgrade websocket
+  }
+  reverse_proxy @websockets vibespot:4200
+  reverse_proxy vibespot:4200
+}</code></pre>
+  <p>Caddy binds ports 80 and 443. Point your DNS A record at the host, and HTTPS works automatically. The <code>@websockets</code> rule is required &mdash; the chat and generation pipeline run over a persistent WebSocket.</p>
 
   <h3 id="docker-env-vars">Environment Variables <a href="#docker-env-vars" class="doc-anchor">#</a></h3>
   <p>The Docker image reads all configuration from environment variables. The <code>.env.example</code> file documents every option.</p>
@@ -1324,7 +1364,6 @@ docker compose --profile https up -d</code></pre>
     </thead>
     <tbody>
       <tr><td><code>VIBESPOT_PORT</code></td><td><code>4200</code></td><td>Port the server listens on inside the container</td></tr>
-      <tr><td><code>VIBESPOT_DOMAIN</code></td><td>&mdash;</td><td>Public domain for the Caddy HTTPS profile</td></tr>
       <tr><td><code>VIBESPOT_NO_OPEN</code></td><td><code>1</code></td><td>Suppress auto-open browser (set automatically in Docker)</td></tr>
       <tr><td><code>VIBESPOT_AI_ENGINE</code></td><td>&mdash;</td><td>Default engine: <code>anthropic-api</code>, <code>openai-api</code>, <code>gemini-api</code>, <code>langdock-api</code></td></tr>
       <tr><td><code>VIBESPOT_AGENTIC_MODE</code></td><td>&mdash;</td><td>Set <code>true</code> to enable the multi-stage agentic pipeline</td></tr>
@@ -1348,9 +1387,9 @@ docker compose --profile https up -d</code></pre>
       <tr><td><code>vibespot-themes</code></td><td><code>/home/vibespot/vibespot-themes</code></td><td>Generated HubSpot themes</td></tr>
     </tbody>
   </table>
-  <p>To back up:</p>
-  <pre><code>docker compose cp vibespot:/home/vibespot/.vibespot ./backup-config
-docker compose cp vibespot:/home/vibespot/vibespot-themes ./backup-themes</code></pre>
+  <p>Mount the themes volume at exactly <code>/home/vibespot/vibespot-themes</code> &mdash; that is where the app writes generated themes. Without it, themes are lost when the container is recreated. To back up:</p>
+  <pre><code>docker cp vibespot:/home/vibespot/.vibespot ./backup-config
+docker cp vibespot:/home/vibespot/vibespot-themes ./backup-themes</code></pre>
 
   <h3 id="docker-reverse-proxy">Reverse Proxy &amp; Kubernetes <a href="#docker-reverse-proxy" class="doc-anchor">#</a></h3>
   <p>If you already have a reverse proxy (nginx, Traefik, k8s Ingress), skip the Caddy profile and point your proxy at port 4200. Key requirements:</p>
@@ -1360,8 +1399,8 @@ docker compose cp vibespot:/home/vibespot/vibespot-themes ./backup-themes</code>
     <li><strong>No buffering</strong> &mdash; for streaming AI responses, disable proxy buffering.</li>
   </ul>
   <div class="doc-callout doc-callout--tip">
-    <div class="doc-callout__label">&#128214; Full guide</div>
-    <p>For nginx configs, Kubernetes manifests, security considerations, and troubleshooting, see the complete <a href="https://github.com/borismichel/vibespot/blob/main/docs/docker-deployment.md" target="_blank">Docker Deployment Guide</a>.</p>
+    <div class="doc-callout__label">&#9888;&#65039; Single instance &amp; auth</div>
+    <p>vibeSpot keeps active sessions in memory &mdash; run a single instance (no horizontal scaling without sticky sessions). It runs as a non-root user and has <strong>no built-in authentication</strong>. For internet-facing deployments, put an authenticating proxy (OAuth2 Proxy, Authelia, Cloudflare Access) in front. Persistence is filesystem-only on the named volumes &mdash; there is no database to run.</p>
   </div>
 </div>
 
