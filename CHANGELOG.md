@@ -6,6 +6,10 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### Documentation
+
+- **Self-contained Docker deployment guides** — rewrote `docs/docker-deployment.md` and `docs/docker-langdock-deployment.md` to work from the public GHCR image alone (repo is private, package is public). Removed `git clone` / `cp .env.example` steps in favour of copy-paste `docker-compose.yml`, `Caddyfile`, and `.env` blocks. Corrected two inaccuracies that affected users: themes persist at `/home/vibespot/vibespot-themes` (not the unused `/workspace` mount), and `VIBESPOT_STORAGE=postgres` is a no-op (the Postgres adapter is not wired into the container startup path) — persistence is filesystem-only. Added image tag table, upgrade steps, version-pinning guidance, and GHCR to the firewall allowlist.
+
 ---
 
 ## v1.5.0 — 2026-05-19

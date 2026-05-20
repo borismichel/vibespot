@@ -2,29 +2,178 @@
 
 Run vibeSpot as a containerised service — expose the web UI to your team over LAN, VPN, or HTTPS.
 
-## Quick start (LAN / VPN only)
+Everything here works from the **public container image** alone. You do **not** need access to the source repository — just Docker and an AI API key.
+
+## The image
+
+vibeSpot is published to the GitHub Container Registry. The package is public, so no login is required to pull it:
 
 ```bash
-cp .env.example .env
-# Edit .env — set at least one AI API key (e.g. ANTHROPIC_API_KEY)
+docker pull ghcr.io/borismichel/vibespot:latest
+```
+
+Available tags:
+
+| Tag | Points to |
+|-----|-----------|
+| `latest` | Most recent tagged release |
+| `1.5.0`, `1.5` | Specific release / minor series |
+| `v1.5.0` | Specific release (git tag form) |
+| `main` | Latest commit on the main branch (may be unstable) |
+
+Pin a specific version (e.g. `1.5.0`) for production so deploys are reproducible.
+
+## Quick start — `docker run`
+
+The fastest way to get a single instance up:
+
+```bash
+docker run -d --name vibespot \
+  -p 4200:4200 \
+  -e VIBESPOT_AI_ENGINE=anthropic-api \
+  -e VIBESPOT_AGENTIC_MODE=true \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -v vibespot-config:/home/vibespot/.vibespot \
+  -v vibespot-themes:/home/vibespot/vibespot-themes \
+  ghcr.io/borismichel/vibespot:latest
+```
+
+Open `http://<host-ip>:4200` in a browser. Swap the engine/key pair for whichever provider you use (see [AI engine](#ai-engine)).
+
+The two `-v` volumes keep your config and generated themes across restarts — see [Persistence](#persistence).
+
+## Quick start — Docker Compose (LAN / VPN)
+
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+  vibespot:
+    image: ghcr.io/borismichel/vibespot:latest
+    container_name: vibespot
+    restart: unless-stopped
+    ports:
+      - "4200:4200"
+    environment:
+      VIBESPOT_AI_ENGINE: ${VIBESPOT_AI_ENGINE:-anthropic-api}
+      VIBESPOT_AGENTIC_MODE: ${VIBESPOT_AGENTIC_MODE:-true}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      LANGDOCK_API_KEY: ${LANGDOCK_API_KEY:-}
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${HUBSPOT_PERSONAL_ACCESS_KEY:-}
+    volumes:
+      - vibespot-config:/home/vibespot/.vibespot
+      - vibespot-themes:/home/vibespot/vibespot-themes
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4200/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  vibespot-config:
+  vibespot-themes:
+```
+
+Create a `.env` file next to it with the secrets you need:
+
+```bash
+# At least one AI key matching VIBESPOT_AI_ENGINE
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Optional: pre-configure HubSpot uploads without using the UI
+# HUBSPOT_PERSONAL_ACCESS_KEY=pat-...
+
+# Optional: switch provider — anthropic-api | openai-api | gemini-api | langdock-api
+# VIBESPOT_AI_ENGINE=anthropic-api
+```
+
+Then:
+
+```bash
 docker compose up -d
 ```
 
-Open `http://<host-ip>:4200` in a browser.
+Open `http://<host-ip>:4200`. Compose automatically reads `.env` from the same directory.
 
-## Quick start with HTTPS
+## Quick start with HTTPS (Caddy)
 
-For public or semi-public deployments, activate the Caddy reverse proxy profile. Caddy auto-provisions a TLS certificate from Let's Encrypt.
+For public or semi-public deployments, add a [Caddy](https://caddyserver.com/) reverse proxy that auto-provisions a Let's Encrypt TLS certificate.
 
-```bash
-cp .env.example .env
-# Edit .env — set your domain and at least one AI key:
-#   VIBESPOT_DOMAIN=vibespot.example.com
-#   ANTHROPIC_API_KEY=sk-ant-...
-docker compose --profile https up -d
+**1.** Create a `Caddyfile` next to your compose file:
+
+```caddyfile
+{
+	email you@example.com
+}
+
+vibespot.example.com {
+	encode zstd gzip
+
+	@websockets {
+		header Connection *Upgrade*
+		header Upgrade websocket
+	}
+	reverse_proxy @websockets vibespot:4200
+
+	reverse_proxy vibespot:4200 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
 ```
 
-Caddy binds ports 80 and 443. Point your DNS A record at the host, and HTTPS works automatically.
+**2.** Use this `docker-compose.yml` instead (vibeSpot is no longer published directly — only Caddy is):
+
+```yaml
+services:
+  vibespot:
+    image: ghcr.io/borismichel/vibespot:latest
+    container_name: vibespot
+    restart: unless-stopped
+    environment:
+      VIBESPOT_AI_ENGINE: ${VIBESPOT_AI_ENGINE:-anthropic-api}
+      VIBESPOT_AGENTIC_MODE: ${VIBESPOT_AGENTIC_MODE:-true}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${HUBSPOT_PERSONAL_ACCESS_KEY:-}
+    volumes:
+      - vibespot-config:/home/vibespot/.vibespot
+      - vibespot-themes:/home/vibespot/vibespot-themes
+    expose:
+      - "4200"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: vibespot-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - vibespot
+
+volumes:
+  vibespot-config:
+  vibespot-themes:
+  caddy-data:
+  caddy-config:
+```
+
+**3.** Point your DNS A record at the host, set the domain + email in the `Caddyfile`, then:
+
+```bash
+docker compose up -d
+```
+
+HTTPS works automatically on ports 80/443. The `@websockets` block is required — vibeSpot's chat and generation pipeline run over a persistent WebSocket.
 
 ## Environment variables
 
@@ -33,7 +182,6 @@ Caddy binds ports 80 and 443. Point your DNS A record at the host, and HTTPS wor
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VIBESPOT_PORT` | `4200` | Port the vibeSpot server listens on inside the container |
-| `VIBESPOT_DOMAIN` | — | Public domain for the Caddy HTTPS profile |
 | `VIBESPOT_NO_OPEN` | `1` (in Docker) | Suppress auto-open browser on startup |
 
 ### AI engine
@@ -41,13 +189,15 @@ Caddy binds ports 80 and 443. Point your DNS A record at the host, and HTTPS wor
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VIBESPOT_AI_ENGINE` | — | Default engine: `anthropic-api`, `openai-api`, `gemini-api`, `langdock-api` |
-| `VIBESPOT_AGENTIC_MODE` | — | Set `true` to enable the multi-stage agentic pipeline |
+| `VIBESPOT_AGENTIC_MODE` | — | Set `true` to enable the multi-stage agentic pipeline (recommended) |
 | `ANTHROPIC_API_KEY` | — | Anthropic Claude API key |
 | `OPENAI_API_KEY` | — | OpenAI API key |
 | `GEMINI_API_KEY` | — | Google Gemini API key |
 | `GOOGLE_AI_API_KEY` | — | Alternative Gemini key variable |
-| `LANGDOCK_API_KEY` | — | Langdock EU gateway key |
+| `LANGDOCK_API_KEY` | — | Langdock EU gateway key (GDPR-compliant, Frankfurt) |
 | `LANGDOCK_BASE_URL` | — | Override Langdock endpoint for self-hosted deployments |
+
+Set `VIBESPOT_AI_ENGINE` to match whichever key you provide. EU teams with data-residency requirements can use `langdock-api`.
 
 ### Integrations
 
@@ -58,23 +208,34 @@ Caddy binds ports 80 and 443. Point your DNS A record at the host, and HTTPS wor
 
 ## Persistence
 
-Two named Docker volumes keep data across container restarts:
+Two named Docker volumes keep data across container restarts and image upgrades:
 
 | Volume | Container path | Contents |
 |--------|---------------|----------|
 | `vibespot-config` | `/home/vibespot/.vibespot` | `config.json`, session data |
-| `vibespot-themes` | `/home/vibespot/vibespot-themes` | Generated HubSpot themes |
+| `vibespot-themes` | `/home/vibespot/vibespot-themes` | Generated HubSpot themes (one git repo per theme) |
+
+> **Important:** mount the themes volume at exactly `/home/vibespot/vibespot-themes`. That is where the app writes generated themes (`$HOME/vibespot-themes`). Without this volume, themes are lost when the container is recreated.
 
 To back up:
 
 ```bash
-docker compose cp vibespot:/home/vibespot/.vibespot ./backup-config
-docker compose cp vibespot:/home/vibespot/vibespot-themes ./backup-themes
+docker cp vibespot:/home/vibespot/.vibespot ./backup-config
+docker cp vibespot:/home/vibespot/vibespot-themes ./backup-themes
 ```
+
+## Upgrading
+
+```bash
+docker compose pull        # fetch the newer image
+docker compose up -d       # recreate the container
+```
+
+Your data survives because it lives in the named volumes, not the container layer. Pin a tag (e.g. `:1.5.0`) if you want to control exactly when you move versions.
 
 ## Reverse proxy (nginx / Traefik / k8s Ingress)
 
-If you already have a reverse proxy, skip the Caddy profile and configure your own:
+If you already run a reverse proxy, skip Caddy and configure your own:
 
 ```nginx
 # nginx example
@@ -101,6 +262,7 @@ server {
         # AI generation can take minutes
         proxy_read_timeout 300s;
         proxy_send_timeout 300s;
+        proxy_buffering off;
     }
 }
 ```
@@ -113,7 +275,7 @@ Key points for any reverse proxy:
 
 ### Kubernetes
 
-A minimal k8s deployment:
+A minimal single-instance deployment, pulling the public image:
 
 ```yaml
 apiVersion: apps/v1
@@ -132,7 +294,7 @@ spec:
     spec:
       containers:
         - name: vibespot
-          image: vibespot:latest
+          image: ghcr.io/borismichel/vibespot:latest
           ports:
             - containerPort: 4200
           envFrom:
@@ -189,30 +351,34 @@ Use an Ingress or Gateway API resource with TLS termination pointing at the Serv
 ## Architecture notes
 
 - **Single instance** — vibeSpot keeps active sessions in memory. Do not scale to multiple replicas behind a load balancer without sticky sessions.
-- **Runs as non-root** — the container runs as user `vibespot` (UID 100). Volume permissions must allow this user to write.
-- **Git inside the container** — git is installed for the version history feature (auto-commit after each generation). The theme volume is a git repo per theme.
-- **No external database required** — the default filesystem storage adapter persists sessions to `~/.vibespot/sessions/`. A PostgreSQL adapter exists (`VIBESPOT_STORAGE_BACKEND=postgres`, `DATABASE_URL=postgres://...`) but is not yet wired into the Docker startup path.
+- **Runs as non-root** — the container runs as the `vibespot` user. On Linux, named Docker volumes are chowned automatically; bind mounts must be writable by that user (see [Troubleshooting](#troubleshooting)).
+- **Git inside the container** — git is bundled for the version history feature (auto-commit after each generation). Each theme directory is its own git repo.
+- **No external database required** — sessions persist to the filesystem (`~/.vibespot/sessions/`). There is no Postgres or other datastore to run.
+- **Health endpoint** — `GET /healthz` returns 200 once the server is ready; it backs the container `HEALTHCHECK` and the k8s probes.
 
 ## Security considerations
 
-- **API keys** — never bake keys into the image. Pass them via `.env` file or k8s Secrets. The `.env` file is excluded from the Docker build via `.dockerignore`.
-- **Network exposure** — without the HTTPS profile, vibeSpot serves plain HTTP. Only expose port 4200 on trusted networks (LAN, VPN, Tailscale).
-- **CORS** — the server allows requests from `localhost`, `127.0.0.1`, and RFC 1918 / Tailscale IP ranges. Behind a reverse proxy with the same origin, CORS is not relevant (same-origin requests).
-- **No authentication** — vibeSpot does not have built-in user authentication. For multi-user deployments, put an authenticating reverse proxy (e.g. OAuth2 Proxy, Authelia, Cloudflare Access) in front.
+- **API keys** — never bake keys into a custom image. Pass them via `.env`, `-e` flags, or k8s Secrets.
+- **Network exposure** — without HTTPS, vibeSpot serves plain HTTP. Only expose port 4200 on trusted networks (LAN, VPN, Tailscale).
+- **CORS** — the server allows requests from `localhost`, `127.0.0.1`, and RFC 1918 / Tailscale IP ranges. Behind a same-origin reverse proxy, CORS is not a factor.
+- **No built-in authentication** — vibeSpot has no user login. For multi-user or internet-facing deployments, put an authenticating reverse proxy (OAuth2 Proxy, Authelia, Cloudflare Access) in front of it.
 
 ## Troubleshooting
 
 **Container starts but UI is unreachable**
-- Check `docker compose logs vibespot` for startup errors.
-- Verify the port mapping: `docker compose ps` should show `0.0.0.0:4200->4200/tcp`.
+- Check `docker logs vibespot` (or `docker compose logs vibespot`) for startup errors.
+- Verify the port mapping: `docker ps` should show `0.0.0.0:4200->4200/tcp`.
 
 **AI generation fails**
-- Verify your API key: `docker compose exec vibespot wget -qO- http://localhost:4200/api/settings/status`.
+- Verify your key: `docker exec vibespot wget -qO- http://localhost:4200/api/settings/status`.
 - Check that `VIBESPOT_AI_ENGINE` matches the key you provided.
 
 **WebSocket disconnects behind a proxy**
 - Ensure your reverse proxy forwards the `Upgrade` and `Connection` headers.
 - Increase proxy timeouts to at least 300 seconds.
 
-**Permission denied on volumes**
-- The container runs as UID 100. On Linux hosts, set ownership: `sudo chown -R 100:101 ./data`.
+**Generated themes disappear after a restart**
+- Confirm the themes volume is mounted at `/home/vibespot/vibespot-themes` (not `/workspace` or another path).
+
+**Permission denied on volumes (bind mounts on Linux)**
+- Named volumes work out of the box. For host bind mounts, make the directory writable by the container user: `sudo chown -R 100:101 ./data` (the `vibespot` user/group). Named volumes are recommended over bind mounts.
