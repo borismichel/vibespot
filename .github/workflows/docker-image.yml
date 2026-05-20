@@ -1,9 +1,9 @@
 name: docker-image
 
+# Automatic triggers disabled until June 1 2025 — GitHub Actions
+# minutes exhausted. See VIB-1759. Restore push/tag triggers when
+# minutes reset.
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
