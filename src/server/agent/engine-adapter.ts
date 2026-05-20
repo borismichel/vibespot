@@ -86,12 +86,17 @@ export type AgentEngine =
 
 /**
  * Langdock — EU-hosted (Frankfurt) AI gateway with a GDPR-native DPA covering
- * OpenAI, Anthropic, Mistral, and Google models behind a single contract. We
- * route Claude requests through their Anthropic-compatible endpoint so prompt
- * caching, tool_use structured output, and extended thinking all work unchanged.
- * Override `langdockBaseUrl` in config for self-hosted / private-cloud installs.
+ * OpenAI, Anthropic, Mistral, and Google models behind a single contract.
+ * Each provider has its own API-compatible endpoint. Override `langdockBaseUrl`
+ * in config for self-hosted / private-cloud installs.
  */
-const LANGDOCK_DEFAULT_BASE_URL = "https://api.langdock.com/anthropic";
+export const LANGDOCK_BASE_URLS: Record<string, string> = {
+  anthropic: "https://api.langdock.com/anthropic",
+  openai: "https://api.langdock.com/openai",
+  google: "https://api.langdock.com/google",
+  mistral: "https://api.langdock.com/mistral",
+};
+const LANGDOCK_DEFAULT_BASE_URL = LANGDOCK_BASE_URLS.anthropic;
 
 // ---------------------------------------------------------------------------
 // Rate limit retry delays (shared with ai-engines.ts pattern)
@@ -398,6 +403,7 @@ async function callOpenAI(
   apiKey: string,
   model: string,
   opts: AgentCallOptions,
+  fetchURL?: string,
 ): Promise<AgentCallResult> {
   const openaiMessages = [
     { role: "system", content: opts.systemPrompt },
@@ -427,7 +433,8 @@ async function callOpenAI(
     };
   }
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const url = fetchURL || "https://api.openai.com/v1/chat/completions";
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -473,6 +480,7 @@ async function callGemini(
   apiKey: string,
   _model: string,
   opts: AgentCallOptions,
+  fetchURL?: string,
 ): Promise<AgentCallResult> {
   const model = _model || "gemini-2.5-flash";
 
@@ -499,7 +507,7 @@ async function callGemini(
     },
   };
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const url = fetchURL || `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
     method: "POST",
@@ -800,8 +808,24 @@ export async function callAgentAPI(
       return callGemini(apiKey, model, opts);
     case "langdock-api": {
       const cfg = loadConfig();
-      const baseURL = cfg.langdockBaseUrl || LANGDOCK_DEFAULT_BASE_URL;
-      return callAnthropic(apiKey, model, opts, undefined, undefined, baseURL);
+      const provider = cfg.langdockProvider || "anthropic";
+      const customBase = cfg.langdockBaseUrl;
+      switch (provider) {
+        case "openai":
+        case "mistral": {
+          const base = customBase || LANGDOCK_BASE_URLS[provider];
+          return callOpenAI(apiKey, model, opts, `${base}/v1/chat/completions`);
+        }
+        case "google": {
+          const base = customBase || LANGDOCK_BASE_URLS.google;
+          return callGemini(apiKey, model, opts, `${base}/v1beta/models/${model}:generateContent`);
+        }
+        case "anthropic":
+        default: {
+          const baseURL = customBase || LANGDOCK_BASE_URLS.anthropic;
+          return callAnthropic(apiKey, model, opts, undefined, undefined, baseURL);
+        }
+      }
     }
     default:
       throw new Error(`Unsupported API engine: ${engine}`);
@@ -840,12 +864,11 @@ export async function callAgent(
  */
 export function resolveThinkingBudget(engine: AgentEngine): number {
   // Extended thinking is an Anthropic feature; supported on engines that route
-  // through Anthropic's API surface (direct, OAuth, or Langdock gateway).
-  if (
-    engine !== "anthropic-api" &&
-    engine !== "claude-oauth" &&
-    engine !== "langdock-api"
-  ) {
+  // through Anthropic's API surface (direct, OAuth, or Langdock with Anthropic provider).
+  if (engine === "langdock-api") {
+    const cfg2 = loadConfig();
+    if ((cfg2.langdockProvider || "anthropic") !== "anthropic") return 0;
+  } else if (engine !== "anthropic-api" && engine !== "claude-oauth") {
     return 0;
   }
   const cfg = loadConfig();

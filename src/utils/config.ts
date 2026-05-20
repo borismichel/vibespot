@@ -34,11 +34,13 @@ export interface VibeSpotConfig {
   codexCliModel?: string;
   geminiCliModel?: string;
   geminiApiModel?: string;
-  // Langdock — EU-hosted gateway, Anthropic-compatible endpoint by default.
+  // Langdock — EU-hosted gateway supporting Anthropic, OpenAI, Google, Mistral.
+  // `langdockProvider` selects which upstream provider to route through.
   // `langdockBaseUrl` is overridable for self-hosted / private-cloud deployments.
   langdockApiKey?: string;
   langdockApiModel?: string;
   langdockBaseUrl?: string;
+  langdockProvider?: "anthropic" | "openai" | "google" | "mistral";
   lastThemePath?: string;
   lastSourcePath?: string;
   // HubSpot account management
@@ -97,6 +99,9 @@ export function loadConfig(): VibeSpotConfig {
   }
   if (process.env.LANGDOCK_BASE_URL && !config.langdockBaseUrl) {
     config.langdockBaseUrl = process.env.LANGDOCK_BASE_URL;
+  }
+  if (process.env.LANGDOCK_PROVIDER && !config.langdockProvider) {
+    config.langdockProvider = process.env.LANGDOCK_PROVIDER as VibeSpotConfig["langdockProvider"];
   }
   if (process.env.FIGMA_TOKEN && !config.figmaToken) {
     config.figmaToken = process.env.FIGMA_TOKEN;
