@@ -10,6 +10,10 @@ All notable changes to vibeSpot are documented here.
 
 - **Langfuse instrumentation (opt-in)** ([VIB-1764](/VIB/issues/VIB-1764)) — the agentic pipeline now captures token usage and estimated USD cost from every API model call (Anthropic, OpenAI, Gemini, Langdock), which were previously discarded. Usage/cost is logged locally (`agent-usage`) regardless of configuration. When Langfuse keys are configured (`langfusePublicKey` / `langfuseSecretKey` in `~/.vibespot/config.json`, or `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` env), each user message is traced as one Langfuse trace with a child generation per pipeline stage — so a full page shows up as a single trace with its total token cost. Implemented as a dependency-free client against Langfuse's ingestion API (no SDK added to the bundle); fully opt-in and fail-safe (a Langfuse outage never blocks or fails a generation). CLI engines (Claude Code / Gemini / Codex) report no token usage, so cost is captured only for API-key engines.
 
+### Fixes
+
+- **OpenAI/Gemini cache-token double-count** ([VIB-1766](/VIB/issues/VIB-1766)) — OpenAI and Gemini fold cached tokens into their prompt count (`prompt_tokens` / `promptTokenCount`), but the engine adapter also reported them separately as `cacheReadTokens`. This made `computeCost()` bill cached tokens twice (full input rate *plus* cache-read rate) and emit overlapping `input` + `cache_read_input_tokens` to Langfuse. The OpenAI/Gemini adapters now subtract cached tokens out of the reported input count, matching Anthropic's already-correct separated semantics; `totalTokens` is unchanged. Small cost over-estimate only; the default Anthropic engine was never affected.
+
 ---
 
 ## v1.5.1 — 2026-05-20
