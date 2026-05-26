@@ -21,6 +21,7 @@ import {
 import { hasValidOAuthToken, getValidAccessToken } from "../utils/claude-oauth.js";
 import { getFileContexts } from "./routes/upload-files.js";
 import { runAgentPipeline, isAgenticCapable, isCLIEngine } from "./agent/pipeline.js";
+import { runWithTrace } from "./langfuse.js";
 import type { AgentEngine } from "./agent/engine-adapter.js";
 import type { PipelineEvent, PipelineResult, MultiPagePipelineResult } from "./agent/types.js";
 import type { SessionSnapshot, PipelineMetadata } from "./session/types.js";
@@ -359,15 +360,25 @@ export async function handleAgenticGenerate(
       .filter((e) => !currentModuleNames.has(e.module.moduleName))
       .map((e) => ({ name: e.module.moduleName, usedIn: e.usedIn }));
 
-    const result = await runAgentPipeline(
-      enrichedMessage,
-      snapshot,
-      engine,
-      apiKey,
-      model,
-      concurrency,
-      onEvent,
-      libraryModules,
+    const result = await runWithTrace(
+      {
+        name: "agent_pipeline",
+        sessionId: snapshot.themeName,
+        input: userMessage,
+        metadata: { engine, model, concurrency },
+        tags: ["vibespot", "agentic-pipeline"],
+      },
+      () =>
+        runAgentPipeline(
+          enrichedMessage,
+          snapshot,
+          engine,
+          apiKey,
+          model,
+          concurrency,
+          onEvent,
+          libraryModules,
+        ),
     );
 
     // Verify session hasn't changed during generation
