@@ -83,6 +83,7 @@ The default generation mode. Runs a 4-stage pipeline for each user message:
 **Engine Adapter** (`engine-adapter.ts`) — Unified interface for all AI engines:
 - API engines (Anthropic, OpenAI, Gemini): structured output via JSON schema, streaming
 - CLI engines (Claude Code, Gemini CLI, Codex CLI): subprocess spawning with prompt piping
+- **Instrumentation**: API responses' token usage is captured into `AgentCallResult.usage` (`TokenUsage` in `src/server/pricing.ts`) and `callAgentAPI` emits a per-call usage/cost log plus a Langfuse generation (`src/server/langfuse.ts`). CLI engines report no usage. See "Observability (Langfuse)" below.
 
 **Prompts** (`prompts/`) — System prompts and JSON schemas for each stage.
 
@@ -95,6 +96,14 @@ The default generation mode. Runs a 4-stage pipeline for each user message:
 - `design_system_ready` — CSS pushed to session for themed placeholders
 - `blueprint_ready` — Module order set for placeholder positioning
 - `pipeline_complete` / `pipeline_partial` — Final stats
+
+### Observability (Langfuse)
+
+`src/server/langfuse.ts` is an **opt-in**, dependency-free client for Langfuse's ingestion API (`POST /api/public/ingestion`) — deliberately not the OpenTelemetry-based Langfuse v5 SDK, to keep the single-file tsup bundle lean.
+
+- **Token/cost capture** (`src/server/pricing.ts`): every API engine's response `usage` flows into `AgentCallResult.usage`; `computeCost()` estimates USD from an approximate price table. This is logged (`agent-usage`) regardless of Langfuse config. CLI engines have no usage.
+- **Tracing**: `runWithTrace()` (called in `ai-handler.ts` around `runAgentPipeline`) opens one trace per user message using `AsyncLocalStorage`; `callAgentAPI` calls `recordGeneration()`, which reads the active trace from ALS so every stage's call (including parallel module-developer calls) nests under the page's trace.
+- **Opt-in / fail-safe**: enabled only when `langfusePublicKey` + `langfuseSecretKey` are set (config or `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` env; `langfuseBaseUrl`/`LANGFUSE_BASE_URL` defaults to `https://cloud.langfuse.com`; `langfuseEnabled:false` forces off). All network/serialization errors are swallowed — a Langfuse outage never blocks or fails generation. Inputs/outputs are truncated before send.
 
 ### AI Engine Design
 

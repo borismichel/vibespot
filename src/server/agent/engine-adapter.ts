@@ -14,6 +14,8 @@ import { tryParseJSON, tryRepairTruncatedJSON } from "../ai-parser.js";
 import { loadConfig } from "../../utils/config.js";
 import { OAUTH_EXTRA_HEADERS, OAUTH_SYSTEM_PREFIX } from "../../utils/claude-oauth.js";
 import { log } from "../log.js";
+import { computeCost, type TokenUsage } from "../pricing.js";
+import { recordGeneration } from "../langfuse.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,8 +73,24 @@ export interface AgentCallOptions {
 }
 
 export type AgentCallResult =
-  | { type: "structured"; data: unknown }
-  | { type: "text"; text: string };
+  | { type: "structured"; data: unknown; usage?: TokenUsage }
+  | { type: "text"; text: string; usage?: TokenUsage };
+
+/** Map an Anthropic SDK usage object to our provider-neutral TokenUsage. */
+function mapAnthropicUsage(u: {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+} | undefined): TokenUsage | undefined {
+  if (!u) return undefined;
+  return {
+    inputTokens: u.input_tokens,
+    outputTokens: u.output_tokens,
+    cacheReadTokens: u.cache_read_input_tokens ?? undefined,
+    cacheCreationTokens: u.cache_creation_input_tokens ?? undefined,
+  };
+}
 
 export type AgentEngine =
   | "anthropic-api"
@@ -221,11 +239,13 @@ async function callAnthropic(
       });
 
       // Extract tool_use input from the response
+      const usage = mapAnthropicUsage(response.usage);
       for (const block of response.content) {
         if (block.type === "tool_use") {
           return {
             type: "structured" as const,
             data: stringifyJsonFields(block.input),
+            usage,
           };
         }
       }
@@ -234,7 +254,7 @@ async function callAnthropic(
       const textParts = response.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map((b) => b.text);
-      return { type: "text" as const, text: textParts.join("") };
+      return { type: "text" as const, text: textParts.join(""), usage };
     }, opts.onStatus);
   }
 
@@ -266,7 +286,13 @@ async function callAnthropic(
       }
     }
 
-    return { type: "text" as const, text: fullText };
+    let usage: TokenUsage | undefined;
+    try {
+      usage = mapAnthropicUsage((await stream.finalMessage()).usage);
+    } catch {
+      /* usage is best-effort */
+    }
+    return { type: "text" as const, text: fullText, usage };
   }, opts.onStatus);
 }
 
@@ -322,16 +348,17 @@ async function callAnthropicOAuth(
           : {}),
       });
 
+      const usage = mapAnthropicUsage(response.usage);
       for (const block of response.content) {
         if (block.type === "tool_use") {
-          return { type: "structured" as const, data: stringifyJsonFields(block.input) };
+          return { type: "structured" as const, data: stringifyJsonFields(block.input), usage };
         }
       }
 
       const textParts = response.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map((b) => b.text);
-      return { type: "text" as const, text: textParts.join("") };
+      return { type: "text" as const, text: textParts.join(""), usage };
     }, opts.onStatus);
   }
 
@@ -357,7 +384,13 @@ async function callAnthropicOAuth(
       }
     }
 
-    return { type: "text" as const, text: fullText };
+    let usage: TokenUsage | undefined;
+    try {
+      usage = mapAnthropicUsage((await stream.finalMessage()).usage);
+    } catch {
+      /* usage is best-effort */
+    }
+    return { type: "text" as const, text: fullText, usage };
   }, opts.onStatus);
 }
 
@@ -457,19 +490,29 @@ async function callOpenAI(
   const json = await response.json();
   const content = json.choices?.[0]?.message?.content || "";
 
+  const usage: TokenUsage | undefined = json.usage
+    ? {
+        inputTokens: json.usage.prompt_tokens,
+        outputTokens: json.usage.completion_tokens,
+        totalTokens: json.usage.total_tokens,
+        cacheReadTokens: json.usage.prompt_tokens_details?.cached_tokens ?? undefined,
+      }
+    : undefined;
+
   if (opts.structuredOutput) {
     try {
       return {
         type: "structured",
         data: stringifyJsonFields(JSON.parse(content)),
+        usage,
       };
     } catch {
       log.warn("agent-adapter", "OpenAI structured output parse failed, returning raw text");
-      return { type: "text", text: content };
+      return { type: "text", text: content, usage };
     }
   }
 
-  return { type: "text", text: content };
+  return { type: "text", text: content, usage };
 }
 
 // ---------------------------------------------------------------------------
@@ -529,19 +572,30 @@ async function callGemini(
   const json = await response.json();
   const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
+  const um = json.usageMetadata;
+  const usage: TokenUsage | undefined = um
+    ? {
+        inputTokens: um.promptTokenCount,
+        outputTokens: um.candidatesTokenCount,
+        totalTokens: um.totalTokenCount,
+        cacheReadTokens: um.cachedContentTokenCount ?? undefined,
+      }
+    : undefined;
+
   if (opts.structuredOutput) {
     try {
       return {
         type: "structured",
         data: stringifyJsonFields(JSON.parse(text)),
+        usage,
       };
     } catch {
       log.warn("agent-adapter", "Gemini structured output parse failed, returning raw text");
-      return { type: "text", text };
+      return { type: "text", text, usage };
     }
   }
 
-  return { type: "text", text };
+  return { type: "text", text, usage };
 }
 
 // ---------------------------------------------------------------------------
@@ -792,44 +846,92 @@ export async function callAgentAPI(
     messageCount: opts.messages.length,
   });
 
-  switch (engine) {
-    case "anthropic-api":
-      return callAnthropic(apiKey, model, opts);
-    case "claude-oauth": {
-      // Resolve fresh OAuth token at call time (auto-refreshes if needed)
-      const { getValidAccessToken } = await import("../../utils/claude-oauth.js");
-      const oauthToken = await getValidAccessToken();
-      if (!oauthToken) throw new Error("Claude OAuth session expired. Please re-authenticate in Settings.");
-      return callAnthropicOAuth(oauthToken, model, opts);
-    }
-    case "openai-api":
-      return callOpenAI(apiKey, model, opts);
-    case "gemini-api":
-      return callGemini(apiKey, model, opts);
-    case "langdock-api": {
-      const cfg = loadConfig();
-      const provider = cfg.langdockProvider || "anthropic";
-      const customBase = cfg.langdockBaseUrl;
-      switch (provider) {
-        case "openai":
-        case "mistral": {
-          const base = customBase || LANGDOCK_BASE_URLS[provider];
-          return callOpenAI(apiKey, model, opts, `${base}/v1/chat/completions`);
-        }
-        case "google": {
-          const base = customBase || LANGDOCK_BASE_URLS.google;
-          return callGemini(apiKey, model, opts, `${base}/v1beta/models/${model}:generateContent`);
-        }
-        case "anthropic":
-        default: {
-          const baseURL = customBase || LANGDOCK_BASE_URLS.anthropic;
-          return callAnthropic(apiKey, model, opts, undefined, undefined, baseURL);
+  const startTime = new Date();
+  const result = await (async (): Promise<AgentCallResult> => {
+    switch (engine) {
+      case "anthropic-api":
+        return callAnthropic(apiKey, model, opts);
+      case "claude-oauth": {
+        // Resolve fresh OAuth token at call time (auto-refreshes if needed)
+        const { getValidAccessToken } = await import("../../utils/claude-oauth.js");
+        const oauthToken = await getValidAccessToken();
+        if (!oauthToken) throw new Error("Claude OAuth session expired. Please re-authenticate in Settings.");
+        return callAnthropicOAuth(oauthToken, model, opts);
+      }
+      case "openai-api":
+        return callOpenAI(apiKey, model, opts);
+      case "gemini-api":
+        return callGemini(apiKey, model, opts);
+      case "langdock-api": {
+        const cfg = loadConfig();
+        const provider = cfg.langdockProvider || "anthropic";
+        const customBase = cfg.langdockBaseUrl;
+        switch (provider) {
+          case "openai":
+          case "mistral": {
+            const base = customBase || LANGDOCK_BASE_URLS[provider];
+            return callOpenAI(apiKey, model, opts, `${base}/v1/chat/completions`);
+          }
+          case "google": {
+            const base = customBase || LANGDOCK_BASE_URLS.google;
+            return callGemini(apiKey, model, opts, `${base}/v1beta/models/${model}:generateContent`);
+          }
+          case "anthropic":
+          default: {
+            const baseURL = customBase || LANGDOCK_BASE_URLS.anthropic;
+            return callAnthropic(apiKey, model, opts, undefined, undefined, baseURL);
+          }
         }
       }
+      default:
+        throw new Error(`Unsupported API engine: ${engine}`);
     }
-    default:
-      throw new Error(`Unsupported API engine: ${engine}`);
+  })();
+
+  reportUsage(engine, model, opts, result, startTime, new Date());
+  return result;
+}
+
+/**
+ * Instrument a completed API call: structured usage/cost log (always) and a
+ * Langfuse generation (only when Langfuse is configured). Best-effort — never
+ * blocks the caller and never throws.
+ */
+function reportUsage(
+  engine: AgentEngine,
+  model: string,
+  opts: AgentCallOptions,
+  result: AgentCallResult,
+  startTime: Date,
+  endTime: Date,
+): void {
+  const name = opts.structuredOutput?.name || "generation";
+  const usage = result.usage;
+  if (usage) {
+    const cost = computeCost(model, usage);
+    log.info("agent-usage", `${engine} ${name}`, {
+      model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      cacheReadTokens: usage.cacheReadTokens,
+      costUsd: cost?.total,
+      durationMs: endTime.getTime() - startTime.getTime(),
+    });
   }
+  void recordGeneration({
+    name,
+    model,
+    engine,
+    input: { system: opts.systemPrompt, messages: opts.messages },
+    output: result.type === "structured" ? result.data : result.text,
+    usage,
+    startTime,
+    endTime,
+    metadata: {
+      structured: !!opts.structuredOutput,
+      systemPromptLength: opts.systemPrompt.length,
+    },
+  });
 }
 
 /**

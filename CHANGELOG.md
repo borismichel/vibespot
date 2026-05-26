@@ -4,6 +4,14 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## Unreleased
+
+### Features
+
+- **Langfuse instrumentation (opt-in)** ([VIB-1764](/VIB/issues/VIB-1764)) — the agentic pipeline now captures token usage and estimated USD cost from every API model call (Anthropic, OpenAI, Gemini, Langdock), which were previously discarded. Usage/cost is logged locally (`agent-usage`) regardless of configuration. When Langfuse keys are configured (`langfusePublicKey` / `langfuseSecretKey` in `~/.vibespot/config.json`, or `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` env), each user message is traced as one Langfuse trace with a child generation per pipeline stage — so a full page shows up as a single trace with its total token cost. Implemented as a dependency-free client against Langfuse's ingestion API (no SDK added to the bundle); fully opt-in and fail-safe (a Langfuse outage never blocks or fails a generation). CLI engines (Claude Code / Gemini / Codex) report no token usage, so cost is captured only for API-key engines.
+
+---
+
 ## v1.5.1 — 2026-05-20
 
 ### Features

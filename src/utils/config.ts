@@ -61,6 +61,12 @@ export interface VibeSpotConfig {
   extendedThinkingBudget?: "low" | "medium" | "high"; // approximates 4k / 16k / 32k thinking tokens
   // Tool flags — apply to Anthropic API + Claude Code CLI
   webSearch?: boolean;                   // allow the AI to use the web-search tool
+  // Langfuse — opt-in LLM observability (tracing + token/cost capture).
+  // Disabled unless both keys are present; set langfuseEnabled:false to force off.
+  langfuseEnabled?: boolean;
+  langfusePublicKey?: string;
+  langfuseSecretKey?: string;
+  langfuseBaseUrl?: string;              // default https://cloud.langfuse.com
 }
 
 const CONFIG_DIR = join(homedir(), ".vibespot");
@@ -108,6 +114,18 @@ export function loadConfig(): VibeSpotConfig {
   }
   if (process.env.VIBESPOT_AGENTIC_MODE !== undefined && config.agenticMode === undefined) {
     config.agenticMode = process.env.VIBESPOT_AGENTIC_MODE === "true";
+  }
+  if (process.env.LANGFUSE_PUBLIC_KEY && !config.langfusePublicKey) {
+    config.langfusePublicKey = process.env.LANGFUSE_PUBLIC_KEY;
+  }
+  if (process.env.LANGFUSE_SECRET_KEY && !config.langfuseSecretKey) {
+    config.langfuseSecretKey = process.env.LANGFUSE_SECRET_KEY;
+  }
+  if (process.env.LANGFUSE_BASE_URL && !config.langfuseBaseUrl) {
+    config.langfuseBaseUrl = process.env.LANGFUSE_BASE_URL;
+  }
+  if (process.env.LANGFUSE_ENABLED !== undefined && config.langfuseEnabled === undefined) {
+    config.langfuseEnabled = process.env.LANGFUSE_ENABLED === "true";
   }
 
   return config;
