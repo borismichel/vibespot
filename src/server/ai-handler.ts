@@ -421,16 +421,26 @@ export async function handleFigmaImport(
 
     const snapshot = takeSnapshot();
 
-    const result = await runFigmaConversion(
-      extraction,
-      themeName,
-      engine,
-      apiKey,
-      model,
-      concurrency,
-      onEvent,
-      snapshot.brandAssets,
-      options?.useAssets,
+    const result = await runWithTrace(
+      {
+        name: "figma_import",
+        sessionId: themeName,
+        input: { fileName: extraction.fileName, sections: extraction.sections.length },
+        metadata: { engine, model, concurrency },
+        tags: ["vibespot", "figma-import"],
+      },
+      () =>
+        runFigmaConversion(
+          extraction,
+          themeName,
+          engine,
+          apiKey,
+          model,
+          concurrency,
+          onEvent,
+          snapshot.brandAssets,
+          options?.useAssets,
+        ),
     );
 
     const current = getSession();

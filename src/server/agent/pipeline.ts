@@ -25,6 +25,7 @@ import { runSiteModulePlanner } from "./stages/site-module-planner.js";
 import { runModuleDeveloper } from "./stages/module-developer.js";
 import { validateModules, validateNavLinks } from "./stages/validator.js";
 import { log } from "../log.js";
+import { runWithSpan } from "../langfuse.js";
 import { execSync } from "node:child_process";
 
 export { isAgenticCapable, isCLIEngine } from "./engine-adapter.js";
@@ -218,19 +219,24 @@ export async function runAgentPipeline(
   let failedModules: string[] = [];
 
   if (moduleSpecs.length > 0) {
-    const devResults = await runModuleDeveloper(
-      userMessage,
-      moduleSpecs,
-      sharedCss,
-      snapshot.themeName,
-      engine,
-      apiKey,
-      model,
-      effectiveConcurrency,
-      onEvent,
-      plan.guidesNeeded,
-      snapshot.brandAssets,
-      plan.contentType,
+    const devResults = await runWithSpan(
+      "module-development",
+      () =>
+        runModuleDeveloper(
+          userMessage,
+          moduleSpecs,
+          sharedCss,
+          snapshot.themeName,
+          engine,
+          apiKey,
+          model,
+          effectiveConcurrency,
+          onEvent,
+          plan.guidesNeeded,
+          snapshot.brandAssets,
+          plan.contentType,
+        ),
+      { metadata: { moduleCount: moduleSpecs.length } },
     );
 
     for (const r of devResults) {
@@ -275,19 +281,24 @@ export async function runAgentPipeline(
           decision: `Regenerating ${retrySpecs.length} module(s) with invalid fields JSON...`,
         });
 
-        const retryResults = await runModuleDeveloper(
-          userMessage,
-          retrySpecs,
-          sharedCss,
-          snapshot.themeName,
-          engine,
-          apiKey,
-          model,
-          effectiveConcurrency,
-          onEvent,
-          plan.guidesNeeded,
-          snapshot.brandAssets,
-          plan.contentType,
+        const retryResults = await runWithSpan(
+          "module-development-retry",
+          () =>
+            runModuleDeveloper(
+              userMessage,
+              retrySpecs,
+              sharedCss,
+              snapshot.themeName,
+              engine,
+              apiKey,
+              model,
+              effectiveConcurrency,
+              onEvent,
+              plan.guidesNeeded,
+              snapshot.brandAssets,
+              plan.contentType,
+            ),
+          { metadata: { moduleCount: retrySpecs.length } },
         );
 
         for (const r of retryResults) {
@@ -523,19 +534,24 @@ async function runMultiPageFlow(
     }
   }
 
-  const devResults = await runModuleDeveloper(
-    userMessage,
-    allSpecs,
-    sharedCss,
-    snapshot.themeName,
-    engine,
-    apiKey,
-    model,
-    concurrency,
-    onEvent,
-    plan.guidesNeeded,
-    snapshot.brandAssets,
-    plan.contentType,
+  const devResults = await runWithSpan(
+    "module-development",
+    () =>
+      runModuleDeveloper(
+        userMessage,
+        allSpecs,
+        sharedCss,
+        snapshot.themeName,
+        engine,
+        apiKey,
+        model,
+        concurrency,
+        onEvent,
+        plan.guidesNeeded,
+        snapshot.brandAssets,
+        plan.contentType,
+      ),
+    { metadata: { moduleCount: allSpecs.length } },
   );
 
   const generatedModules: ModuleFiles[] = [];
@@ -580,19 +596,24 @@ async function runMultiPageFlow(
           decision: `Regenerating ${retrySpecs.length} module(s) with invalid fields JSON...`,
         });
 
-        const retryResults = await runModuleDeveloper(
-          userMessage,
-          retrySpecs,
-          sharedCss,
-          snapshot.themeName,
-          engine,
-          apiKey,
-          model,
-          concurrency,
-          onEvent,
-          plan.guidesNeeded,
-          snapshot.brandAssets,
-          plan.contentType,
+        const retryResults = await runWithSpan(
+          "module-development-retry",
+          () =>
+            runModuleDeveloper(
+              userMessage,
+              retrySpecs,
+              sharedCss,
+              snapshot.themeName,
+              engine,
+              apiKey,
+              model,
+              concurrency,
+              onEvent,
+              plan.guidesNeeded,
+              snapshot.brandAssets,
+              plan.contentType,
+            ),
+          { metadata: { moduleCount: retrySpecs.length } },
         );
 
         for (const r of retryResults) {

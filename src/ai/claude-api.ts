@@ -10,6 +10,8 @@ import {
   buildTemplatePrompt,
 } from "./prompts.js";
 import { readFile, fileExists, writeFile, ensureDir } from "../utils/fs.js";
+import { reportModelUsage } from "../server/langfuse.js";
+import { mapAnthropicUsage } from "../server/pricing.js";
 
 export class ClaudeAPIEngine implements AIEngine {
   private client: Anthropic;
@@ -144,6 +146,7 @@ export class ClaudeAPIEngine implements AIEngine {
   }
 
   private async complete(system: string, user: string): Promise<string> {
+    const startTime = new Date();
     const response = await this.client.messages.create({
       model: this.model,
       max_tokens: 8192,
@@ -158,7 +161,20 @@ export class ClaudeAPIEngine implements AIEngine {
     });
 
     const textBlock = response.content.find((b) => b.type === "text");
-    return textBlock?.text || "";
+    const text = textBlock?.text || "";
+
+    reportModelUsage({
+      engine: "anthropic-api",
+      model: this.model,
+      name: "react-conversion",
+      input: { system, messages: [{ role: "user", content: user }] },
+      output: text,
+      usage: mapAnthropicUsage(response.usage),
+      startTime,
+      endTime: new Date(),
+    });
+
+    return text;
   }
 
   private findAndReadCSS(dir: string): string {
