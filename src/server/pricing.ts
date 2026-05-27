@@ -103,6 +103,71 @@ export function computeCost(model: string, usage: TokenUsage): CostDetails | und
   return details;
 }
 
+// ---------------------------------------------------------------------------
+// Provider usage mappers
+//
+// Each provider reports token usage in its own shape. These map into the
+// provider-neutral `TokenUsage` and are the single source of truth reused by
+// the agentic engine adapter AND the direct-SDK paths (streaming chat, design
+// extraction). Cached-token handling matches VIB-1766: OpenAI/Gemini fold
+// cached tokens into the prompt count, so we subtract them out to stop input
+// and cache-read from overlapping (Anthropic already reports them separately).
+// ---------------------------------------------------------------------------
+
+/** Map an Anthropic SDK `usage` object to provider-neutral `TokenUsage`. */
+export function mapAnthropicUsage(u: {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+} | undefined | null): TokenUsage | undefined {
+  if (!u) return undefined;
+  return {
+    inputTokens: u.input_tokens,
+    outputTokens: u.output_tokens,
+    cacheReadTokens: u.cache_read_input_tokens ?? undefined,
+    cacheCreationTokens: u.cache_creation_input_tokens ?? undefined,
+  };
+}
+
+/** Map an OpenAI chat-completions `usage` object to provider-neutral `TokenUsage`. */
+export function mapOpenAIUsage(u: {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  prompt_tokens_details?: { cached_tokens?: number } | null;
+} | undefined | null): TokenUsage | undefined {
+  if (!u) return undefined;
+  const cachedTokens = u.prompt_tokens_details?.cached_tokens ?? 0;
+  const promptTokens = u.prompt_tokens;
+  return {
+    inputTokens:
+      promptTokens != null ? Math.max(0, promptTokens - cachedTokens) : undefined,
+    outputTokens: u.completion_tokens,
+    totalTokens: u.total_tokens,
+    cacheReadTokens: cachedTokens || undefined,
+  };
+}
+
+/** Map a Gemini `usageMetadata` object to provider-neutral `TokenUsage`. */
+export function mapGeminiUsage(um: {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  totalTokenCount?: number;
+  cachedContentTokenCount?: number;
+} | undefined | null): TokenUsage | undefined {
+  if (!um) return undefined;
+  const cachedTokens = um.cachedContentTokenCount ?? 0;
+  const promptTokens = um.promptTokenCount;
+  return {
+    inputTokens:
+      promptTokens != null ? Math.max(0, promptTokens - cachedTokens) : undefined,
+    outputTokens: um.candidatesTokenCount,
+    totalTokens: um.totalTokenCount,
+    cacheReadTokens: cachedTokens || undefined,
+  };
+}
+
 /** Langfuse `usageDetails` map (token counts per usage type). */
 export function toUsageDetails(usage: TokenUsage): Record<string, number> {
   const d: Record<string, number> = {};

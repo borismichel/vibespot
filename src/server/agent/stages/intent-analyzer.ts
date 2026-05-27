@@ -13,6 +13,7 @@ import {
   INTENT_ANALYZER_SCHEMA,
 } from "../prompts/intent-analyzer.js";
 import { log } from "../../log.js";
+import { runWithSpan } from "../../langfuse.js";
 
 export async function runIntentAnalyzer(
   userMessage: string,
@@ -59,15 +60,17 @@ export async function runIntentAnalyzer(
   // Always end with the current user message
   messages.push({ role: "user", content: userMessage });
 
-  const result = await callAgent(engine, apiKey, model, {
-    systemPrompt,
-    messages,
-    structuredOutput: {
-      schema: INTENT_ANALYZER_SCHEMA as unknown as Record<string, unknown>,
-      name: "pipeline_plan",
-    },
-    maxTokens: 2000,
-  });
+  const result = await runWithSpan("intent-analyzer", () =>
+    callAgent(engine, apiKey, model, {
+      systemPrompt,
+      messages,
+      structuredOutput: {
+        schema: INTENT_ANALYZER_SCHEMA as unknown as Record<string, unknown>,
+        name: "pipeline_plan",
+      },
+      maxTokens: 2000,
+    }),
+  );
 
   if (result.type !== "structured") {
     log.warn("intent-analyzer", "Did not get structured output, falling back");

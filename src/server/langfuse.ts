@@ -10,9 +10,11 @@
  *  - Opt-in: no keys configured → every export is a no-op. "Without sacrificing
  *    functionality" means a generation never waits on or fails because of us.
  *  - Fail-safe: all network/serialization errors are swallowed and logged.
- *  - Grouped: one trace per pipeline run (via AsyncLocalStorage), with a child
- *    generation per model call — so a full page shows up as one trace with its
- *    total token cost.
+ *  - Grouped & nested (via AsyncLocalStorage): one trace per user action
+ *    (`runWithTrace`), a span per pipeline stage (`runWithSpan`), and a
+ *    generation per model call. Generations attach to the innermost active
+ *    span via `parentObservationId`, so a full page reads as
+ *    trace → stage spans → generations, with token cost rolling up.
  *
  * Configure via `~/.vibespot/config.json` (langfusePublicKey / langfuseSecretKey
  * / langfuseBaseUrl) or env (LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY /
@@ -41,7 +43,7 @@ interface LangfuseSettings {
 
 interface IngestionEvent {
   id: string;
-  type: "trace-create" | "generation-create";
+  type: "trace-create" | "span-create" | "generation-create";
   timestamp: string;
   body: Record<string, unknown>;
 }
@@ -49,6 +51,8 @@ interface IngestionEvent {
 interface TraceContext {
   traceId: string;
   sessionId?: string;
+  /** Innermost active span observation id — set by `runWithSpan`. */
+  spanId?: string;
 }
 
 const traceStore = new AsyncLocalStorage<TraceContext>();
@@ -139,6 +143,64 @@ export function currentTraceId(): string | undefined {
   return traceStore.getStore()?.traceId;
 }
 
+/** The innermost active span id, if a `runWithSpan` scope is on the stack. */
+export function currentSpanId(): string | undefined {
+  return traceStore.getStore()?.spanId;
+}
+
+/**
+ * Run `fn` inside a Langfuse span nested under the active trace. Every
+ * `recordGeneration` made while `fn` runs (including parallel awaited work)
+ * attaches to this span via `parentObservationId`, and spans nest under each
+ * other the same way — giving a `trace → stage span → N generations` shape.
+ *
+ * No-op pass-through when Langfuse is disabled or there is no active trace
+ * (a span with no enclosing trace has nothing to attach to).
+ */
+export async function runWithSpan<T>(
+  name: string,
+  fn: () => Promise<T>,
+  opts?: { input?: unknown; metadata?: Record<string, unknown> },
+): Promise<T> {
+  const ctx = traceStore.getStore();
+  if (!isLangfuseEnabled() || !ctx?.traceId) return fn();
+
+  const spanId = randomUUID();
+  const parentObservationId = ctx.spanId;
+  const startTime = new Date();
+  let level: "ERROR" | undefined;
+  let statusMessage: string | undefined;
+
+  try {
+    return await traceStore.run({ ...ctx, spanId }, fn);
+  } catch (err) {
+    level = "ERROR";
+    statusMessage = (err as Error)?.message;
+    throw err;
+  } finally {
+    // Emit one span-create with both start and end. Langfuse is id-keyed and
+    // eventually consistent, so the span can land after the generations that
+    // reference it as their parent.
+    buffer.push({
+      id: randomUUID(),
+      type: "span-create",
+      timestamp: new Date().toISOString(),
+      body: {
+        id: spanId,
+        traceId: ctx.traceId,
+        name,
+        startTime: startTime.toISOString(),
+        endTime: new Date().toISOString(),
+        ...(parentObservationId ? { parentObservationId } : {}),
+        ...(opts?.input !== undefined ? { input: truncate(opts.input) } : {}),
+        ...(opts?.metadata ? { metadata: opts.metadata } : {}),
+        ...(level ? { level } : {}),
+        ...(statusMessage ? { statusMessage } : {}),
+      },
+    });
+  }
+}
+
 /**
  * Record a single model call as a Langfuse generation. Attaches to the active
  * trace; if there is none, a standalone trace is created so the generation is
@@ -161,6 +223,9 @@ export async function recordGeneration(params: {
   try {
     const ctx = traceStore.getStore();
     let traceId = ctx?.traceId;
+    // Nest under the active stage span (if any) so generations group under
+    // their stage. Only valid when we have a real (non-standalone) trace.
+    const parentObservationId = traceId ? ctx?.spanId : undefined;
     let standalone = false;
 
     if (!traceId) {
@@ -185,6 +250,7 @@ export async function recordGeneration(params: {
       body: {
         id: randomUUID(),
         traceId,
+        ...(parentObservationId ? { parentObservationId } : {}),
         name: params.name,
         model: params.model,
         startTime: (params.startTime ?? new Date()).toISOString(),
@@ -207,6 +273,53 @@ export async function recordGeneration(params: {
   } catch (err) {
     log.warn("langfuse", `recordGeneration failed: ${(err as Error).message}`);
   }
+}
+
+/**
+ * Instrument a completed model call: emit a structured `agent-usage` cost log
+ * (always, when usage is known) and a Langfuse generation (only when Langfuse
+ * is configured). The single chokepoint shared by the agentic engine adapter
+ * and the direct-SDK paths (streaming chat, design/brand extraction) so every
+ * AI call is captured the same way. Best-effort — never throws.
+ */
+export function reportModelUsage(params: {
+  engine: string;
+  model: string;
+  name: string;
+  input?: unknown;
+  output?: unknown;
+  usage?: TokenUsage;
+  startTime: Date;
+  endTime: Date;
+  level?: "DEFAULT" | "WARNING" | "ERROR";
+  statusMessage?: string;
+  metadata?: Record<string, unknown>;
+}): void {
+  const { engine, model, name, usage, startTime, endTime } = params;
+  if (usage) {
+    const cost = computeCost(model, usage);
+    log.info("agent-usage", `${engine} ${name}`, {
+      model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      cacheReadTokens: usage.cacheReadTokens,
+      costUsd: cost?.total,
+      durationMs: endTime.getTime() - startTime.getTime(),
+    });
+  }
+  void recordGeneration({
+    name,
+    model,
+    engine,
+    input: params.input,
+    output: params.output,
+    usage,
+    startTime,
+    endTime,
+    level: params.level,
+    statusMessage: params.statusMessage,
+    metadata: params.metadata,
+  });
 }
 
 /** POST any buffered events to Langfuse. Errors are logged, never thrown. */

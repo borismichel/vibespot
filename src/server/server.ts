@@ -30,6 +30,7 @@ import { startStreamingJob, startJobSafe, getJob, addJobListener, removeJobListe
 import { uploadTheme, type UploadFileError } from "../hubspot/uploader.js";
 import { jsonResponse } from "./route-helpers.js";
 import { getChangelog } from "../utils/fs.js";
+import { runWithTrace, runWithSpan } from "./langfuse.js";
 
 // Route modules
 import {
@@ -946,12 +947,23 @@ function handleWsConnection(ws: WebSocket): void {
             if (!previewHtml || previewHtml.length < 50) return;
 
             const { extractThemeContext } = await import("./agent/stages/context-extractor.js");
-            const themeContext = await extractThemeContext(
-              previewHtml,
-              session.brandAssets?.themeContext,
-              engine,
-              apiKey,
-              model,
+            const themeContext = await runWithTrace(
+              {
+                name: "brand_extract",
+                sessionId: session.themeName,
+                metadata: { type: "themeContext" },
+                tags: ["vibespot", "brand-extract"],
+              },
+              () =>
+                runWithSpan("extract-theme-context", () =>
+                  extractThemeContext(
+                    previewHtml,
+                    session.brandAssets?.themeContext,
+                    engine,
+                    apiKey,
+                    model,
+                  ),
+                ),
             );
 
             const { mkdirSync, writeFileSync } = await import("node:fs");
@@ -973,7 +985,15 @@ function handleWsConnection(ws: WebSocket): void {
             if (!session.brandAssets?.styleguide) {
               try {
                 const { extractDesignContext } = await import("../ai/design-extractor.js");
-                const styleguide = await extractDesignContext(session.themePath);
+                const styleguide = await runWithTrace(
+                  {
+                    name: "brand_extract",
+                    sessionId: session.themeName,
+                    metadata: { type: "styleguide" },
+                    tags: ["vibespot", "brand-extract"],
+                  },
+                  () => runWithSpan("extract-styleguide", () => extractDesignContext(session.themePath)),
+                );
                 if (styleguide) {
                   if (!session.brandAssets) session.brandAssets = {};
                   session.brandAssets.styleguide = styleguide;

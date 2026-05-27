@@ -10,6 +10,7 @@ import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 const _shellOpt: ExecFileSyncOptions = process.platform === "win32" ? { shell: true } : {};
 import { jsonResponse, readBody } from "../route-helpers.js";
 import { log } from "../log.js";
+import { runWithTrace, runWithSpan } from "../langfuse.js";
 import { getHubSpotPak } from "../../utils/config.js";
 import { addEmailTemplateToTheme } from "../../hubspot/theme-scaffold.js";
 import {
@@ -681,6 +682,11 @@ function saveBrandAsset(
   writeFile(join(assetDir, filename), content);
 }
 
+/** Langfuse span name for a brand-asset extraction, matching brand-enrichment. */
+function extractionSpanName(type: "styleguide" | "brandvoice" | "themeContext"): string {
+  return type === "themeContext" ? "extract-theme-context" : `extract-${type}`;
+}
+
 /** Extract a single brand asset by type. */
 async function extractSingleAsset(
   session: NonNullable<ReturnType<typeof getSession>>,
@@ -727,10 +733,21 @@ export function handleDesignExtractRoute(req: IncomingMessage, res: ServerRespon
         const sourcePath = parsed.sourcePath;
 
         if (type === "all") {
-          // Extract all three in parallel
+          // Extract all three in parallel — one trace, a span per asset.
           const types = ["styleguide", "brandvoice", "themeContext"] as const;
-          const results = await Promise.allSettled(
-            types.map((t) => extractSingleAsset(session, t, sourcePath)),
+          const results = await runWithTrace(
+            {
+              name: "brand_extract",
+              sessionId: session.themeName,
+              metadata: { type: "all" },
+              tags: ["vibespot", "brand-extract"],
+            },
+            () =>
+              Promise.allSettled(
+                types.map((t) =>
+                  runWithSpan(extractionSpanName(t), () => extractSingleAsset(session, t, sourcePath)),
+                ),
+              ),
           );
 
           const extracted: Record<string, string | null> = {};
@@ -758,7 +775,15 @@ export function handleDesignExtractRoute(req: IncomingMessage, res: ServerRespon
           return;
         }
 
-        const content = await extractSingleAsset(session, type, sourcePath);
+        const content = await runWithTrace(
+          {
+            name: "brand_extract",
+            sessionId: session.themeName,
+            metadata: { type },
+            tags: ["vibespot", "brand-extract"],
+          },
+          () => runWithSpan(extractionSpanName(type), () => extractSingleAsset(session, type, sourcePath)),
+        );
         if (!content) {
           jsonResponse(res, 200, { ok: false, type, error: "No content to extract from" });
           return;
@@ -841,7 +866,15 @@ export function handleReferenceImportRoute(req: IncomingMessage, res: ServerResp
 
         // Extract design context and save to current theme
         const { extractDesignContext } = await import("../../ai/design-extractor.js");
-        const styleguide = await extractDesignContext(sourcePath);
+        const styleguide = await runWithTrace(
+          {
+            name: "brand_extract",
+            sessionId: session.themeName,
+            metadata: { type: "styleguide", source },
+            tags: ["vibespot", "brand-extract"],
+          },
+          () => runWithSpan("extract-styleguide", () => extractDesignContext(sourcePath)),
+        );
 
         if (!session.brandAssets) session.brandAssets = {};
         session.brandAssets.styleguide = styleguide;

@@ -32,6 +32,7 @@ import {
 } from "./prompts/module-developer.js";
 import { validateModules } from "./stages/validator.js";
 import { log } from "../log.js";
+import { runWithSpan } from "../langfuse.js";
 
 // ---------------------------------------------------------------------------
 // Main entry point
@@ -73,60 +74,68 @@ export async function runFigmaConversion(
   const limit = createConcurrencyLimiter(concurrency);
   const total = specs.length;
 
-  const promises = specs.map((spec, index) => {
-    const section = extraction.sections[index];
-    return limit(async (): Promise<{ moduleName: string; module?: ModuleFiles; error?: string }> => {
-      onEvent({ type: "module_progress", module: spec.name, status: "generating", current: index + 1, total });
+  // Wrap the parallel per-module conversions in one span so all module
+  // generations roll up under a single "module-development" observation.
+  const settled = await runWithSpan(
+    "module-development",
+    () => {
+      const promises = specs.map((spec, index) => {
+        const section = extraction.sections[index];
+        return limit(async (): Promise<{ moduleName: string; module?: ModuleFiles; error?: string }> => {
+          onEvent({ type: "module_progress", module: spec.name, status: "generating", current: index + 1, total });
 
-      const userContent = buildFigmaModuleMessage(section, spec, extraction.assets, themeName, useAssets !== false);
+          const userContent = buildFigmaModuleMessage(section, spec, extraction.assets, themeName, useAssets !== false);
 
-      let lastError = "";
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          if (attempt > 0) {
-            log.warn("figma-pipeline", `${spec.name}: retrying (attempt ${attempt + 1})`);
-            onEvent({ type: "module_progress", module: spec.name, status: "retrying", current: index + 1, total });
+          let lastError = "";
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              if (attempt > 0) {
+                log.warn("figma-pipeline", `${spec.name}: retrying (attempt ${attempt + 1})`);
+                onEvent({ type: "module_progress", module: spec.name, status: "retrying", current: index + 1, total });
+              }
+
+              const result = await callAgent(engine, apiKey, model, {
+                systemPrompt,
+                systemBlocks,
+                messages: [{ role: "user", content: userContent }],
+                structuredOutput: {
+                  schema: MODULE_DEVELOPER_SCHEMA as unknown as Record<string, unknown>,
+                  name: "module_output",
+                },
+                maxTokens: 16000,
+              });
+
+              if (result.type !== "structured") {
+                throw new Error("No structured output returned");
+              }
+
+              const data = result.data as Record<string, unknown>;
+              const module: ModuleFiles = {
+                moduleName: spec.name,
+                fieldsJson: typeof data.fieldsJson === "string" ? data.fieldsJson : JSON.stringify(data.fieldsJson, null, 2),
+                metaJson: typeof data.metaJson === "string" ? data.metaJson : JSON.stringify(data.metaJson, null, 2),
+                moduleHtml: String(data.moduleHtml || ""),
+                moduleCss: String(data.moduleCss || ""),
+                moduleJs: data.moduleJs ? String(data.moduleJs) : undefined,
+              };
+
+              onEvent({ type: "module_progress", module: spec.name, status: "complete", current: index + 1, total, moduleFiles: module });
+              return { moduleName: spec.name, module };
+            } catch (err) {
+              lastError = err instanceof Error ? err.message : String(err);
+              log.error("figma-pipeline", `Failed: ${spec.name} (attempt ${attempt + 1}): ${lastError}`);
+            }
           }
 
-          const result = await callAgent(engine, apiKey, model, {
-            systemPrompt,
-            systemBlocks,
-            messages: [{ role: "user", content: userContent }],
-            structuredOutput: {
-              schema: MODULE_DEVELOPER_SCHEMA as unknown as Record<string, unknown>,
-              name: "module_output",
-            },
-            maxTokens: 16000,
-          });
+          onEvent({ type: "module_progress", module: spec.name, status: "failed", current: index + 1, total });
+          return { moduleName: spec.name, error: lastError };
+        });
+      });
 
-          if (result.type !== "structured") {
-            throw new Error("No structured output returned");
-          }
-
-          const data = result.data as Record<string, unknown>;
-          const module: ModuleFiles = {
-            moduleName: spec.name,
-            fieldsJson: typeof data.fieldsJson === "string" ? data.fieldsJson : JSON.stringify(data.fieldsJson, null, 2),
-            metaJson: typeof data.metaJson === "string" ? data.metaJson : JSON.stringify(data.metaJson, null, 2),
-            moduleHtml: String(data.moduleHtml || ""),
-            moduleCss: String(data.moduleCss || ""),
-            moduleJs: data.moduleJs ? String(data.moduleJs) : undefined,
-          };
-
-          onEvent({ type: "module_progress", module: spec.name, status: "complete", current: index + 1, total, moduleFiles: module });
-          return { moduleName: spec.name, module };
-        } catch (err) {
-          lastError = err instanceof Error ? err.message : String(err);
-          log.error("figma-pipeline", `Failed: ${spec.name} (attempt ${attempt + 1}): ${lastError}`);
-        }
-      }
-
-      onEvent({ type: "module_progress", module: spec.name, status: "failed", current: index + 1, total });
-      return { moduleName: spec.name, error: lastError };
-    });
-  });
-
-  const settled = await Promise.allSettled(promises);
+      return Promise.allSettled(promises);
+    },
+    { metadata: { moduleCount: total } },
+  );
   const results = settled.map((r) =>
     r.status === "fulfilled" ? r.value : { moduleName: "unknown", error: String(r.reason) },
   );

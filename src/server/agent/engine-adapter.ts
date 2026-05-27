@@ -14,8 +14,13 @@ import { tryParseJSON, tryRepairTruncatedJSON } from "../ai-parser.js";
 import { loadConfig } from "../../utils/config.js";
 import { OAUTH_EXTRA_HEADERS, OAUTH_SYSTEM_PREFIX } from "../../utils/claude-oauth.js";
 import { log } from "../log.js";
-import { computeCost, type TokenUsage } from "../pricing.js";
-import { recordGeneration } from "../langfuse.js";
+import {
+  mapAnthropicUsage,
+  mapOpenAIUsage,
+  mapGeminiUsage,
+  type TokenUsage,
+} from "../pricing.js";
+import { reportModelUsage } from "../langfuse.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -75,22 +80,6 @@ export interface AgentCallOptions {
 export type AgentCallResult =
   | { type: "structured"; data: unknown; usage?: TokenUsage }
   | { type: "text"; text: string; usage?: TokenUsage };
-
-/** Map an Anthropic SDK usage object to our provider-neutral TokenUsage. */
-function mapAnthropicUsage(u: {
-  input_tokens?: number;
-  output_tokens?: number;
-  cache_read_input_tokens?: number | null;
-  cache_creation_input_tokens?: number | null;
-} | undefined): TokenUsage | undefined {
-  if (!u) return undefined;
-  return {
-    inputTokens: u.input_tokens,
-    outputTokens: u.output_tokens,
-    cacheReadTokens: u.cache_read_input_tokens ?? undefined,
-    cacheCreationTokens: u.cache_creation_input_tokens ?? undefined,
-  };
-}
 
 export type AgentEngine =
   | "anthropic-api"
@@ -490,22 +479,7 @@ async function callOpenAI(
   const json = await response.json();
   const content = json.choices?.[0]?.message?.content || "";
 
-  let usage: TokenUsage | undefined;
-  if (json.usage) {
-    // OpenAI folds cached tokens *into* prompt_tokens, whereas Anthropic reports
-    // them separately. Subtract so `input` and `cache_read` don't overlap —
-    // otherwise computeCost() bills cached tokens at full input rate plus an
-    // extra cache-read rate. totalTokens stays as reported by the provider.
-    const cachedTokens = json.usage.prompt_tokens_details?.cached_tokens ?? 0;
-    const promptTokens = json.usage.prompt_tokens;
-    usage = {
-      inputTokens:
-        promptTokens != null ? Math.max(0, promptTokens - cachedTokens) : undefined,
-      outputTokens: json.usage.completion_tokens,
-      totalTokens: json.usage.total_tokens,
-      cacheReadTokens: cachedTokens || undefined,
-    };
-  }
+  const usage = mapOpenAIUsage(json.usage);
 
   if (opts.structuredOutput) {
     try {
@@ -580,22 +554,7 @@ async function callGemini(
   const json = await response.json();
   const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-  const um = json.usageMetadata;
-  let usage: TokenUsage | undefined;
-  if (um) {
-    // Gemini folds cached tokens *into* promptTokenCount; subtract so input and
-    // cache_read don't overlap (matching Anthropic's separated semantics).
-    // totalTokens stays as reported by the provider.
-    const cachedTokens = um.cachedContentTokenCount ?? 0;
-    const promptTokens = um.promptTokenCount;
-    usage = {
-      inputTokens:
-        promptTokens != null ? Math.max(0, promptTokens - cachedTokens) : undefined,
-      outputTokens: um.candidatesTokenCount,
-      totalTokens: um.totalTokenCount,
-      cacheReadTokens: cachedTokens || undefined,
-    };
-  }
+  const usage = mapGeminiUsage(json.usageMetadata);
 
   if (opts.structuredOutput) {
     try {
@@ -908,9 +867,9 @@ export async function callAgentAPI(
 }
 
 /**
- * Instrument a completed API call: structured usage/cost log (always) and a
- * Langfuse generation (only when Langfuse is configured). Best-effort — never
- * blocks the caller and never throws.
+ * Instrument a completed API call via the shared `reportModelUsage` chokepoint:
+ * structured usage/cost log (always) and a Langfuse generation (only when
+ * Langfuse is configured). Best-effort — never blocks the caller, never throws.
  */
 function reportUsage(
   engine: AgentEngine,
@@ -920,26 +879,13 @@ function reportUsage(
   startTime: Date,
   endTime: Date,
 ): void {
-  const name = opts.structuredOutput?.name || "generation";
-  const usage = result.usage;
-  if (usage) {
-    const cost = computeCost(model, usage);
-    log.info("agent-usage", `${engine} ${name}`, {
-      model,
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-      cacheReadTokens: usage.cacheReadTokens,
-      costUsd: cost?.total,
-      durationMs: endTime.getTime() - startTime.getTime(),
-    });
-  }
-  void recordGeneration({
-    name,
-    model,
+  reportModelUsage({
     engine,
+    model,
+    name: opts.structuredOutput?.name || "generation",
     input: { system: opts.systemPrompt, messages: opts.messages },
     output: result.type === "structured" ? result.data : result.text,
-    usage,
+    usage: result.usage,
     startTime,
     endTime,
     metadata: {

@@ -24,6 +24,7 @@ import {
   SITE_MODULE_PLANNER_SCHEMA,
 } from "../prompts/site-module-planner.js";
 import { log } from "../../log.js";
+import { runWithSpan } from "../../langfuse.js";
 
 export async function runSiteModulePlanner(
   userMessage: string,
@@ -55,16 +56,18 @@ export async function runSiteModulePlanner(
   const userContent = `## User Request\n${userMessage}\n\n## Site Map\n${pages.map((p) => `- ${p.label} (${p.slug}): ${p.purpose}`).join("\n")}`;
 
   const thinkingBudget = resolveThinkingBudget(engine);
-  const result = await callAgent(engine, apiKey, model, {
-    systemPrompt,
-    messages: [{ role: "user", content: userContent }],
-    structuredOutput: {
-      schema: SITE_MODULE_PLANNER_SCHEMA as unknown as Record<string, unknown>,
-      name: "site_module_plan",
-    },
-    maxTokens: 16000,
-    ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
-  });
+  const result = await runWithSpan("site-module-planner", () =>
+    callAgent(engine, apiKey, model, {
+      systemPrompt,
+      messages: [{ role: "user", content: userContent }],
+      structuredOutput: {
+        schema: SITE_MODULE_PLANNER_SCHEMA as unknown as Record<string, unknown>,
+        name: "site_module_plan",
+      },
+      maxTokens: 16000,
+      ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
+    }),
+  );
 
   if (result.type !== "structured") {
     log.warn("site-planner", "Did not get structured output, building fallback");

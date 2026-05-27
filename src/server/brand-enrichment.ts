@@ -11,6 +11,7 @@ import type { VibeSession } from "./session/types.js";
 import { ensureDir, writeFile } from "../utils/fs.js";
 import { loadConfig } from "../utils/config.js";
 import { log } from "./log.js";
+import { runWithTrace, runWithSpan } from "./langfuse.js";
 
 export type EnrichedBrandAsset = "styleguide" | "brandvoice" | "themeContext";
 
@@ -76,12 +77,33 @@ export async function enrichImportedThemeBrandAssets(
 
   if (missing.length === 0) return result;
 
+  // One trace per enrichment run (Langfuse session = theme). Each extractor's
+  // generation nests under its own span via runWithSpan in the steps below.
+  return runWithTrace(
+    {
+      name: "brand_enrichment",
+      sessionId: session.themeName,
+      metadata: { missing },
+      tags: ["vibespot", "brand-enrichment"],
+    },
+    () => runBrandEnrichmentSteps(session, deps, missing, result),
+  );
+}
+
+async function runBrandEnrichmentSteps(
+  session: VibeSession,
+  deps: Partial<BrandEnrichmentDependencies> | undefined,
+  missing: EnrichedBrandAsset[],
+  result: BrandEnrichmentResult,
+): Promise<BrandEnrichmentResult> {
   const resolved = hasCompleteDependencies(deps)
     ? deps
     : { ...(await defaultDependencies(session)), ...(deps ?? {}) };
 
   if (missing.includes("styleguide")) {
-    await attemptAsset(session, "styleguide", result, () => resolved.extractStyleguide!(session));
+    await attemptAsset(session, "styleguide", result, () =>
+      runWithSpan("extract-styleguide", () => resolved.extractStyleguide!(session)),
+    );
   }
 
   const copyAssets = missing.filter((asset) => asset === "brandvoice" || asset === "themeContext");
@@ -105,10 +127,14 @@ export async function enrichImportedThemeBrandAssets(
   }
 
   if (missing.includes("brandvoice")) {
-    await attemptAsset(session, "brandvoice", result, () => resolved.extractBrandvoice!(session, previewHtml));
+    await attemptAsset(session, "brandvoice", result, () =>
+      runWithSpan("extract-brandvoice", () => resolved.extractBrandvoice!(session, previewHtml)),
+    );
   }
   if (missing.includes("themeContext")) {
-    await attemptAsset(session, "themeContext", result, () => resolved.extractThemeContext!(session, previewHtml));
+    await attemptAsset(session, "themeContext", result, () =>
+      runWithSpan("extract-theme-context", () => resolved.extractThemeContext!(session, previewHtml)),
+    );
   }
 
   return result;

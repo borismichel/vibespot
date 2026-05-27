@@ -26,6 +26,7 @@ import {
   EMAIL_DESIGN_SYSTEM_SCHEMA,
 } from "../prompts/email-architect.js";
 import { log } from "../../log.js";
+import { runWithSpan } from "../../langfuse.js";
 
 /**
  * Run only the Design System stage (2a) without the Module Planner.
@@ -66,17 +67,19 @@ export async function runDesignSystem(
 
   const thinkingBudget = resolveThinkingBudget(engine);
   const designSchema = isEmail ? EMAIL_DESIGN_SYSTEM_SCHEMA : DESIGN_SYSTEM_SCHEMA;
-  const designResult = await callAgent(engine, apiKey, model, {
-    systemPrompt: designPrompt,
-    systemBlocks: designBlocks,
-    messages: [{ role: "user", content: designUserContent }],
-    structuredOutput: {
-      schema: designSchema as unknown as Record<string, unknown>,
-      name: "design_system",
-    },
-    maxTokens: 16000,
-    ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
-  });
+  const designResult = await runWithSpan("design-system", () =>
+    callAgent(engine, apiKey, model, {
+      systemPrompt: designPrompt,
+      systemBlocks: designBlocks,
+      messages: [{ role: "user", content: designUserContent }],
+      structuredOutput: {
+        schema: designSchema as unknown as Record<string, unknown>,
+        name: "design_system",
+      },
+      maxTokens: 16000,
+      ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
+    }),
+  );
 
   let designSystem: DesignSystemOutput;
 
@@ -168,17 +171,19 @@ export async function runPageArchitect(
 
   const thinkingBudget = resolveThinkingBudget(engine);
   const designSchema = isEmail ? EMAIL_DESIGN_SYSTEM_SCHEMA : DESIGN_SYSTEM_SCHEMA;
-  const designResult = await callAgent(engine, apiKey, model, {
-    systemPrompt: designPrompt,
-    systemBlocks: designBlocks,
-    messages: [{ role: "user", content: designUserContent }],
-    structuredOutput: {
-      schema: designSchema as unknown as Record<string, unknown>,
-      name: "design_system",
-    },
-    maxTokens: 16000,
-    ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
-  });
+  const designResult = await runWithSpan("design-system", () =>
+    callAgent(engine, apiKey, model, {
+      systemPrompt: designPrompt,
+      systemBlocks: designBlocks,
+      messages: [{ role: "user", content: designUserContent }],
+      structuredOutput: {
+        schema: designSchema as unknown as Record<string, unknown>,
+        name: "design_system",
+      },
+      maxTokens: 16000,
+      ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
+    }),
+  );
 
   let designSystem: DesignSystemOutput;
 
@@ -304,16 +309,18 @@ export async function runPageArchitect(
     }
   }
 
-  const plannerResult = await callAgent(engine, apiKey, model, {
-    systemPrompt: plannerPrompt,
-    messages: [{ role: "user", content: plannerUserContent }],
-    structuredOutput: {
-      schema: MODULE_PLANNER_SCHEMA as unknown as Record<string, unknown>,
-      name: "module_plan",
-    },
-    maxTokens: 8000,
-    ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
-  });
+  const plannerResult = await runWithSpan("module-planner", () =>
+    callAgent(engine, apiKey, model, {
+      systemPrompt: plannerPrompt,
+      messages: [{ role: "user", content: plannerUserContent }],
+      structuredOutput: {
+        schema: MODULE_PLANNER_SCHEMA as unknown as Record<string, unknown>,
+        name: "module_plan",
+      },
+      maxTokens: 8000,
+      ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
+    }),
+  );
 
   let modulePlan: { modules: PageBlueprint["modules"]; moduleOrder: string[]; narrative: string };
 

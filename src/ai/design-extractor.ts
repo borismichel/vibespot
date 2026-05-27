@@ -11,6 +11,13 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { resolveAsset, readFile } from "../utils/fs.js";
 import { loadConfig, getApiKeyForEngine, type AIEngineType } from "../utils/config.js";
+import { reportModelUsage } from "../server/langfuse.js";
+import {
+  mapAnthropicUsage,
+  mapOpenAIUsage,
+  mapGeminiUsage,
+  type TokenUsage,
+} from "../server/pricing.js";
 
 // ---------------------------------------------------------------------------
 // Lazy-loaded Anthropic SDK
@@ -177,6 +184,11 @@ export async function extractDesignContext(
   const config = loadConfig();
   const engine = (config.aiEngine || "anthropic-api") as AIEngineType;
   let text = "";
+  // Usage instrumentation — captured per API path, reported after the switch.
+  // CLI engines report no usage (same as the agentic adapter).
+  const startTime = new Date();
+  let usage: TokenUsage | undefined;
+  let usedModel = "";
 
   switch (engine) {
     // ----- API engines -----
@@ -187,8 +199,9 @@ export async function extractDesignContext(
 
       const AnthropicSDK = await getAnthropicSDK();
       const client = new AnthropicSDK({ apiKey });
+      usedModel = config.anthropicApiModel || "claude-sonnet-4-6";
       const response = await client.messages.create({
-        model: config.anthropicApiModel || "claude-sonnet-4-6",
+        model: usedModel,
         max_tokens: 8000,
         system: [
           {
@@ -202,6 +215,7 @@ export async function extractDesignContext(
       text = response.content
         .map((block) => (block.type === "text" ? block.text : ""))
         .join("");
+      usage = mapAnthropicUsage(response.usage);
       break;
     }
 
@@ -212,8 +226,9 @@ export async function extractDesignContext(
 
       const AnthropicSDK = await getAnthropicSDK();
       const client = new AnthropicSDK({ authToken: accessToken, defaultHeaders: OAUTH_EXTRA_HEADERS } as any);
+      usedModel = config.anthropicApiModel || "claude-sonnet-4-6";
       const response = await client.messages.create({
-        model: config.anthropicApiModel || "claude-sonnet-4-6",
+        model: usedModel,
         max_tokens: 8000,
         system: [
           { type: "text", text: OAUTH_SYSTEM_PREFIX },
@@ -228,6 +243,7 @@ export async function extractDesignContext(
       text = response.content
         .map((block) => (block.type === "text" ? block.text : ""))
         .join("");
+      usage = mapAnthropicUsage(response.usage);
       break;
     }
 
@@ -235,11 +251,12 @@ export async function extractDesignContext(
       const apiKey = getApiKeyForEngine("openai-api");
       if (!apiKey) throw new Error("OpenAI API key not configured. Open Settings to add one.");
 
+      usedModel = config.openaiApiModel || "gpt-4o";
       const resp = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
-          model: config.openaiApiModel || "gpt-4o",
+          model: usedModel,
           max_tokens: 8000,
           messages: [
             { role: "system", content: systemPrompt },
@@ -248,8 +265,9 @@ export async function extractDesignContext(
         }),
       });
       if (!resp.ok) throw new Error(`OpenAI API error: ${resp.status} ${await resp.text()}`);
-      const data = await resp.json() as { choices: { message: { content: string } }[] };
+      const data = await resp.json() as { choices: { message: { content: string } }[]; usage?: Parameters<typeof mapOpenAIUsage>[0] };
       text = data.choices?.[0]?.message?.content || "";
+      usage = mapOpenAIUsage(data.usage);
       break;
     }
 
@@ -257,9 +275,9 @@ export async function extractDesignContext(
       const apiKey = getApiKeyForEngine("gemini-api");
       if (!apiKey) throw new Error("Gemini API key not configured. Open Settings to add one.");
 
-      const model = config.geminiApiModel || "gemini-2.5-flash";
+      usedModel = config.geminiApiModel || "gemini-2.5-flash";
       const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${usedModel}:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -271,8 +289,9 @@ export async function extractDesignContext(
         },
       );
       if (!resp.ok) throw new Error(`Gemini API error: ${resp.status} ${await resp.text()}`);
-      const data = await resp.json() as { candidates: { content: { parts: { text: string }[] } }[] };
+      const data = await resp.json() as { candidates: { content: { parts: { text: string }[] } }[]; usageMetadata?: Parameters<typeof mapGeminiUsage>[0] };
       text = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") || "";
+      usage = mapGeminiUsage(data.usageMetadata);
       break;
     }
 
@@ -303,6 +322,21 @@ export async function extractDesignContext(
 
   if (!text.trim()) {
     throw new Error("AI returned empty response.");
+  }
+
+  // Instrument API engines (usage was captured above). CLI engines (claude-code,
+  // gemini-cli, codex-cli) report no usage, matching the agentic adapter.
+  if (usedModel) {
+    reportModelUsage({
+      engine,
+      model: usedModel,
+      name: "styleguide-extraction",
+      input: { system: systemPrompt, messages: [{ role: "user", content: userMessage }] },
+      output: text,
+      usage,
+      startTime,
+      endTime: new Date(),
+    });
   }
 
   onProgress?.({ status: "Design extraction complete." });

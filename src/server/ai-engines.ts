@@ -10,6 +10,8 @@ import { getValidAccessToken, OAUTH_EXTRA_HEADERS, OAUTH_SYSTEM_PREFIX } from ".
 import { getSession } from "./session.js";
 import { buildVibeSystemPrompt, buildVibeSystemPromptBlocks, buildStateContext, buildMessagesWithContext, getPromptContext, type SystemPromptBlock, type MultimodalMessage } from "./ai-prompts.js";
 import { log } from "./log.js";
+import { reportModelUsage } from "./langfuse.js";
+import { mapAnthropicUsage, mapOpenAIUsage, mapGeminiUsage } from "./pricing.js";
 import type { UploadedFileContext } from "./routes/upload-files.js";
 
 // ---------------------------------------------------------------------------
@@ -78,8 +80,10 @@ async function _streamAnthropic(
   onChunk: (chunk: string) => void,
   onStatus?: (status: string) => void,
   onFinish?: (fullResponse: string) => void,
+  engine = "anthropic-api",
 ): Promise<void> {
   for (let attempt = 0; ; attempt++) {
+    const startTime = new Date();
     try {
       let fullResponse = "";
 
@@ -91,14 +95,14 @@ async function _streamAnthropic(
         sendStatus(CLI_STATUS_MESSAGES[Math.min(statusIndex, CLI_STATUS_MESSAGES.length - 1)]);
       }, 6000);
 
-      try {
-        const stream = client.messages.stream({
-          model,
-          max_tokens: 48000,
-          system: system as any,
-          messages: messages as unknown as Anthropic.MessageParam[],
-        });
+      const stream = client.messages.stream({
+        model,
+        max_tokens: 48000,
+        system: system as any,
+        messages: messages as unknown as Anthropic.MessageParam[],
+      });
 
+      try {
         for await (const event of stream) {
           if (
             event.type === "content_block_delta" &&
@@ -112,6 +116,23 @@ async function _streamAnthropic(
       } finally {
         clearInterval(heartbeat);
       }
+
+      let usage;
+      try {
+        usage = mapAnthropicUsage((await stream.finalMessage()).usage);
+      } catch {
+        /* usage is best-effort */
+      }
+      reportModelUsage({
+        engine,
+        model,
+        name: "vibe-chat",
+        input: { system, messages },
+        output: fullResponse,
+        usage,
+        startTime,
+        endTime: new Date(),
+      });
 
       if (onFinish) onFinish(fullResponse);
       return;
@@ -206,7 +227,7 @@ export async function streamWithClaudeOAuth(
     messageCount: messages.length,
   });
 
-  await _streamAnthropic(client, oauthBlocks, messages, model, onChunk, onStatus, onFinish);
+  await _streamAnthropic(client, oauthBlocks, messages, model, onChunk, onStatus, onFinish, "claude-oauth");
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +266,13 @@ export async function streamWithOpenAIAPI(
     };
   });
 
+  const systemContent = buildVibeSystemPrompt(conversionGuide, themeName, editMode, ctx.pageType, ctx.brandAssets);
   const url = fetchURL || "https://api.openai.com/v1/chat/completions";
+  // `stream_options.include_usage` is an OpenAI-spec field. Only send it to
+  // OpenAI-family endpoints; some gateways (e.g. Langdock's Mistral passthrough)
+  // may reject unknown fields, and we must never break the stream to capture usage.
+  const wantsUsage = !/\/mistral(\/|$|\?)/.test(url);
+  const startTime = new Date();
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -256,8 +283,11 @@ export async function streamWithOpenAIAPI(
       model,
       max_tokens: 48000,
       stream: true,
+      // Ask for a final usage chunk (choices:[] + usage) so we can capture
+      // token counts on the streaming path, same as the non-streaming adapter.
+      ...(wantsUsage ? { stream_options: { include_usage: true } } : {}),
       messages: [
-        { role: "system", content: buildVibeSystemPrompt(conversionGuide, themeName, editMode, ctx.pageType, ctx.brandAssets) },
+        { role: "system", content: systemContent },
         ...openaiMessages,
       ],
     }),
@@ -277,6 +307,7 @@ export async function streamWithOpenAIAPI(
   }, 6000);
 
   let fullResponse = "";
+  let usageRaw: Parameters<typeof mapOpenAIUsage>[0];
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -302,12 +333,25 @@ export async function streamWithOpenAIAPI(
             fullResponse += delta;
             onChunk(delta);
           }
+          // Final chunk (include_usage) carries usage with empty choices.
+          if (parsed.usage) usageRaw = parsed.usage;
         } catch { /* skip malformed SSE lines */ }
       }
     }
   } finally {
     clearInterval(heartbeat);
   }
+
+  reportModelUsage({
+    engine: "openai-api",
+    model,
+    name: "vibe-chat",
+    input: { system: systemContent, messages: openaiMessages },
+    output: fullResponse,
+    usage: mapOpenAIUsage(usageRaw),
+    startTime,
+    endTime: new Date(),
+  });
 
   if (onFinish) onFinish(fullResponse);
 }
@@ -375,11 +419,13 @@ export async function streamWithGeminiAPI(
   const model = modelOverride || "gemini-2.5-flash";
   const url = fetchURL || `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
+  const systemContent = buildVibeSystemPrompt(conversionGuide, themeName, editMode, ctx.pageType, ctx.brandAssets);
+  const startTime = new Date();
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: buildVibeSystemPrompt(conversionGuide, themeName, editMode, ctx.pageType, ctx.brandAssets) }] },
+      systemInstruction: { parts: [{ text: systemContent }] },
       contents,
       generationConfig: { maxOutputTokens: 48000 },
     }),
@@ -399,6 +445,7 @@ export async function streamWithGeminiAPI(
   }, 6000);
 
   let fullResponse = "";
+  let usageRaw: Parameters<typeof mapGeminiUsage>[0];
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -423,12 +470,25 @@ export async function streamWithGeminiAPI(
             fullResponse += text;
             onChunk(text);
           }
+          // usageMetadata is cumulative; the last chunk carries final totals.
+          if (parsed.usageMetadata) usageRaw = parsed.usageMetadata;
         } catch { /* skip malformed SSE lines */ }
       }
     }
   } finally {
     clearInterval(heartbeat);
   }
+
+  reportModelUsage({
+    engine: "gemini-api",
+    model,
+    name: "vibe-chat",
+    input: { system: systemContent, contents },
+    output: fullResponse,
+    usage: mapGeminiUsage(usageRaw),
+    startTime,
+    endTime: new Date(),
+  });
 
   if (onFinish) onFinish(fullResponse);
 }
