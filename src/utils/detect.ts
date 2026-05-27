@@ -8,6 +8,12 @@ import { hasValidOAuthToken, getOAuthTokenInfo } from "./claude-oauth.js";
 
 const whichCmd = process.platform === "win32" ? "where" : "which";
 
+// `gh auth status` and `hs accounts list` validate credentials over the network.
+// run()'s default 120s ceiling is far past the settings panel's load budget, so
+// cap these credential probes aggressively — a timeout is treated like any other
+// failure (not authenticated), which is the safe degradation here (VIB-1834).
+const AUTH_PROBE_TIMEOUT_MS = 3000;
+
 export interface ToolInfo {
   name: string;
   found: boolean;
@@ -128,7 +134,7 @@ export function detectHubSpotAuth(): {
   portalId: string;
   accounts: HubSpotAccount[];
 } {
-  const result = run("hs accounts list");
+  const result = run("hs accounts list", { timeout: AUTH_PROBE_TIMEOUT_MS });
   if (!result.success || !result.stdout) {
     return { authenticated: false, portalName: "", portalId: "", accounts: [] };
   }
@@ -252,7 +258,7 @@ export function detectGitHubCLI(): ToolInfo {
 }
 
 export function detectGitHubAuth(): { authenticated: boolean; username: string } {
-  const result = run("gh auth status 2>&1");
+  const result = run("gh auth status 2>&1", { timeout: AUTH_PROBE_TIMEOUT_MS });
   if (!result.success && !result.stdout) {
     return { authenticated: false, username: "" };
   }

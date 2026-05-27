@@ -70,8 +70,14 @@ async function refreshSettings() {
   const body = document.getElementById("settings-body");
   body.innerHTML = `<div class="settings__loading"><div class="settings__spinner-lg"></div><span>Loading environment...</span></div>`;
 
+  // The server caps its own slow paths (provider model-list fetches + network
+  // credential probes) so /api/settings/status always returns within a few
+  // seconds, degrading to static model lists rather than hanging. Give the
+  // client enough headroom to clear that bounded worst case (~9s under a
+  // degraded network) instead of falsely reporting "Settings unavailable"
+  // at the old 3s budget (VIB-1834).
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3000);
+  const timeout = setTimeout(() => controller.abort(), 12000);
 
   try {
     const res = await fetch("/api/settings/status", { signal: controller.signal });

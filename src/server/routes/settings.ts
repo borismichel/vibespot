@@ -133,8 +133,28 @@ function labelForOpenAIModel(id: string): string {
   return id;
 }
 
+// Live model-catalog lookups are a best-effort enhancement over STATIC_MODELS.
+// Bound every provider request so a slow or unreachable provider API can never
+// stall the settings endpoint past the client's load budget (VIB-1834). On
+// timeout the fetch aborts and the caller falls back to the static list.
+const MODEL_FETCH_TIMEOUT_MS = 2500;
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  ms = MODEL_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchAnthropicModels(apiKey: string): Promise<ModelEntry[]> {
-  const resp = await fetch("https://api.anthropic.com/v1/models", {
+  const resp = await fetchWithTimeout("https://api.anthropic.com/v1/models", {
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
   });
   if (!resp.ok) return [];
@@ -145,7 +165,7 @@ async function fetchAnthropicModels(apiKey: string): Promise<ModelEntry[]> {
 }
 
 async function fetchOpenAIModelIds(apiKey: string): Promise<string[]> {
-  const resp = await fetch("https://api.openai.com/v1/models", {
+  const resp = await fetchWithTimeout("https://api.openai.com/v1/models", {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!resp.ok) return [];
@@ -161,7 +181,7 @@ function filterAndLabel(ids: string[], regex: RegExp): ModelEntry[] {
 }
 
 async function fetchGeminiModels(apiKey: string): Promise<ModelEntry[]> {
-  const resp = await fetch(
+  const resp = await fetchWithTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
   );
   if (!resp.ok) return [];
@@ -226,14 +246,27 @@ async function getModelCatalog(): Promise<Record<string, ModelEntry[]>> {
     );
   }
 
-  await Promise.all(jobs);
+  // Belt-and-suspenders over the per-fetch timeout: never wait on the aggregate
+  // longer than the fetch budget. A job still pending after that (e.g. a socket
+  // the AbortController didn't unblock) just leaves its STATIC_MODELS default in
+  // place. Each job mutates `catalog` in place on success and swallows its own
+  // errors, so partial completion degrades gracefully (VIB-1834).
+  let allSettled = false;
+  await Promise.race([
+    Promise.all(jobs).then(() => { allSettled = true; }),
+    new Promise<void>((resolve) => setTimeout(resolve, MODEL_FETCH_TIMEOUT_MS + 500)),
+  ]);
 
   // Langdock: use per-provider model list based on config
   const ldProvider = config.langdockProvider || "anthropic";
   catalog["langdock-api"] = LANGDOCK_PROVIDER_MODELS[ldProvider] || LANGDOCK_PROVIDER_MODELS.anthropic;
 
-  modelCache.data = catalog;
-  modelCache.ts = Date.now();
+  // Only cache a fully-resolved catalog. A partial result from a timeout should
+  // be retried on the next open, not pinned for the 10-minute TTL.
+  if (allSettled) {
+    modelCache.data = catalog;
+    modelCache.ts = Date.now();
+  }
   return catalog;
 }
 
