@@ -4184,6 +4184,19 @@ body { display: flex; }
   font-size: var(--text-sm);
   color: var(--text-dim);
 }
+/* Per-project running generation cost chip (VIB-1770) */
+.chat__cost-total {
+  margin-left: auto;
+  font-size: var(--text-xs, 11px);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  background: var(--bg-subtle, rgba(127, 127, 127, 0.12));
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: default;
+  white-space: nowrap;
+}
 
 .chat__messages {
   flex: 1;
@@ -5030,6 +5043,15 @@ body { display: flex; }
 
 .pipeline-stats--partial {
   color: var(--warning, #f59e0b);
+}
+
+/* Per-page estimated generation cost (VIB-1770) */
+.pipeline-cost {
+  font-size: var(--text-xs, 11px);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  padding: 0 0 2px;
+  cursor: default;
 }
 
 .pipeline-footer {

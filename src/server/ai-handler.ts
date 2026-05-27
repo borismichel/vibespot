@@ -7,9 +7,10 @@
 
 import { execSync } from "node:child_process";
 import { loadConfig, getApiKeyForEngine, type AIEngineType } from "../utils/config.js";
-import { getSession, addMessage, saveSession, updateModules, reorderModules, getModuleLibrary, getActiveTemplate, applyMultiPageResult } from "./session.js";
+import { getSession, addMessage, saveSession, updateModules, reorderModules, getModuleLibrary, getActiveTemplate, applyMultiPageResult, addProjectCost } from "./session.js";
 import { parseAndApplyModules } from "./ai-parser.js";
 import { log } from "./log.js";
+import { runWithCostTracking } from "./cost-tracker.js";
 import {
   streamWithAnthropicAPI,
   streamWithClaudeOAuth,
@@ -360,26 +361,32 @@ export async function handleAgenticGenerate(
       .filter((e) => !currentModuleNames.has(e.module.moduleName))
       .map((e) => ({ name: e.module.moduleName, usedIn: e.usedIn }));
 
-    const result = await runWithTrace(
-      {
-        name: "agent_pipeline",
-        sessionId: snapshot.themeName,
-        input: userMessage,
-        metadata: { engine, model, concurrency },
-        tags: ["vibespot", "agentic-pipeline"],
-      },
-      () =>
-        runAgentPipeline(
-          enrichedMessage,
-          snapshot,
-          engine,
-          apiKey,
-          model,
-          concurrency,
-          onEvent,
-          libraryModules,
-        ),
+    // Wrap in a cost-tracking scope so every model call's usage accumulates
+    // into one per-page total (VIB-1770). Independent of Langfuse — works in
+    // the local-CLI model with no Langfuse keys configured.
+    const { result, cost } = await runWithCostTracking(() =>
+      runWithTrace(
+        {
+          name: "agent_pipeline",
+          sessionId: snapshot.themeName,
+          input: userMessage,
+          metadata: { engine, model, concurrency },
+          tags: ["vibespot", "agentic-pipeline"],
+        },
+        () =>
+          runAgentPipeline(
+            enrichedMessage,
+            snapshot,
+            engine,
+            apiKey,
+            model,
+            concurrency,
+            onEvent,
+            libraryModules,
+          ),
+      ),
     );
+    result.cost = cost;
 
     // Verify session hasn't changed during generation
     const current = getSession();
@@ -421,27 +428,30 @@ export async function handleFigmaImport(
 
     const snapshot = takeSnapshot();
 
-    const result = await runWithTrace(
-      {
-        name: "figma_import",
-        sessionId: themeName,
-        input: { fileName: extraction.fileName, sections: extraction.sections.length },
-        metadata: { engine, model, concurrency },
-        tags: ["vibespot", "figma-import"],
-      },
-      () =>
-        runFigmaConversion(
-          extraction,
-          themeName,
-          engine,
-          apiKey,
-          model,
-          concurrency,
-          onEvent,
-          snapshot.brandAssets,
-          options?.useAssets,
-        ),
+    const { result, cost } = await runWithCostTracking(() =>
+      runWithTrace(
+        {
+          name: "figma_import",
+          sessionId: themeName,
+          input: { fileName: extraction.fileName, sections: extraction.sections.length },
+          metadata: { engine, model, concurrency },
+          tags: ["vibespot", "figma-import"],
+        },
+        () =>
+          runFigmaConversion(
+            extraction,
+            themeName,
+            engine,
+            apiKey,
+            model,
+            concurrency,
+            onEvent,
+            snapshot.brandAssets,
+            options?.useAssets,
+          ),
+      ),
     );
+    result.cost = cost;
 
     const current = getSession();
     if (!current || current.id !== capturedSessionId) {
@@ -494,6 +504,12 @@ export function applyPipelineResult(result: PipelineResult, pipelineMeta?: Pipel
         tpl.contentMode = "email";
       }
     }
+  }
+
+  // Roll this generation's cost into the project (per-theme) running total
+  // before persisting (VIB-1770). Cost is carried on the pipeline metadata.
+  if (pipelineMeta?.cost) {
+    addProjectCost(pipelineMeta.cost);
   }
 
   // Add assistant message to chat history with pipeline metadata

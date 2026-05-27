@@ -29,6 +29,10 @@ let changedModulesInRun = new Set();
 let highlightOnNextModulesUpdated = false;
 let changedListClearTimer = null;
 
+// VIB-1770 — the assistant bubble of the just-finished generation, so the
+// trailing `generation_cost` event can append its estimated cost line to it.
+let lastGenerationBubbleEl = null;
+
 const messagesEl = document.getElementById("chat-messages");
 const inputEl = document.getElementById("chat-input");
 const sendBtn = document.getElementById("chat-send");
@@ -605,6 +609,9 @@ function handleWsMessage(msg) {
       if (chatHeaderTitle) chatHeaderTitle.textContent = msg.themeName || "Chat";
       if (chatHeaderContext) chatHeaderContext.textContent = msg.engine || "";
 
+      // Hydrate the per-project generation cost chip (VIB-1770)
+      updateProjectCostChip(msg.costTotal);
+
       // Restore chat history from server
       if (msg.messages && msg.messages.length > 0) {
         for (const m of msg.messages) {
@@ -743,6 +750,9 @@ function handleWsMessage(msg) {
       break;
     case "pipeline_partial":
       handlePipelinePartial(msg);
+      break;
+    case "generation_cost":
+      handleGenerationCost(msg);
       break;
     case "agentic_prompt":
       handleAgenticPrompt();
@@ -1270,6 +1280,10 @@ function handlePipelineComplete(msg) {
   }
   bubble.appendChild(stats);
 
+  // Remember this bubble so the trailing `generation_cost` event (sent right
+  // after completion) can append its cost line to the same message (VIB-1770).
+  lastGenerationBubbleEl = bubble;
+
   resetPipelineState();
 }
 
@@ -1298,6 +1312,8 @@ function handlePipelinePartial(msg) {
   stats.textContent = `${msg.succeeded.length} modules succeeded, ${msg.failed.length} failed in ${duration}`;
   bubble.appendChild(stats);
 
+  lastGenerationBubbleEl = bubble;
+
   resetPipelineState();
 }
 
@@ -1310,6 +1326,89 @@ function resetPipelineState() {
   pipelineCurrentStep = null;
 
   renderChatSuggestions();
+}
+
+// ---------------------------------------------------------------------------
+// Generation cost (VIB-1770) — per-page estimate + per-project running total
+// ---------------------------------------------------------------------------
+
+// Format an estimated USD amount. Sub-dollar costs show 4 decimals so a
+// fraction of a cent is still legible; larger amounts round to cents.
+function formatUsd(usd) {
+  const n = Number(usd) || 0;
+  if (n > 0 && n < 0.01) return "$" + n.toFixed(4);
+  if (n < 1) return "$" + n.toFixed(3);
+  return "$" + n.toFixed(2);
+}
+
+function formatTokenCount(tokens) {
+  const n = Number(tokens) || 0;
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
+  return String(n);
+}
+
+// Build the per-page cost summary text from a PageCost object.
+// `costComplete === false` means some model wasn't in the price table, so the
+// dollar figure is a lower bound — prefix "≥" and explain it via the title.
+function buildCostText(cost) {
+  if (!cost || !cost.calls) return null;
+  const tokens = formatTokenCount(cost.totalTokens) + " tokens";
+  if (cost.costUsd > 0 || cost.costComplete) {
+    const prefix = cost.costComplete ? "" : "≥ ";
+    return "Est. " + prefix + formatUsd(cost.costUsd) + " · " + tokens;
+  }
+  // No priced calls at all — show tokens only.
+  return tokens;
+}
+
+// Append (or replace) the cost line on a finished generation's bubble.
+function renderCostLineOnBubble(bubble, cost) {
+  if (!bubble) return;
+  const text = buildCostText(cost);
+  if (!text) return;
+  let line = bubble.querySelector(".pipeline-cost");
+  if (!line) {
+    line = document.createElement("div");
+    line.className = "pipeline-cost";
+    bubble.appendChild(line);
+  }
+  line.textContent = text;
+  if (cost.costComplete === false) {
+    line.title = "Some model calls had no price data — this is a lower-bound estimate.";
+  } else {
+    line.title = "Estimated cost of this generation. Local estimate from public model prices; not a bill.";
+  }
+}
+
+// Live `generation_cost` event — arrives right after pipeline completion.
+function handleGenerationCost(msg) {
+  if (msg.cost) renderCostLineOnBubble(lastGenerationBubbleEl, msg.cost);
+  lastGenerationBubbleEl = null;
+  updateProjectCostChip(msg.projectTotal);
+}
+
+// Update the persistent per-project cost chip in the chat header. Hidden when
+// there's no cost yet (new project / CLI engine).
+function updateProjectCostChip(total) {
+  const chip = document.getElementById("chat-cost-total");
+  if (!chip) return;
+  if (!total || !total.generations) {
+    chip.classList.add("hidden");
+    chip.textContent = "";
+    return;
+  }
+  const prefix = total.costComplete === false ? "≥ " : "";
+  chip.textContent = "Σ " + prefix + formatUsd(total.costUsd);
+  chip.title =
+    "Estimated total for this project: " +
+    formatUsd(total.costUsd) +
+    " over " +
+    total.generations +
+    " generation" + (total.generations === 1 ? "" : "s") +
+    " · " + formatTokenCount(total.totalTokens) + " tokens" +
+    (total.costComplete === false ? " (lower bound)" : "");
+  chip.classList.remove("hidden");
 }
 
 // ---------------------------------------------------------------------------
@@ -2110,6 +2209,12 @@ function appendRestoredAssistantMessage(text, timestamp, pipeline) {
     }
     const statsClass = pipeline.stats.modulesFailed > 0 ? "pipeline-stats pipeline-stats--partial" : "pipeline-stats";
 
+    // Per-page cost line, if this generation persisted one (VIB-1770)
+    const costText = buildCostText(pipeline.cost);
+    const costHtml = costText
+      ? `<div class="pipeline-cost">${escapeHtml(costText)}</div>`
+      : "";
+
     div.innerHTML = `
       <div class="chat-msg__avatar chat-msg__avatar--ai">AI</div>
       <div class="chat-msg__content">
@@ -2119,6 +2224,7 @@ function appendRestoredAssistantMessage(text, timestamp, pipeline) {
           ${decisionHtml}
           ${modulesHtml}
           <div class="${statsClass}">${statsText}</div>
+          ${costHtml}
         </div>
       </div>`;
   } else {
