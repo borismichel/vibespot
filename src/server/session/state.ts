@@ -96,6 +96,36 @@ export function addSessionAsset(asset: SessionAsset): void {
   saveSession();
 }
 
+/**
+ * Add one generation's cost to the project (per-theme) running total (VIB-1770)
+ * and return the updated total. No-op when there's no active session or the
+ * generation had no priced/usage-bearing calls (e.g. CLI engines). Does not
+ * save on its own — the caller (`applyPipelineResult`) persists via saveSession.
+ */
+export function addProjectCost(
+  cost: import("./types.js").PageCost,
+): import("./types.js").ProjectCostTotal | undefined {
+  const activeSession = getSession();
+  if (!activeSession) return undefined;
+  if (cost.calls === 0) return activeSession.costTotal;
+
+  const prev = activeSession.costTotal ?? {
+    costUsd: 0,
+    totalTokens: 0,
+    generations: 0,
+    costComplete: true,
+  };
+  const updated = {
+    costUsd: prev.costUsd + cost.costUsd,
+    totalTokens: prev.totalTokens + cost.totalTokens,
+    generations: prev.generations + 1,
+    costComplete: prev.costComplete && cost.costComplete,
+  };
+  activeSession.costTotal = updated;
+  activeSession.updatedAt = Date.now();
+  return updated;
+}
+
 // ---------------------------------------------------------------------------
 // Module mutations
 // ---------------------------------------------------------------------------

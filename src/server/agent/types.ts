@@ -4,6 +4,7 @@
 
 import type { ModuleFiles } from "../../ai/engine.js";
 import type { SessionSnapshot, PageType } from "../session/types.js";
+import type { PageCost } from "../cost-tracker.js";
 
 // ---------------------------------------------------------------------------
 // Stage 1 output: Intent Analyzer
@@ -161,6 +162,12 @@ export interface PipelineResult {
     modulesFailed: number;
     durationMs: number;
   };
+  /**
+   * Aggregated token + USD cost of every model call this generation made
+   * (VIB-1770). Attached by the handler that wraps the pipeline in
+   * `runWithCostTracking`. Absent for CLI engines (no usage reported).
+   */
+  cost?: PageCost;
 }
 
 // ---------------------------------------------------------------------------

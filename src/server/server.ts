@@ -206,6 +206,24 @@ function buildPipelineOnEvent(
 }
 
 // ---------------------------------------------------------------------------
+// Generation cost (VIB-1770) — push the per-page token/USD estimate plus the
+// updated per-project running total to the UI after a generation completes.
+// Call AFTER applyPipelineResult so the session's running total is current.
+// No-op when there's no priced usage (e.g. CLI engines report none).
+// ---------------------------------------------------------------------------
+
+function sendGenerationCost(result: import("./agent/types.js").PipelineResult): void {
+  const cost = result.cost;
+  if (!cost || cost.calls === 0) return;
+  const sess = getSession();
+  sendToClient({
+    type: "generation_cost",
+    cost,
+    projectTotal: sess?.costTotal,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -773,7 +791,9 @@ function handleWsConnection(ws: WebSocket): void {
               steps: pipelineSteps,
               modules: pipelineModules,
               stats: result.stats,
+              cost: result.cost,
             });
+            sendGenerationCost(result);
 
           } else {
             // --- Single-call mode (existing behavior) ---
@@ -900,7 +920,9 @@ function handleWsConnection(ws: WebSocket): void {
             steps: pipelineSteps,
             modules: pipelineModules,
             stats: result.stats,
+            cost: result.cost,
           });
+          sendGenerationCost(result);
 
           writeModulesToDisk();
           commitThemeState(getSession()!.themePath, `Figma import: ${extraction.fileName}`);
@@ -1249,7 +1271,9 @@ ${errorContext}`;
             steps: pipelineSteps,
             modules: pipelineModules,
             stats: result.stats,
+            cost: result.cost,
           });
+          sendGenerationCost(result);
 
           const currentSession = getSession();
           if (currentSession) {
@@ -1351,6 +1375,8 @@ ${errorContext}`;
       plan: session.brandAssets?.plan || "",
       // Active generation state for reconnecting clients
       isGenerating: generating,
+      // Per-project running generation cost (VIB-1770)
+      costTotal: session.costTotal || null,
     }));
 
     // Replay accumulated pipeline events so reconnecting clients catch up

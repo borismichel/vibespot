@@ -31,6 +31,7 @@ import {
   type TokenUsage,
   type CostDetails,
 } from "./pricing.js";
+import { recordCostSample } from "./cost-tracker.js";
 
 const DEFAULT_BASE_URL = "https://cloud.langfuse.com";
 // Cap serialized input/output so we never ship multi-hundred-KB prompts.
@@ -367,6 +368,10 @@ export function reportModelUsage(params: {
       }
     }
   }
+  // Accumulate into the active per-generation cost scope (VIB-1770), if any.
+  // No-op outside a `runWithCostTracking` scope or when usage is unknown, so
+  // the legacy single-call paths that share this chokepoint don't contribute.
+  recordCostSample(model, usage);
   void recordGeneration({
     name,
     model,

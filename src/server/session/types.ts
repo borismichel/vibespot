@@ -3,6 +3,9 @@
  */
 
 import type { ModuleFiles } from "../../ai/engine.js";
+import type { PageCost } from "../cost-tracker.js";
+
+export type { PageCost } from "../cost-tracker.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -25,6 +28,18 @@ export interface PipelineMetadata {
   steps: { step: string; label: string; decisions?: string[] }[];
   modules: { name: string; status: "complete" | "failed" }[];
   stats: { modulesGenerated: number; modulesUnchanged: number; modulesFailed: number; durationMs: number };
+  /** Estimated token + USD cost of this generation (VIB-1770). */
+  cost?: PageCost;
+}
+
+/** Running per-project (per-theme) generation cost total (VIB-1770). */
+export interface ProjectCostTotal {
+  costUsd: number;
+  totalTokens: number;
+  /** Number of generations that contributed (with known usage). */
+  generations: number;
+  /** False once any contributing generation had an unpriced model call. */
+  costComplete: boolean;
 }
 
 export interface ChatMessage {
@@ -84,6 +99,13 @@ export interface VibeSession {
     brandKit?: BrandKit;
   };
   assets?: SessionAsset[];
+
+  /**
+   * Running estimated generation cost for this project/theme (VIB-1770).
+   * Accumulated across generations and persisted with the session. Absent on
+   * sessions created before this field existed (treated as zero).
+   */
+  costTotal?: ProjectCostTotal;
 
   // Legacy flat fields — kept for backward compat, redirected to active template
   messages: ChatMessage[];
