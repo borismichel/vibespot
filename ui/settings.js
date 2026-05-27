@@ -456,6 +456,105 @@ function renderAITab(body, data) {
     cliSection.appendChild(row);
   }
   body.appendChild(cliSection);
+
+  // Observability section — opt-in Langfuse keys, base URL, and enable toggle
+  body.appendChild(renderObservabilitySection(env, config));
+}
+
+// ---------------------------------------------------------------------------
+// Observability — Langfuse keys + base URL + enable toggle
+// ---------------------------------------------------------------------------
+
+function renderObservabilitySection(env, config) {
+  const section = el("section", "settings__section");
+  section.appendChild(sectionTitle("Observability"));
+  section.appendChild(desc("Langfuse captures token usage, estimated cost, and traces for every API model call. Opt-in — traces are sent only when both a public and secret key are set. Keys are stored locally in ~/.vibespot/config.json and sent only to your Langfuse instance."));
+
+  const pub = env.apiKeys.langfusePublic || { configured: false, masked: "" };
+  const sec = env.apiKeys.langfuseSecret || { configured: false, masked: "" };
+  const hasKeys = pub.configured && sec.configured;
+  const enabledFlag = config.langfuseEnabled; // undefined | true | false
+  const isOn = enabledFlag !== false;          // on by default unless explicitly disabled
+
+  // Enable toggle
+  const toggleRow = el("div", "settings__toggle-row");
+  const labelWrap = el("div", "");
+  const label = el("div", "settings__toggle-label");
+  label.textContent = "Send traces to Langfuse";
+  labelWrap.appendChild(label);
+
+  const sub = el("div", "settings__toggle-label-sub");
+  if (enabledFlag === false) {
+    sub.textContent = "Disabled — no traces or usage sent";
+    sub.style.color = "var(--text-muted)";
+  } else if (hasKeys) {
+    sub.textContent = "Active — traces, token usage & cost sent to Langfuse";
+    sub.style.color = "var(--success)";
+  } else {
+    sub.textContent = "Add a public + secret key below to start sending traces";
+    sub.style.color = "var(--warning)";
+  }
+  labelWrap.appendChild(sub);
+  toggleRow.appendChild(labelWrap);
+
+  const toggle = el("button", "settings__toggle" + (isOn ? " active" : ""));
+  toggle.addEventListener("click", async () => {
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ langfuseEnabled: !isOn }),
+    });
+    refreshSettings();
+  });
+  toggleRow.appendChild(toggle);
+  section.appendChild(toggleRow);
+
+  // Keys — masked display, persisted via the shared /api/settings/apikey route
+  section.appendChild(createApiKeyCard("langfuse-public", "Public Key", "pk-lf-...", pub));
+  section.appendChild(createApiKeyCard("langfuse-secret", "Secret Key", "sk-lf-...", sec));
+
+  // Base URL
+  const urlCard = el("div", "settings__card");
+  const urlRow = el("div", "settings__card-row");
+  urlRow.style.gap = "8px";
+  const urlLabel = el("span", "settings__card-label");
+  urlLabel.textContent = "Base URL";
+  urlRow.appendChild(urlLabel);
+
+  const urlInput = el("input", "settings__apikey-input");
+  urlInput.type = "text";
+  urlInput.placeholder = "https://cloud.langfuse.com";
+  urlInput.value = config.langfuseBaseUrl || "";
+  urlRow.appendChild(urlInput);
+
+  const urlSaveBtn = el("button", "settings__btn settings__btn--primary");
+  urlSaveBtn.textContent = "Save";
+  const saveBaseUrl = async () => {
+    urlSaveBtn.disabled = true;
+    urlSaveBtn.textContent = "Saving...";
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ langfuseBaseUrl: urlInput.value.trim() }),
+    });
+    refreshSettings();
+  };
+  urlSaveBtn.addEventListener("click", saveBaseUrl);
+  urlInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); saveBaseUrl(); }
+  });
+  urlRow.appendChild(urlSaveBtn);
+  urlCard.appendChild(urlRow);
+
+  const urlHint = el("div", "settings__toggle-label-sub");
+  urlHint.textContent = "cloud.langfuse.com (EU) · us.cloud.langfuse.com (US) · or your self-host URL. Leave blank for EU cloud.";
+  urlHint.style.color = "var(--text-muted)";
+  urlHint.style.marginTop = "6px";
+  urlCard.appendChild(urlHint);
+
+  section.appendChild(urlCard);
+
+  return section;
 }
 
 // ---------------------------------------------------------------------------

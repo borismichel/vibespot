@@ -342,6 +342,9 @@ export interface EnvironmentStatus {
     anthropic: { configured: boolean; masked: string; source: "config" | "env" | null };
     openai: { configured: boolean; masked: string; source: "config" | "env" | null };
     gemini: { configured: boolean; masked: string; source: "config" | "env" | null };
+    langdock: { configured: boolean; masked: string; source: "config" | "env" | null };
+    langfusePublic: { configured: boolean; masked: string; source: "config" | "env" | null };
+    langfuseSecret: { configured: boolean; masked: string; source: "config" | "env" | null };
   };
   activeEngine: AIEngineType | null;
   availableEngines: AIEngineType[];
@@ -406,6 +409,8 @@ export function detectEnvironment(): EnvironmentStatus {
   const openaiKey = keyStatus(config.openaiApiKey, "OPENAI_API_KEY");
   const geminiKey = keyStatus(config.geminiApiKey, "GEMINI_API_KEY", "GOOGLE_AI_API_KEY");
   const langdockKey = keyStatus(config.langdockApiKey, "LANGDOCK_API_KEY");
+  const langfusePublic = keyStatus(config.langfusePublicKey, "LANGFUSE_PUBLIC_KEY");
+  const langfuseSecret = keyStatus(config.langfuseSecretKey, "LANGFUSE_SECRET_KEY");
 
   // Build available engines — CLI tools must be enabled + authenticated
   const available: AIEngineType[] = [];
@@ -434,6 +439,8 @@ export function detectEnvironment(): EnvironmentStatus {
       openai: openaiKey,
       gemini: geminiKey,
       langdock: langdockKey,
+      langfusePublic,
+      langfuseSecret,
     },
     activeEngine: config.aiEngine || null,
     availableEngines: available,

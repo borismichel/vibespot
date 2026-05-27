@@ -267,6 +267,10 @@ export function handleSettingsStatusRoute(res: ServerResponse): void {
     extendedThinkingBudget: config.extendedThinkingBudget || "medium",
     webSearch: config.webSearch || false,
     figmaToken: config.figmaToken ? "••••" + config.figmaToken.slice(-4) : null,
+    // Langfuse — keys come through environment.apiKeys (masked); these carry the
+    // enable toggle (tri-state: undefined/true/false) and base URL.
+    langfuseEnabled: config.langfuseEnabled,
+    langfuseBaseUrl: config.langfuseBaseUrl || null,
   };
 
   const sessionCount = listSessions().length;
@@ -362,6 +366,8 @@ export function handleSettingsApiKeyRoute(req: IncomingMessage, res: ServerRespo
           case "gemini": configUpdate.geminiApiKey = ""; break;
           case "langdock": configUpdate.langdockApiKey = ""; break;
           case "figma": configUpdate.figmaToken = ""; break;
+          case "langfuse-public": configUpdate.langfusePublicKey = ""; break;
+          case "langfuse-secret": configUpdate.langfuseSecretKey = ""; break;
           default:
             jsonResponse(res, 400, { error: `Unknown provider: ${provider}` });
             return;
@@ -378,6 +384,8 @@ export function handleSettingsApiKeyRoute(req: IncomingMessage, res: ServerRespo
         case "gemini": configUpdate.geminiApiKey = apiKey; break;
         case "langdock": configUpdate.langdockApiKey = apiKey; break;
         case "figma": configUpdate.figmaToken = apiKey; break;
+        case "langfuse-public": configUpdate.langfusePublicKey = apiKey; break;
+        case "langfuse-secret": configUpdate.langfuseSecretKey = apiKey; break;
         default:
           jsonResponse(res, 400, { error: `Unknown provider: ${provider}` });
           return;
@@ -749,11 +757,21 @@ export function handleSettingsGenericRoute(req: IncomingMessage, res: ServerResp
         "extendedThinkingBudget",
         "webSearch",
         "langdockProvider",
+        "langfuseEnabled",
+        "langfuseBaseUrl",
       ];
       // Validate enums
       if (data.extendedThinkingBudget !== undefined &&
           !["low", "medium", "high"].includes(data.extendedThinkingBudget)) {
         jsonResponse(res, 400, { error: "extendedThinkingBudget must be 'low' | 'medium' | 'high'" });
+        return;
+      }
+      if (data.langfuseEnabled !== undefined && typeof data.langfuseEnabled !== "boolean") {
+        jsonResponse(res, 400, { error: "langfuseEnabled must be a boolean" });
+        return;
+      }
+      if (data.langfuseBaseUrl !== undefined && typeof data.langfuseBaseUrl !== "string") {
+        jsonResponse(res, 400, { error: "langfuseBaseUrl must be a string" });
         return;
       }
       if (data.langdockProvider !== undefined &&
