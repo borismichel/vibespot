@@ -90,5 +90,46 @@ the frontier provider.
 
 ## Real run
 
-_Not yet executed — pending API keys. Replace this section with the summary
-table from `latest.md` after running the command above._
+**Date:** 2026-05-27 · **Mode:** real · **Dataset:** 6 reference pages ·
+**Judge:** anthropic (`claude-sonnet-4-6`)
+
+> **Single-provider baseline (Anthropic only).** This first real run was scoped
+> to one provider — Anthropic `claude-sonnet-4-6` — because that was the only
+> key available. It is a real-output baseline, not yet a cross-provider
+> comparison; OpenAI and Gemini are backfilled in a follow-up once their keys
+> are in place. Command run:
+>
+> ```bash
+> npm run eval -- --providers=anthropic --judge=anthropic --langfuse
+> ```
+
+| Rank | Provider | Model | Accuracy | Validator pass | Clean first-pass | Coverage | Judge | Cost/page | Total cost | Latency/page |
+|------|----------|-------|----------|----------------|------------------|----------|-------|-----------|------------|--------------|
+| 1 | **anthropic** | `claude-sonnet-4-6` | 98% | 100% | 89% | 100% | 94% | $1.5516 | $9.3094 | 358.5s |
+
+### Per-page detail — anthropic (`claude-sonnet-4-6`)
+
+| Page | Accuracy | Validator | Coverage | Judge | Cost | Latency | Modules | Notes |
+|------|----------|-----------|----------|-------|------|---------|---------|-------|
+| saas-analytics | 98% | 100% (7/7 clean) | 100% | 95% | $1.5608 | 422.4s | 7 | — |
+| design-agency | 98% | 100% (6/6 clean) | 100% | 95% | $1.5354 | 322.4s | 6 | — |
+| restaurant | 98% | 100% (6/6 clean) | 100% | 95% | $1.6036 | 341.1s | 6 | — |
+| webinar-event | 96% | 100% (6/6 clean) | 100% | 90% | $1.6766 | 374.6s | 6 | — |
+| mobile-app | 98% | 100% (3/6 clean) | 100% | 95% | $1.3888 | 345.4s | 6 | — |
+| consulting | 98% | 100% (5/6 clean) | 100% | 95% | $1.5444 | 344.9s | 6 | — |
+
+**Read of the numbers.** Sonnet 4.6 ships near-flawless content: validator
+pass-rate 100% (every raw module is fixable or clean) and full section coverage
+on all 6 briefs, with the LLM-judge averaging 94%. The stricter **clean
+first-pass** axis (89% overall) is the real discriminator — `mobile-app`
+(3/6 clean) and `consulting` (5/6 clean) needed the auto-fixer on a couple of
+modules, while the other four pages were 100% clean. Cost is the headline
+trade-off: **~$1.55/page, $9.31 for the 6-page run** (~6 min/page wall-clock) —
+frontier-model economics, materially pricier than the mid/cheap tiers the mock
+projects. This baseline is the reference the OpenAI/Gemini backfill ranks
+against.
+
+**Langfuse.** Run registered as the experiment `eval-2026-05-27T15-14-20-590Z`
+in the self-hosted instance (project **vibespot**), dataset
+`vibespot-module-eval` — per-page traces carry accuracy / validator-pass-rate /
+coverage / judge / cost / latency scores for drill-down.
