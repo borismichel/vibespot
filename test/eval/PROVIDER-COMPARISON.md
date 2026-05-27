@@ -90,7 +90,8 @@ the frontier provider.
 
 ## Real run
 
-**Date:** 2026-05-27 · **Mode:** real · **Provider:** Anthropic, 3 models ·
+**Date:** 2026-05-27 · **Mode:** real · **Provider:** Anthropic (3 models) +
+OpenAI GPT-5 (3 models, [VIB-1832](/VIB/issues/VIB-1832)) ·
 **Langfuse:** self-hosted instance, project **vibespot**, dataset
 `vibespot-module-eval`.
 
@@ -100,8 +101,9 @@ the frontier provider.
 > judge model equals the generation model** — the validator / coverage /
 > clean-first-pass axes are objective and directly comparable across rows, but
 > **the judge (and therefore the blended accuracy) axis is _not_ strictly
-> comparable across rows** (a different judge per row). OpenAI + Gemini remain a
-> separate follow-up ([VIB-1832](/VIB/issues/VIB-1832)). Commands:
+> comparable across rows** (a different judge per row). The OpenAI GPT-5 backfill
+> ([VIB-1832](/VIB/issues/VIB-1832)) is in its own section below; Gemini remains
+> a follow-up (no API key configured). Commands:
 >
 > ```bash
 > # config.anthropicApiModel selects the model (harness has no per-run flag)
@@ -184,4 +186,53 @@ Three experiments registered in the self-hosted instance (project **vibespot**,
 dataset `vibespot-module-eval`): `eval-2026-05-27T15-14-20-590Z` (Sonnet 4.6),
 `eval-2026-05-27T17-07-53-818Z` (Haiku 4.5), and the Opus 4.7 run — each with
 per-page accuracy / validator-pass-rate / coverage / judge / cost / latency
-scores for drill-down.
+scores for drill-down. The OpenAI GPT-5 backfill registered 9 further runs (3
+models × 3 runs).
+
+## OpenAI GPT-5 backfill (VIB-1832)
+
+**Date:** 2026-05-27 · **Mode:** real · three GPT-5 chat variants.
+
+> **Different methodology — read before comparing to the Anthropic rows.** Each
+> model was run **3× over the single `saas-analytics` page** (the runs capture
+> variance; accuracy is shown as mean with lo/hi across the 3). Judge =
+> **`claude-sonnet-4-6`**, i.e. a *fixed external* judge — so the judge axis is
+> directly comparable *across the three OpenAI rows*, but it differs from the
+> Anthropic rows' self-judge, and the page set differs (1 page vs 6/2). Treat
+> validator / clean / coverage / cost / latency as the hard cross-provider
+> signal and the judge/accuracy columns as directional. This run required two
+> OpenAI-engine fixes shipped in this PR — `max_completion_tokens` (GPT-5 rejects
+> the legacy `max_tokens`) and `strict: false` structured-output (our schemas use
+> JSON-Schema keywords OpenAI strict mode rejects) — plus approximate GPT-5
+> pricing in `pricing.ts`. Command:
+>
+> ```bash
+> # openaiApiModel in config selects the variant (harness has no per-run flag);
+> # set per model, then:
+> npm run eval -- --providers=openai --judge=anthropic --langfuse --limit=1   # ×3 per model
+> ```
+
+### saas-analytics — GPT-5 family (mean of 3 runs each)
+
+| Model | Accuracy | Validator | Clean first-pass | Coverage | Judge | Cost/page | Latency/page | Failed |
+|-------|----------|-----------|------------------|----------|-------|-----------|--------------|--------|
+| `gpt-5.3-chat-latest` | 93% (lo 90% / hi 98%) | 100% | 100% | 100% | 82% | **$0.4596** | **168.5s** | 0 |
+| `gpt-5.4` | 96% (lo 94% / hi 98%) | 100% | 100% | 100% | 90% | $1.0161 | 387.2s | 0 |
+| `gpt-5.5` | 98% (lo 98% / hi 98%) | 100% | 100% | 100% | 95% | $3.7279 | 556.7s | 0 |
+
+### Read of the numbers
+
+- **All three GPT-5 variants clear the objective bar** — 100% validator pass,
+  100% clean first-pass, 100% coverage, **0 failures** across all 9 runs. The
+  pipeline + rules produce structurally valid, complete HubSpot modules on
+  OpenAI just as on Anthropic.
+- **Quality scales with tier — and so does cost, faster.** Judge-blended
+  accuracy climbs 93% → 96% → 98% across 5.3 → 5.4 → 5.5, but cost climbs
+  **$0.46 → $1.02 → $3.73/page (~8×)** and latency 169s → 387s → 557s.
+- **`gpt-5.5` matches Sonnet 4.6's 98%** on this page but at ~2.4× the cost
+  ($3.73 vs $1.55/page) and ~1.5× the latency — on this task the frontier OpenAI
+  tier buys no measurable quality over Sonnet 4.6 while costing more.
+- **`gpt-5.3-chat-latest` is the OpenAI value tier** — $0.46/page, closest to
+  Haiku 4.5's $0.38 — though Haiku edges it on judge score at lower cost/latency.
+- **Caveat (as above):** single page, external judge ≠ generation model, so the
+  cross-provider accuracy read is directional, not a verdict.

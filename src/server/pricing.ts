@@ -46,7 +46,11 @@ const PRICES: ModelPrice[] = [
   { match: "claude-3-5-sonnet", inputPerM: 3, outputPerM: 15 },
   { match: "claude-3-5-haiku", inputPerM: 0.8, outputPerM: 4 },
   { match: "claude-3-opus", inputPerM: 15, outputPerM: 75 },
-  // OpenAI
+  // OpenAI — GPT-5 family (ordered specific-first; default cacheRead = 0.1× input
+  // matches OpenAI's published cached-input rate, e.g. $0.50/M for gpt-5.5).
+  { match: "gpt-5.5", inputPerM: 5, outputPerM: 30 },
+  { match: "gpt-5.4", inputPerM: 2.5, outputPerM: 15 },
+  { match: "gpt-5.3", inputPerM: 1.75, outputPerM: 14 },
   { match: "gpt-4o-mini", inputPerM: 0.15, outputPerM: 0.6 },
   { match: "gpt-4o", inputPerM: 2.5, outputPerM: 10 },
   { match: "gpt-4.1-nano", inputPerM: 0.1, outputPerM: 0.4 },

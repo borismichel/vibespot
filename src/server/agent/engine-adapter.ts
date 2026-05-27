@@ -440,7 +440,11 @@ async function callOpenAI(
 
   const body: Record<string, unknown> = {
     model,
-    max_tokens: opts.maxTokens || 16000,
+    // `max_completion_tokens` (not the legacy `max_tokens`) is required by the
+    // GPT-5 family — gpt-5.x reject `max_tokens` with a 400. It is also accepted
+    // by gpt-4o / gpt-4.1, so it is the safe choice for all OpenAI chat models.
+    // For reasoning models this budget also covers internal reasoning tokens.
+    max_completion_tokens: opts.maxTokens || 16000,
     messages: openaiMessages,
   };
 
@@ -449,7 +453,12 @@ async function callOpenAI(
       type: "json_schema",
       json_schema: {
         name: opts.structuredOutput.name,
-        strict: true,
+        // `strict: false` — our schemas are authored for Anthropic tool_use and
+        // use JSON-Schema keywords (pattern, format, minimum, default, …) and
+        // partial `required` sets that OpenAI's strict mode rejects. Non-strict
+        // mode still does schema-guided generation (and is the closer analogue
+        // to Anthropic's lenient tool_use), while the pipeline parses defensively.
+        strict: false,
         schema: addAdditionalPropertiesFalse(opts.structuredOutput.schema),
       },
     };
