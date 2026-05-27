@@ -490,14 +490,22 @@ async function callOpenAI(
   const json = await response.json();
   const content = json.choices?.[0]?.message?.content || "";
 
-  const usage: TokenUsage | undefined = json.usage
-    ? {
-        inputTokens: json.usage.prompt_tokens,
-        outputTokens: json.usage.completion_tokens,
-        totalTokens: json.usage.total_tokens,
-        cacheReadTokens: json.usage.prompt_tokens_details?.cached_tokens ?? undefined,
-      }
-    : undefined;
+  let usage: TokenUsage | undefined;
+  if (json.usage) {
+    // OpenAI folds cached tokens *into* prompt_tokens, whereas Anthropic reports
+    // them separately. Subtract so `input` and `cache_read` don't overlap —
+    // otherwise computeCost() bills cached tokens at full input rate plus an
+    // extra cache-read rate. totalTokens stays as reported by the provider.
+    const cachedTokens = json.usage.prompt_tokens_details?.cached_tokens ?? 0;
+    const promptTokens = json.usage.prompt_tokens;
+    usage = {
+      inputTokens:
+        promptTokens != null ? Math.max(0, promptTokens - cachedTokens) : undefined,
+      outputTokens: json.usage.completion_tokens,
+      totalTokens: json.usage.total_tokens,
+      cacheReadTokens: cachedTokens || undefined,
+    };
+  }
 
   if (opts.structuredOutput) {
     try {
@@ -573,14 +581,21 @@ async function callGemini(
   const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
   const um = json.usageMetadata;
-  const usage: TokenUsage | undefined = um
-    ? {
-        inputTokens: um.promptTokenCount,
-        outputTokens: um.candidatesTokenCount,
-        totalTokens: um.totalTokenCount,
-        cacheReadTokens: um.cachedContentTokenCount ?? undefined,
-      }
-    : undefined;
+  let usage: TokenUsage | undefined;
+  if (um) {
+    // Gemini folds cached tokens *into* promptTokenCount; subtract so input and
+    // cache_read don't overlap (matching Anthropic's separated semantics).
+    // totalTokens stays as reported by the provider.
+    const cachedTokens = um.cachedContentTokenCount ?? 0;
+    const promptTokens = um.promptTokenCount;
+    usage = {
+      inputTokens:
+        promptTokens != null ? Math.max(0, promptTokens - cachedTokens) : undefined,
+      outputTokens: um.candidatesTokenCount,
+      totalTokens: um.totalTokenCount,
+      cacheReadTokens: cachedTokens || undefined,
+    };
+  }
 
   if (opts.structuredOutput) {
     try {

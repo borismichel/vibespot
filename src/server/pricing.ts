@@ -85,8 +85,9 @@ export function computeCost(model: string, usage: TokenUsage): CostDetails | und
   const cacheReadPerM = price.cacheReadPerM ?? price.inputPerM * 0.1;
   const cacheWritePerM = price.cacheWritePerM ?? price.inputPerM * 1.25;
 
-  // Anthropic reports cache tokens separately from `inputTokens`; OpenAI/Gemini
-  // fold everything into input. When cache fields are absent this is a no-op.
+  // `inputTokens` excludes cached tokens for every engine: Anthropic reports
+  // them separately, and the OpenAI/Gemini adapters subtract them out of the
+  // prompt count. So input and cache-read never overlap here.
   const input = (usage.inputTokens ?? 0) * price.inputPerM;
   const output = (usage.outputTokens ?? 0) * price.outputPerM;
   const cacheRead = (usage.cacheReadTokens ?? 0) * cacheReadPerM;
