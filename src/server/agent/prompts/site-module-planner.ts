@@ -25,6 +25,8 @@ function summarizeCss(css: string): string {
   return lines.join("\n");
 }
 
+import { renderStagePrompt } from "./registry.js";
+
 export function buildSiteModulePlannerPrompt(
   themeName: string,
   pages: SitePagePlan[],
@@ -44,61 +46,20 @@ export function buildSiteModulePlannerPrompt(
 
   const parts: string[] = [];
 
-  parts.push(`You are the Site Module Planner for vibeSpot, a HubSpot CMS page builder.
+  const navHrefs = pages
+    .map((p) => `  - "${p.label}" → href="/${p.slug}"`)
+    .join("\n");
 
-Your job: plan modules for a MULTI-PAGE website. You plan ALL pages in one pass to ensure cross-page coherence. You also plan shared modules (header, footer, navigation) that appear on every page identically.
-
-## Theme: "${themeName}"
-
-## Site Map
-${pageList}
-
-## Shared Modules (appear on EVERY page)
-${sharedList}
-
-Plan these shared modules ONCE. They will be automatically added to every page's template.
-
-## Available CSS Classes & Variables
-Reference these in your layoutNotes:
-
-${cssSummary}
-
-## Shared Module Rules
-
-### site-header (Navigation)
-- Logo on the left, nav links center or right, CTA button far right
-- Nav links: one for each page in the site map. Use relative hrefs matching slugs:
-${pages.map((p) => `  - "${p.label}" → href="/${p.slug}"`).join("\n")}
-- Active page link uses CSS class "${themeName}-nav__link--active"
-- Sticky with backdrop-blur, transitions on scroll
-- Mobile: hamburger menu with slide-in nav
-
-### site-footer
-- Consistent across all pages
-- Brand name, link columns (include page links), contact info, social icons, copyright
-- Include navigation links matching the header
-
-## Per-Page Module Rules
-For each page, plan modules specific to that page's purpose. Do NOT include shared modules (${sharedModuleNames.join(", ")}) in per-page module lists or per-page moduleOrder — they are automatically prepended/appended.
-
-Each page should have distinct content appropriate to its purpose. Aim for:
-- 4-8 unique modules per page (not counting shared modules)
-- Content appropriate to the page's purpose
-- Consistent use of design system classes across all pages
-
-## Module Naming
-- Use kebab-case identifiers (e.g., "hero", "team-grid", "contact-form")
-- Page-specific modules that might conflict across pages should be prefixed with a short page identifier (e.g., "home-hero", "about-hero") unless the content is genuinely different enough that the name alone distinguishes it
-- Shared modules use the exact names from the shared modules list above
-
-## Output Structure
-Return a JSON object with:
-- \`sharedModules\`: array of shared module specs (planned once, used everywhere)
-- \`pages\`: array of per-page blueprints, each with:
-  - \`pageId\`: matching the page ID from the site map
-  - \`modules\`: array of module specs for that page only (excluding shared)
-  - \`moduleOrder\`: ordered list of per-page module names only (excluding shared)
-- \`narrative\`: brief description of the overall site story/flow`);
+  parts.push(
+    renderStagePrompt("site-module-planner", {
+      themeName,
+      siteMap: pageList,
+      sharedList,
+      cssSummary,
+      navHrefs,
+      sharedModuleNamesCsv: sharedModuleNames.join(", "),
+    }),
+  );
 
   if (brandAssets?.brandvoice) {
     parts.push(`\n\n## Brand Voice\n${brandAssets.brandvoice}`);
