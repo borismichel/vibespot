@@ -204,6 +204,16 @@ Key behaviors:
 
 `detectDataCenter()` in `src/utils/detect.ts` reads `~/.hscli/config.yml` and checks the personal access key prefix (`CiRldTE` = eu1). Used to build correct regional URLs (`app-eu1.hubspot.com` vs `app.hubspot.com`).
 
+### Settings load path (low-latency, VIB-1835)
+
+`GET /api/settings/status` (`handleSettingsStatusRoute`) is **config-only and side-effect-free** — no subprocess, no network — so the settings panel opens instantly. It uses `detectEnvironmentLite()` (`src/utils/detect.ts`), which reads only config/env (API-key flags, Claude OAuth token file, HubSpot API-mode accounts) and returns `scanned:false` with the CLI/auth tools left as "not scanned" placeholders. Dropdowns ship from the inline `STATIC_MODELS`. Engine availability on this path is **optimistic** (enabled CLI engines are listed without verifying install).
+
+The expensive work is on-demand:
+- `GET /api/settings/models?refresh=1` (`handleSettingsModelsRoute`) — live provider catalog via `getModelCatalog()`, 10-min cache, `refresh=1` bypasses. Each provider fetch is bounded by `fetchWithTimeout` (2.5s) and the aggregate only caches when fully resolved.
+- `GET /api/settings/tools?group=ai|platform|all&refresh=1` (`handleSettingsToolsRoute`) — subprocess detection split by group (`ai` = the 3 AI CLIs via `detectAITools()`, which also returns an accurate `availableEngines`; `platform` = GitHub + HubSpot-CLI via `detectPlatformTools()`; `all` = full `detectEnvironment()`). ~60s per-group server cache; the `gh auth status` / `hs accounts list` probes are capped at `AUTH_PROBE_TIMEOUT_MS` (4s).
+
+Client (`ui/settings.js`): `refreshSettings()` renders instantly from `/status`; `fetchModels`/`fetchTools` layer their results over the fast payload via `applyScanCaches` (module-level `liveModels` / `scannedTools` / `scannedEngines` / `scannedGroups`). Per-tab **Refresh models** / **Scan AI tools** / **Check** buttons trigger the on-demand routes, and one non-blocking background scan (`maybeStartBackgroundScan`, `group=all` + models) runs once per open. (Note: `handleSetupInfoRoute` in `routes/setup.ts` still calls the full `detectEnvironment()` — separate flow, out of scope here.)
+
 ## Critical Constraints
 
 - **Pure ESM** — `"type": "module"` in package.json. No CommonJS `require()`. All internal imports use `.js` extensions.

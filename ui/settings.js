@@ -10,6 +10,98 @@ let settingsData = null;
 let activeTab = "ai";
 const activePolls = {};
 
+// VIB-1835: /api/settings/status is now config-only and renders instantly. The
+// expensive bits — live model lists and CLI/auth detection — are fetched on
+// demand and cached here, layered over the fast /status response on each render.
+let liveModels = null;                              // from /api/settings/models
+let scannedTools = {};                              // tool entries from /api/settings/tools
+let scannedEngines = null;                          // availableEngines refined by an AI scan
+const scannedGroups = { ai: false, platform: false };
+let bgScanStarted = false;                          // one-time background scan guard (per open)
+
+function resetScanState() {
+  liveModels = null;
+  scannedTools = {};
+  scannedEngines = null;
+  scannedGroups.ai = false;
+  scannedGroups.platform = false;
+  bgScanStarted = false;
+}
+
+// Layer the on-demand caches over the fast /status payload so a re-render after
+// any action keeps already-fetched models / scanned tool state.
+function applyScanCaches(data) {
+  if (!data || !data.environment) return;
+  if (liveModels) data.models = liveModels;
+  if (Object.keys(scannedTools).length) {
+    data.environment.tools = { ...data.environment.tools, ...scannedTools };
+  }
+  if (scannedEngines) data.environment.availableEngines = scannedEngines;
+}
+
+async function fetchModels(refresh) {
+  try {
+    const res = await fetch("/api/settings/models" + (refresh ? "?refresh=1" : ""));
+    const data = await res.json();
+    if (data && data.models) {
+      liveModels = data.models;
+      if (settingsData) settingsData.models = liveModels;
+      return true;
+    }
+  } catch { /* keep STATIC_MODELS */ }
+  return false;
+}
+
+async function fetchTools(group, refresh) {
+  try {
+    const qs = `?group=${group}` + (refresh ? "&refresh=1" : "");
+    const res = await fetch("/api/settings/tools" + qs);
+    const data = await res.json();
+    if (data && data.tools) {
+      scannedTools = { ...scannedTools, ...data.tools };
+      if (Array.isArray(data.availableEngines)) scannedEngines = data.availableEngines;
+      if (group === "ai" || group === "all") scannedGroups.ai = true;
+      if (group === "platform" || group === "all") scannedGroups.platform = true;
+      return true;
+    }
+  } catch { /* leave "not scanned" */ }
+  return false;
+}
+
+// Hybrid default (Boris-approved): after the instant render, kick off one
+// non-blocking scan of models + all tools, then re-render in place. Every later
+// open repeats this once; explicit Refresh/Scan/Check buttons are always live.
+function maybeStartBackgroundScan() {
+  if (bgScanStarted) return;
+  bgScanStarted = true;
+  Promise.all([fetchModels(false), fetchTools("all", false)]).then((results) => {
+    // Don't yank a re-render out from under someone mid-typing.
+    if (results.some(Boolean) && settingsData && !settingsHasFocusedInput()) {
+      renderSettings(settingsData);
+    }
+  });
+}
+
+function settingsHasFocusedInput() {
+  const body = document.getElementById("settings-body");
+  const ae = document.activeElement;
+  return !!(body && ae && body.contains(ae) && (ae.tagName === "INPUT" || ae.tagName === "SELECT"));
+}
+
+// Small button that runs an on-demand scan with a spinner, then re-renders the
+// active tab (which recreates this button in its resolved state).
+function makeScanButton(label, onScan, extraClass) {
+  const btn = el("button", "settings__btn settings__btn--small" + (extraClass ? " " + extraClass : ""));
+  btn.textContent = label;
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="settings__spinner"></span> ' + escSettings(label) + "…";
+    await onScan();
+    if (settingsData) renderSettings(settingsData);
+  });
+  return btn;
+}
+
 const ENGINE_LABELS = {
   "claude-code": "Claude Code",
   "anthropic-api": "Anthropic API",
@@ -34,6 +126,7 @@ function openSettings(tab) {
   }
   const overlay = document.getElementById("settings-overlay");
   if (overlay) overlay.classList.remove("hidden");
+  resetScanState();
   refreshSettings();
 }
 
@@ -70,14 +163,17 @@ async function refreshSettings() {
   const body = document.getElementById("settings-body");
   body.innerHTML = `<div class="settings__loading"><div class="settings__spinner-lg"></div><span>Loading environment...</span></div>`;
 
+  // /status is config-only and returns in single-digit ms; this is just a relaxed
+  // safety net for an unreachable server, not the old 3s budget that timed out.
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3000);
+  const timeout = setTimeout(() => controller.abort(), 12000);
 
   try {
     const res = await fetch("/api/settings/status", { signal: controller.signal });
     clearTimeout(timeout);
     settingsData = await res.json();
     renderSettings(settingsData);
+    maybeStartBackgroundScan();
   } catch (err) {
     clearTimeout(timeout);
     const aborted = err && err.name === "AbortError";
@@ -108,6 +204,7 @@ function renderSettingsError(body, timedOut) {
 }
 
 function renderSettings(data) {
+  applyScanCaches(data);
   const body = document.getElementById("settings-body");
   body.innerHTML = "";
 
@@ -230,6 +327,9 @@ function renderAITab(body, data) {
     });
 
     modelRow.appendChild(modelSelect);
+    // Dropdowns populate instantly from STATIC_MODELS; Refresh pulls the live
+    // provider catalog on demand (VIB-1835).
+    modelRow.appendChild(makeScanButton("Refresh", () => fetchModels(true)));
     section.appendChild(modelRow);
   }
 
@@ -376,7 +476,14 @@ function renderAITab(body, data) {
   // CLI Tools section with toggles
   const cliSection = el("section", "settings__section");
   cliSection.appendChild(sectionTitle("CLI Tools"));
-  cliSection.appendChild(desc("Enable CLI tools you have installed. Install status is only checked when you toggle a tool on, so disabled tools add zero overhead."));
+  cliSection.appendChild(desc("Enable the CLI tools you have installed. Install and auth status is detected on demand — scan to check or refresh it."));
+
+  const cliScanRow = el("div", "settings__card-row");
+  const cliScanHint = el("span", "settings__card-meta");
+  cliScanHint.textContent = scannedGroups.ai ? "Status scanned" : "Not scanned yet";
+  cliScanRow.appendChild(cliScanHint);
+  cliScanRow.appendChild(makeScanButton(scannedGroups.ai ? "Rescan" : "Scan AI tools", () => fetchTools("ai", true)));
+  cliSection.appendChild(cliScanRow);
 
   const cliTools = [
     { key: "claudeCode", id: "claude-code", name: "Claude Code", installId: "claude", url: "https://claude.ai/code" },
@@ -397,7 +504,12 @@ function renderAITab(body, data) {
     label.textContent = tool.name;
     labelWrap.appendChild(label);
 
-    if (enabled && info.found) {
+    if (enabled && !scannedGroups.ai) {
+      const sub = el("div", "settings__toggle-label-sub");
+      sub.textContent = "Not scanned";
+      sub.style.color = "var(--text-muted)";
+      labelWrap.appendChild(sub);
+    } else if (enabled && info.found) {
       const sub = el("div", "settings__toggle-label-sub");
       sub.textContent = `v${info.version}` + (info.authenticated ? " \u2014 authenticated" : " \u2014 not authenticated");
       sub.style.color = info.authenticated ? "var(--success)" : "var(--warning)";
@@ -425,8 +537,9 @@ function renderAITab(body, data) {
 
     row.appendChild(toggleRow);
 
-    // If enabled but not installed, show install button
-    if (enabled && !info.found) {
+    // If enabled but not installed, show install button (only once we've scanned
+    // — before that, info.found is just an unscanned placeholder).
+    if (enabled && scannedGroups.ai && !info.found) {
       const installRow = el("div", "settings__card-row");
       const installBtn = el("button", "settings__btn settings__btn--primary");
       installBtn.textContent = "Install";
@@ -444,7 +557,7 @@ function renderAITab(body, data) {
     }
 
     // If enabled, installed, but not authenticated — show sign in
-    if (enabled && info.found && !info.authenticated) {
+    if (enabled && scannedGroups.ai && info.found && !info.authenticated) {
       const authRow = el("div", "settings__card-row");
       const authBtn = el("button", "settings__btn settings__btn--primary");
       authBtn.textContent = "Sign in";
@@ -870,6 +983,28 @@ function renderHubSpotTab(body, data) {
     // CLI mode — show CLI status and accounts from hs accounts list
     acctSection.appendChild(desc("HubSpot CLI accounts are managed by the hs command. Use \u201chs auth\u201d to add accounts."));
 
+    // The hs CLI + accounts probe is a subprocess, so it runs on demand rather
+    // than on every settings open (VIB-1835).
+    const hsCheckRow = el("div", "settings__card-row");
+    const hsCheckHint = el("span", "settings__card-meta");
+    hsCheckHint.textContent = scannedGroups.platform ? "Status checked" : "Not checked yet";
+    hsCheckRow.appendChild(hsCheckHint);
+    hsCheckRow.appendChild(makeScanButton(scannedGroups.platform ? "Recheck" : "Check", () => fetchTools("platform", true)));
+    acctSection.appendChild(hsCheckRow);
+
+    if (!scannedGroups.platform) {
+      const pending = el("div", "settings__card");
+      const prow = el("div", "settings__card-row");
+      prow.appendChild(dot("muted"));
+      const plabel = el("span", "settings__card-label");
+      plabel.textContent = "HubSpot CLI — not scanned";
+      prow.appendChild(plabel);
+      pending.appendChild(prow);
+      acctSection.appendChild(pending);
+      body.appendChild(acctSection);
+      return;
+    }
+
     const cliCard = el("div", "settings__card");
     const cliRow = el("div", "settings__card-row");
     cliRow.appendChild(dot(hs.found ? "success" : "warn"));
@@ -1001,6 +1136,28 @@ function renderGitHubTab(body, data) {
   const section = el("section", "settings__section");
   section.appendChild(sectionTitle("GitHub CLI"));
   section.appendChild(desc("GitHub CLI enables pushing your theme to a repository. Optional \u2014 not needed for HubSpot deployment."));
+
+  // GitHub install/auth is detected via subprocess, so it's checked on demand
+  // rather than on every settings open (VIB-1835).
+  const checkRow = el("div", "settings__card-row");
+  const checkHint = el("span", "settings__card-meta");
+  checkHint.textContent = scannedGroups.platform ? "Status checked" : "Not checked yet";
+  checkRow.appendChild(checkHint);
+  checkRow.appendChild(makeScanButton(scannedGroups.platform ? "Recheck" : "Check", () => fetchTools("platform", true)));
+  section.appendChild(checkRow);
+
+  if (!scannedGroups.platform) {
+    const pending = el("div", "settings__card");
+    const pendingRow = el("div", "settings__card-row");
+    pendingRow.appendChild(dot("muted"));
+    const pendingLabel = el("span", "settings__card-label");
+    pendingLabel.textContent = "GitHub CLI \u2014 not scanned";
+    pendingRow.appendChild(pendingLabel);
+    pending.appendChild(pendingRow);
+    section.appendChild(pending);
+    body.appendChild(section);
+    return;
+  }
 
   const card = el("div", "settings__card");
 

@@ -2,11 +2,19 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { run } from "./shell.js";
-import { loadConfig, maskApiKey, isCliToolEnabled, getActiveHubSpotAccount, type AIEngineType, type HubSpotAccountConfig } from "./config.js";
+import { loadConfig, maskApiKey, isCliToolEnabled, getActiveHubSpotAccount, type AIEngineType, type HubSpotAccountConfig, type VibeSpotConfig } from "./config.js";
 import { detectDataCenterFromPak } from "../hubspot/api.js";
 import { hasValidOAuthToken, getOAuthTokenInfo } from "./claude-oauth.js";
 
 const whichCmd = process.platform === "win32" ? "where" : "which";
+
+// `gh auth status` and `hs accounts list` validate credentials over the network.
+// run()'s default 120s ceiling is far past the settings panel's load budget, so
+// cap these credential probes aggressively — a timeout is treated like any other
+// failure (not authenticated), which is the safe degradation here (VIB-1834).
+// These probes only ever run from the on-demand `/api/settings/tools` scan, never
+// from `/api/settings/status` (which is config-only and side-effect-free).
+const AUTH_PROBE_TIMEOUT_MS = 4000;
 
 export interface ToolInfo {
   name: string;
@@ -128,7 +136,7 @@ export function detectHubSpotAuth(): {
   portalId: string;
   accounts: HubSpotAccount[];
 } {
-  const result = run("hs accounts list");
+  const result = run("hs accounts list", { timeout: AUTH_PROBE_TIMEOUT_MS });
   if (!result.success || !result.stdout) {
     return { authenticated: false, portalName: "", portalId: "", accounts: [] };
   }
@@ -252,7 +260,7 @@ export function detectGitHubCLI(): ToolInfo {
 }
 
 export function detectGitHubAuth(): { authenticated: boolean; username: string } {
-  const result = run("gh auth status 2>&1");
+  const result = run("gh auth status 2>&1", { timeout: AUTH_PROBE_TIMEOUT_MS });
   if (!result.success && !result.stdout) {
     return { authenticated: false, username: "" };
   }
@@ -349,36 +357,190 @@ export interface EnvironmentStatus {
   activeEngine: AIEngineType | null;
   availableEngines: AIEngineType[];
   enabledCLITools: string[];
+  // false when produced by the config-only `detectEnvironmentLite()` (no
+  // subprocess detection has run yet); true after a full/grouped scan. The
+  // settings UI uses this to render tool/auth cards as "not scanned" until the
+  // user (or the one-time background scan) triggers `/api/settings/tools`.
+  scanned: boolean;
 }
 
 const DISABLED_CLI: CLIToolInfo = { name: "", found: false, version: "", path: "", authenticated: false, authDetail: "Disabled" };
 
-export function detectEnvironment(): EnvironmentStatus {
-  const config = loadConfig();
+type ApiKeyStatus = { configured: boolean; masked: string; source: "config" | "env" | null };
 
-  const node = detectNode();
-  const git = detectGit();
+function keyStatus(configKey: string | undefined, ...envVars: string[]): ApiKeyStatus {
+  if (configKey) return { configured: true, masked: maskApiKey(configKey), source: "config" };
+  for (const v of envVars) {
+    if (process.env[v]) return { configured: true, masked: maskApiKey(process.env[v]!), source: "env" };
+  }
+  return { configured: false, masked: "", source: null };
+}
 
-  // HubSpot: API mode uses config, CLI mode uses hs CLI
-  const hsUploadMode = config.hubspotUploadMode || "api";
-  let hsInfo: ToolInfo & { authenticated: boolean; portalName: string; portalId: string; dataCenter: string; accounts: HubSpotAccount[]; uploadMode: "api" | "cli" };
+// API-key status is derived purely from config + env vars — no subprocess, no
+// network — so it is safe to compute on the fast `/status` path.
+function detectApiKeys(config: VibeSpotConfig): EnvironmentStatus["apiKeys"] {
+  return {
+    anthropic: keyStatus(config.anthropicApiKey, "ANTHROPIC_API_KEY"),
+    openai: keyStatus(config.openaiApiKey, "OPENAI_API_KEY"),
+    gemini: keyStatus(config.geminiApiKey, "GEMINI_API_KEY", "GOOGLE_AI_API_KEY"),
+    langdock: keyStatus(config.langdockApiKey, "LANGDOCK_API_KEY"),
+    langfusePublic: keyStatus(config.langfusePublicKey, "LANGFUSE_PUBLIC_KEY"),
+    langfuseSecret: keyStatus(config.langfuseSecretKey, "LANGFUSE_SECRET_KEY"),
+  };
+}
 
-  if (hsUploadMode === "cli") {
+// Engine availability. API engines depend only on key presence (cheap); the
+// three CLI engines depend on the tool being usable — which means
+// `found && authenticated` after a scan, or (optimistically) just "enabled" on
+// the config-only path before any scan has run. Ordering matches the engine
+// selector in the settings UI.
+function computeAvailableEngines(opts: {
+  apiKeys: EnvironmentStatus["apiKeys"];
+  claudeOAuth: boolean;
+  claudeCode: boolean;
+  geminiCli: boolean;
+  codexCli: boolean;
+}): AIEngineType[] {
+  const a: AIEngineType[] = [];
+  if (opts.claudeCode) a.push("claude-code");
+  if (opts.claudeOAuth) a.push("claude-oauth");
+  if (opts.apiKeys.anthropic.configured) a.push("anthropic-api");
+  if (opts.apiKeys.openai.configured) a.push("openai-api");
+  if (opts.geminiCli) a.push("gemini-cli");
+  if (opts.apiKeys.gemini.configured) a.push("gemini-api");
+  if (opts.codexCli) a.push("codex-cli");
+  if (opts.apiKeys.langdock.configured) a.push("langdock-api");
+  return a;
+}
+
+// HubSpot tool info. API mode is config-derived (no subprocess) so it is always
+// safe; CLI mode shells out and so only runs on a scan.
+function detectHubSpotTool(
+  uploadMode: "api" | "cli",
+  scan: boolean,
+): ToolInfo & { authenticated: boolean; portalName: string; portalId: string; dataCenter: string; accounts: HubSpotAccount[]; uploadMode: "api" | "cli" } {
+  if (uploadMode === "cli") {
+    if (!scan) {
+      return { name: "HubSpot CLI", found: false, version: "", path: "", authenticated: false, portalName: "", portalId: "", dataCenter: "na1", accounts: [], uploadMode: "cli" };
+    }
     const hs = detectHubSpotCLI();
     const hsAuth = hs.found ? detectHubSpotAuth() : { authenticated: false, portalName: "", portalId: "", accounts: [] as HubSpotAccount[] };
     const dc = hsAuth.portalId ? detectDataCenter(hsAuth.portalId) : "na1";
-    hsInfo = { ...hs, ...hsAuth, dataCenter: dc, uploadMode: "cli" };
-  } else {
-    // API mode — read from vibespot config, no subprocess
-    const apiAuth = detectHubSpotAuthFromConfig();
-    hsInfo = {
-      name: "HubSpot API",
-      found: true, // always available (built-in)
-      version: "v3",
-      path: "",
-      ...apiAuth,
-    };
+    return { ...hs, ...hsAuth, dataCenter: dc, uploadMode: "cli" };
   }
+  // API mode — read from vibespot config, no subprocess.
+  return {
+    name: "HubSpot API",
+    found: true, // always available (built-in)
+    version: "v3",
+    path: "",
+    ...detectHubSpotAuthFromConfig(),
+  };
+}
+
+// Config-only, side-effect-free environment status for the fast settings
+// `/status` path: no subprocesses, no network. Tool/auth state for the AI CLIs
+// and the GitHub/HubSpot-CLI probes is left "not scanned" (placeholders); only
+// the cheap config/env reads (API keys, Claude OAuth token file, HubSpot API
+// accounts) are populated. Engine availability is optimistic — enabled CLI
+// engines are listed without verifying install — and is refined by a later
+// `/api/settings/tools` scan (VIB-1834).
+export function detectEnvironmentLite(): EnvironmentStatus {
+  const config = loadConfig();
+  const uploadMode = config.hubspotUploadMode || "api";
+  const apiKeys = detectApiKeys(config);
+
+  const claudeOAuth = {
+    authenticated: hasValidOAuthToken(),
+    expiresAt: getOAuthTokenInfo()?.expiresAt,
+  };
+
+  const notScannedCli = (name: string): CLIToolInfo => ({ name, found: false, version: "", path: "", authenticated: false, authDetail: "Not scanned" });
+  const notScannedTool = (name: string): ToolInfo => ({ name, found: false, version: "", path: "" });
+
+  return {
+    tools: {
+      node: notScannedTool("Node.js"),
+      git: notScannedTool("Git"),
+      hubspot: detectHubSpotTool(uploadMode, false),
+      github: { ...notScannedTool("GitHub CLI"), authenticated: false, username: "" },
+      claudeCode: notScannedCli("Claude Code"),
+      claudeOAuth,
+      geminiCli: notScannedCli("Gemini CLI"),
+      codexCli: notScannedCli("OpenAI Codex CLI"),
+    },
+    apiKeys,
+    activeEngine: config.aiEngine || null,
+    availableEngines: computeAvailableEngines({
+      apiKeys,
+      claudeOAuth: claudeOAuth.authenticated,
+      claudeCode: isCliToolEnabled("claude-code"),
+      geminiCli: isCliToolEnabled("gemini-cli"),
+      codexCli: isCliToolEnabled("codex-cli"),
+    }),
+    enabledCLITools: config.enabledCLITools || [],
+    scanned: false,
+  };
+}
+
+// Subprocess scan of just the AI CLI tools (Claude Code / Gemini / Codex) plus
+// the cheap Claude OAuth check. Because engine availability depends only on API
+// keys + OAuth + these three CLIs, this also returns an accurate
+// `availableEngines` to replace the optimistic one from `/status`.
+export function detectAITools(): {
+  claudeCode: CLIToolInfo;
+  geminiCli: CLIToolInfo;
+  codexCli: CLIToolInfo;
+  claudeOAuth: { authenticated: boolean; expiresAt?: string };
+  availableEngines: AIEngineType[];
+} {
+  const config = loadConfig();
+  const apiKeys = detectApiKeys(config);
+  const claudeOAuth = {
+    authenticated: hasValidOAuthToken(),
+    expiresAt: getOAuthTokenInfo()?.expiresAt,
+  };
+  const claude = isCliToolEnabled("claude-code") ? detectClaudeCode() : { ...DISABLED_CLI, name: "Claude Code" };
+  const gemini = isCliToolEnabled("gemini-cli") ? detectGeminiCLI() : { ...DISABLED_CLI, name: "Gemini CLI" };
+  const codex = isCliToolEnabled("codex-cli") ? detectCodexCLI() : { ...DISABLED_CLI, name: "OpenAI Codex CLI" };
+  return {
+    claudeCode: claude,
+    geminiCli: gemini,
+    codexCli: codex,
+    claudeOAuth,
+    availableEngines: computeAvailableEngines({
+      apiKeys,
+      claudeOAuth: claudeOAuth.authenticated,
+      claudeCode: claude.found && claude.authenticated,
+      geminiCli: gemini.found && gemini.authenticated,
+      codexCli: codex.found && codex.authenticated,
+    }),
+  };
+}
+
+// Subprocess scan of the platform tools (GitHub CLI + auth, HubSpot CLI + auth
+// when in CLI mode). These never affect engine availability.
+export function detectPlatformTools(): {
+  github: ToolInfo & { authenticated: boolean; username: string };
+  hubspot: ToolInfo & { authenticated: boolean; portalName: string; portalId: string; dataCenter: string; accounts: HubSpotAccount[]; uploadMode: "api" | "cli" };
+} {
+  const config = loadConfig();
+  const uploadMode = config.hubspotUploadMode || "api";
+  const gh = detectGitHubCLI();
+  const ghAuth = gh.found ? detectGitHubAuth() : { authenticated: false, username: "" };
+  return {
+    github: { ...gh, ...ghAuth },
+    hubspot: detectHubSpotTool(uploadMode, true),
+  };
+}
+
+export function detectEnvironment(): EnvironmentStatus {
+  const config = loadConfig();
+  const uploadMode = config.hubspotUploadMode || "api";
+
+  const node = detectNode();
+  const git = detectGit();
+  const hsInfo = detectHubSpotTool(uploadMode, true);
 
   // GitHub CLI — always checked (lightweight)
   const gh = detectGitHubCLI();
@@ -391,37 +553,11 @@ export function detectEnvironment(): EnvironmentStatus {
   };
 
   // AI CLI tools — only check if enabled in config (lazy loading)
-  const enabledTools = config.enabledCLITools || [];
   const claude = isCliToolEnabled("claude-code") ? detectClaudeCode() : { ...DISABLED_CLI, name: "Claude Code" };
   const gemini = isCliToolEnabled("gemini-cli") ? detectGeminiCLI() : { ...DISABLED_CLI, name: "Gemini CLI" };
   const codex = isCliToolEnabled("codex-cli") ? detectCodexCLI() : { ...DISABLED_CLI, name: "OpenAI Codex CLI" };
 
-  // Determine API key status
-  function keyStatus(configKey: string | undefined, ...envVars: string[]): { configured: boolean; masked: string; source: "config" | "env" | null } {
-    if (configKey) return { configured: true, masked: maskApiKey(configKey), source: "config" };
-    for (const v of envVars) {
-      if (process.env[v]) return { configured: true, masked: maskApiKey(process.env[v]!), source: "env" };
-    }
-    return { configured: false, masked: "", source: null };
-  }
-
-  const anthropicKey = keyStatus(config.anthropicApiKey, "ANTHROPIC_API_KEY");
-  const openaiKey = keyStatus(config.openaiApiKey, "OPENAI_API_KEY");
-  const geminiKey = keyStatus(config.geminiApiKey, "GEMINI_API_KEY", "GOOGLE_AI_API_KEY");
-  const langdockKey = keyStatus(config.langdockApiKey, "LANGDOCK_API_KEY");
-  const langfusePublic = keyStatus(config.langfusePublicKey, "LANGFUSE_PUBLIC_KEY");
-  const langfuseSecret = keyStatus(config.langfuseSecretKey, "LANGFUSE_SECRET_KEY");
-
-  // Build available engines — CLI tools must be enabled + authenticated
-  const available: AIEngineType[] = [];
-  if (claude.found && claude.authenticated) available.push("claude-code");
-  if (claudeOAuth.authenticated) available.push("claude-oauth");
-  if (anthropicKey.configured) available.push("anthropic-api");
-  if (openaiKey.configured) available.push("openai-api");
-  if (gemini.found && gemini.authenticated) available.push("gemini-cli");
-  if (geminiKey.configured) available.push("gemini-api");
-  if (codex.found && codex.authenticated) available.push("codex-cli");
-  if (langdockKey.configured) available.push("langdock-api");
+  const apiKeys = detectApiKeys(config);
 
   return {
     tools: {
@@ -434,16 +570,16 @@ export function detectEnvironment(): EnvironmentStatus {
       geminiCli: gemini,
       codexCli: codex,
     },
-    apiKeys: {
-      anthropic: anthropicKey,
-      openai: openaiKey,
-      gemini: geminiKey,
-      langdock: langdockKey,
-      langfusePublic,
-      langfuseSecret,
-    },
+    apiKeys,
     activeEngine: config.aiEngine || null,
-    availableEngines: available,
-    enabledCLITools: enabledTools,
+    availableEngines: computeAvailableEngines({
+      apiKeys,
+      claudeOAuth: claudeOAuth.authenticated,
+      claudeCode: claude.found && claude.authenticated,
+      geminiCli: gemini.found && gemini.authenticated,
+      codexCli: codex.found && codex.authenticated,
+    }),
+    enabledCLITools: config.enabledCLITools || [],
+    scanned: true,
   };
 }
