@@ -85,7 +85,17 @@ The default generation mode. Runs a 4-stage pipeline for each user message:
 - CLI engines (Claude Code, Gemini CLI, Codex CLI): subprocess spawning with prompt piping
 - **Instrumentation**: API responses' token usage is captured into `AgentCallResult.usage` (`TokenUsage` in `src/server/pricing.ts`) and `callAgentAPI` emits a per-call usage/cost log plus a Langfuse generation (`src/server/langfuse.ts`). CLI engines report no usage. See "Observability (Langfuse)" below.
 
-**Prompts** (`prompts/`) — System prompts and JSON schemas for each stage.
+**Prompts** (`prompts/`) — System prompts and JSON schemas for each stage. The editable stage *instruction* prompts (intent-analyzer, design-system, module-planner, site-module-planner, module-developer) are sourced through the **stage-prompt registry** (`prompts/registry.ts`, VIB-1769) rather than inline literals — see "Stage-prompt registry" below. The large static `.md` guides are NOT managed there; they stay as cached file blocks appended by the builders.
+
+### Stage-prompt registry (Langfuse Phase 3, `prompts/registry.ts` + `prompts/managed/`)
+
+Langfuse-managed prompts via **bundle-at-build** (no runtime dependency on our infra — fits the local-CLI deployment model, confirmed by Boris on [VIB-1769]):
+
+- **Source selection**: `renderStagePrompt(id, vars)` / `getStagePrompt(id)` pick the active template — the version-pinned Langfuse-compiled bundle entry when valid, else the in-code local fallback. A bundle entry is accepted only when (a) its `version` equals the pinned local version and (b) it references no placeholder outside the stage's allow-list; either failure silently falls back to local (per-prompt). So a stale/missing/tampered bundle never alters generation.
+- **Local fallback** (`managed/local-prompts.ts`): the canonical `LOCAL_STAGE_PROMPTS` — each stage's instruction template (with `{{placeholder}}` tokens), pinned `version`, and allow-listed `placeholders`. This is the guaranteed offline copy.
+- **Bundle** (`assets/prompts.bundle.json`): compiled at build time by `scripts/sync-prompts.ts` (`npm run prompts:pull` pulls each stage prompt from Langfuse at its pinned version → `vibespot-stage-{id}`; `npm run prompts:seed` / `--from-local` seeds it from the local fallback). Loaded at runtime via `resolveAsset` (same path as the `.md` guides), shipped via `files: [assets]`. **`build` never fetches Langfuse** — it uses the committed bundle.
+- **No untrusted interpolation**: substitution replaces only allow-listed `{{token}}`s with CONTROLLED values (theme name, computed module/CSS summaries — never raw user input), single-pass so inserted values are never re-scanned/re-expanded.
+- **Behavior parity**: externalization is byte-identical to the previous inline prompts, locked by a golden snapshot test (`test/prompt-registry.test.ts` + `test/fixtures/prompt-golden.json`). The quality-check stage is rule-based (no model call) → it has no managed prompt.
 
 **Types** (`types.ts`) — `PipelinePlan`, `PageBlueprint`, `ModuleSpec`, `PipelineEvent`, `PipelineResult`, concurrency limiter.
 

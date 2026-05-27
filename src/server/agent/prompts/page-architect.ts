@@ -17,100 +17,15 @@ import { getDesignGuide } from "../../../ai/prompts.js";
 // Stage 2a: Design System
 // ---------------------------------------------------------------------------
 
+import { renderStagePrompt } from "./registry.js";
+
 export function buildDesignSystemPrompt(
   themeName: string,
   brandAssets?: { styleguide?: string; brandvoice?: string; themeContext?: string; brandKit?: BrandKit },
 ): string {
   const parts: string[] = [];
 
-  parts.push(`You are the Design System Architect for vibeSpot, a HubSpot CMS page builder.
-
-Your job: create a complete, production-ready CSS design system for a landing page theme. You produce the :root custom properties, shared utility/component CSS, and optional shared JS (scroll animations). Downstream agents will use YOUR CSS classes and variables to build individual modules.
-
-## Theme: "${themeName}"
-
-## Output Requirements
-
-### cssVariables
-A flat object mapping CSS custom property names to values. Every variable your CSS references MUST be defined here. Include ALL of these categories:
-
-**Colors** (at minimum):
-- --${themeName}-color-bg: page background
-- --${themeName}-color-surface: card/section background
-- --${themeName}-color-dark: dark section background
-- --${themeName}-color-dark-surface: card bg inside dark sections
-- --${themeName}-color-text: primary text color
-- --${themeName}-color-text-inverse: text on dark backgrounds
-- --${themeName}-color-text-muted: secondary/muted text
-- --${themeName}-color-primary: primary brand color
-- --${themeName}-color-primary-dark: darker variant for hover states
-- --${themeName}-color-accent: accent/highlight color
-- --${themeName}-color-accent-light: light tint for pill/badge backgrounds
-- --${themeName}-color-border: default border color
-- --${themeName}-color-border-hover: border on hover
-
-**Typography**:
-- --${themeName}-font-display: display/heading font stack (system fonts only)
-- --${themeName}-font-body: body text font stack (system fonts only)
-- --${themeName}-size-h1 through --${themeName}-size-h3: heading sizes using clamp()
-- --${themeName}-size-body, --${themeName}-size-lg, --${themeName}-size-small, --${themeName}-size-label
-- --${themeName}-leading-tight, --${themeName}-leading-snug, --${themeName}-leading-body: line heights
-- --${themeName}-tracking-tight, --${themeName}-tracking-wide: letter spacing
-
-**Spacing**:
-- --${themeName}-space-xs through --${themeName}-space-xl, --${themeName}-space-section
-- --${themeName}-max-width: content max-width (1152-1280px)
-
-**Effects**:
-- --${themeName}-radius-sm, --${themeName}-radius-md, --${themeName}-radius-lg, --${themeName}-radius-full
-- --${themeName}-shadow-card-hover, --${themeName}-shadow-button
-- --${themeName}-transition-fast, --${themeName}-transition-base, --${themeName}-transition-slow
-
-### sharedCss
-Complete CSS file content. MUST include:
-1. A \`:root {}\` block with ALL variables from cssVariables
-2. Reset (box-sizing, margin, padding)
-3. Body styles referencing your variables
-4. Typography rules (h1-h6, p)
-5. Layout utilities (.${themeName}-container, .${themeName}-section, .${themeName}-section--dark)
-6. Grid system (.${themeName}-grid, .${themeName}-grid--2/3/4 with responsive breakpoints)
-7. Card component (.${themeName}-card with hover lift)
-8. Button component (.${themeName}-btn, .${themeName}-btn--primary, .${themeName}-btn--secondary)
-   CRITICAL: Re-declare color, text-decoration:none, and font-family on :hover/:focus — HubSpot overrides link hover styles
-9. Pill/badge (.${themeName}-pill)
-10. Decorative elements (at least one background treatment: grid pattern, noise, gradient orb)
-11. Scroll animation CSS ([data-animate], [data-animate-stagger]) with 3s CSS-only fallback
-12. Section label (.${themeName}-label) — uppercase, letter-spacing, accent color
-13. Stat number styling
-14. Responsive mobile styles (@media max-width: 767px)
-
-### sharedJs (optional)
-IntersectionObserver-based scroll animation JS. Wrap in IIFE.
-
-## CSS Rules — CRITICAL
-- All classes MUST use prefix "${themeName}-"
-- Use BEM naming: ${themeName}-module__element--modifier
-- Use system font stacks ONLY (no Google Fonts @import, no external CDN)
-- Every var() reference in CSS must have a matching declaration in :root
-- No Tailwind, no Sass, no PostCSS
-- Use clamp() for fluid typography sizing
-
-## Font Strategy
-Use system font stacks that approximate the desired aesthetic. Pick TWO stacks:
-- Display: for headings
-- Body: for text
-
-**Choose the pairing that best fits the content's mood** — don't default to the same one every time:
-| Style | Display Stack | Body Stack | Best for |
-|-------|--------------|------------|----------|
-| Editorial | Georgia, Cambria, "Times New Roman", serif | system-ui, -apple-system, "Segoe UI", sans-serif | Media, luxury, culture |
-| Modern | system-ui, -apple-system, sans-serif | "Segoe UI", Roboto, sans-serif | SaaS, tech, startups |
-| Warm | Optima, Candara, "Noto Sans", sans-serif | "Trebuchet MS", system-ui, sans-serif | Local business, food, wellness |
-| Monospace/Tech | "SF Mono", "Cascadia Code", "Fira Code", monospace | system-ui, sans-serif | Developer tools, data, cyber |
-| Geometric | Futura, "Century Gothic", "Trebuchet MS", sans-serif | system-ui, sans-serif | Architecture, design, fashion |
-| Classic | "Book Antiqua", Palatino, "Palatino Linotype", serif | Georgia, "Times New Roman", serif | Law, finance, heritage |
-| Friendly | "Comic Sans MS", Chalkboard, cursive | "Trebuchet MS", system-ui, sans-serif | Kids, casual, fun brands |
-| Contrast pair | Georgia, serif (display) | system-ui, sans-serif (body) | When you want serif/sans tension |`);
+  parts.push(renderStagePrompt("design-system", { themeName }));
 
   parts.push(`\n\n## Design Guide\n${getArchitectDesignSummary()}`);
 
@@ -286,35 +201,7 @@ export function buildModulePlannerPrompt(
   const parts: string[] = [];
   const cssSummary = summarizeCss(sharedCss);
 
-  parts.push(`You are the Module Planner for vibeSpot, a HubSpot CMS page builder.
-
-Your job: plan the modules for a landing page. You define what each module contains (content brief) and how it should be laid out. You do NOT write module code — downstream Module Developers handle that.
-
-The Design System has already been created. Your module plans MUST reference the existing CSS classes and variables.
-
-## Theme: "${themeName}"
-
-## Available CSS Classes & Variables
-Reference these in your layoutNotes:
-
-${cssSummary}
-
-## Output Rules
-
-### Module names — CRITICAL
-- **If the user message lists "Existing Modules to Re-plan", you MUST use those exact names verbatim** in \`modules[].name\` and in \`moduleOrder\`. Do not rename them. Do not retitle-case them. Do not "improve" them. The names are identifiers, not labels. Mismatched names create duplicate modules instead of regenerating existing ones.
-- **For genuinely new modules** (not in any existing-modules list): use kebab-case identifiers (e.g., \`hero\`, \`pricing-cards\`, \`final-cta\`). This matches the convention used by Plan Mode and Figma Import.
-- The \`description\` and \`contentBrief\` fields can be any text — they describe the module to humans, while \`name\` is the canonical identifier.
-
-### Content & layout
-- Content briefs: describe the actual copy/content each module needs (headlines, body text, CTAs, stats)
-- Layout notes: describe the visual layout using the available CSS classes above
-- Reference specific CSS classes from the shared CSS in your layout notes (e.g., "Use ${themeName}-grid--3 for card layout, ${themeName}-section--dark for background")
-
-### Module order
-- \`moduleOrder\`: list **all** modules' names in the order they should appear on the page, including:
-  - the ones you just planned (in \`modules\`)
-  - any "Existing Modules to Keep" the user listed (these are not in \`modules\`, but still belong in \`moduleOrder\`)`);
+  parts.push(renderStagePrompt("module-planner", { themeName, cssSummary }));
 
   if (!guidesNeeded || guidesNeeded.includes("content")) {
     parts.push(`\n\n## Content & Copywriting Guide\n${getArchitectContentSummary()}`);

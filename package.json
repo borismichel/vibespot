@@ -20,6 +20,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "eval": "tsx test/eval/run-eval.ts",
+    "prompts:pull": "tsx scripts/sync-prompts.ts",
+    "prompts:seed": "tsx scripts/sync-prompts.ts --from-local",
     "prepublishOnly": "npm run build",
     "contact-monitor": "tsx scripts/contact-monitor.ts",
     "docker:publish": "scripts/docker-publish.sh",

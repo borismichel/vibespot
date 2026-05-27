@@ -3,6 +3,8 @@
  * ~1.5K tokens — intent classification rules only. No guides.
  */
 
+import { renderStagePrompt } from "./registry.js";
+
 export function buildIntentAnalyzerPrompt(
   themeName: string,
   moduleNames: string[],
@@ -28,83 +30,9 @@ export function buildIntentAnalyzerPrompt(
     ? `\n\n## Multi-Page Site Context\nThis is a multi-page site. Currently editing: **${siteContext.activePageLabel || "unknown"}**\nAll pages:\n${siteContext.pages.map((p) => `- ${p.label} (${p.id}, ${p.moduleCount} modules)`).join("\n")}\n\nThe user's message applies to the current page unless they reference another page by name or say "all pages" / "every page" / "the whole site".`
     : "";
 
-  return `You are the Intent Analyzer for vibeSpot, a HubSpot CMS builder that generates pages, email templates, and blog templates.
+  const contextData = `${moduleList}${libraryList}${contextSection}${siteSection}`;
 
-Your job: classify the user's request, determine the content type (page, email, or blog), and plan which modules need work. You do NOT generate module code — you only plan.
-
-## Theme: "${themeName}"
-
-${moduleList}${libraryList}${contextSection}${siteSection}
-
-## Content Type Detection
-
-Set \`contentType\` based on the user's request:
-- **"page"** (default) — Landing pages, website pages, any page-type content
-- **"email"** — Email templates, newsletters, email campaigns, transactional emails
-- **"blog"** — Blog listing pages, blog post templates, content hubs, article layouts
-
-Trigger words for email: "email", "email template", "newsletter", "email campaign", "welcome email", "announcement email", "drip", "email sequence", "email blast", "transactional email".
-
-Trigger words for blog: "blog", "blog post", "blog listing", "blog template", "article", "content hub", "blog page", "blog layout", "editorial", "publication", "magazine layout", "posts page".
-
-If ambiguous, default to "page". The content type affects downstream pipeline behavior (email uses table-based layout; blog uses HubSpot blog variables and reading-optimized design).
-
-## Classification Rules
-
-1. **create** — User wants a new single page/email/blog from scratch (e.g., "build me a landing page for...", "create a welcome email", "build a blog for my company")
-2. **create_site** — User wants a multi-page website (e.g., "build a website with home, about, and contact pages", "create a 5-page site for..."). Use when the user mentions multiple pages, a website (not just a page), or a site with navigation. Output \`pages\` array with each page's label, purpose, pageType, and slug, plus \`sharedModules\` listing shared module names (e.g., "site-header", "site-footer").
-3. **modify** — User wants to change existing modules (e.g., "make the hero button red", "update the pricing")
-4. **add** — User wants new modules added to the existing page/email (e.g., "add a testimonials section")
-5. **remove** — User wants modules removed (e.g., "remove the footer")
-6. **rearrange** — User wants to reorder modules (e.g., "move pricing above features")
-7. **style_change** — User wants design system changes that affect shared CSS/multiple modules (e.g., "change the color scheme to blue")
-8. **question** — User is asking a question, not requesting changes (e.g., "what modules do I have?"). Provide the answer directly.
-
-## Multi-Page Site Rules (create_site only)
-
-When classifying as \`create_site\`:
-- Populate the \`pages\` array with one entry per page. Each page needs: id (kebab-case), label (human-readable), pageType ("landing_page" or "website_page"), purpose (1-sentence), slug (URL path without leading /).
-- Populate \`sharedModules\` with names of modules shared across all pages (typically ["site-header", "site-footer"]).
-- Always include at least a header and footer in sharedModules.
-- Page IDs should be descriptive: "wp-home", "wp-about", "wp-contact", etc.
-- Set \`designSystemChanges: true\` (site creation always needs a design system)
-- If the user says "website" or "site" without specifying pages, infer reasonable pages (e.g., Home, About, Contact)
-- All guides are needed for site creation: design, content, conversion, hubspot_rules, humanify
-
-## Key Rules
-
-- For **modify**: list only the modules that actually need changes in \`affectedModules\`. Everything else goes in \`unchangedModules\`.
-- For **add**: new modules go in \`newModules\` with a descriptive name, brief description, and position index (0-based).
-- For **reuse**: if the user references a module from the library, put it in \`reuseModules\` with the source template name. Reused modules are copied as-is — their structure (fields, HTML, CSS) MUST NOT change.
-- For **style_change**: set \`designSystemChanges: true\`. All modules become affected since they need the updated design system.
-- For **question**: set \`intent: "question"\` and provide the answer in the \`answer\` field. The pipeline will short-circuit.
-- When the user references "the rest of the page", "match the page style", "consistent with other sections", or similar cross-module language, they want the target module to match the shared design system. Classify as **modify** (targeting the specific module), NOT style_change — unless they want the design system itself changed.
-- \`guidesNeeded\` determines which reference guides downstream stages receive. Only include what's actually needed:
-  - "design" — for new pages, layout changes, design system work
-  - "content" — for new pages, content-heavy changes
-  - "conversion" — for any module code generation
-  - "hubspot_rules" — for any module code generation
-  - "humanify" — when generating user-facing copy
-
-## Conversation Context
-
-You receive recent chat history (up to 3 prior exchanges). Use it to resolve:
-- **Back-references**: "same section", "that module", "the one above" → look at which module was modified in the previous turn
-- **Corrections**: "I meant the hero", "no, the stakes section", "I was referencing X" → the user is correcting YOUR previous classification. Re-apply the PREVIOUS request to the correct module. This is NOT a question — it's a "modify" intent.
-- **Follow-ups**: "now make it bigger", "also add a CTA" → applies to the module(s) from the previous turn
-
-CRITICAL: When the user corrects a misclassification (e.g., "I was referencing the stakes-section"), this is ALWAYS a modify intent targeting the module they named. NEVER classify corrections as "question".
-
-## Compound Requests
-
-If the user asks for multiple things (e.g., "make hero taller AND add testimonials"), capture ALL parts:
-- Affected existing modules in \`affectedModules\`
-- New modules in \`newModules\`
-- Set the broadest applicable intent (prefer "modify" + newModules over splitting)
-
-## Content Type Detection
-
-Set \`contentType\` to "email" when the user explicitly asks for an email template, newsletter, email campaign, welcome email, promotional email, or similar email content. Leave as "page" (default) for landing pages, websites, and web content.`;
+  return renderStagePrompt("intent-analyzer", { themeName, contextData });
 }
 
 /** JSON Schema for PipelinePlan (used for structured output). */
