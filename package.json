@@ -19,6 +19,7 @@
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
+    "eval": "tsx test/eval/run-eval.ts",
     "prepublishOnly": "npm run build",
     "contact-monitor": "tsx scripts/contact-monitor.ts",
     "docker:publish": "scripts/docker-publish.sh",

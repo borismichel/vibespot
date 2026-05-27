@@ -29,6 +29,7 @@ import {
   computeCost,
   toUsageDetails,
   type TokenUsage,
+  type CostDetails,
 } from "./pricing.js";
 
 const DEFAULT_BASE_URL = "https://cloud.langfuse.com";
@@ -57,6 +58,45 @@ interface TraceContext {
 
 const traceStore = new AsyncLocalStorage<TraceContext>();
 let buffer: IngestionEvent[] = [];
+
+// ---------------------------------------------------------------------------
+// Usage observers — an in-process hook on every completed model call.
+//
+// `reportModelUsage` notifies registered observers with the normalized usage,
+// the estimated cost (via the shipped `computeCost`), and wall-clock latency.
+// This is independent of Langfuse: it fires whether or not Langfuse is
+// configured. With no observer registered it is a no-op, so production code
+// paths are entirely unaffected — it exists so dev/CI tooling (the eval
+// harness) can aggregate token cost + latency without re-plumbing every
+// engine. Observers must never throw; errors are swallowed.
+// ---------------------------------------------------------------------------
+
+/** A single completed model call, as seen by a usage observer. */
+export interface ModelUsageReport {
+  engine: string;
+  model: string;
+  name: string;
+  usage?: TokenUsage;
+  cost?: CostDetails;
+  startTime: Date;
+  endTime: Date;
+  durationMs: number;
+}
+
+type ModelUsageObserver = (report: ModelUsageReport) => void;
+const usageObservers = new Set<ModelUsageObserver>();
+
+/**
+ * Register an observer notified for every completed model call. Returns an
+ * unsubscribe function. Intended for dev/CI instrumentation (e.g. the eval
+ * harness), not production hot paths.
+ */
+export function onModelUsage(observer: ModelUsageObserver): () => void {
+  usageObservers.add(observer);
+  return () => {
+    usageObservers.delete(observer);
+  };
+}
 
 function resolveSettings(): LangfuseSettings | null {
   const cfg = loadConfig();
@@ -296,16 +336,36 @@ export function reportModelUsage(params: {
   metadata?: Record<string, unknown>;
 }): void {
   const { engine, model, name, usage, startTime, endTime } = params;
+  const durationMs = endTime.getTime() - startTime.getTime();
+  const cost = usage ? computeCost(model, usage) : undefined;
   if (usage) {
-    const cost = computeCost(model, usage);
     log.info("agent-usage", `${engine} ${name}`, {
       model,
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
       cacheReadTokens: usage.cacheReadTokens,
       costUsd: cost?.total,
-      durationMs: endTime.getTime() - startTime.getTime(),
+      durationMs,
     });
+  }
+  if (usageObservers.size > 0) {
+    const report: ModelUsageReport = {
+      engine,
+      model,
+      name,
+      usage,
+      cost,
+      startTime,
+      endTime,
+      durationMs,
+    };
+    for (const observer of usageObservers) {
+      try {
+        observer(report);
+      } catch {
+        /* observers must never break a generation */
+      }
+    }
   }
   void recordGeneration({
     name,

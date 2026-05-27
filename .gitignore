@@ -6,6 +6,7 @@ LPAGE.md
 CLAUDE.md
 .claude/
 test/validate.ts
+test/eval/output/
 _validation_workspace/
 workspace/
 vibespot/
