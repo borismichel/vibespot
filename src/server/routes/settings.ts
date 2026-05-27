@@ -10,7 +10,7 @@ import { jsonResponse, readBody } from "../route-helpers.js";
 import { loadConfig, saveConfig, getApiKeyForEngine, addHubSpotAccount, removeHubSpotAccount, setActiveHubSpotAccount, setCliToolEnabled, type AIEngineType, type HubSpotAccountConfig } from "../../utils/config.js";
 import { listSessions } from "../session.js";
 import { getLocalThemes } from "./setup.js";
-import { detectEnvironment, detectHubSpotCLI, detectHubSpotAuth, detectGitHubCLI, detectGitHubAuth } from "../../utils/detect.js";
+import { detectEnvironment, detectEnvironmentLite, detectAITools, detectPlatformTools, detectHubSpotCLI, detectHubSpotAuth, detectGitHubCLI, detectGitHubAuth } from "../../utils/detect.js";
 import { validatePak } from "../../hubspot/api.js";
 import { getVersion } from "../../utils/fs.js";
 import { startJob, startJobSafe, getJob } from "../process-manager.js";
@@ -133,8 +133,28 @@ function labelForOpenAIModel(id: string): string {
   return id;
 }
 
+// Live model-catalog lookups are a best-effort enhancement over STATIC_MODELS.
+// Bound every provider request so a slow or unreachable provider API can never
+// stall the on-demand `/api/settings/models` route. On timeout the fetch aborts
+// and the caller falls back to the static list (VIB-1834, folds in #170).
+const MODEL_FETCH_TIMEOUT_MS = 2500;
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  ms = MODEL_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchAnthropicModels(apiKey: string): Promise<ModelEntry[]> {
-  const resp = await fetch("https://api.anthropic.com/v1/models", {
+  const resp = await fetchWithTimeout("https://api.anthropic.com/v1/models", {
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
   });
   if (!resp.ok) return [];
@@ -145,7 +165,7 @@ async function fetchAnthropicModels(apiKey: string): Promise<ModelEntry[]> {
 }
 
 async function fetchOpenAIModelIds(apiKey: string): Promise<string[]> {
-  const resp = await fetch("https://api.openai.com/v1/models", {
+  const resp = await fetchWithTimeout("https://api.openai.com/v1/models", {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!resp.ok) return [];
@@ -161,7 +181,7 @@ function filterAndLabel(ids: string[], regex: RegExp): ModelEntry[] {
 }
 
 async function fetchGeminiModels(apiKey: string): Promise<ModelEntry[]> {
-  const resp = await fetch(
+  const resp = await fetchWithTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
   );
   if (!resp.ok) return [];
@@ -171,8 +191,8 @@ async function fetchGeminiModels(apiKey: string): Promise<ModelEntry[]> {
     .map((m) => ({ id: m.name.replace("models/", ""), label: m.displayName }));
 }
 
-async function getModelCatalog(): Promise<Record<string, ModelEntry[]>> {
-  if (Date.now() - modelCache.ts < MODEL_CACHE_TTL && Object.keys(modelCache.data).length > 0) {
+async function getModelCatalog(refresh = false): Promise<Record<string, ModelEntry[]>> {
+  if (!refresh && Date.now() - modelCache.ts < MODEL_CACHE_TTL && Object.keys(modelCache.data).length > 0) {
     return modelCache.data;
   }
 
@@ -226,19 +246,37 @@ async function getModelCatalog(): Promise<Record<string, ModelEntry[]>> {
     );
   }
 
-  await Promise.all(jobs);
+  // Belt-and-suspenders over the per-fetch timeout: never wait on the aggregate
+  // longer than the fetch budget. A job still pending after that just leaves its
+  // STATIC_MODELS default in place. Each job mutates `catalog` in place on
+  // success and swallows its own errors, so partial completion degrades
+  // gracefully (VIB-1834, folds in #170).
+  let allSettled = false;
+  await Promise.race([
+    Promise.all(jobs).then(() => { allSettled = true; }),
+    new Promise<void>((resolve) => setTimeout(resolve, MODEL_FETCH_TIMEOUT_MS + 500)),
+  ]);
 
   // Langdock: use per-provider model list based on config
   const ldProvider = config.langdockProvider || "anthropic";
   catalog["langdock-api"] = LANGDOCK_PROVIDER_MODELS[ldProvider] || LANGDOCK_PROVIDER_MODELS.anthropic;
 
-  modelCache.data = catalog;
-  modelCache.ts = Date.now();
+  // Only cache a fully-resolved catalog. A partial result from a timeout should
+  // be retried on the next request, not pinned for the 10-minute TTL.
+  if (allSettled) {
+    modelCache.data = catalog;
+    modelCache.ts = Date.now();
+  }
   return catalog;
 }
 
 export function handleSettingsStatusRoute(res: ServerResponse): void {
-  const env = detectEnvironment();
+  // Config-only and side-effect-free: no subprocess, no network, low single-digit
+  // ms. Tool/auth state is "not scanned" (detectEnvironmentLite) and dropdowns ship
+  // from STATIC_MODELS so they populate instantly. Live model lists and CLI/auth
+  // detection are fetched on demand via /api/settings/models and
+  // /api/settings/tools (VIB-1834).
+  const env = detectEnvironmentLite();
   const config = loadConfig();
 
   const configPayload = {
@@ -273,30 +311,71 @@ export function handleSettingsStatusRoute(res: ServerResponse): void {
     langfuseBaseUrl: config.langfuseBaseUrl || null,
   };
 
-  const sessionCount = listSessions().length;
-  const localThemeCount = getLocalThemes().length;
-
-  const version = getVersion();
-
-  getModelCatalog().then((models) => {
-    jsonResponse(res, 200, {
-      version,
-      environment: env,
-      config: configPayload,
-      models,
-      sessionCount,
-      localThemeCount,
-    });
-  }).catch(() => {
-    jsonResponse(res, 200, {
-      version,
-      environment: env,
-      config: configPayload,
-      models: STATIC_MODELS,
-      sessionCount,
-      localThemeCount,
-    });
+  jsonResponse(res, 200, {
+    version: getVersion(),
+    environment: env,
+    config: configPayload,
+    models: STATIC_MODELS,
+    sessionCount: listSessions().length,
+    localThemeCount: getLocalThemes().length,
   });
+}
+
+// ---------------------------------------------------------------------------
+// On-demand: live model catalog — GET /api/settings/models[?refresh=1]
+// ---------------------------------------------------------------------------
+
+export function handleSettingsModelsRoute(req: IncomingMessage, res: ServerResponse): void {
+  const refresh = /[?&]refresh=1\b/.test(req.url || "");
+  getModelCatalog(refresh)
+    .then((models) => jsonResponse(res, 200, { models }))
+    // Never fail the route — fall back to the static list so dropdowns still work.
+    .catch(() => jsonResponse(res, 200, { models: STATIC_MODELS }));
+}
+
+// ---------------------------------------------------------------------------
+// On-demand: CLI/tool + auth detection — GET /api/settings/tools?group=ai|platform|all[&refresh=1]
+//
+// Subprocess-heavy detection lives here, off the fast /status path. Results are
+// cached ~60s per group so tab switches never re-scan; refresh=1 bypasses it.
+// ---------------------------------------------------------------------------
+
+type ToolGroup = "ai" | "platform" | "all";
+const TOOLS_CACHE_TTL = 60 * 1000;
+const toolsCache: Record<ToolGroup, { data: Record<string, unknown>; ts: number }> = {
+  ai: { data: {}, ts: 0 },
+  platform: { data: {}, ts: 0 },
+  all: { data: {}, ts: 0 },
+};
+
+export function handleSettingsToolsRoute(req: IncomingMessage, res: ServerResponse): void {
+  const url = new URL(req.url || "/", "http://localhost");
+  const groupParam = url.searchParams.get("group") || "all";
+  const group: ToolGroup = groupParam === "ai" || groupParam === "platform" ? groupParam : "all";
+  const refresh = url.searchParams.get("refresh") === "1";
+
+  const cached = toolsCache[group];
+  if (!refresh && Date.now() - cached.ts < TOOLS_CACHE_TTL && Object.keys(cached.data).length > 0) {
+    jsonResponse(res, 200, { ...cached.data, group, cached: true });
+    return;
+  }
+
+  let payload: Record<string, unknown>;
+  if (group === "ai") {
+    const ai = detectAITools();
+    payload = {
+      tools: { claudeCode: ai.claudeCode, geminiCli: ai.geminiCli, codexCli: ai.codexCli, claudeOAuth: ai.claudeOAuth },
+      availableEngines: ai.availableEngines,
+    };
+  } else if (group === "platform") {
+    payload = { tools: detectPlatformTools() };
+  } else {
+    const env = detectEnvironment();
+    payload = { tools: env.tools, availableEngines: env.availableEngines };
+  }
+
+  toolsCache[group] = { data: payload, ts: Date.now() };
+  jsonResponse(res, 200, { ...payload, group, cached: false });
 }
 
 export function handleSettingsEngineRoute(req: IncomingMessage, res: ServerResponse): void {

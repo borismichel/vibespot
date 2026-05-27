@@ -45,6 +45,8 @@ import {
 } from "./routes/setup.js";
 import {
   handleSettingsStatusRoute,
+  handleSettingsModelsRoute,
+  handleSettingsToolsRoute,
   handleSettingsEngineRoute,
   handleSettingsApiKeyRoute,
   handleSettingsInstallRoute,
@@ -435,6 +437,16 @@ function handleApiRoute(
     // Settings routes
     case "/api/settings/status":
       if (method === "GET") handleSettingsStatusRoute(res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/settings/models":
+      if (method === "GET") handleSettingsModelsRoute(req, res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/settings/tools":
+      if (method === "GET") handleSettingsToolsRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 
