@@ -90,46 +90,98 @@ the frontier provider.
 
 ## Real run
 
-**Date:** 2026-05-27 · **Mode:** real · **Dataset:** 6 reference pages ·
-**Judge:** anthropic (`claude-sonnet-4-6`)
+**Date:** 2026-05-27 · **Mode:** real · **Provider:** Anthropic, 3 models ·
+**Langfuse:** self-hosted instance, project **vibespot**, dataset
+`vibespot-module-eval`.
 
-> **Single-provider baseline (Anthropic only).** This first real run was scoped
-> to one provider — Anthropic `claude-sonnet-4-6` — because that was the only
-> key available. It is a real-output baseline, not yet a cross-provider
-> comparison; OpenAI and Gemini are backfilled in a follow-up once their keys
-> are in place. Command run:
+> **Within-Anthropic model comparison.** Sonnet 4.6 and Haiku 4.5 were run over
+> the full 6-page dataset; Opus 4.7 over a 2-page subset (`saas-analytics`,
+> `design-agency`) to cap its cost. Each run used `--judge=anthropic`, so **the
+> judge model equals the generation model** — the validator / coverage /
+> clean-first-pass axes are objective and directly comparable across rows, but
+> **the judge (and therefore the blended accuracy) axis is _not_ strictly
+> comparable across rows** (a different judge per row). OpenAI + Gemini remain a
+> separate follow-up ([VIB-1832](/VIB/issues/VIB-1832)). Commands:
 >
 > ```bash
-> npm run eval -- --providers=anthropic --judge=anthropic --langfuse
+> # config.anthropicApiModel selects the model (harness has no per-run flag)
+> npm run eval -- --providers=anthropic --judge=anthropic --langfuse            # Sonnet 4.6, Haiku 4.5 (6 pages)
+> npm run eval -- --providers=anthropic --judge=anthropic --langfuse --limit=2  # Opus 4.7 (2 pages)
 > ```
 
-| Rank | Provider | Model | Accuracy | Validator pass | Clean first-pass | Coverage | Judge | Cost/page | Total cost | Latency/page |
-|------|----------|-------|----------|----------------|------------------|----------|-------|-----------|------------|--------------|
-| 1 | **anthropic** | `claude-sonnet-4-6` | 98% | 100% | 89% | 100% | 94% | $1.5516 | $9.3094 | 358.5s |
+### Full dataset (6 pages) — Sonnet 4.6 vs Haiku 4.5
 
-### Per-page detail — anthropic (`claude-sonnet-4-6`)
+| Model | Accuracy | Validator pass | Clean first-pass | Coverage | Judge | Cost/page | Total (6pg) | Latency/page |
+|-------|----------|----------------|------------------|----------|-------|-----------|-------------|--------------|
+| `claude-sonnet-4-6` | 98% | 100% | 89% | 100% | 94% | $1.5516 | $9.3094 | 358.5s |
+| `claude-haiku-4-5-20251001` | 95% | 100% | **98%** | 100% | 88% | **$0.3755** | **$2.2533** | **105.2s** |
 
-| Page | Accuracy | Validator | Coverage | Judge | Cost | Latency | Modules | Notes |
-|------|----------|-----------|----------|-------|------|---------|---------|-------|
-| saas-analytics | 98% | 100% (7/7 clean) | 100% | 95% | $1.5608 | 422.4s | 7 | — |
-| design-agency | 98% | 100% (6/6 clean) | 100% | 95% | $1.5354 | 322.4s | 6 | — |
-| restaurant | 98% | 100% (6/6 clean) | 100% | 95% | $1.6036 | 341.1s | 6 | — |
-| webinar-event | 96% | 100% (6/6 clean) | 100% | 90% | $1.6766 | 374.6s | 6 | — |
-| mobile-app | 98% | 100% (3/6 clean) | 100% | 95% | $1.3888 | 345.4s | 6 | — |
-| consulting | 98% | 100% (5/6 clean) | 100% | 95% | $1.5444 | 344.9s | 6 | — |
+### 2-page subset (`saas-analytics`, `design-agency`) — all three models, apples-to-apples
 
-**Read of the numbers.** Sonnet 4.6 ships near-flawless content: validator
-pass-rate 100% (every raw module is fixable or clean) and full section coverage
-on all 6 briefs, with the LLM-judge averaging 94%. The stricter **clean
-first-pass** axis (89% overall) is the real discriminator — `mobile-app`
-(3/6 clean) and `consulting` (5/6 clean) needed the auto-fixer on a couple of
-modules, while the other four pages were 100% clean. Cost is the headline
-trade-off: **~$1.55/page, $9.31 for the 6-page run** (~6 min/page wall-clock) —
-frontier-model economics, materially pricier than the mid/cheap tiers the mock
-projects. This baseline is the reference the OpenAI/Gemini backfill ranks
-against.
+| Model | Accuracy | Validator | Clean | Coverage | Judge | Cost/page | Total (2pg) | Latency/page |
+|-------|----------|-----------|-------|----------|-------|-----------|-------------|--------------|
+| `claude-sonnet-4-6` | 98% | 100% | 100% | 100% | 95% | $1.5481 | $3.0962 | 372.4s |
+| `claude-haiku-4-5-20251001` | 94% | 100% | 92% | 100% | 85% | $0.3630 | $0.7259 | 99.4s |
+| `claude-opus-4-7` | 84% | 100% | 100% | 100% | 60% | $7.8013 | $15.6027 | 290.0s |
 
-**Langfuse.** Run registered as the experiment `eval-2026-05-27T15-14-20-590Z`
-in the self-hosted instance (project **vibespot**), dataset
-`vibespot-module-eval` — per-page traces carry accuracy / validator-pass-rate /
-coverage / judge / cost / latency scores for drill-down.
+### Per-page detail
+
+**`claude-sonnet-4-6` (6 pages)**
+
+| Page | Accuracy | Validator | Coverage | Judge | Cost | Latency | Modules |
+|------|----------|-----------|----------|-------|------|---------|---------|
+| saas-analytics | 98% | 100% (7/7 clean) | 100% | 95% | $1.5608 | 422.4s | 7 |
+| design-agency | 98% | 100% (6/6 clean) | 100% | 95% | $1.5354 | 322.4s | 6 |
+| restaurant | 98% | 100% (6/6 clean) | 100% | 95% | $1.6036 | 341.1s | 6 |
+| webinar-event | 96% | 100% (6/6 clean) | 100% | 90% | $1.6766 | 374.6s | 6 |
+| mobile-app | 98% | 100% (3/6 clean) | 100% | 95% | $1.3888 | 345.4s | 6 |
+| consulting | 98% | 100% (5/6 clean) | 100% | 95% | $1.5444 | 344.9s | 6 |
+
+**`claude-haiku-4-5-20251001` (6 pages)**
+
+| Page | Accuracy | Validator | Coverage | Judge | Cost | Latency | Modules |
+|------|----------|-----------|----------|-------|------|---------|---------|
+| saas-analytics | 92% | 100% (6/7 clean) | 100% | 80% | $0.3949 | 120.9s | 7 |
+| design-agency | 96% | 100% (6/6 clean) | 100% | 90% | $0.3310 | 77.9s | 6 |
+| restaurant | 92% | 100% (7/7 clean) | 100% | 80% | $0.3926 | 112.7s | 7 |
+| webinar-event | 100% | 100% (6/6 clean) | 100% | 100% | $0.3673 | 99.3s | 6 |
+| mobile-app | 98% | 100% (7/7 clean) | 100% | 95% | $0.3986 | 111.5s | 7 |
+| consulting | 92% | 100% (6/6 clean) | 100% | 80% | $0.3689 | 109.1s | 6 |
+
+**`claude-opus-4-7` (2 pages)**
+
+| Page | Accuracy | Validator | Coverage | Judge | Cost | Latency | Modules |
+|------|----------|-----------|----------|-------|------|---------|---------|
+| saas-analytics | 68% | 100% (7/7 clean) | 100% | 20% | $8.6862 | 343.6s | 7 |
+| design-agency | 100% | 100% (6/6 clean) | 100% | 100% | $6.9164 | 236.4s | 6 |
+
+### Read of the numbers
+
+- **All three models clear the objective bar.** Validator pass-rate and section
+  coverage are **100% across every model and page** — the pipeline + rules
+  produce structurally valid, complete HubSpot modules regardless of tier.
+- **Haiku 4.5 is the value standout.** 95% blended accuracy (3 pts under Sonnet)
+  at **$0.38/page — ~¼ Sonnet's cost, ~20× cheaper than Opus** — and the
+  **highest clean-first-pass of all three (98%)**, i.e. it needed the auto-fixer
+  least. It's also ~3.4× faster (105s vs 358s/page).
+- **Opus 4.7 did _not_ win this task.** On the shared 2-page subset it scored
+  84% blended accuracy vs Sonnet's 98% and Haiku's 94% — driven **entirely** by
+  the judge rating `saas-analytics` 20% (the other page scored 100%). Its
+  objective axes were all perfect (100% validator / coverage / clean). At
+  **$7.80/page** (~5× Sonnet, ~20× Haiku) the premium isn't justified here.
+- **Judge caveat (important).** Because the judge = the generation model, the
+  judge axis is self-evaluation and is noisy on small samples — the Opus
+  `saas-analytics` 20% is a single-page judge outlier, not a structural failure.
+  Treat the validator/coverage/clean/cost/latency columns as the comparable
+  signal; treat the judge/accuracy columns as within-row, not cross-row.
+- **Takeaway:** for vibeSpot module generation, **Haiku 4.5 is the cost/quality
+  pick**, **Sonnet 4.6 the balanced default**, and **Opus 4.7's premium buys no
+  measurable quality on this task**.
+
+### Langfuse
+
+Three experiments registered in the self-hosted instance (project **vibespot**,
+dataset `vibespot-module-eval`): `eval-2026-05-27T15-14-20-590Z` (Sonnet 4.6),
+`eval-2026-05-27T17-07-53-818Z` (Haiku 4.5), and the Opus 4.7 run — each with
+per-page accuracy / validator-pass-rate / coverage / judge / cost / latency
+scores for drill-down.
