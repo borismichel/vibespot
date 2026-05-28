@@ -88,6 +88,9 @@ type JudgeFn = (item: (typeof EVAL_DATASET)[number], modules: Parameters<typeof 
 
 async function main(): Promise<void> {
   const flags = parseArgs(process.argv.slice(2));
+  // Langfuse is off by default in the product; `--langfuse` is the operator's
+  // explicit opt-in for this run, so enable it for the gated paths.
+  if (flags.langfuse) process.env.LANGFUSE_ENABLED = "true";
   const notes: string[] = [];
 
   // --- Resolve mode + providers -------------------------------------------
