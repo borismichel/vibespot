@@ -104,6 +104,9 @@
     <a class="doc-nav__link doc-nav__link--sub" href="#field-editor">Field Editor</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#brand-kit">Brand Kit</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#design-system">Design System</a>
+    <a class="doc-nav__link" href="#observability">Observability &amp; Cost</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#cost-tracking">Per-Page Cost</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#langfuse">Langfuse Tracing</a>
   </div>
 
   <div class="doc-nav__section">
@@ -361,6 +364,10 @@ vibespot</code></pre>
       <tr><td><code>enabledCLITools</code></td><td>string[]</td><td>Array of enabled CLI tool IDs: <code>["claude-code", "gemini-cli", "codex-cli"]</code>. Only enabled tools are checked on startup.</td></tr>
       <tr><td><code>agenticMode</code></td><td>boolean</td><td>Enable the 4-stage agentic pipeline. <code>undefined</code> on first run (vibeSpot prompts you to choose), then <code>true</code> or <code>false</code>.</td></tr>
       <tr><td><code>agenticConcurrency</code></td><td>number</td><td>Max parallel module generation calls (default: <code>20</code>)</td></tr>
+      <tr><td><code>langfuseEnabled</code></td><td>boolean</td><td>Opt in to <a href="#langfuse">Langfuse tracing</a>. Off by default; required even when keys are set.</td></tr>
+      <tr><td><code>langfusePublicKey</code></td><td>string</td><td>Langfuse public key (<code>pk-lf-</code>)</td></tr>
+      <tr><td><code>langfuseSecretKey</code></td><td>string</td><td>Langfuse secret key (<code>sk-lf-</code>)</td></tr>
+      <tr><td><code>langfuseBaseUrl</code></td><td>string</td><td>Langfuse ingestion endpoint (default: <code>https://cloud.langfuse.com</code>)</td></tr>
     </tbody>
   </table>
 
@@ -383,6 +390,10 @@ vibespot</code></pre>
       <tr><td><code>VIBESPOT_AGENTIC_MODE</code></td><td>Set <code>true</code> to enable the multi-stage agentic pipeline</td></tr>
       <tr><td><code>VIBESPOT_PORT</code></td><td>Override the HTTP server port (default: <code>4200</code>)</td></tr>
       <tr><td><code>VIBESPOT_NO_OPEN</code></td><td>Set <code>1</code> to suppress auto-opening the browser on startup</td></tr>
+      <tr><td><code>LANGFUSE_ENABLED</code></td><td>Set <code>true</code> to send <a href="#langfuse">Langfuse traces</a>. Required &mdash; keys alone don't enable it.</td></tr>
+      <tr><td><code>LANGFUSE_PUBLIC_KEY</code></td><td>Langfuse public key (<code>pk-lf-</code>)</td></tr>
+      <tr><td><code>LANGFUSE_SECRET_KEY</code></td><td>Langfuse secret key (<code>sk-lf-</code>)</td></tr>
+      <tr><td><code>LANGFUSE_BASE_URL</code></td><td>Langfuse ingestion endpoint (default: <code>https://cloud.langfuse.com</code>)</td></tr>
     </tbody>
   </table>
 </div>
@@ -1172,6 +1183,95 @@ testimonial carousel, and a minimal footer with social links.</code></pre>
 </div>
 
 <!-- ============================================================
+     Section 6b: Observability & Cost
+     ============================================================ -->
+<div class="doc-section" id="observability">
+  <h2 id="observability-heading">Observability &amp; Cost <a href="#observability" class="doc-anchor">#</a></h2>
+  <p>Every AI generation spends tokens, which cost money and take time. vibeSpot surfaces both. The per-page cost line is always on and needs no setup. For deeper inspection &mdash; full prompts, per-stage breakdowns, latency, and history across runs &mdash; you can opt in to <a href="https://langfuse.com" target="_blank">Langfuse</a> tracing.</p>
+
+  <h3 id="cost-tracking">Per-Page Cost</h3>
+  <p>After each generation, the chat shows what that page cost. There is nothing to configure &mdash; it works with no keys and no Langfuse.</p>
+  <ul>
+    <li><strong>Per-message cost</strong> &mdash; a small line under each assistant reply showing the estimated USD for that generation, summed across every model call the pipeline made (intent analysis, design system, module planning, and each module).</li>
+    <li><strong>Per-project total</strong> &mdash; a running total chip in the chat header that accumulates across every generation in the theme.</li>
+  </ul>
+  <p>Costs are estimates from an approximate per-model price table, not your provider invoice. When a call uses a model vibeSpot can't price, the total is shown as a lower bound (<code>&ge;</code>). CLI engines (Claude Code, Gemini CLI, Codex CLI) don't report token usage, so no cost is shown for them. This is display-only &mdash; no billing, credits, or quotas.</p>
+
+  <h3 id="langfuse">Langfuse Tracing</h3>
+  <p>Langfuse is an LLM observability platform. With it connected, vibeSpot sends a trace for every generation so you can inspect the exact input and output of each model call, token usage, estimated cost, and latency &mdash; and compare runs over time. It is <strong>opt-in and off by default</strong>.</p>
+  <p>vibeSpot runs locally, not on a backend we operate, so traces go straight from your machine to your Langfuse instance &mdash; Langfuse Cloud or your own self-hosted install. The integration is a small, dependency-free client; it never pulls in a heavy SDK or adds startup overhead when it's off.</p>
+
+  <h4 id="langfuse-model">How a trace is structured</h4>
+  <p>vibeSpot maps the pipeline onto Langfuse's nesting so cost and latency roll up at every level:</p>
+  <ul>
+    <li><strong>Trace</strong> &mdash; one user action (a page generation, a Figma conversion, a brand extraction). The Langfuse <em>session</em> is set to the theme name, so every trace for a project groups together.</li>
+    <li><strong>Span</strong> &mdash; one pipeline stage: intent analysis, design system, module planning, and module development.</li>
+    <li><strong>Generation</strong> &mdash; one model call. The N parallel module calls (plus any retries) nest under the single module-development span.</li>
+  </ul>
+  <p>A full page reads as <code>trace &rarr; stage spans &rarr; generations</code>, with token cost summing up the tree.</p>
+
+  <h4 id="langfuse-instance">Get a Langfuse instance</h4>
+  <p>You need somewhere to send the traces. Pick one: Langfuse's hosted cloud (fastest to start) or your own self-hosted install (your data stays on your infrastructure). Either way you end up with a <strong>public key</strong>, a <strong>secret key</strong>, and a <strong>host URL</strong> &mdash; the three things vibeSpot needs in the next step.</p>
+
+  <p><strong>Option A &mdash; Langfuse Cloud</strong></p>
+  <ol class="doc-steps">
+    <li><strong>Sign up.</strong> Create a free account at <a href="https://cloud.langfuse.com" target="_blank">cloud.langfuse.com</a> (EU region) or <a href="https://us.cloud.langfuse.com" target="_blank">us.cloud.langfuse.com</a> (US region).</li>
+    <li><strong>Create an organization and a project.</strong> Langfuse walks you through this on first login. Traces are scoped to a project.</li>
+    <li><strong>Create API keys.</strong> In the project, open Settings &rarr; API Keys &rarr; <strong>Create new API keys</strong>. Copy the public key (<code>pk-lf-...</code>) and secret key (<code>sk-lf-...</code>) &mdash; the secret is shown only once.</li>
+    <li><strong>Note your host.</strong> It's <code>https://cloud.langfuse.com</code> (EU) or <code>https://us.cloud.langfuse.com</code> (US). You'll use this as the base URL.</li>
+  </ol>
+
+  <p><strong>Option B &mdash; Self-hosted (local)</strong></p>
+  <p>Langfuse ships a Docker Compose stack that runs the whole thing on your machine. With <a href="https://docs.docker.com/get-docker/" target="_blank">Docker</a> installed:</p>
+  <pre><code>git clone https://github.com/langfuse/langfuse.git
+cd langfuse
+docker compose up</code></pre>
+  <ol class="doc-steps">
+    <li><strong>Open the UI.</strong> Once the containers are healthy, go to <code>http://localhost:3000</code>. Create an account &mdash; the first user becomes the owner.</li>
+    <li><strong>Create an organization and a project</strong>, same as cloud.</li>
+    <li><strong>Create API keys</strong> under Settings &rarr; API Keys, and copy both.</li>
+    <li><strong>Your host is</strong> <code>http://localhost:3000</code> &mdash; use that as the base URL.</li>
+  </ol>
+  <div class="doc-callout doc-callout--info">
+    <div class="doc-callout__label">&#8505; Local vs. production self-host</div>
+    <p>The Docker Compose stack is meant for local use and evaluation. For a persistent, production self-host (managed Postgres, ClickHouse, object storage, scaling), follow the <a href="https://langfuse.com/self-hosting" target="_blank">Langfuse self-hosting guide</a>. vibeSpot only needs the host URL and a key pair &mdash; it doesn't care how Langfuse is deployed.</p>
+  </div>
+
+  <h4 id="langfuse-setup">Connect vibeSpot</h4>
+  <p>With your keys and host URL from the step above:</p>
+  <ol class="doc-steps">
+    <li><strong>Add the keys in vibeSpot.</strong> Open Settings &rarr; AI tab &rarr; <strong>Observability</strong>. Paste the public and secret keys. They are stored locally in <code>~/.vibespot/config.json</code> and sent only to your Langfuse instance.</li>
+    <li><strong>Set the base URL.</strong> Leave it blank for EU cloud (<code>https://cloud.langfuse.com</code>). Use <code>https://us.cloud.langfuse.com</code> for US cloud, or <code>http://localhost:3000</code> (or your own URL) for a self-hosted install.</li>
+    <li><strong>Turn it on.</strong> Flip the <strong>Send traces to Langfuse</strong> toggle. Generate a page, then check your Langfuse project &mdash; the trace appears under a session named after your theme.</li>
+  </ol>
+  <div class="doc-callout doc-callout--info">
+    <div class="doc-callout__label">&#8505; Keys alone don't enable it</div>
+    <p>Tracing requires <strong>both</strong> an explicit opt-in (the toggle, <code>langfuseEnabled: true</code>, or <code>LANGFUSE_ENABLED=true</code>) <strong>and</strong> both keys set. A stray <code>LANGFUSE_*</code> variable in your environment never sends traces on its own.</p>
+  </div>
+
+  <h4 id="langfuse-config">Config &amp; environment</h4>
+  <p>Instead of the UI, you can configure tracing in <code>~/.vibespot/config.json</code> or via environment variables:</p>
+  <table>
+    <thead>
+      <tr><th>Config field</th><th>Environment variable</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>langfuseEnabled</code></td><td><code>LANGFUSE_ENABLED</code></td><td>Set to <code>true</code> to send traces. Required &mdash; keys alone don't enable it.</td></tr>
+      <tr><td><code>langfusePublicKey</code></td><td><code>LANGFUSE_PUBLIC_KEY</code></td><td>Langfuse public key (<code>pk-lf-...</code>)</td></tr>
+      <tr><td><code>langfuseSecretKey</code></td><td><code>LANGFUSE_SECRET_KEY</code></td><td>Langfuse secret key (<code>sk-lf-...</code>)</td></tr>
+      <tr><td><code>langfuseBaseUrl</code></td><td><code>LANGFUSE_BASE_URL</code></td><td>Ingestion endpoint (default <code>https://cloud.langfuse.com</code>)</td></tr>
+    </tbody>
+  </table>
+
+  <h4 id="langfuse-privacy">What's sent, and what isn't</h4>
+  <ul>
+    <li><strong>Only API engines produce traces.</strong> Anthropic, OpenAI, Gemini, and Langdock report token usage. CLI engines (Claude Code, Gemini CLI, Codex CLI) don't, so they generate no traces or cost.</li>
+    <li><strong>Prompts and outputs are truncated</strong> before sending, so a single trace never ships hundreds of kilobytes of content.</li>
+    <li><strong>It never blocks generation.</strong> All network and serialization errors are swallowed &mdash; a Langfuse outage slows nothing and fails nothing. When tracing is off, there are no network calls at all.</li>
+  </ul>
+</div>
+
+<!-- ============================================================
      Section 7: Deploying to HubSpot
      ============================================================ -->
 <div class="doc-section" id="deploying">
@@ -1584,6 +1684,7 @@ docker cp vibespot:/home/vibespot/vibespot-themes ./backup-themes</code></pre>
     <li><strong>API keys section</strong> &mdash; Input fields for Anthropic, OpenAI, and Google AI API keys. Keys are displayed masked (only last 4 characters visible) after saving.</li>
     <li><strong>Claude OAuth</strong> &mdash; A section to paste the OAuth token generated by <code>claude setup-token</code>. Shows the token status (valid/expired).</li>
     <li><strong>CLI tools</strong> &mdash; Toggle switches for Claude Code, Gemini CLI, and Codex CLI. CLI tools must be toggled <strong>on</strong> before they appear as selectable engines in the Engine section above. This lazy-detection approach means disabled tools add zero startup overhead. Once toggled on, vibeSpot checks if the CLI is installed and authenticated. If not installed, an install button appears. If installed but not authenticated, an auth button appears.</li>
+    <li><strong>Observability section</strong> &mdash; Opt-in <a href="#langfuse">Langfuse tracing</a>. Paste your public and secret keys, set a base URL if you self-host, and flip the toggle to send a trace for every model call. Off by default. See <a href="#observability">Observability &amp; Cost</a>.</li>
   </ul>
 
   <div class="doc-callout doc-callout--tip">
