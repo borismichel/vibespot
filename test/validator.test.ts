@@ -241,3 +241,80 @@ describe("validator — multiple modules", () => {
     expect(results[1].issues.length).toBeGreaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Invalid CSS / unstyled-section detection (VIB-1842)
+// ---------------------------------------------------------------------------
+
+import { findInvalidColorValues } from "../src/server/agent/stages/validator.js";
+
+describe("findInvalidColorValues", () => {
+  it("flags color functions with empty components", () => {
+    expect(findInvalidColorValues("a{background:rgba(15, 17, 21, )}")).toHaveLength(1);
+    expect(findInvalidColorValues("a{background:rgba(#0f1115, )}")).toHaveLength(1);
+    expect(findInvalidColorValues("a{color:rgba(, )}")).toHaveLength(1);
+    expect(findInvalidColorValues("a{color:hsla(210, 50%, 40%, )}")).toHaveLength(1);
+  });
+
+  it("passes well-formed color functions", () => {
+    expect(findInvalidColorValues("a{background:rgba(15, 17, 21, 0.5)}")).toHaveLength(0);
+    expect(findInvalidColorValues("a{color:rgb(255,255,255)}")).toHaveLength(0);
+  });
+
+  it("does not flag color functions with nested parens (calc/var)", () => {
+    expect(findInvalidColorValues("a{background:rgba(var(--c, 0,0,0), 1)}")).toHaveLength(0);
+  });
+});
+
+describe("validator — rendered CSS validity", () => {
+  // The GPT-5.x defect: build colors from style fields with no defaults.
+  const styleTpl =
+    "{% scope_css %}.x{background:rgba({{ module.styles.bg.color|convert_rgb }}, {{ module.styles.bg.opacity/100 }})}{% end_scope_css %}<section class=\"x\"></section>";
+
+  function styleFields(withDefaults: boolean) {
+    return JSON.stringify([
+      {
+        name: "styles",
+        type: "group",
+        children: [
+          {
+            name: "bg",
+            type: "group",
+            children: [
+              { name: "color", type: "color", ...(withDefaults ? { default: "#0f1115" } : {}) },
+              { name: "opacity", type: "number", ...(withDefaults ? { default: 50 } : {}) },
+            ],
+          },
+        ],
+      },
+    ]);
+  }
+
+  it("flags a module whose style fields have no defaults (renders unstyled)", () => {
+    const results = run([
+      makeModule({ moduleName: "hero", moduleHtml: styleTpl, moduleCss: "", fieldsJson: styleFields(false) }),
+    ]);
+    const issue = results[0].issues.find((i) => i.code === "invalid-css");
+    expect(issue).toBeDefined();
+    expect(issue!.autoFixed).toBe(false);
+    expect(results[0].valid).toBe(false);
+  });
+
+  it("passes the same module once the style fields have defaults", () => {
+    const results = run([
+      makeModule({ moduleName: "hero", moduleHtml: styleTpl, moduleCss: "", fieldsJson: styleFields(true) }),
+    ]);
+    expect(results[0].issues.find((i) => i.code === "invalid-css")).toBeUndefined();
+  });
+
+  it("passes a module that hard-codes its colors (Anthropic-style)", () => {
+    const results = run([
+      makeModule({
+        moduleName: "hero",
+        moduleHtml: "<section class=\"x\"></section>",
+        moduleCss: ".x{background:rgba(15, 17, 21, 0.5)}",
+      }),
+    ]);
+    expect(results[0].issues.find((i) => i.code === "invalid-css")).toBeUndefined();
+  });
+});

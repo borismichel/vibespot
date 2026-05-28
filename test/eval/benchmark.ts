@@ -229,6 +229,7 @@ async function main(): Promise<void> {
           accuracy,
           validatorPassRate: validity.passRate,
           cleanRate: validity.cleanRate,
+          invalidCssModules: validity.invalidCssModules,
           coverage: coverage.coverage,
           missing: coverage.missing,
           judge: judge?.overall ?? null,
@@ -256,6 +257,7 @@ async function main(): Promise<void> {
           accuracy,
           validatorPassRate: validity.passRate,
           cleanRate: validity.cleanRate,
+          invalidCssModules: validity.invalidCssModules,
           coverage: coverage.coverage,
           judge: judge?.overall ?? null,
           costUsd: usage.costUsd,
@@ -272,6 +274,7 @@ async function main(): Promise<void> {
         if (langfuseOn && page.traceId) {
           await linkRunItem({ runName, itemId: item.id, traceId: page.traceId, metadata: { model: model.label } });
           await pushScore({ traceId: page.traceId, name: "accuracy", value: accuracy });
+          await pushScore({ traceId: page.traceId, name: "invalid_css_modules", value: validity.invalidCssModules });
           await pushScore({ traceId: page.traceId, name: "coverage", value: coverage.coverage });
           if (judge) await pushScore({ traceId: page.traceId, name: "judge", value: judge.overall });
           await pushScore({ traceId: page.traceId, name: "cost_usd", value: usage.costUsd });

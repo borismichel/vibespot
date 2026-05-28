@@ -6,6 +6,10 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### Fixes
+
+- **Catch invalid-CSS / unstyled-section defects** ([VIB-1842](/VIB/issues/VIB-1842)) — the benchmark scored GPT-5.4/5.5 pages high (96–97% accuracy, judge 90–93%) while they shipped visibly broken: those models build section colors from style fields with no defaults via `rgba({{ module.styles.X.color|convert_rgb }}, {{ module.styles.X.opacity/100 }})`, which renders to invalid CSS like `rgba(15, 17, 21, )` (missing opacity) so the browser drops the declaration and the section loses its background/borders. Tag-balance validation and the code-reading judge both missed it because neither inspected the *rendered* output. Two changes: (1) the HubL preview renderer now implements the `convert_rgb` filter (hex / color-field object → `r, g, b`) and the `opacity/100` arithmetic idiom, so defaulted colors render faithfully (matching HubSpot) and undefaulted ones collapse to empty; (2) the quality-check validator (`stages/validator.ts`) now renders each module with its field defaults and flags any color function with an empty component as an `invalid-css` issue. This is surfaced as a `⚠` warning in the quality check and as a distinct eval axis (`scoring.ts` → `invalidCssModules`, shown in the provider-comparison report) that docks pass-rate — models that hard-code or fall back their colors score `0`. Under `--langfuse` both eval harnesses also push it as a dedicated `invalid_css_modules` Langfuse score (alongside accuracy / validator-pass-rate / coverage / judge / cost / latency), so it's visible per-run in the Langfuse experiment. Follow-ups (separate issues): an optional quality-check auto-fix that injects sensible style-field defaults, and an optional vision judge over the captured screenshots.
+
 ## 1.6.0 — 2026-05-28
 
 ### Changed

@@ -96,3 +96,44 @@ describe("combineAccuracy", () => {
     expect(combineAccuracy(validity, coverage, null)).toBeCloseTo(0.65 + 0.35);
   });
 });
+
+describe("scoreValidity — invalid CSS axis (VIB-1842)", () => {
+  const styleTpl =
+    "{% scope_css %}.x{background:rgba({{ module.styles.bg.color|convert_rgb }}, {{ module.styles.bg.opacity/100 }})}{% end_scope_css %}<section class=\"x\"></section>";
+
+  function gptStyleModule(name: string): ModuleFiles {
+    return {
+      moduleName: name,
+      fieldsJson: JSON.stringify([
+        {
+          name: "styles",
+          type: "group",
+          children: [
+            { name: "bg", type: "group", children: [
+              { name: "color", type: "color" },
+              { name: "opacity", type: "number" },
+            ] },
+          ],
+        },
+      ]),
+      metaJson: JSON.stringify({ host_template_types: ["PAGE"], is_available_for_new_content: true }),
+      moduleHtml: styleTpl,
+      moduleCss: "",
+    };
+  }
+
+  it("counts undefaulted-style modules and docks pass-rate", () => {
+    const v = scoreValidity([gptStyleModule("hero"), cleanModule("footer")], THEME, "page");
+    expect(v.invalidCssModules).toBe(1);
+    expect(v.passRate).toBe(0.5); // the hero ships broken → unfixable
+    expect(v.unfixableSamples.some((s) => /invalid CSS color/i.test(s))).toBe(true);
+  });
+
+  it("is zero for modules that hard-code their colors", () => {
+    const mod = cleanModule("hero");
+    mod.moduleCss = `.${THEME}-hero{background:rgba(15, 17, 21, 0.5)}`;
+    const v = scoreValidity([mod], THEME, "page");
+    expect(v.invalidCssModules).toBe(0);
+    expect(v.passRate).toBe(1);
+  });
+});
