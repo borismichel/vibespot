@@ -1,0 +1,38 @@
+name: release
+
+# Publishes the package to npm. Docker images go to GHCR via docker-image.yml
+# (which uses the built-in GITHUB_TOKEN). Run this on a published GitHub release,
+# or manually via the Actions tab (workflow_dispatch).
+#
+# Requires an `NPM_TOKEN` repository secret: an npm automation/publish token for
+# the `vibespot` package. Add it once with:
+#   gh secret set NPM_TOKEN
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    name: publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Install
+        run: npm ci
+
+      # `npm publish` runs the `prepublishOnly` script (npm run build) first.
+      - name: Publish
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
