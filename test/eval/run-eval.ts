@@ -188,6 +188,7 @@ async function main(): Promise<void> {
           await linkRunItem({ runName, itemId: item.id, traceId: page.traceId, metadata: { provider: provider.id } });
           await pushScore({ traceId: page.traceId, name: "accuracy", value: accuracy });
           await pushScore({ traceId: page.traceId, name: "validator_pass_rate", value: validity.passRate });
+          await pushScore({ traceId: page.traceId, name: "invalid_css_modules", value: validity.invalidCssModules });
           await pushScore({ traceId: page.traceId, name: "coverage", value: coverage.coverage });
           if (judge) await pushScore({ traceId: page.traceId, name: "judge", value: judge.overall });
           await pushScore({ traceId: page.traceId, name: "cost_usd", value: usage.costUsd });
