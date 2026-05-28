@@ -8,7 +8,7 @@ All notable changes to vibeSpot are documented here.
 
 ### Docs
 
-- **Document Langfuse setup in the in-app docs** ([VIB-1846](/VIB/issues/VIB-1846)) — `ui/docs` gains an **Observability & Cost** section covering the always-on per-page cost line and the opt-in Langfuse tracing flow: what a trace captures, the `trace → stage spans → generations` data model (session = theme name), step-by-step setup (Settings → AI tab → Observability, plus the config-file and `LANGFUSE_*` env equivalents), the both-keys-and-explicit-opt-in rule, and what is/isn't sent (API engines only, truncated payloads, fail-safe on outage). Adds the `langfuse*` config fields and `LANGFUSE_*` env vars to the reference tables and a cross-reference from the AI Settings tab.
+- **Document Langfuse setup in the in-app docs** ([VIB-1846](/VIB/issues/VIB-1846)) — `ui/docs` gains an **Observability & Cost** section covering the always-on per-page cost line and the opt-in Langfuse tracing flow: what a trace captures, the `trace → stage spans → generations` data model (session = theme name), how to **stand up a Langfuse instance** (Langfuse Cloud EU/US sign-up, or a local self-host via `docker compose up` on `http://localhost:3000`, with a pointer to the production self-hosting guide), how to **connect vibeSpot** (Settings → AI tab → Observability, plus the config-file and `LANGFUSE_*` env equivalents), the both-keys-and-explicit-opt-in rule, and what is/isn't sent (API engines only, truncated payloads, fail-safe on outage). Adds the `langfuse*` config fields and `LANGFUSE_*` env vars to the reference tables and a cross-reference from the AI Settings tab.
 
 ### Fixes
 

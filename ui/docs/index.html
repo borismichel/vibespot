@@ -1210,11 +1210,38 @@ testimonial carousel, and a minimal footer with social links.</code></pre>
   </ul>
   <p>A full page reads as <code>trace &rarr; stage spans &rarr; generations</code>, with token cost summing up the tree.</p>
 
-  <h4 id="langfuse-setup">Setup</h4>
+  <h4 id="langfuse-instance">Get a Langfuse instance</h4>
+  <p>You need somewhere to send the traces. Pick one: Langfuse's hosted cloud (fastest to start) or your own self-hosted install (your data stays on your infrastructure). Either way you end up with a <strong>public key</strong>, a <strong>secret key</strong>, and a <strong>host URL</strong> &mdash; the three things vibeSpot needs in the next step.</p>
+
+  <p><strong>Option A &mdash; Langfuse Cloud</strong></p>
   <ol class="doc-steps">
-    <li><strong>Get your Langfuse keys.</strong> In Langfuse, open Project Settings &rarr; API Keys and create a key pair. Copy the <strong>public key</strong> (<code>pk-lf-...</code>) and <strong>secret key</strong> (<code>sk-lf-...</code>).</li>
-    <li><strong>Add them in vibeSpot.</strong> Open Settings &rarr; AI tab &rarr; <strong>Observability</strong>. Paste both keys. They are stored locally in <code>~/.vibespot/config.json</code> and sent only to your Langfuse instance.</li>
-    <li><strong>Set the base URL if needed.</strong> Leave it blank for EU cloud (<code>https://cloud.langfuse.com</code>). Use <code>https://us.cloud.langfuse.com</code> for US cloud, or your own URL for a self-hosted install.</li>
+    <li><strong>Sign up.</strong> Create a free account at <a href="https://cloud.langfuse.com" target="_blank">cloud.langfuse.com</a> (EU region) or <a href="https://us.cloud.langfuse.com" target="_blank">us.cloud.langfuse.com</a> (US region).</li>
+    <li><strong>Create an organization and a project.</strong> Langfuse walks you through this on first login. Traces are scoped to a project.</li>
+    <li><strong>Create API keys.</strong> In the project, open Settings &rarr; API Keys &rarr; <strong>Create new API keys</strong>. Copy the public key (<code>pk-lf-...</code>) and secret key (<code>sk-lf-...</code>) &mdash; the secret is shown only once.</li>
+    <li><strong>Note your host.</strong> It's <code>https://cloud.langfuse.com</code> (EU) or <code>https://us.cloud.langfuse.com</code> (US). You'll use this as the base URL.</li>
+  </ol>
+
+  <p><strong>Option B &mdash; Self-hosted (local)</strong></p>
+  <p>Langfuse ships a Docker Compose stack that runs the whole thing on your machine. With <a href="https://docs.docker.com/get-docker/" target="_blank">Docker</a> installed:</p>
+  <pre><code>git clone https://github.com/langfuse/langfuse.git
+cd langfuse
+docker compose up</code></pre>
+  <ol class="doc-steps">
+    <li><strong>Open the UI.</strong> Once the containers are healthy, go to <code>http://localhost:3000</code>. Create an account &mdash; the first user becomes the owner.</li>
+    <li><strong>Create an organization and a project</strong>, same as cloud.</li>
+    <li><strong>Create API keys</strong> under Settings &rarr; API Keys, and copy both.</li>
+    <li><strong>Your host is</strong> <code>http://localhost:3000</code> &mdash; use that as the base URL.</li>
+  </ol>
+  <div class="doc-callout doc-callout--info">
+    <div class="doc-callout__label">&#8505; Local vs. production self-host</div>
+    <p>The Docker Compose stack is meant for local use and evaluation. For a persistent, production self-host (managed Postgres, ClickHouse, object storage, scaling), follow the <a href="https://langfuse.com/self-hosting" target="_blank">Langfuse self-hosting guide</a>. vibeSpot only needs the host URL and a key pair &mdash; it doesn't care how Langfuse is deployed.</p>
+  </div>
+
+  <h4 id="langfuse-setup">Connect vibeSpot</h4>
+  <p>With your keys and host URL from the step above:</p>
+  <ol class="doc-steps">
+    <li><strong>Add the keys in vibeSpot.</strong> Open Settings &rarr; AI tab &rarr; <strong>Observability</strong>. Paste the public and secret keys. They are stored locally in <code>~/.vibespot/config.json</code> and sent only to your Langfuse instance.</li>
+    <li><strong>Set the base URL.</strong> Leave it blank for EU cloud (<code>https://cloud.langfuse.com</code>). Use <code>https://us.cloud.langfuse.com</code> for US cloud, or <code>http://localhost:3000</code> (or your own URL) for a self-hosted install.</li>
     <li><strong>Turn it on.</strong> Flip the <strong>Send traces to Langfuse</strong> toggle. Generate a page, then check your Langfuse project &mdash; the trace appears under a session named after your theme.</li>
   </ol>
   <div class="doc-callout doc-callout--info">
