@@ -103,10 +103,13 @@ function resolveSettings(): LangfuseSettings | null {
   const cfg = loadConfig();
   const publicKey = cfg.langfusePublicKey || process.env.LANGFUSE_PUBLIC_KEY;
   const secretKey = cfg.langfuseSecretKey || process.env.LANGFUSE_SECRET_KEY;
-  // Explicit disable wins; otherwise presence of both keys enables it.
-  const disabled =
-    cfg.langfuseEnabled === false || process.env.LANGFUSE_ENABLED === "false";
-  if (disabled || !publicKey || !secretKey) return null;
+  // Off by default: requires an explicit opt-in, not just the presence of keys.
+  // A user who happens to have LANGFUSE_* in their environment never has traces
+  // sent unless they turn it on (`langfuseEnabled: true` in config, the AI
+  // Settings toggle, or `LANGFUSE_ENABLED=true`). Keys are still required to send.
+  const enabled =
+    cfg.langfuseEnabled === true || process.env.LANGFUSE_ENABLED === "true";
+  if (!enabled || !publicKey || !secretKey) return null;
   const baseUrl = (
     cfg.langfuseBaseUrl ||
     process.env.LANGFUSE_BASE_URL ||
@@ -115,7 +118,7 @@ function resolveSettings(): LangfuseSettings | null {
   return { publicKey, secretKey, baseUrl };
 }
 
-/** True when Langfuse keys are configured and not explicitly disabled. */
+/** True only when Langfuse is explicitly enabled AND both keys are configured. */
 export function isLangfuseEnabled(): boolean {
   return resolveSettings() !== null;
 }

@@ -62,7 +62,8 @@ export interface VibeSpotConfig {
   // Tool flags — apply to Anthropic API + Claude Code CLI
   webSearch?: boolean;                   // allow the AI to use the web-search tool
   // Langfuse — opt-in LLM observability (tracing + token/cost capture).
-  // Disabled unless both keys are present; set langfuseEnabled:false to force off.
+  // Off by default: requires langfuseEnabled:true (config / AI Settings toggle /
+  // LANGFUSE_ENABLED=true) AND both keys. Keys alone do not enable it.
   langfuseEnabled?: boolean;
   langfusePublicKey?: string;
   langfuseSecretKey?: string;

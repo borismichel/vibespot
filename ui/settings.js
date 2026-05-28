@@ -581,13 +581,13 @@ function renderAITab(body, data) {
 function renderObservabilitySection(env, config) {
   const section = el("section", "settings__section");
   section.appendChild(sectionTitle("Observability"));
-  section.appendChild(desc("Langfuse captures token usage, estimated cost, and traces for every API model call. Opt-in — traces are sent only when both a public and secret key are set. Keys are stored locally in ~/.vibespot/config.json and sent only to your Langfuse instance."));
+  section.appendChild(desc("Langfuse captures token usage, estimated cost, and traces for every API model call. Off by default — turn it on with the toggle and set both keys to start sending traces. Keys are stored locally in ~/.vibespot/config.json and sent only to your Langfuse instance."));
 
   const pub = env.apiKeys.langfusePublic || { configured: false, masked: "" };
   const sec = env.apiKeys.langfuseSecret || { configured: false, masked: "" };
   const hasKeys = pub.configured && sec.configured;
   const enabledFlag = config.langfuseEnabled; // undefined | true | false
-  const isOn = enabledFlag !== false;          // on by default unless explicitly disabled
+  const isOn = enabledFlag === true;           // off by default; explicit opt-in required
 
   // Enable toggle
   const toggleRow = el("div", "settings__toggle-row");
@@ -597,14 +597,14 @@ function renderObservabilitySection(env, config) {
   labelWrap.appendChild(label);
 
   const sub = el("div", "settings__toggle-label-sub");
-  if (enabledFlag === false) {
-    sub.textContent = "Disabled — no traces or usage sent";
+  if (!isOn) {
+    sub.textContent = "Off — no traces or usage sent";
     sub.style.color = "var(--text-muted)";
   } else if (hasKeys) {
     sub.textContent = "Active — traces, token usage & cost sent to Langfuse";
     sub.style.color = "var(--success)";
   } else {
-    sub.textContent = "Add a public + secret key below to start sending traces";
+    sub.textContent = "Enabled — add a public + secret key below to start sending traces";
     sub.style.color = "var(--warning)";
   }
   labelWrap.appendChild(sub);
