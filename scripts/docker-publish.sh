@@ -29,7 +29,10 @@ Tags applied:
 
 Prerequisites:
   - Docker (with buildx for --multi-arch)
-  - gh CLI authenticated (used for GHCR login)
+  - A GHCR credential with the **write:packages** scope. Provide one of
+    (checked in order): \$GHCR_TOKEN, \$CR_PAT, or an authenticated gh CLI
+    (\`gh auth token\`). Note: a default \`gh\` token often lacks write:packages —
+    set GHCR_TOKEN to a PAT that has it. Override the user with \$GHCR_USER.
 EOF
   exit 0
 }
@@ -52,7 +55,15 @@ echo "    dry-run : $DRY_RUN"
 echo ""
 
 echo "==> Authenticating with GHCR"
-echo "$(gh auth token)" | docker login ghcr.io -u borismichel --password-stdin
+# Prefer an explicit PAT with write:packages; fall back to the gh CLI token
+# (which often lacks write:packages, so the push would be denied).
+GHCR_AUTH_TOKEN="${GHCR_TOKEN:-${CR_PAT:-$(gh auth token 2>/dev/null || true)}}"
+if [ -z "$GHCR_AUTH_TOKEN" ]; then
+  echo "ERROR: no GHCR credential. Set GHCR_TOKEN (or CR_PAT) to a PAT with the" >&2
+  echo "       write:packages scope, or run 'gh auth login'." >&2
+  exit 1
+fi
+echo "$GHCR_AUTH_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-borismichel}" --password-stdin
 
 TAGS="-t $IMAGE:latest -t $IMAGE:v$VERSION -t $IMAGE:sha-$SHA"
 
