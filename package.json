@@ -20,6 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "eval": "tsx test/eval/run-eval.ts",
+    "benchmark": "tsx test/eval/benchmark.ts",
     "prompts:pull": "tsx scripts/sync-prompts.ts",
     "prompts:seed": "tsx scripts/sync-prompts.ts --from-local",
     "prepublishOnly": "npm run build",

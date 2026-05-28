@@ -27,6 +27,10 @@ export interface GeneratedPage {
   /** Post-pipeline modules — what a user would actually receive (judge input). */
   finalModules: ModuleFiles[];
   moduleOrder: string[];
+  /** Shared design-system CSS for the page (for persistence + full-page render). */
+  sharedCss: string;
+  /** Shared JS for the page (for persistence + full-page render). */
+  sharedJs: string;
   /** End-to-end wall-clock latency for the page (pipeline `stats.durationMs`). */
   durationMs: number;
   /** Langfuse trace id, when tracing is enabled (for dataset-run linkage). */
@@ -96,6 +100,8 @@ export function makeRealGenerator(concurrency: number): PageGenerator {
       rawModules: [...rawByName.values()],
       finalModules: result.modules,
       moduleOrder: result.moduleOrder,
+      sharedCss: result.sharedCss,
+      sharedJs: result.sharedJs,
       durationMs: result.stats.durationMs,
       traceId,
       failed: result.stats.modulesFailed,
@@ -209,10 +215,17 @@ export const mockGenerator: PageGenerator = async (item, provider) => {
       : m.moduleHtml + "\n{% endif %}",
   }));
 
+  const sharedCss = `:root{--bg:#0f0f14;--surface:#1a1a20;--text:#fff;--text-muted:#9a9aa5;--accent:#e8613a;--border:#2a2a33}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:'DM Sans',system-ui,sans-serif;line-height:1.5}
+h1,h2,h3{font-family:'Space Grotesk',system-ui,sans-serif;letter-spacing:-.01em}
+a{color:var(--accent)}section{max-width:1080px;margin:0 auto}`;
+
   return {
     rawModules,
     finalModules,
     moduleOrder: sections,
+    sharedCss,
+    sharedJs: "",
     durationMs: profile.latencyMs,
     failed: 0,
   };
