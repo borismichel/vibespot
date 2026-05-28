@@ -6,6 +6,8 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+## 1.6.0 — 2026-05-28
+
 ### Changed
 
 - **Langfuse is off by default** ([VIB-1833](/VIB/issues/VIB-1833)) — tracing is now an explicit opt-in rather than auto-on when keys are present. Traces are sent only when `langfuseEnabled` is true (in `~/.vibespot/config.json`, via the AI Settings **Observability** toggle, or `LANGFUSE_ENABLED=true`) **and** both keys are set. A stray `LANGFUSE_*` in a user's environment no longer silently sends traces on `npx vibespot`. The eval harness's `--langfuse` flag sets `LANGFUSE_ENABLED=true` for that run, so `npm run eval`/`npm run benchmark` are unaffected.
