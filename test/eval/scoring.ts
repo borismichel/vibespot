@@ -37,6 +37,12 @@ export interface ValidityScore {
   cleanRate: number;
   /** Human-readable list of the distinct unfixable issues found. */
   unfixableSamples: string[];
+  /**
+   * Modules that render invalid CSS color values (`rgba(…, )` etc.) — the
+   * unstyled-section defect (VIB-1842). Counted distinctly because it's the
+   * objective, code-judge-invisible defect this axis was added to catch.
+   */
+  invalidCssModules: number;
 }
 
 /**
@@ -60,6 +66,7 @@ export function scoreValidity(
       passRate: 0,
       cleanRate: 0,
       unfixableSamples: [],
+      invalidCssModules: 0,
     };
   }
 
@@ -75,6 +82,7 @@ export function scoreValidity(
   let totalIssues = 0;
   let autoFixableIssues = 0;
   let unfixableIssues = 0;
+  let invalidCssModules = 0;
   const unfixableSamples = new Set<string>();
 
   for (const r of results) {
@@ -84,6 +92,7 @@ export function scoreValidity(
     autoFixableIssues += fixable.length;
     unfixableIssues += unfixable.length;
     if (r.issues.length === 0) cleanModules++;
+    if (r.issues.some((i) => i.code === "invalid-css")) invalidCssModules++;
     if (unfixable.length > 0) {
       modulesWithUnfixable++;
       for (const i of unfixable) unfixableSamples.add(`${i.module}: ${i.message}`);
@@ -101,6 +110,7 @@ export function scoreValidity(
     passRate: (moduleCount - modulesWithUnfixable) / moduleCount,
     cleanRate: cleanModules / moduleCount,
     unfixableSamples: [...unfixableSamples].slice(0, 10),
+    invalidCssModules,
   };
 }
 

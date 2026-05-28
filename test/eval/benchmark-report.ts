@@ -18,6 +18,8 @@ export interface BenchRecord {
   accuracy: number;
   validatorPassRate: number;
   cleanRate: number;
+  /** Modules rendering invalid CSS color values (VIB-1842 unstyled-section defect). */
+  invalidCssModules?: number;
   coverage: number;
   judge: number | null;
   costUsd: number;

@@ -50,7 +50,7 @@ The default command (no subcommand) runs the vibe coding web UI. Subcommands: `w
 - `src/server/session/` — Session management split into submodules (state, store, disk, templates, types)
 - `src/wizard/` — Step implementations for the wizard flow: preflight → source → theme-setup → conversion → uploader → next-steps
 - `src/ai/` — Multi-engine AI system for single-call mode (legacy)
-- `src/hubl/` — Lightweight HubL template renderer for local preview (supports variables, conditionals, loops, filters, scope_css, require_css/js)
+- `src/hubl/` — Lightweight HubL template renderer for local preview (supports variables, conditionals, loops, filters incl. `convert_rgb`, simple `path/N`·`path*N` arithmetic, scope_css, require_css/js). `convert_rgb` + the `opacity/100` idiom render defaulted colors faithfully and collapse undefaulted ones to empty — this keeps the validator's rendered-CSS check sound (VIB-1842).
 - `src/cli/` — Commander setup, ASCII banner, chalk color theme (respects `NO_COLOR`)
 - `src/utils/` — Shell execution (`execSync` wrappers), tool detection, file helpers, `~/.vibespot/config.json` persistence
 - `src/prompts/` — `@clack/prompts` wrapper with themed styling and cancel handling
@@ -79,6 +79,7 @@ The default generation mode. Runs a 4-stage pipeline for each user message:
    - CDN @import stripping
    - `now()` → `local_dt`
    - Missing meta.json required fields
+   - Invalid CSS color values (VIB-1842): renders the module with its field defaults (via `src/hubl`) and flags color functions with empty components — e.g. `rgba(15, 17, 21, )` from a style field with no default. Recorded as a `⚠` warning (`code: "invalid-css"`, not auto-fixed); the eval (`scoreValidity` → `invalidCssModules`) counts it as a distinct axis that docks pass-rate.
 
 **Engine Adapter** (`engine-adapter.ts`) — Unified interface for all AI engines:
 - API engines (Anthropic, OpenAI, Gemini): structured output via JSON schema, streaming

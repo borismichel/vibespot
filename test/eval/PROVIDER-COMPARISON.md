@@ -30,6 +30,7 @@ is scored on three accuracy axes plus cost and latency:
 |------|-----|---------------|
 | Validator pass-rate | raw modules with no *unfixable* issue | `stages/validator.ts` |
 | Clean first-pass | raw modules with *zero* issues (stricter) | `stages/validator.ts` |
+| Invalid CSS | modules rendering `rgba(…, )` / empty color values (VIB-1842) | `stages/validator.ts` (rendered) |
 | Coverage | brief's expected sections present | `scoring.ts` |
 | Fidelity (judge) | LLM-as-judge, 4×(1–5) on the shipped page | `judge.ts` + `callAgent` |
 | Cost | Σ model-call USD (judge excluded) | `pricing.computeCost` + `onModelUsage` |
@@ -49,6 +50,16 @@ auto-fixer resolves nearly every issue, so validator pass-rate saturates near
 **clean first-pass rate**, not pass-rate. Cost and latency differ by ~5–10×
 between frontier and cheap-fast models and are usually the deciding factors once
 accuracy clears a quality bar.
+
+**Invalid-CSS axis (VIB-1842):** earlier benchmarks scored high while shipping
+visibly broken pages — GPT-5.4/5.5 built section colors from style fields with no
+defaults (`rgba({{ …color|convert_rgb }}, {{ …opacity/100 }})`), which render to
+invalid CSS like `rgba(15, 17, 21, )` so the browser drops the declaration and the
+section loses its background. Neither tag-balance validation nor the code-reading
+judge caught it. The validator now renders each module with its field defaults
+(the renderer implements `convert_rgb` + the `opacity/100` idiom) and flags color
+functions with empty components. It's an *unfixable* issue, so it docks pass-rate;
+models that hard-code or fall back their colors (the Anthropic models) score `0`.
 
 ## Sample run (MOCK — simulated, not real providers)
 

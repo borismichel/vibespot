@@ -125,6 +125,7 @@ export function renderMarkdown(report: EvalReport): string {
   lines.push("");
   lines.push(`- **Accuracy** = 0.40·validator-pass-rate + 0.20·coverage + 0.40·judge (weights without judge: 0.65 / 0.35).`);
   lines.push(`- **Validator pass-rate**: fraction of *raw* generated modules (before the pipeline's auto-fixer) with no *unfixable* issues, via the shipped \`stages/validator.ts\`. For page content most issues are auto-fixable, so this saturates near 100% — **clean first-pass** (modules with zero issues at all) is the stricter discriminator.`);
+  lines.push(`- **Invalid CSS** (VIB-1842): modules are rendered with their field defaults and scanned for color functions with empty components (\`rgba(…, )\`) — the unstyled-section defect. Counts surface in the Validator cell (\`+N invalid-css\`) and dock pass-rate; \`0\` for models that hard-code/fallback their colors.`);
   lines.push(`- **Coverage**: fraction of the brief's expected sections present in the output.`);
   lines.push(`- **Judge**: LLM-as-judge mean of brief-coverage / layout / content / HubSpot-correctness (1–5 → 0–1) on the shipped page.`);
   lines.push(`- **Cost**: sum of every model call's estimated USD via the shipped \`computeCost\`, captured through the \`onModelUsage\` hook. Judge cost is excluded (eval overhead).`);
@@ -142,8 +143,9 @@ export function renderMarkdown(report: EvalReport): string {
       const note = r.error
         ? `error: ${r.error}`
         : r.validity.unfixableSamples[0] ?? (r.coverage.missing.length ? `missing: ${r.coverage.missing.join(", ")}` : "—");
+      const cssNote = r.validity.invalidCssModules > 0 ? ` +${r.validity.invalidCssModules} invalid-css` : "";
       lines.push(
-        `| ${r.itemId} | ${pct(r.accuracy)} | ${pct(r.validity.passRate)} (${r.validity.cleanModules}/${r.validity.moduleCount} clean) | ${pct(r.coverage.coverage)} | ${r.judge ? pct(r.judge.overall) : "—"} | ${usd(r.costUsd)} | ${secs(r.latencyMs)} | ${r.moduleCount} | ${note} |`,
+        `| ${r.itemId} | ${pct(r.accuracy)} | ${pct(r.validity.passRate)} (${r.validity.cleanModules}/${r.validity.moduleCount} clean${cssNote}) | ${pct(r.coverage.coverage)} | ${r.judge ? pct(r.judge.overall) : "—"} | ${usd(r.costUsd)} | ${secs(r.latencyMs)} | ${r.moduleCount} | ${note} |`,
       );
     }
     lines.push("");

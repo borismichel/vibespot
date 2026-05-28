@@ -328,7 +328,7 @@ function resolveExpressions(tpl: string, context: RenderContext): string {
     const filterParts = trimmed.split("|");
     const path = filterParts[0].trim();
 
-    let value = resolvePath(context, path);
+    let value = resolveValueExpr(context, path);
 
     // Apply basic filters
     for (let i = 1; i < filterParts.length; i++) {
@@ -417,6 +417,27 @@ function resolvePath(context: RenderContext, path: string): unknown {
   }
 
   return current;
+}
+
+/**
+ * Resolve a value expression that may include simple arithmetic on a path.
+ * Handles the common HubSpot opacity idiom `module.styles.x.opacity/100` (and `*`).
+ * If the left path is empty/non-numeric, the whole expression collapses to "" —
+ * this is intentional: an undefaulted style field renders empty, which surfaces
+ * the invalid-CSS defect instead of masking it.
+ */
+function resolveValueExpr(context: RenderContext, expr: string): unknown {
+  const arith = expr.match(/^(.+?)\s*([*/])\s*([\d.]+)$/);
+  if (arith) {
+    const left = resolvePath(context, arith[1].trim());
+    if (left === undefined || left === null || left === "") return "";
+    const ln = Number(left);
+    if (Number.isNaN(ln)) return "";
+    const rn = Number(arith[3]);
+    if (arith[2] === "/") return rn === 0 ? "" : ln / rn;
+    return ln * rn;
+  }
+  return resolvePath(context, expr);
 }
 
 /**
@@ -529,8 +550,47 @@ function applyFilter(value: unknown, filter: string): unknown {
       return Math.abs(Number(str));
     case "round":
       return Math.round(Number(str));
+    case "convert_rgb": {
+      // HubSpot filter: hex color (or color-field object) → "r, g, b".
+      // Empty/invalid input → "" so the surrounding rgba() collapses, surfacing
+      // the defect rather than emitting invalid CSS like rgba(#hex, ...).
+      const hex = extractHex(value);
+      return hex ? hexToRgbTriple(hex) : "";
+    }
     default:
       // Unknown filter — pass through
       return value;
   }
+}
+
+/**
+ * Pull a 6-digit hex out of a color value: a hex string ("#0f1115" / "0f1115" /
+ * "#abc") or a HubSpot color-field object ({ color: "#hex", opacity }).
+ * Returns the normalised 6-char hex (no "#") or null.
+ */
+function extractHex(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") {
+    const m = value.match(/#?([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/);
+    return m ? normalizeHex(m[1]) : null;
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.color === "string") return extractHex(obj.color);
+    if (typeof obj.hex === "string") return extractHex(obj.hex);
+  }
+  return null;
+}
+
+function normalizeHex(h: string): string {
+  const lower = h.toLowerCase();
+  if (lower.length === 3) return lower.split("").map((c) => c + c).join("");
+  return lower;
+}
+
+function hexToRgbTriple(hex: string): string {
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `${r}, ${g}, ${b}`;
 }

@@ -383,3 +383,87 @@ describe("assemblePreview", () => {
     expect(html).not.toContain("<style></style>");
   });
 });
+
+// ---------------------------------------------------------------------------
+// convert_rgb + arithmetic (VIB-1842)
+// ---------------------------------------------------------------------------
+
+describe("convert_rgb filter", () => {
+  it("converts a hex string to an r, g, b triple", () => {
+    const ctx: RenderContext = { module: { c: "#0f1115" } };
+    expect(renderHubL("{{ module.c|convert_rgb }}", ctx)).toBe("15, 17, 21");
+  });
+
+  it("expands 3-digit hex", () => {
+    const ctx: RenderContext = { module: { c: "#fff" } };
+    expect(renderHubL("{{ module.c|convert_rgb }}", ctx)).toBe("255, 255, 255");
+  });
+
+  it("reads the hex out of a color-field object", () => {
+    const ctx: RenderContext = { module: { c: { color: "#ff5c35", opacity: 100 } } };
+    expect(renderHubL("{{ module.c|convert_rgb }}", ctx)).toBe("255, 92, 53");
+  });
+
+  it("renders empty for a missing/undefaulted color (surfaces the defect)", () => {
+    const ctx: RenderContext = { module: { c: "" } };
+    expect(renderHubL("{{ module.c|convert_rgb }}", ctx)).toBe("");
+  });
+});
+
+describe("expression arithmetic", () => {
+  it("evaluates the opacity/100 idiom", () => {
+    const ctx: RenderContext = { module: { o: 50 } };
+    expect(renderHubL("{{ module.o/100 }}", ctx)).toBe("0.5");
+  });
+
+  it("collapses to empty when the operand is undefaulted", () => {
+    const ctx: RenderContext = { module: { o: "" } };
+    expect(renderHubL("{{ module.o/100 }}", ctx)).toBe("");
+  });
+});
+
+describe("rgba composition (the GPT vs Anthropic split)", () => {
+  const tpl = "background: rgba({{ module.styles.bg.color|convert_rgb }}, {{ module.styles.bg.opacity/100 }});";
+
+  it("renders valid CSS when the style group has defaults", () => {
+    const fields: FieldDef[] = [
+      {
+        name: "styles",
+        type: "group",
+        children: [
+          {
+            name: "bg",
+            type: "group",
+            children: [
+              { name: "color", type: "color", default: "#0f1115" },
+              { name: "opacity", type: "number", default: 50 },
+            ],
+          },
+        ],
+      },
+    ];
+    const ctx: RenderContext = { module: buildContextFromFields(fields) };
+    expect(renderHubL(tpl, ctx)).toBe("background: rgba(15, 17, 21, 0.5);");
+  });
+
+  it("renders empty components when the style group has no defaults", () => {
+    const fields: FieldDef[] = [
+      {
+        name: "styles",
+        type: "group",
+        children: [
+          {
+            name: "bg",
+            type: "group",
+            children: [
+              { name: "color", type: "color" },
+              { name: "opacity", type: "number" },
+            ],
+          },
+        ],
+      },
+    ];
+    const ctx: RenderContext = { module: buildContextFromFields(fields) };
+    expect(renderHubL(tpl, ctx)).toBe("background: rgba(, );");
+  });
+});

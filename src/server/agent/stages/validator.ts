@@ -9,12 +9,15 @@ import type { ContentType, PipelineEvent } from "../types.js";
 import type { BrandKit } from "../../session/types.js";
 import { tryParseJSON } from "../../ai-parser.js";
 import { log } from "../../log.js";
+import { renderHubL, buildContextFromFields, type FieldDef } from "../../../hubl/renderer.js";
 
 export interface ValidationIssue {
   module: string;
   field: string;
   message: string;
   autoFixed: boolean;
+  /** Stable identifier for issue classes the eval/report want to count distinctly. */
+  code?: string;
 }
 
 export interface ValidationResult {
@@ -117,6 +120,11 @@ export function validateModules(
       fixedModule.moduleName,
       issues,
     );
+
+    // --- Rendered CSS validity (invalid rgba()/hsla() from undefaulted fields) ---
+    if (!isEmail) {
+      checkRenderedCssValidity(fixedModule, issues);
+    }
 
     // --- metaJson required fields ---
     fixedModule.metaJson = ensureMetaFields(
@@ -534,6 +542,71 @@ function fixHublSyntax(
   }
 
   return fixed;
+}
+
+/**
+ * Scan a CSS string for color functions that will render as invalid CSS — i.e.
+ * an `rgb()/rgba()/hsl()/hsla()` with at least one EMPTY component. This is the
+ * signature of the unstyled-section defect: a style field with no default fed
+ * into `rgba({{ ...color|convert_rgb }}, {{ ...opacity/100 }})` renders empty
+ * (`rgba(, )` or `rgba(15, 17, 21, )`), the browser drops the declaration, and
+ * the section loses its background/border.
+ *
+ * Intentionally narrow: only EMPTY components are flagged (not merely odd
+ * values), and color functions containing nested parens (e.g. `calc()`,
+ * `var(--x, …)`) are skipped, so a non-empty value from an unmodelled filter
+ * never produces a false positive. Returns the offending snippets.
+ */
+export function findInvalidColorValues(css: string): string[] {
+  if (!css) return [];
+  const offenders: string[] = [];
+  const re = /\b(rgba?|hsla?)\(([^()]*)\)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(css)) !== null) {
+    const args = m[2];
+    if (args.trim() === "" || args.split(",").some((p) => p.trim() === "")) {
+      offenders.push(m[0].trim());
+    }
+  }
+  return offenders;
+}
+
+/**
+ * Render the module with its field defaults (so HubL color expressions are
+ * resolved exactly as the preview/HubSpot would) and flag any invalid color
+ * values in the result. Recorded as a warning (not auto-fixed) — see
+ * VIB-1842 follow-ups for the quality-check auto-fix.
+ */
+function checkRenderedCssValidity(
+  mod: ModuleFiles,
+  issues: ValidationIssue[],
+): void {
+  const fields = tryParseJSON(mod.fieldsJson);
+  const moduleCtx = Array.isArray(fields)
+    ? buildContextFromFields(fields as FieldDef[])
+    : {};
+
+  let rendered = mod.moduleHtml || "";
+  try {
+    rendered = renderHubL(mod.moduleHtml || "", { module: moduleCtx });
+  } catch {
+    // Fall back to the raw template — better to scan something than nothing.
+  }
+
+  const offenders = [
+    ...findInvalidColorValues(rendered),
+    ...findInvalidColorValues(mod.moduleCss || ""),
+  ];
+  if (offenders.length === 0) return;
+
+  const sample = offenders[0].length > 60 ? offenders[0].slice(0, 57) + "…" : offenders[0];
+  issues.push({
+    module: mod.moduleName,
+    field: "moduleCss",
+    message: `${offenders.length} invalid CSS color value${offenders.length === 1 ? "" : "s"} (e.g. \`${sample}\`) — renders unstyled. A style field with no default is likely fed into rgba()/hsla().`,
+    autoFixed: false,
+    code: "invalid-css",
+  });
 }
 
 function ensureMetaFields(
