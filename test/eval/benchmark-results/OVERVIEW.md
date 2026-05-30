@@ -2,7 +2,7 @@
 
 Same brief, five models, every theme saved. Each model below generated the same landing-page brief through the vibeSpot pipeline. We kept the themes so you can open them and judge the build yourself, and we tracked the Langfuse KPIs — accuracy, cost, and latency — so the trade-offs are on the table.
 
-_Generated 2026-05-27T22:38:54.598Z · run `combined` · mode: **real** · 2 page(s) × 5 model(s) · judge: `anthropic-api:claude-sonnet-4-6`._
+_Generated 2026-05-30T11:56:36.077Z · run `combined6` · mode: **real** · 2 page(s) × 6 model(s) · judge: `anthropic-api:claude-sonnet-4-6`._
 
 ## Langfuse KPIs (ranked by accuracy)
 
@@ -11,12 +11,13 @@ _Generated 2026-05-27T22:38:54.598Z · run `combined` · mode: **real** · 2 pag
 | 1 | **Sonnet 4.6** | `anthropic-api:claude-sonnet-4-6` | 99% | 100% | 100% | 98% | $1.3881 | 367.9s | $2.7762 |
 | 2 | **Opus 4.7** | `anthropic-api:claude-opus-4-7` | 98% | 100% | 100% | 95% | $7.7580 | 284.4s | $15.5161 |
 | 3 | **GPT 5.4** | `openai-api:gpt-5.4` | 97% | 100% | 100% | 93% | $0.8317 | 269.1s | $1.6634 |
-| 4 | **GPT 5.5** | `openai-api:gpt-5.5` | 96% | 100% | 100% | 90% | $3.9053 | 529.4s | $7.8105 |
-| 5 | **Haiku 4.5** | `anthropic-api:claude-haiku-4-5` | 92% | 100% | 100% | 80% | $0.3894 | 115.1s | $0.7789 |
+| 4 | **Opus 4.8** | `anthropic-api:claude-opus-4-8` | 97% | 100% | 100% | 93% | $6.4978 | 219.5s | $12.9956 |
+| 5 | **GPT 5.5** | `openai-api:gpt-5.5` | 96% | 100% | 100% | 90% | $3.9053 | 529.4s | $7.8105 |
+| 6 | **Haiku 4.5** | `anthropic-api:claude-haiku-4-5` | 92% | 100% | 100% | 80% | $0.3894 | 115.1s | $0.7789 |
 
 ## Fidelity — saved themes
 
-Every generation is saved under `combined/<model>/<page>/`: the importable theme (`theme/`), a standalone full-page render (`page.html`), plus per-page KPIs (`metrics.json`). Open them side by side to compare fidelity.
+Every generation is saved under `combined6/<model>/<page>/`: the importable theme (`theme/`), a standalone full-page render (`page.html`), plus per-page KPIs (`metrics.json`). Open them side by side to compare fidelity.
 
 ### SaaS analytics product landing page
 
@@ -29,6 +30,7 @@ _Screenshots not captured this run — open the saved render instead:_
 - **Sonnet 4.6** — [`page.html`](./sonnet-4-6/saas-analytics/page.html) · [`theme/`](./sonnet-4-6/saas-analytics/theme/)
 - **Opus 4.7** — [`page.html`](./opus-4-7/saas-analytics/page.html) · [`theme/`](./opus-4-7/saas-analytics/theme/)
 - **GPT 5.4** — [`page.html`](./gpt-5-4/saas-analytics/page.html) · [`theme/`](./gpt-5-4/saas-analytics/theme/)
+- **Opus 4.8** — [`page.html`](./opus-4-8/saas-analytics/page.html) · [`theme/`](./opus-4-8/saas-analytics/theme/)
 - **GPT 5.5** — [`page.html`](./gpt-5-5/saas-analytics/page.html) · [`theme/`](./gpt-5-5/saas-analytics/theme/)
 - **Haiku 4.5** — [`page.html`](./haiku-4-5/saas-analytics/page.html) · [`theme/`](./haiku-4-5/saas-analytics/theme/)
 
@@ -37,6 +39,7 @@ _Screenshots not captured this run — open the saved render instead:_
 | Sonnet 4.6 | 98% | 100% | 100% | 95% | $1.5551 | 420.4s | 7 | `553c0246-e5e8-4096-8417-09c85043fab3` |
 | Opus 4.7 | 98% | 100% | 100% | 95% | $8.3817 | 323.7s | 7 | `a0a42b7d-3274-4598-85af-b3ab372bdeaa` |
 | GPT 5.4 | 96% | 100% | 100% | 90% | $0.8638 | 307.1s | 7 | `8df37c9e-ad20-4170-a82c-ac700fed8cb5` |
+| Opus 4.8 | 96% | 100% | 100% | 90% | $6.9333 | 237.6s | 7 | `390da2ad-98fd-4e2b-b983-ef45203d0469` |
 | GPT 5.5 | 100% | 100% | 100% | 100% | $3.6724 | 510.4s | 11 | `b00595e9-bef2-452a-a31b-f21d79f2e32c` |
 | Haiku 4.5 | 92% | 100% | 100% | 80% | $0.4491 | 149.7s | 7 | `61781fbd-4440-4a8e-b0b1-efe7662c269c` |
 
@@ -51,6 +54,7 @@ _Screenshots not captured this run — open the saved render instead:_
 - **Sonnet 4.6** — [`page.html`](./sonnet-4-6/design-agency/page.html) · [`theme/`](./sonnet-4-6/design-agency/theme/)
 - **Opus 4.7** — [`page.html`](./opus-4-7/design-agency/page.html) · [`theme/`](./opus-4-7/design-agency/theme/)
 - **GPT 5.4** — [`page.html`](./gpt-5-4/design-agency/page.html) · [`theme/`](./gpt-5-4/design-agency/theme/)
+- **Opus 4.8** — [`page.html`](./opus-4-8/design-agency/page.html) · [`theme/`](./opus-4-8/design-agency/theme/)
 - **GPT 5.5** — [`page.html`](./gpt-5-5/design-agency/page.html) · [`theme/`](./gpt-5-5/design-agency/theme/)
 - **Haiku 4.5** — [`page.html`](./haiku-4-5/design-agency/page.html) · [`theme/`](./haiku-4-5/design-agency/theme/)
 
@@ -59,6 +63,7 @@ _Screenshots not captured this run — open the saved render instead:_
 | Sonnet 4.6 | 100% | 100% | 100% | 100% | $1.2210 | 315.3s | 6 | `75b58794-448f-4e52-bbbd-74ee041916fa` |
 | Opus 4.7 | 98% | 100% | 100% | 95% | $7.1344 | 245.1s | 6 | `2ac74dbd-62da-4731-9c31-0e5908fae7d7` |
 | GPT 5.4 | 98% | 100% | 100% | 95% | $0.7995 | 231.1s | 6 | `a3e0eeb2-ddf8-43d6-83a2-d0dce5197dae` |
+| Opus 4.8 | 98% | 100% | 100% | 95% | $6.0623 | 201.4s | 6 | `0ef47d57-55bf-4ea5-94f5-0a7e7f493f8d` |
 | GPT 5.5 | 92% | 100% | 100% | 80% | $4.1381 | 548.5s | 13 | `f9064519-14cb-47fc-a7e7-394a5b44eaa3` |
 | Haiku 4.5 | 92% | 100% | 100% | 80% | $0.3298 | 80.4s | 6 | `e83ca61f-d5dd-402c-9636-6e2471e521ec` |
 
@@ -75,5 +80,5 @@ _Screenshots not captured this run — open the saved render instead:_
 
 ## Notes
 
-- Merged 6 record(s) from DIRTY-RUN-openai-quota-failed-2026-05-27T19-58.
-- Merged 4 record(s) from 2026-05-27T21-57-01-829Z.
+- Merged 10 record(s) from combined.
+- Merged 2 record(s) from 2026-05-30T11-43-33-122Z.
