@@ -2703,6 +2703,10 @@ function updateModuleList(moduleNames) {
   const pageTreeCountEl = document.getElementById("page-tree-module-count");
   if (pageTreeCountEl) pageTreeCountEl.textContent = moduleNames.length;
 
+  // Download is only meaningful once the theme has at least one module.
+  const downloadBtn = document.getElementById("btn-download");
+  if (downloadBtn) downloadBtn.disabled = moduleNames.length === 0;
+
   // Preserve which items were marked as recently changed across re-renders so
   // the dots survive the per-module `modules_updated` events that happen
   // mid-run.
@@ -3242,6 +3246,19 @@ document.getElementById("btn-upload").addEventListener("click", () => {
   if (typeof startUpload === "function") {
     startUpload();
   }
+});
+
+// Download button — fetches the HubSpot-ready .zip of the active theme.
+// The server streams it as an attachment; an anchor lets the browser save it.
+document.getElementById("btn-download")?.addEventListener("click", () => {
+  const btn = document.getElementById("btn-download");
+  if (!btn || btn.disabled) return;
+  const a = document.createElement("a");
+  a.href = "/api/download-zip";
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 });
 
 // Resize handle
