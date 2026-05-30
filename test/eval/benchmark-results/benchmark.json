@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-27T22:38:54.598Z",
-  "runStamp": "combined",
+  "generatedAt": "2026-05-30T11:56:36.077Z",
+  "runStamp": "combined6",
   "mode": "real",
   "judge": {
     "enabled": true,
@@ -48,6 +48,12 @@
       "engine": "openai-api",
       "model": "gpt-5.5",
       "slug": "gpt-5-5"
+    },
+    {
+      "label": "Opus 4.8",
+      "engine": "anthropic-api",
+      "model": "claude-opus-4-8",
+      "slug": "opus-4-8"
     }
   ],
   "records": [
@@ -260,11 +266,55 @@
       "artifactDir": "/tmp/vib1833/bench-output/2026-05-27T21-57-01-829Z/gpt-5-5/design-agency",
       "traceId": "f9064519-14cb-47fc-a7e7-394a5b44eaa3",
       "sessionId": "eval-gpt-5-5-design-agency"
+    },
+    {
+      "modelLabel": "Opus 4.8",
+      "engine": "anthropic-api",
+      "model": "claude-opus-4-8",
+      "modelSlug": "opus-4-8",
+      "itemId": "saas-analytics",
+      "itemTitle": "SaaS analytics product landing page",
+      "accuracy": 0.9600000000000002,
+      "validatorPassRate": 1,
+      "cleanRate": 0,
+      "invalidCssModules": 0,
+      "coverage": 1,
+      "judge": 0.9,
+      "costUsd": 6.9333435,
+      "hasUnpricedCalls": false,
+      "latencyMs": 237582,
+      "moduleCount": 7,
+      "failed": 0,
+      "artifactDir": "/tmp/vib1833b/bench-output/2026-05-30T11-43-33-122Z/opus-4-8/saas-analytics",
+      "traceId": "390da2ad-98fd-4e2b-b983-ef45203d0469",
+      "sessionId": "eval-opus-4-8-saas-analytics"
+    },
+    {
+      "modelLabel": "Opus 4.8",
+      "engine": "anthropic-api",
+      "model": "claude-opus-4-8",
+      "modelSlug": "opus-4-8",
+      "itemId": "design-agency",
+      "itemTitle": "Creative design agency / portfolio site",
+      "accuracy": 0.9800000000000001,
+      "validatorPassRate": 1,
+      "cleanRate": 0,
+      "invalidCssModules": 0,
+      "coverage": 1,
+      "judge": 0.95,
+      "costUsd": 6.06228975,
+      "hasUnpricedCalls": false,
+      "latencyMs": 201368,
+      "moduleCount": 6,
+      "failed": 0,
+      "artifactDir": "/tmp/vib1833b/bench-output/2026-05-30T11-43-33-122Z/opus-4-8/design-agency",
+      "traceId": "0ef47d57-55bf-4ea5-94f5-0a7e7f493f8d",
+      "sessionId": "eval-opus-4-8-design-agency"
     }
   ],
   "notes": [
-    "Merged 6 record(s) from DIRTY-RUN-openai-quota-failed-2026-05-27T19-58.",
-    "Merged 4 record(s) from 2026-05-27T21-57-01-829Z."
+    "Merged 10 record(s) from combined.",
+    "Merged 2 record(s) from 2026-05-30T11-43-33-122Z."
   ],
   "screenshotsAvailable": false
 }

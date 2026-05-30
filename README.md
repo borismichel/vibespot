@@ -83,17 +83,18 @@ vibeSpot runs the same pipeline across seven engines. Use whichever subscription
 
 ## How the models compare
 
-We ran the same two landing-page briefs through the pipeline on five models and kept every theme. The table shows accuracy (HubSpot/HubL validity + section coverage + an LLM judge), cost, and speed per page. The full themes, renders, and Langfuse trace ids live in [`test/eval/benchmark-results/`](test/eval/benchmark-results/).
+We ran the same two landing-page briefs through the pipeline on six models and kept every theme. The table shows accuracy (HubSpot/HubL validity + section coverage + an LLM judge), cost, and speed per page. The full themes, renders, and Langfuse trace ids live in [`test/eval/benchmark-results/`](test/eval/benchmark-results/).
 
 | Model | Accuracy | Cost/page | Speed/page |
 |-------|----------|-----------|------------|
 | Sonnet 4.6 | 99% | $1.39 | ~6 min |
 | Opus 4.7 | 98% | $7.76 | ~5 min |
 | GPT 5.4 | 97% | $0.83 | ~4.5 min |
+| Opus 4.8 | 97% | $6.50 | ~4 min |
 | GPT 5.5 | 96% | $3.91 | ~9 min |
 | Haiku 4.5 | 92% | $0.39 | ~2 min |
 
-Every model produced valid, complete pages — 100% validator pass and section coverage across the board. Sonnet 4.6 leads on quality at roughly a fifth of Opus's cost; GPT 5.4 is the value pick; Haiku 4.5 is fastest and cheapest if you plan to polish by hand. Two briefs scored by one judge — read it as a directional guide, and judge fidelity yourself from the saved themes. Reproduce it with `npm run benchmark` (see [`test/eval/BENCHMARK.md`](test/eval/BENCHMARK.md)).
+Every model produced valid, complete pages — 100% validator pass and section coverage across the board. Sonnet 4.6 leads on quality at roughly a fifth of Opus's cost; GPT 5.4 is the value pick; Opus 4.8 matches Opus 4.7's quality a bit cheaper and faster; Haiku 4.5 is fastest and cheapest if you plan to polish by hand. Two briefs scored by one judge — read it as a directional guide, and judge fidelity yourself from the saved themes. Reproduce it with `npm run benchmark` (see [`test/eval/BENCHMARK.md`](test/eval/BENCHMARK.md)).
 
 ## Setup
 
