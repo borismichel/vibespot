@@ -1,6 +1,6 @@
 {
   "name": "vibespot",
-  "version": "1.6.0",
+  "version": "1.6.2",
   "description": "AI-powered HubSpot CMS landing page builder — vibe coding & React converter",
   "type": "module",
   "bin": {
@@ -23,6 +23,7 @@
     "benchmark": "tsx test/eval/benchmark.ts",
     "prompts:pull": "tsx scripts/sync-prompts.ts",
     "prompts:seed": "tsx scripts/sync-prompts.ts --from-local",
+    "prompts:push": "tsx scripts/sync-prompts.ts --push",
     "prepublishOnly": "npm run build",
     "contact-monitor": "tsx scripts/contact-monitor.ts",
     "docker:publish": "scripts/docker-publish.sh",

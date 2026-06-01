@@ -2,13 +2,23 @@
  * sync-prompts — compile the editable stage-instruction prompts into the
  * shipped bundle (VIB-1769, Langfuse Phase 3 "bundle-at-build").
  *
- * Two modes:
+ * Three modes:
  *   --from-local    Seed the bundle from the in-code LOCAL_STAGE_PROMPTS. No
  *                   network, no keys. Use to bootstrap or after editing the
  *                   local fallback. (Default when no Langfuse keys are present.)
  *   (default)       Pull each stage prompt from Langfuse at its PINNED version
  *                   and compile it into the bundle. Requires langfusePublicKey /
  *                   langfuseSecretKey (config or LANGFUSE_* env).
+ *   --push          Publish the in-code LOCAL_STAGE_PROMPTS up to Langfuse Prompt
+ *                   Management (POST create-prompt) so they're visible + editable
+ *                   in the Langfuse UI. This is what populates a fresh project's
+ *                   Prompts tab — the pull/build flow only READS, it never creates
+ *                   prompts (VIB-1853). Requires Langfuse keys. Skips a stage if a
+ *                   prompt with the pinned version already exists (idempotent).
+ *
+ * The bundle/build flow is deliberately one-directional (Langfuse → bundle →
+ * runtime), so the round-trip is: `prompts:push` (seed the project once) →
+ * edit in the Langfuse UI → `prompts:pull` (bake the edits at build).
  *
  * The output (assets/prompts.bundle.json) is committed and shipped in the npm
  * package, then inlined by the registry at runtime — so users' machines never
@@ -17,6 +27,7 @@
  *
  * Usage:
  *   npm run prompts:pull                 # Langfuse pull (or local seed w/o keys)
+ *   npm run prompts:push                 # publish local prompts → Langfuse UI
  *   tsx scripts/sync-prompts.ts --from-local
  *   tsx scripts/sync-prompts.ts --dry-run
  */
@@ -99,7 +110,8 @@ async function fetchLangfusePrompt(
   return body.prompt;
 }
 
-async function buildFromLangfuse(): Promise<Bundle> {
+/** Resolve Langfuse base URL + basic-auth header from config/env, or throw. */
+function resolveLangfuseAuth(): { baseUrl: string; auth: string } {
   const cfg = loadConfig();
   const publicKey = cfg.langfusePublicKey || process.env.LANGFUSE_PUBLIC_KEY;
   const secretKey = cfg.langfuseSecretKey || process.env.LANGFUSE_SECRET_KEY;
@@ -107,7 +119,11 @@ async function buildFromLangfuse(): Promise<Bundle> {
   if (!publicKey || !secretKey) {
     throw new Error("Langfuse keys missing (langfusePublicKey/langfuseSecretKey or LANGFUSE_* env)");
   }
-  const auth = Buffer.from(`${publicKey}:${secretKey}`).toString("base64");
+  return { baseUrl: baseUrl.replace(/\/$/, ""), auth: Buffer.from(`${publicKey}:${secretKey}`).toString("base64") };
+}
+
+async function buildFromLangfuse(): Promise<Bundle> {
+  const { baseUrl, auth } = resolveLangfuseAuth();
 
   const prompts: Record<string, BundleEntry> = {};
   for (const id of Object.keys(LOCAL_STAGE_PROMPTS) as StagePromptId[]) {
@@ -121,9 +137,71 @@ async function buildFromLangfuse(): Promise<Bundle> {
   return { generatedAt: new Date().toISOString(), source: "langfuse", prompts };
 }
 
+/** Does a prompt with this name + version already exist in Langfuse? */
+async function promptVersionExists(
+  baseUrl: string,
+  auth: string,
+  name: string,
+  version: number,
+): Promise<boolean> {
+  const url = `${baseUrl}/api/public/v2/prompts/${encodeURIComponent(name)}?version=${version}`;
+  const res = await fetch(url, { headers: { Authorization: `Basic ${auth}` } });
+  if (res.status === 404) return false;
+  if (res.ok) return true;
+  throw new Error(`Langfuse ${res.status} probing ${name} v${version}: ${await res.text().catch(() => "")}`);
+}
+
+/**
+ * Publish the in-code LOCAL_STAGE_PROMPTS to Langfuse Prompt Management.
+ * Fresh prompts are created at v1 (matching the pinned versions), so a later
+ * `prompts:pull` lines up. Idempotent: a stage already at its pinned version is
+ * skipped rather than re-pushed (which would bump the version and break the pin).
+ */
+async function pushToLangfuse(dryRun: boolean): Promise<void> {
+  const { baseUrl, auth } = resolveLangfuseAuth();
+  console.log(`Pushing ${Object.keys(LOCAL_STAGE_PROMPTS).length} stage prompts → ${baseUrl}`);
+  for (const id of Object.keys(LOCAL_STAGE_PROMPTS) as StagePromptId[]) {
+    const p = LOCAL_STAGE_PROMPTS[id];
+    assertPlaceholders(id, p.template);
+    const name = langfuseName(id);
+    if (await promptVersionExists(baseUrl, auth, name, p.version)) {
+      console.log(`  • ${name} v${p.version} already exists — skipping`);
+      continue;
+    }
+    if (dryRun) {
+      console.log(`  [dry-run] would create ${name} (${p.template.length} chars, labels: production)`);
+      continue;
+    }
+    const res = await fetch(`${baseUrl}/api/public/v2/prompts`, {
+      method: "POST",
+      headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        type: "text",
+        prompt: p.template,
+        labels: ["production"],
+        config: { placeholders: p.placeholders },
+        commitMessage: `vibeSpot stage prompt seeded from local fallback v${p.version}`,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`Langfuse ${res.status} creating ${name}: ${await res.text().catch(() => "")}`);
+    }
+    const body = (await res.json().catch(() => ({}))) as { version?: number };
+    console.log(`  ✓ created ${name} (Langfuse v${body.version ?? "?"})`);
+  }
+  console.log("Done. The prompts are now visible under Prompts in the Langfuse UI.");
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
+
+  if (args.includes("--push")) {
+    await pushToLangfuse(dryRun);
+    return;
+  }
+
   const cfg = loadConfig();
   const hasKeys = Boolean(
     (cfg.langfusePublicKey || process.env.LANGFUSE_PUBLIC_KEY) &&
