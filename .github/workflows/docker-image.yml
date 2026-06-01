@@ -94,7 +94,7 @@ jobs:
 
       - name: Compute image metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/borismichel/vibespot
           # `latest` only on tagged releases; main pushes get `main` + SHA.
