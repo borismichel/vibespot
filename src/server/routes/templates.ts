@@ -3,11 +3,10 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { existsSync, readFileSync, rmSync } from "node:fs";
-import { join, basename } from "node:path";
-import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
+import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { join, basename, relative, sep } from "node:path";
+import JSZip from "jszip";
 
-const _shellOpt: ExecFileSyncOptions = process.platform === "win32" ? { shell: true } : {};
 import { jsonResponse, readBody } from "../route-helpers.js";
 import { log } from "../log.js";
 import { runWithTrace, runWithSpan } from "../langfuse.js";
@@ -63,7 +62,23 @@ export function handleDashboardRoute(res: ServerResponse): void {
   });
 }
 
-export function handleDownloadZipRoute(res: ServerResponse): void {
+/** Directories never included in the downloadable theme archive. */
+const ZIP_EXCLUDE_DIRS = new Set([".git", ".vibespot", "node_modules"]);
+
+/** Recursively collect file paths under `dir`, skipping excluded directories. */
+function collectThemeFiles(dir: string, acc: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (ZIP_EXCLUDE_DIRS.has(entry.name)) continue;
+      collectThemeFiles(join(dir, entry.name), acc);
+    } else if (entry.isFile()) {
+      acc.push(join(dir, entry.name));
+    }
+  }
+  return acc;
+}
+
+export async function handleDownloadZipRoute(res: ServerResponse): Promise<void> {
   const session = getSession();
   if (!session) {
     jsonResponse(res, 404, { error: "No active session" });
@@ -77,26 +92,27 @@ export function handleDownloadZipRoute(res: ServerResponse): void {
   }
 
   const themeName = session.themeName || "theme";
-  const parentDir = join(themePath, "..");
   const folderName = basename(themePath);
 
   try {
-    const zipFileName = `${themeName}.zip`;
-    const tmpZip = join(parentDir, zipFileName);
+    // Build the archive in-process with jszip (portable — no dependency on a
+    // system `zip` binary, which is absent on Windows `npx` setups).
+    const zip = new JSZip();
+    for (const filePath of collectThemeFiles(themePath)) {
+      // Archive paths are nested under the theme folder, forward-slashed.
+      const archivePath = join(folderName, relative(themePath, filePath)).split(sep).join("/");
+      zip.file(archivePath, readFileSync(filePath));
+    }
 
-    if (existsSync(tmpZip)) rmSync(tmpZip);
-
-    execFileSync("zip", [
-      "-r", zipFileName, folderName,
-      "-x", `${folderName}/.git/*`, `${folderName}/.vibespot/*`, `${folderName}/node_modules/*`,
-    ], { cwd: parentDir, timeout: 30_000, ..._shellOpt });
-
-    const zipData = readFileSync(tmpZip);
-    rmSync(tmpZip);
+    const zipData = await zip.generateAsync({
+      type: "nodebuffer",
+      compression: "DEFLATE",
+      compressionOptions: { level: 6 },
+    });
 
     res.writeHead(200, {
       "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="${zipFileName}"`,
+      "Content-Disposition": `attachment; filename="${themeName}.zip"`,
       "Content-Length": zipData.length,
     });
     res.end(zipData);

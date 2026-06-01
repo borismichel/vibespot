@@ -6,6 +6,10 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### Features
+
+- **Download theme as a HubSpot-ready .zip** ([VIB-1851](/VIB/issues/VIB-1851)) — the editor topbar gains a **Download** button (next to **Deploy**) that saves the active theme as a `.zip` you can import straight into HubSpot Design Manager, share with a colleague, or back up outside git. It's disabled until the theme has at least one module. The download route (`GET /api/download-zip`) now builds the archive in-process with `jszip` instead of shelling out to the system `zip` binary, so it works on environments without `zip` installed (notably Windows `npx` users) — `.git`, `.vibespot`, and `node_modules` are excluded as before.
+
 ### Changed
 
 - **Benchmark: added an Opus 4.8 pass** ([VIB-1833](/VIB/issues/VIB-1833)) — the model generation overview now covers six models. Opus 4.8 (`claude-opus-4-8`) scores 97% mean accuracy at ~$6.50/page with zero invalid-CSS modules — matching Opus 4.7's quality a bit cheaper and faster. Refreshed `test/eval/benchmark-results/` and the README "How the models compare" table; full themes + screenshots + Langfuse trace ids are attached to the issue.
