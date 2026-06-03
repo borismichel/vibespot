@@ -4,6 +4,12 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## 1.6.3 — 2026-06-03
+
+### Fixes
+
+- **Isolate the spawned Claude Code CLI context — fix recurring "Prompt is too long"** ([VIB-1855](/VIB/issues/VIB-1855)) — when the Claude Code engine is selected, vibeSpot spawns `claude --print` for each generation. It did so with **zero isolation**, so the CLI loaded the user's own MCP servers (unbounded tool schemas) and any ambient project `CLAUDE.md` on top of our ~30–40k-token payload — overflowing the 200k context window and surfacing the raw API string `Error: claude exited with code 1. Output: Prompt is too long` on every generation, even for short requests (root cause analysed in [VIB-1854](/VIB/issues/VIB-1854)). Three changes: (1) **context isolation** — every `claude` spawn now passes `--strict-mcp-config` (use zero MCP servers, ignoring the user's configs) and runs in a dedicated empty temp `cwd` (`getIsolatedClaudeCwd`) so the CLI can't discover an ambient project `CLAUDE.md` / `.mcp.json`; vibeSpot now owns the whole window. Applied on both the agentic pipeline (`engine-adapter.ts` → `resolveCLIBinary`) and the legacy single-call path (`ai-engines.ts` → `generateWithClaudeCode`). (2) **Page-state token budget** — `buildStateContext` now clamps each injected module source and degrades to a name-only summary once the assembled state crosses a ~50k-token budget, so a large imported theme can't overflow the window on its own. (3) **Friendly error** — the raw "Prompt is too long" string is mapped (`mapClaudeCliError`) to an actionable message pointing to fixes (trim large modules, fresh theme, or switch to the isolated Anthropic API engine). New unit tests in `test/cli-isolation.test.ts`, plus a live-CLI integration test (`test/cli-isolation.integration.mts`, manual) that plants a poison project `CLAUDE.md` and proves plain `claude --print` reads it while our isolated spawn does not.
+
 ## 1.6.2 — 2026-06-01
 
 ### Features

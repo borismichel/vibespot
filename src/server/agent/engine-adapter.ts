@@ -9,7 +9,7 @@
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { spawnCLI, spawnClaudeCodeStreamJSON } from "../ai-engines.js";
+import { spawnCLI, spawnClaudeCodeStreamJSON, CLAUDE_ISOLATION_FLAGS } from "../ai-engines.js";
 import { tryParseJSON, tryRepairTruncatedJSON } from "../ai-parser.js";
 import { loadConfig } from "../../utils/config.js";
 import { OAUTH_EXTRA_HEADERS, OAUTH_SYSTEM_PREFIX } from "../../utils/claude-oauth.js";
@@ -596,7 +596,9 @@ function resolveCLIBinary(
 ): { bin: string; args: string[] } {
   switch (engine) {
     case "claude-code": {
-      const args = ["--print"];
+      // Isolation flags (VIB-1855): vibeSpot owns the 200k context window
+      // instead of inheriting the user's MCP servers + ambient CLAUDE.md.
+      const args = ["--print", ...CLAUDE_ISOLATION_FLAGS];
       if (model) args.push("--model", model);
       // Web Search is exposed via Claude Code's tool allowlist. We add to
       // the existing default toolset rather than replacing it (using the

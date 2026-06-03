@@ -4,6 +4,9 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import { spawn } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { getConversionGuide } from "../ai/prompts.js";
 import { loadConfig } from "../utils/config.js";
 import { getValidAccessToken, OAUTH_EXTRA_HEADERS, OAUTH_SYSTEM_PREFIX } from "../utils/claude-oauth.js";
@@ -535,6 +538,61 @@ export interface ClaudeCodeStreamHandlers {
   onEvent?: (event: ClaudeCodeStreamEvent) => void;
 }
 
+// ---------------------------------------------------------------------------
+// Claude Code CLI context isolation (VIB-1855)
+// ---------------------------------------------------------------------------
+
+/**
+ * Flags that make vibeSpot own the spawned `claude` CLI's 200k context window
+ * instead of inheriting the user's ambient environment. Without these the CLI
+ * loads the user's MCP servers (unbounded tool schemas) on top of our ~30-40k
+ * token payload, which overflows the window on every generation and surfaces
+ * as a raw "Prompt is too long" API error (VIB-1854/VIB-1855).
+ *
+ * `--strict-mcp-config` with no accompanying `--mcp-config` means: use ZERO
+ * MCP servers (ignore every user/project `.mcp.json`). The isolated cwd
+ * (see `getIsolatedClaudeCwd`) handles the ambient project-level CLAUDE.md.
+ */
+export const CLAUDE_ISOLATION_FLAGS = ["--strict-mcp-config"] as const;
+
+let isolatedClaudeCwd: string | null = null;
+
+/**
+ * A dedicated empty working directory for spawned `claude` CLI processes.
+ * Running the CLI here (instead of the user's project dir) stops it from
+ * discovering an ambient project-level `CLAUDE.md` / `.mcp.json` and pulling
+ * it into every generation's context window. Created once, reused, and lives
+ * under the OS temp dir so no parent directory carries project memory.
+ * Falls back to the bare temp dir if mkdtemp fails — never throws.
+ */
+export function getIsolatedClaudeCwd(): string {
+  if (isolatedClaudeCwd) return isolatedClaudeCwd;
+  try {
+    isolatedClaudeCwd = mkdtempSync(join(tmpdir(), "vibespot-claude-"));
+  } catch {
+    isolatedClaudeCwd = tmpdir();
+  }
+  return isolatedClaudeCwd;
+}
+
+/**
+ * Map the raw Anthropic "Prompt is too long" string (passed through verbatim
+ * by the spawned CLI) to a friendly, actionable message. Returns the original
+ * text unchanged for any other error (VIB-1855).
+ */
+export function mapClaudeCliError(raw: string): string {
+  if (/prompt is too long|exceed\w*\s+(the\s+)?(maximum\s+)?context|too many (input )?tokens|200000|context window/i.test(raw)) {
+    return (
+      "This request exceeded the model's 200k-token context window. vibeSpot " +
+      "isolates the Claude Code CLI from your MCP servers and project memory, so " +
+      "this usually means the page state itself is too large. Try: removing or " +
+      "splitting very large modules, starting a fresh theme, or switching to the " +
+      "Anthropic API engine in AI Settings (isolated per-request, no ambient context)."
+    );
+  }
+  return raw;
+}
+
 /**
  * Spawn `claude --output-format stream-json --include-partial-messages
  * --verbose` and parse line-delimited JSON. Returns the full assistant text
@@ -557,9 +615,12 @@ export function spawnClaudeCodeStreamJSON(
     const env = { ...process.env };
     delete env.CLAUDECODE;
 
+    // Run in an isolated empty cwd so the CLI never discovers an ambient
+    // project-level CLAUDE.md / .mcp.json (VIB-1855).
     const child = spawn("claude", args, {
       stdio: ["pipe", "pipe", "pipe"],
       env,
+      cwd: getIsolatedClaudeCwd(),
     });
 
     let assistantText = "";
@@ -636,11 +697,17 @@ export function spawnClaudeCodeStreamJSON(
       settle(() => {
         const errored = code !== 0 || (resultEvent && resultEvent.is_error);
         if (errored) {
-          reject(new Error(
-            `claude exited with code ${code}.\n` +
-            (stderr ? `Stderr: ${stderr.slice(0, 500)}\n` : "") +
-            (assistantText ? `Output: ${assistantText.slice(0, 500)}` : "No output"),
-          ));
+          const rawDetail = `${stderr}\n${assistantText}`;
+          const friendly = mapClaudeCliError(rawDetail);
+          if (friendly !== rawDetail) {
+            reject(new Error(friendly));
+          } else {
+            reject(new Error(
+              `claude exited with code ${code}.\n` +
+              (stderr ? `Stderr: ${stderr.slice(0, 500)}\n` : "") +
+              (assistantText ? `Output: ${assistantText.slice(0, 500)}` : "No output"),
+            ));
+          }
         } else {
           resolve(assistantText);
         }
@@ -770,7 +837,7 @@ export async function generateWithClaudeCode(
   prompt += buildFileContextText(fileContexts);
   prompt += "\n\n---\nRemember: respond with a ```vibespot-modules JSON block containing ALL modules. No text-only responses.";
 
-  const args = ["--print"];
+  const args = ["--print", ...CLAUDE_ISOLATION_FLAGS];
   if (config.claudeCodeModel) args.push("--model", config.claudeCodeModel);
   if (config.webSearch) args.push("--allowedTools=WebSearch");
   // Stream-json gives us structured events we can surface as live status

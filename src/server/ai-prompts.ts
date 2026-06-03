@@ -391,6 +391,22 @@ ${conversionGuide}` + formatReminder;
 /**
  * Build a summary of the current module state for inclusion in user messages.
  */
+/**
+ * Char budget for the injected page-state context (VIB-1855). A large imported
+ * theme can dump every module's full HTML/CSS/JS plus shared CSS/JS into every
+ * generation prompt; combined with our static guides this can overflow the
+ * model's 200k-token (~800k-char) context window. We cap the state portion at
+ * ~50k tokens so the guides + the model's own reasoning headroom always fit.
+ * ≈4 chars/token, so 200k chars ≈ 50k tokens.
+ */
+const STATE_CONTEXT_CHAR_BUDGET = 200_000;
+
+/** Truncate a source block to `max` chars with a visible marker when clipped. */
+function clampSource(source: string, max: number): string {
+  if (source.length <= max) return source;
+  return source.slice(0, max) + `\n/* …truncated ${source.length - max} chars to fit the context budget… */`;
+}
+
 export function buildStateContext(): string {
   const session = getSession()!;
   const parts: string[] = [];
@@ -406,23 +422,35 @@ export function buildStateContext(): string {
     }
     parts.push(`\nWhen the user asks to modify this page, decide whether to MODIFY existing modules, ADD new ones at the right narrative position, REARRANGE the sequence, or REMOVE sections. Always include ALL modules you want to keep in your output.\n`);
 
-    // Detailed module state
+    // Detailed module state. Each block is clamped, and once we cross the
+    // overall budget remaining modules degrade to a name-only summary so a
+    // huge imported theme can never overflow the context window (VIB-1855).
     parts.push("\n## Current Module State\n");
+    let used = 0;
+    let budgetExceeded = false;
+    // Per-block cap scales down with module count so no single module hogs the budget.
+    const perBlockCap = Math.max(2_000, Math.floor(STATE_CONTEXT_CHAR_BUDGET / Math.max(total, 1)));
     for (let i = 0; i < total; i++) {
       const mod = modules[i];
-      parts.push(`\n### ${i + 1}/${total}: ${mod.moduleName}.module\n`);
-      parts.push(`**fields.json:**\n\`\`\`json\n${mod.fieldsJson}\n\`\`\`\n`);
-      parts.push(`**module.html:**\n\`\`\`html\n${mod.moduleHtml}\n\`\`\`\n`);
-      parts.push(`**module.css:**\n\`\`\`css\n${mod.moduleCss}\n\`\`\`\n`);
-      if (mod.moduleJs) {
-        parts.push(`**module.js:**\n\`\`\`js\n${mod.moduleJs}\n\`\`\`\n`);
+      if (budgetExceeded) {
+        parts.push(`\n### ${i + 1}/${total}: ${mod.moduleName}.module — (source omitted to fit context budget; ask to edit it specifically to load its source)\n`);
+        continue;
       }
+      const block =
+        `\n### ${i + 1}/${total}: ${mod.moduleName}.module\n` +
+        `**fields.json:**\n\`\`\`json\n${clampSource(mod.fieldsJson, perBlockCap)}\n\`\`\`\n` +
+        `**module.html:**\n\`\`\`html\n${clampSource(mod.moduleHtml, perBlockCap)}\n\`\`\`\n` +
+        `**module.css:**\n\`\`\`css\n${clampSource(mod.moduleCss, perBlockCap)}\n\`\`\`\n` +
+        (mod.moduleJs ? `**module.js:**\n\`\`\`js\n${clampSource(mod.moduleJs, perBlockCap)}\n\`\`\`\n` : "");
+      used += block.length;
+      parts.push(block);
+      if (used > STATE_CONTEXT_CHAR_BUDGET) budgetExceeded = true;
     }
     if (session.sharedCss) {
-      parts.push(`\n### Shared CSS\n\`\`\`css\n${session.sharedCss}\n\`\`\`\n`);
+      parts.push(`\n### Shared CSS\n\`\`\`css\n${clampSource(session.sharedCss, perBlockCap)}\n\`\`\`\n`);
     }
     if (session.sharedJs) {
-      parts.push(`\n### Shared JS\n\`\`\`js\n${session.sharedJs}\n\`\`\`\n`);
+      parts.push(`\n### Shared JS\n\`\`\`js\n${clampSource(session.sharedJs, perBlockCap)}\n\`\`\`\n`);
     }
   }
 
