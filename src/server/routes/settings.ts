@@ -25,6 +25,7 @@ const MODEL_CACHE_TTL = 10 * 60 * 1000;
 
 const STATIC_MODELS: Record<string, ModelEntry[]> = {
   "claude-code": [
+    { id: "claude-opus-4-8", label: "Claude Opus 4.8" },
     { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
     { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
     { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
@@ -43,6 +44,7 @@ const STATIC_MODELS: Record<string, ModelEntry[]> = {
     { id: "codex-mini-latest", label: "Codex Mini (latest)" },
   ],
   "anthropic-api": [
+    { id: "claude-opus-4-8", label: "Claude Opus 4.8" },
     { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
     { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
     { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
@@ -50,6 +52,7 @@ const STATIC_MODELS: Record<string, ModelEntry[]> = {
     { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
   ],
   "claude-oauth": [
+    { id: "claude-opus-4-8", label: "Claude Opus 4.8" },
     { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
     { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
     { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
@@ -79,6 +82,7 @@ const STATIC_MODELS: Record<string, ModelEntry[]> = {
 const LANGDOCK_PROVIDER_MODELS: Record<string, ModelEntry[]> = {
   anthropic: [
     { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
+    { id: "claude-opus-4-8", label: "Claude Opus 4.8" },
     { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
     { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
     { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
@@ -209,6 +213,10 @@ async function getModelCatalog(refresh = false): Promise<Record<string, ModelEnt
           if (models.length) {
             catalog["anthropic-api"] = models;
             catalog["claude-oauth"] = models; // same model list
+            // Claude Code runs the same Claude model family. Without this, the
+            // claude-code dropdown is *always* the static list — "Refresh" never
+            // surfaces a newly released model for CLI users (VIB-1859).
+            catalog["claude-code"] = models;
           }
         })
         .catch(() => {}),
