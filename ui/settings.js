@@ -1725,6 +1725,7 @@ function getModelsForEngine(engine) {
   switch (engine) {
     case "claude-code":
       return [
+        { id: "claude-opus-4-8", label: "Claude Opus 4.8" },
         { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
         { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
         { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
@@ -1734,6 +1735,7 @@ function getModelsForEngine(engine) {
     case "anthropic-api":
     case "claude-oauth":
       return [
+        { id: "claude-opus-4-8", label: "Claude Opus 4.8" },
         { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
         { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
         { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
@@ -1772,6 +1774,7 @@ function getModelsForEngine(engine) {
       const ldModels = {
         anthropic: [
           { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (default)" },
+          { id: "claude-opus-4-8", label: "Claude Opus 4.8" },
           { id: "claude-opus-4-7", label: "Claude Opus 4.7" },
           { id: "claude-opus-4-6", label: "Claude Opus 4.6" },
           { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },

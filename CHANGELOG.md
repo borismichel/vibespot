@@ -4,6 +4,12 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## 1.6.4 — 2026-06-03
+
+### Fixes
+
+- **Claude Opus 4.8 missing from the model dropdown** ([VIB-1859](/VIB/issues/VIB-1859)) — the model picker is seeded from a curated static list, and that list had never been updated past Opus 4.7, so `claude-opus-4-8` (a released model — the one the benchmark already covers) couldn't be selected. Added Opus 4.8 to the curated lists for the Claude Code, Anthropic API, Claude OAuth, and Langdock (Anthropic provider) engines, in both the server catalog (`src/server/routes/settings.ts`) and the client fallback (`ui/settings.js`). The reporter also noticed that **Refresh** appeared to do nothing for the Claude Code engine — that was real: `getModelCatalog` only fetched live model lists for the API engines (Anthropic / OpenAI / Gemini, each gated on an API key) and **never** for `claude-code`, which was always served from the static list. Claude Code runs the same Claude model family, so it now inherits the live Anthropic `/v1/models` catalog whenever an Anthropic API key is configured — so a future model release shows up on **Refresh** without a code change. (Cost tracking already prefix-matches `claude-opus-4`, so no pricing-table change was needed.)
+
 ## 1.6.3 — 2026-06-03
 
 ### Fixes
