@@ -34,8 +34,14 @@ import {
 import { recordCostSample } from "./cost-tracker.js";
 
 const DEFAULT_BASE_URL = "https://cloud.langfuse.com";
-// Cap serialized input/output so we never ship multi-hundred-KB prompts.
+// Default cap for serialized fields (trace/span I/O — these are deliberately
+// compact summaries, so a tight cap keeps the Traces list and span views lean).
 const MAX_FIELD_CHARS = 24_000;
+// Generations carry the real model I/O. For API engines we have the full SDK
+// request (system prompt + guide blocks + messages) and response, and that's
+// the whole point of a generation — so use a much larger cap to keep them
+// effectively full while still guarding against a pathological multi-MB blob.
+const MAX_GENERATION_FIELD_CHARS = 200_000;
 
 interface LangfuseSettings {
   publicKey: string;
@@ -123,16 +129,16 @@ export function isLangfuseEnabled(): boolean {
   return resolveSettings() !== null;
 }
 
-function truncate(value: unknown): unknown {
+function truncate(value: unknown, max: number = MAX_FIELD_CHARS): unknown {
   if (typeof value === "string") {
-    return value.length > MAX_FIELD_CHARS
-      ? value.slice(0, MAX_FIELD_CHARS) + `…[+${value.length - MAX_FIELD_CHARS} chars]`
+    return value.length > max
+      ? value.slice(0, max) + `…[+${value.length - max} chars]`
       : value;
   }
   try {
     const json = JSON.stringify(value);
-    if (json && json.length > MAX_FIELD_CHARS) {
-      return json.slice(0, MAX_FIELD_CHARS) + `…[+${json.length - MAX_FIELD_CHARS} chars]`;
+    if (json && json.length > max) {
+      return json.slice(0, max) + `…[+${json.length - max} chars]`;
     }
   } catch {
     return "[unserializable]";
@@ -326,8 +332,8 @@ export async function recordGeneration(params: {
         model: params.model,
         startTime: (params.startTime ?? new Date()).toISOString(),
         endTime: (params.endTime ?? new Date()).toISOString(),
-        ...(params.input !== undefined ? { input: truncate(params.input) } : {}),
-        ...(params.output !== undefined ? { output: truncate(params.output) } : {}),
+        ...(params.input !== undefined ? { input: truncate(params.input, MAX_GENERATION_FIELD_CHARS) } : {}),
+        ...(params.output !== undefined ? { output: truncate(params.output, MAX_GENERATION_FIELD_CHARS) } : {}),
         ...(usageDetails ? { usageDetails } : {}),
         ...(costDetails ? { costDetails } : {}),
         ...(params.level ? { level: params.level } : {}),
