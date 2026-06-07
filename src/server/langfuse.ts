@@ -193,6 +193,30 @@ export function currentSpanId(): string | undefined {
 }
 
 /**
+ * Set the output on the active trace — an end-of-run result summary that gives
+ * the Langfuse Traces list a meaningful preview (VIB-1862). Traces are id-keyed
+ * and upserted by the ingestion API, so this emits a second `trace-create` for
+ * the same trace id carrying only the output; Langfuse merges it onto the
+ * existing trace. Truncated like every other field. No-op (and never throws)
+ * when Langfuse is disabled or there is no active `runWithTrace` scope.
+ */
+export function setTraceOutput(output: unknown): void {
+  if (!isLangfuseEnabled()) return;
+  const ctx = traceStore.getStore();
+  if (!ctx?.traceId) return;
+  buffer.push({
+    id: randomUUID(),
+    type: "trace-create",
+    timestamp: new Date().toISOString(),
+    body: {
+      id: ctx.traceId,
+      timestamp: new Date().toISOString(),
+      output: truncate(output),
+    },
+  });
+}
+
+/**
  * Run `fn` inside a Langfuse span nested under the active trace. Every
  * `recordGeneration` made while `fn` runs (including parallel awaited work)
  * attaches to this span via `parentObservationId`, and spans nest under each
@@ -262,6 +286,9 @@ export async function recordGeneration(params: {
   level?: "DEFAULT" | "WARNING" | "ERROR";
   statusMessage?: string;
   metadata?: Record<string, unknown>;
+  /** Langfuse prompt linkage — the managed stage prompt that drove this call. */
+  promptName?: string;
+  promptVersion?: number;
 }): Promise<void> {
   if (!isLangfuseEnabled()) return;
   try {
@@ -305,6 +332,15 @@ export async function recordGeneration(params: {
         ...(costDetails ? { costDetails } : {}),
         ...(params.level ? { level: params.level } : {}),
         ...(params.statusMessage ? { statusMessage: params.statusMessage } : {}),
+        // Link to the managed prompt (VIB-1861) so the Langfuse UI surfaces
+        // per-prompt-version cost/latency/quality. `promptVersion` is sent only
+        // alongside a name (a version with no name has nothing to link to).
+        ...(params.promptName
+          ? {
+              promptName: params.promptName,
+              ...(params.promptVersion != null ? { promptVersion: params.promptVersion } : {}),
+            }
+          : {}),
         metadata: {
           ...(params.engine ? { engine: params.engine } : {}),
           ...(params.metadata ?? {}),
@@ -338,6 +374,9 @@ export function reportModelUsage(params: {
   level?: "DEFAULT" | "WARNING" | "ERROR";
   statusMessage?: string;
   metadata?: Record<string, unknown>;
+  /** Langfuse prompt linkage — the managed stage prompt that drove this call. */
+  promptName?: string;
+  promptVersion?: number;
 }): void {
   const { engine, model, name, usage, startTime, endTime } = params;
   const durationMs = endTime.getTime() - startTime.getTime();
@@ -387,6 +426,8 @@ export function reportModelUsage(params: {
     level: params.level,
     statusMessage: params.statusMessage,
     metadata: params.metadata,
+    promptName: params.promptName,
+    promptVersion: params.promptVersion,
   });
 }
 

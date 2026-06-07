@@ -4,6 +4,12 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## Unreleased
+
+### Fixes
+
+- **Langfuse traces now show a result preview** ([VIB-1862](/VIB/issues/VIB-1862)) — `runWithTrace` set the trace *input* but never an *output*, so every `agent_pipeline` / `figma_import` trace showed an empty result in the Langfuse Traces list (found by the langfuse-skill evaluation on [VIB-1860]). Added `setTraceOutput()` in `src/server/langfuse.ts` — it reads the active trace from the ALS scope and emits a second `trace-create` for the same trace id carrying only the output (traces are id-keyed and upserted by the ingestion API, so Langfuse merges it onto the existing trace), truncated like every other field and a no-op when Langfuse is disabled or there's no active trace. The pipeline handlers (`ai-handler.ts`) call it at the end of each run with a compact `summarizePipelineOutput()` — module names + count, module order, stats, page ids (multi-page), and the assistant message — instead of dumping the full generated code. A trace now reads `input → stage spans → N generations → output`.
+
 ## 1.6.4 — 2026-06-03
 
 ### Fixes

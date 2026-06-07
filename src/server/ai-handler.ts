@@ -22,7 +22,7 @@ import {
 import { hasValidOAuthToken, getValidAccessToken } from "../utils/claude-oauth.js";
 import { getFileContexts } from "./routes/upload-files.js";
 import { runAgentPipeline, isAgenticCapable, isCLIEngine } from "./agent/pipeline.js";
-import { runWithTrace } from "./langfuse.js";
+import { runWithTrace, setTraceOutput } from "./langfuse.js";
 import type { AgentEngine } from "./agent/engine-adapter.js";
 import type { PipelineEvent, PipelineResult, MultiPagePipelineResult } from "./agent/types.js";
 import type { SessionSnapshot, PipelineMetadata } from "./session/types.js";
@@ -309,6 +309,24 @@ export function resolveAgenticEngine(config: ReturnType<typeof loadConfig>): {
 }
 
 /**
+ * Build a compact result summary for the Langfuse trace output (VIB-1862), so
+ * the Traces list shows a meaningful preview instead of an empty result. Kept
+ * small — `setTraceOutput` truncates, but a short structured object is more
+ * useful than a giant blob of generated code.
+ */
+function summarizePipelineOutput(result: PipelineResult): Record<string, unknown> {
+  const multiPage = (result as PipelineResult & { multiPage?: MultiPagePipelineResult }).multiPage;
+  return {
+    modules: result.modules.map((m) => m.moduleName),
+    moduleCount: result.modules.length,
+    moduleOrder: result.moduleOrder,
+    stats: result.stats,
+    ...(multiPage ? { pages: multiPage.pages.map((p) => p.pageId) } : {}),
+    assistantMessage: result.assistantMessage,
+  };
+}
+
+/**
  * Run the agentic pipeline for a user message.
  * Returns the PipelineResult. The caller (WebSocket handler in server.ts)
  * is responsible for applying the result to the session and committing.
@@ -373,8 +391,8 @@ export async function handleAgenticGenerate(
           metadata: { engine, model, concurrency },
           tags: ["vibespot", "agentic-pipeline"],
         },
-        () =>
-          runAgentPipeline(
+        async () => {
+          const r = await runAgentPipeline(
             enrichedMessage,
             snapshot,
             engine,
@@ -383,7 +401,10 @@ export async function handleAgenticGenerate(
             concurrency,
             onEvent,
             libraryModules,
-          ),
+          );
+          setTraceOutput(summarizePipelineOutput(r));
+          return r;
+        },
       ),
     );
     result.cost = cost;
@@ -437,8 +458,8 @@ export async function handleFigmaImport(
           metadata: { engine, model, concurrency },
           tags: ["vibespot", "figma-import"],
         },
-        () =>
-          runFigmaConversion(
+        async () => {
+          const r = await runFigmaConversion(
             extraction,
             themeName,
             engine,
@@ -448,7 +469,10 @@ export async function handleFigmaImport(
             onEvent,
             snapshot.brandAssets,
             options?.useAssets,
-          ),
+          );
+          setTraceOutput(summarizePipelineOutput(r));
+          return r;
+        },
       ),
     );
     result.cost = cost;
