@@ -80,9 +80,11 @@ parallelises within a page.
 | `scoring.ts` | Validator pass-rate + coverage; accuracy blend. |
 | `judge.ts` | LLM-as-judge (+ deterministic mock judge). |
 | `usage-collector.ts` | Aggregates cost/tokens via the `onModelUsage` hook. |
-| `langfuse-dataset.ts` | Optional Langfuse dataset / run / score sync. |
+| `langfuse-dataset.ts` | Optional Langfuse dataset / run / score sync (eval **and** calibration). |
 | `report.ts` | Aggregation + markdown/JSON rendering. |
 | `run-eval.ts` | CLI entry point. |
+| `calibration-set.ts` | Human-labeled (PASS/FAIL) ground-truth pages for judge calibration. |
+| `calibrate-judge.ts` | Judge-calibration CLI entry point. |
 | `scoring.test.ts` | Vitest unit tests for the rule-based scoring. |
 
 ## Extending the dataset
@@ -100,3 +102,39 @@ one item per page, and registers each provider as a **dataset run** whose traces
 carry `accuracy` / `validator_pass_rate` / `coverage` / `judge` / `cost_usd` /
 `latency_ms` scores — so providers can be compared run-over-run in the Langfuse
 UI on top of the local markdown report.
+
+## Judge calibration (VIB-1863)
+
+The benchmark numbers lean on the LLM-as-judge — so the judge itself must be
+validated against human labels before it's trusted for comparison decisions
+(per the langfuse skill's `judge-calibration` reference, **simple mode**).
+
+```bash
+npm run eval:calibrate                         # offline mock judge (no keys, CI)
+npm run eval:calibrate -- --judge=anthropic    # the real judge
+npm run eval:calibrate -- --judge=anthropic --langfuse   # + Langfuse experiment
+npm run eval:calibrate -- --judge=anthropic --threshold=0.55
+```
+
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--judge=<id>` | mock judge | Provider that runs the judge under test. |
+| `--threshold=N` | `0.7` | `overall ≥ N → PASS` decision rule (binarises the 4-dim score). |
+| `--sweep` | always reported | Threshold sweep is always in the report; flag reserved. |
+| `--langfuse` | off | Sync the `vibespot-judge-calibration` dataset + push scores. |
+| `--out=DIR` | `test/eval/output` | Where `calibration-latest.{md,json}` are written. |
+
+**How it works.** `calibration-set.ts` holds a small set of pages paired with a
+**human PASS/FAIL label** — hand-authored so the correct label is unambiguous by
+construction (clearly-shippable vs clearly-broken, plus two honest borderline
+probes). The harness runs the judge over each page (never showing it the label),
+binarises the judge's `overall` via `--threshold`, and reports **valid rows /
+invalid-label count / exact-match accuracy** plus a **threshold sweep** — which
+separates *does the judge discriminate good from bad* from *is the cut-point set
+right*. With `--langfuse` it pushes `judge-exact-match` (per row) and
+`judge-accuracy` (run aggregate) via the same direct-REST score path as the eval.
+
+This is a **bootstrap label set, not a held-out test split** — the accuracy is
+an alignment sanity check, not a final quality guarantee. Grow the set (ideally
+with real reviewed benchmark pages) for a tighter estimate. A committed sample
+result lives in [`JUDGE-CALIBRATION.md`](./JUDGE-CALIBRATION.md).

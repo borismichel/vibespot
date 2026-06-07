@@ -18,8 +18,10 @@
 
 import { loadConfig } from "../../src/utils/config.js";
 import { EVAL_DATASET, type EvalItem } from "./dataset.js";
+import type { CalibrationFixture } from "./calibration-set.js";
 
 const DATASET_NAME = "vibespot-module-eval";
+const CALIBRATION_DATASET_NAME = "vibespot-judge-calibration";
 
 interface LangfuseAuth {
   baseUrl: string;
@@ -84,6 +86,38 @@ export async function syncDataset(items: EvalItem[] = EVAL_DATASET): Promise<boo
   return ok;
 }
 
+/**
+ * Create the judge-calibration dataset and upsert one item per labeled fixture
+ * (VIB-1863). The human PASS/FAIL label is the ground-truth `expectedOutput`;
+ * the page the judge scores is the `input`. Idempotent.
+ */
+export async function syncCalibrationDataset(
+  fixtures: CalibrationFixture[],
+): Promise<boolean> {
+  const auth = resolveAuth();
+  if (!auth) return false;
+
+  await post(auth, "/api/public/v2/datasets", {
+    name: CALIBRATION_DATASET_NAME,
+    description:
+      "vibeSpot eval LLM-judge calibration — pages with human PASS/FAIL labels (VIB-1863).",
+    metadata: { source: "test/eval/calibration-set.ts", itemCount: fixtures.length },
+  });
+
+  let ok = true;
+  for (const fx of fixtures) {
+    const created = await post(auth, "/api/public/dataset-items", {
+      id: fx.id,
+      datasetName: CALIBRATION_DATASET_NAME,
+      input: { datasetItemId: fx.datasetItemId, moduleCount: fx.modules.length },
+      expectedOutput: { label: fx.label },
+      metadata: { note: fx.note, brief: fx.datasetItemId },
+    });
+    ok = ok && created;
+  }
+  return ok;
+}
+
 /** Link a provider's trace for an item into the named dataset run. */
 export async function linkRunItem(params: {
   runName: string;
@@ -107,6 +141,7 @@ export async function pushScore(params: {
   name: string;
   value: number;
   comment?: string;
+  metadata?: Record<string, unknown>;
 }): Promise<boolean> {
   const auth = resolveAuth();
   if (!auth) return false;
@@ -116,7 +151,8 @@ export async function pushScore(params: {
     value: params.value,
     dataType: "NUMERIC",
     ...(params.comment ? { comment: params.comment } : {}),
+    ...(params.metadata ? { metadata: params.metadata } : {}),
   });
 }
 
-export { DATASET_NAME };
+export { DATASET_NAME, CALIBRATION_DATASET_NAME };
