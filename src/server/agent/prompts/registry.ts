@@ -31,6 +31,21 @@ export interface StagePromptSelection {
   template: string;
 }
 
+/** Langfuse prompt-linkage descriptor for a stage's generation. */
+export interface StagePromptLink {
+  /** Langfuse prompt name — the stable key seeded by `prompts:push`. */
+  name: string;
+  /** Active/pinned version (bundle and local fallback share this version). */
+  version: number;
+  source: StagePromptSource;
+}
+
+/**
+ * Langfuse prompt name for a stage id. MUST stay in lockstep with
+ * `scripts/sync-prompts.ts:langfuseName` — it's the key a generation links to.
+ */
+export const LANGFUSE_STAGE_PROMPT_PREFIX = "vibespot-stage-";
+
 interface BundleEntry {
   version: number;
   label?: string;
@@ -109,6 +124,18 @@ function substitute(id: StagePromptId, template: string, vars: Record<string, st
 /** Inspect which template/version/source a stage would use (diagnostics/telemetry). */
 export function getStagePrompt(id: StagePromptId): StagePromptSelection {
   return selectTemplate(id);
+}
+
+/**
+ * Langfuse prompt-linkage for a stage — the name + active version to attach to a
+ * generation so the Langfuse UI links it to the managed prompt (VIB-1861). The
+ * bundle is only accepted when its version matches the pinned local fallback, so
+ * the version is valid whichever source is active; `source` is surfaced for
+ * diagnostics (which copy actually drove the call).
+ */
+export function stagePromptLink(id: StagePromptId): StagePromptLink {
+  const sel = selectTemplate(id);
+  return { name: `${LANGFUSE_STAGE_PROMPT_PREFIX}${id}`, version: sel.version, source: sel.source };
 }
 
 /**

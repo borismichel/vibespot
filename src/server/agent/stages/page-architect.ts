@@ -25,6 +25,7 @@ import {
   buildEmailModulePlannerPrompt,
   EMAIL_DESIGN_SYSTEM_SCHEMA,
 } from "../prompts/email-architect.js";
+import { stagePromptLink } from "../prompts/registry.js";
 import { log } from "../../log.js";
 import { runWithSpan } from "../../langfuse.js";
 
@@ -78,6 +79,9 @@ export async function runDesignSystem(
       },
       maxTokens: 16000,
       ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
+      // Email uses a non-registry builder (email-architect) — link only the
+      // registry-managed page-mode prompt (VIB-1861).
+      ...(isEmail ? {} : { prompt: stagePromptLink("design-system") }),
     }),
   );
 
@@ -182,6 +186,9 @@ export async function runPageArchitect(
       },
       maxTokens: 16000,
       ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
+      // Email uses a non-registry builder (email-architect) — link only the
+      // registry-managed page-mode prompt (VIB-1861).
+      ...(isEmail ? {} : { prompt: stagePromptLink("design-system") }),
     }),
   );
 
@@ -319,6 +326,7 @@ export async function runPageArchitect(
       },
       maxTokens: 8000,
       ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
+      ...(isEmail ? {} : { prompt: stagePromptLink("module-planner") }),
     }),
   );
 

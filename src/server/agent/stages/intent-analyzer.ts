@@ -12,6 +12,7 @@ import {
   buildIntentAnalyzerPrompt,
   INTENT_ANALYZER_SCHEMA,
 } from "../prompts/intent-analyzer.js";
+import { stagePromptLink } from "../prompts/registry.js";
 import { log } from "../../log.js";
 import { runWithSpan } from "../../langfuse.js";
 
@@ -69,6 +70,7 @@ export async function runIntentAnalyzer(
         name: "pipeline_plan",
       },
       maxTokens: 2000,
+      prompt: stagePromptLink("intent-analyzer"),
     }),
   );
 
