@@ -213,6 +213,9 @@ export class PostgresStorageAdapter implements StorageAdapter {
         updatedAt: row.updated_at as number,
         moduleCount: templates.reduce((n: number, t: any) => n + (t.modules?.length || 0), 0),
         templateCount: templates.length,
+        pageCount: templates.filter((t: any) => t.contentMode !== "email").length,
+        emailCount: templates.filter((t: any) => t.contentMode === "email").length,
+        hasBrandAssets: !!(data?.brandAssets && (data.brandAssets.styleguide || data.brandAssets.brandvoice || data.brandAssets.brandKit)),
         isImported: !!row.is_imported,
       };
     });
