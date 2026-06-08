@@ -27,6 +27,7 @@ import {
   buildBlogModuleUserMessage,
   BLOG_MODULE_DEVELOPER_SCHEMA,
 } from "../prompts/blog-module-developer.js";
+import { stagePromptLink, type StagePromptLink } from "../prompts/registry.js";
 import { log } from "../../log.js";
 
 export interface ModuleDevResult {
@@ -82,6 +83,10 @@ export async function runModuleDeveloper(
       ? BLOG_MODULE_DEVELOPER_SCHEMA
       : MODULE_DEVELOPER_SCHEMA;
 
+  // Link to the registry-managed prompt (VIB-1861) only on the page path; email
+  // and blog use non-registry builders and have no managed Langfuse prompt.
+  const promptLink = isEmail || isBlog ? undefined : stagePromptLink("module-developer");
+
   const promises = specs.map((spec, index) =>
     limit(async (): Promise<ModuleDevResult> => {
       onEvent({
@@ -118,6 +123,7 @@ export async function runModuleDeveloper(
             isEmail,
             outputSchema,
             isBlog,
+            promptLink,
           );
 
           onEvent({
@@ -177,6 +183,7 @@ async function generateSingleModule(
   isEmail = false,
   schema: Record<string, unknown> = MODULE_DEVELOPER_SCHEMA as unknown as Record<string, unknown>,
   isBlog = false,
+  promptLink?: StagePromptLink,
 ): Promise<ModuleFiles> {
   const userContent = isEmail
     ? buildEmailModuleUserMessage(userMessage, spec, spec.existingCode)
@@ -193,6 +200,7 @@ async function generateSingleModule(
       name: "module_output",
     },
     maxTokens: 16000,
+    ...(promptLink ? { prompt: promptLink } : {}),
   });
 
   if (result.type !== "structured") {
@@ -213,6 +221,7 @@ async function generateSingleModule(
         isEmail,
         schema,
         isBlog,
+        promptLink,
       );
     }
     throw new Error(

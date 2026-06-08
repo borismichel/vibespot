@@ -75,6 +75,13 @@ export interface AgentCallOptions {
    * Other engines silently ignore.
    */
   enableWebSearch?: boolean;
+  /**
+   * Langfuse prompt linkage (VIB-1861) — the managed stage prompt driving this
+   * call. When set, the emitted generation links to that prompt+version so the
+   * Langfuse UI can break down cost/latency/quality per prompt version. Stages
+   * pass `stagePromptLink(id)` on the registry-managed (page-mode) path only.
+   */
+  prompt?: { name: string; version: number; source?: string };
 }
 
 export type AgentCallResult =
@@ -902,7 +909,9 @@ function reportUsage(
     metadata: {
       structured: !!opts.structuredOutput,
       systemPromptLength: opts.systemPrompt.length,
+      ...(opts.prompt?.source ? { promptSource: opts.prompt.source } : {}),
     },
+    ...(opts.prompt ? { promptName: opts.prompt.name, promptVersion: opts.prompt.version } : {}),
   });
 }
 

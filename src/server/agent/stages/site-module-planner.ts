@@ -23,6 +23,7 @@ import {
   buildSiteModulePlannerPrompt,
   SITE_MODULE_PLANNER_SCHEMA,
 } from "../prompts/site-module-planner.js";
+import { stagePromptLink } from "../prompts/registry.js";
 import { log } from "../../log.js";
 import { runWithSpan } from "../../langfuse.js";
 
@@ -66,6 +67,7 @@ export async function runSiteModulePlanner(
       },
       maxTokens: 16000,
       ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
+      prompt: stagePromptLink("site-module-planner"),
     }),
   );
 
