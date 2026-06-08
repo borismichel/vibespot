@@ -1208,7 +1208,7 @@ testimonial carousel, and a minimal footer with social links.</code></pre>
     <li><strong>Span</strong> &mdash; one pipeline stage: intent analysis, design system, module planning, and module development.</li>
     <li><strong>Generation</strong> &mdash; one model call. The N parallel module calls (plus any retries) nest under the single module-development span.</li>
   </ul>
-  <p>A full page reads as <code>trace &rarr; stage spans &rarr; generations</code>, with token cost summing up the tree.</p>
+  <p>A full page reads as <code>trace &rarr; stage spans &rarr; generations &rarr; output</code>, with token cost summing up the tree. The trace carries a compact <em>output</em> summary (the modules it produced), so the Traces list shows a result preview at a glance, and each generation links to the managed <em>prompt</em> version that produced it &mdash; so you can break cost, latency, and quality down per prompt version in Langfuse.</p>
 
   <h4 id="langfuse-instance">Get a Langfuse instance</h4>
   <p>You need somewhere to send the traces. Pick one: Langfuse's hosted cloud (fastest to start) or your own self-hosted install (your data stays on your infrastructure). Either way you end up with a <strong>public key</strong>, a <strong>secret key</strong>, and a <strong>host URL</strong> &mdash; the three things vibeSpot needs in the next step.</p>
