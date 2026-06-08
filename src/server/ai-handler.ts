@@ -521,7 +521,7 @@ export function applyPipelineResult(result: PipelineResult, pipelineMeta?: Pipel
     });
     reorderModules(result.moduleOrder);
 
-    const ct = (result as PipelineResult & { contentType?: string }).contentType;
+    const ct = result.contentType;
     if (ct === "email") {
       const tpl = getActiveTemplate();
       if (tpl && !tpl.contentMode) {
