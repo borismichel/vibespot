@@ -119,7 +119,7 @@ npm run eval:calibrate -- --judge=anthropic --threshold=0.55
 | Flag | Default | Meaning |
 |------|---------|---------|
 | `--judge=<id>` | mock judge | Provider that runs the judge under test. |
-| `--threshold=N` | `0.7` | `overall ≥ N → PASS` decision rule (binarises the 4-dim score). |
+| `--threshold=N` | `0.5` | `overall ≥ N → PASS` decision rule (binarises the 4-dim score). Retuned from 0.7 in [VIB-1864] — 0.5 is the centre of the 90%-exact-match plateau; see [`JUDGE-CALIBRATION.md`](./JUDGE-CALIBRATION.md). |
 | `--sweep` | always reported | Threshold sweep is always in the report; flag reserved. |
 | `--langfuse` | off | Sync the `vibespot-judge-calibration` dataset + push scores. |
 | `--out=DIR` | `test/eval/output` | Where `calibration-latest.{md,json}` are written. |

@@ -12,7 +12,9 @@
  *
  *   1. Run the judge over each labeled page (the judge never sees the label).
  *   2. Reduce the judge's 4-dim score to a binary PASS/FAIL via a threshold on
- *      `overall` (default 0.70).
+ *      `overall` (default 0.50 — retuned in VIB-1864 from the original 0.70,
+ *      which sat above where Sonnet 4.6 actually separates good from bad pages;
+ *      0.50 is the centre of the 90%-exact-match plateau, see JUDGE-CALIBRATION.md).
  *   3. exact_match each row against the human label; report valid rows /
  *      invalid-label count / accuracy + a ship-or-iterate recommendation.
  *
@@ -50,7 +52,7 @@ interface Flags {
 }
 
 function parseArgs(argv: string[]): Flags {
-  const f: Flags = { langfuse: false, threshold: 0.7, sweep: false, out: resolve("test/eval/output") };
+  const f: Flags = { langfuse: false, threshold: 0.5, sweep: false, out: resolve("test/eval/output") };
   for (const arg of argv) {
     if (arg === "--langfuse") f.langfuse = true;
     else if (arg === "--sweep") f.sweep = true;
