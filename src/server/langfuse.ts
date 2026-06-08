@@ -34,8 +34,14 @@ import {
 import { recordCostSample } from "./cost-tracker.js";
 
 const DEFAULT_BASE_URL = "https://cloud.langfuse.com";
-// Cap serialized input/output so we never ship multi-hundred-KB prompts.
+// Default cap for serialized fields (trace/span I/O — these are deliberately
+// compact summaries, so a tight cap keeps the Traces list and span views lean).
 const MAX_FIELD_CHARS = 24_000;
+// Generations carry the real model I/O. For API engines we have the full SDK
+// request (system prompt + guide blocks + messages) and response, and that's
+// the whole point of a generation — so use a much larger cap to keep them
+// effectively full while still guarding against a pathological multi-MB blob.
+const MAX_GENERATION_FIELD_CHARS = 200_000;
 
 interface LangfuseSettings {
   publicKey: string;
@@ -123,16 +129,16 @@ export function isLangfuseEnabled(): boolean {
   return resolveSettings() !== null;
 }
 
-function truncate(value: unknown): unknown {
+function truncate(value: unknown, max: number = MAX_FIELD_CHARS): unknown {
   if (typeof value === "string") {
-    return value.length > MAX_FIELD_CHARS
-      ? value.slice(0, MAX_FIELD_CHARS) + `…[+${value.length - MAX_FIELD_CHARS} chars]`
+    return value.length > max
+      ? value.slice(0, max) + `…[+${value.length - max} chars]`
       : value;
   }
   try {
     const json = JSON.stringify(value);
-    if (json && json.length > MAX_FIELD_CHARS) {
-      return json.slice(0, MAX_FIELD_CHARS) + `…[+${json.length - MAX_FIELD_CHARS} chars]`;
+    if (json && json.length > max) {
+      return json.slice(0, max) + `…[+${json.length - max} chars]`;
     }
   } catch {
     return "[unserializable]";
@@ -190,6 +196,30 @@ export function currentTraceId(): string | undefined {
 /** The innermost active span id, if a `runWithSpan` scope is on the stack. */
 export function currentSpanId(): string | undefined {
   return traceStore.getStore()?.spanId;
+}
+
+/**
+ * Set the output on the active trace — an end-of-run result summary that gives
+ * the Langfuse Traces list a meaningful preview (VIB-1862). Traces are id-keyed
+ * and upserted by the ingestion API, so this emits a second `trace-create` for
+ * the same trace id carrying only the output; Langfuse merges it onto the
+ * existing trace. Truncated like every other field. No-op (and never throws)
+ * when Langfuse is disabled or there is no active `runWithTrace` scope.
+ */
+export function setTraceOutput(output: unknown): void {
+  if (!isLangfuseEnabled()) return;
+  const ctx = traceStore.getStore();
+  if (!ctx?.traceId) return;
+  buffer.push({
+    id: randomUUID(),
+    type: "trace-create",
+    timestamp: new Date().toISOString(),
+    body: {
+      id: ctx.traceId,
+      timestamp: new Date().toISOString(),
+      output: truncate(output),
+    },
+  });
 }
 
 /**
@@ -262,6 +292,9 @@ export async function recordGeneration(params: {
   level?: "DEFAULT" | "WARNING" | "ERROR";
   statusMessage?: string;
   metadata?: Record<string, unknown>;
+  /** Langfuse prompt linkage — the managed stage prompt that drove this call. */
+  promptName?: string;
+  promptVersion?: number;
 }): Promise<void> {
   if (!isLangfuseEnabled()) return;
   try {
@@ -299,12 +332,21 @@ export async function recordGeneration(params: {
         model: params.model,
         startTime: (params.startTime ?? new Date()).toISOString(),
         endTime: (params.endTime ?? new Date()).toISOString(),
-        ...(params.input !== undefined ? { input: truncate(params.input) } : {}),
-        ...(params.output !== undefined ? { output: truncate(params.output) } : {}),
+        ...(params.input !== undefined ? { input: truncate(params.input, MAX_GENERATION_FIELD_CHARS) } : {}),
+        ...(params.output !== undefined ? { output: truncate(params.output, MAX_GENERATION_FIELD_CHARS) } : {}),
         ...(usageDetails ? { usageDetails } : {}),
         ...(costDetails ? { costDetails } : {}),
         ...(params.level ? { level: params.level } : {}),
         ...(params.statusMessage ? { statusMessage: params.statusMessage } : {}),
+        // Link to the managed prompt (VIB-1861) so the Langfuse UI surfaces
+        // per-prompt-version cost/latency/quality. `promptVersion` is sent only
+        // alongside a name (a version with no name has nothing to link to).
+        ...(params.promptName
+          ? {
+              promptName: params.promptName,
+              ...(params.promptVersion != null ? { promptVersion: params.promptVersion } : {}),
+            }
+          : {}),
         metadata: {
           ...(params.engine ? { engine: params.engine } : {}),
           ...(params.metadata ?? {}),
@@ -338,6 +380,9 @@ export function reportModelUsage(params: {
   level?: "DEFAULT" | "WARNING" | "ERROR";
   statusMessage?: string;
   metadata?: Record<string, unknown>;
+  /** Langfuse prompt linkage — the managed stage prompt that drove this call. */
+  promptName?: string;
+  promptVersion?: number;
 }): void {
   const { engine, model, name, usage, startTime, endTime } = params;
   const durationMs = endTime.getTime() - startTime.getTime();
@@ -387,6 +432,8 @@ export function reportModelUsage(params: {
     level: params.level,
     statusMessage: params.statusMessage,
     metadata: params.metadata,
+    promptName: params.promptName,
+    promptVersion: params.promptVersion,
   });
 }
 
