@@ -40,7 +40,7 @@ export async function runIntentAnalyzer(
     snapshot.brandAssets?.themeContext,
     snapshot.sitePages ? {
       activePageLabel: snapshot.activePageLabel,
-      pages: snapshot.sitePages as { id: string; label: string; moduleCount: number }[],
+      pages: snapshot.sitePages.map((p) => ({ id: p.id, label: p.label, moduleCount: p.moduleCount })),
     } : undefined,
   );
 

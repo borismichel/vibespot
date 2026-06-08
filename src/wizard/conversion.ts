@@ -18,8 +18,17 @@ function createEngine(type: AIEngineType, model?: string): AIEngine {
       return new GeminiCLIEngine();
     case "codex-cli":
       return new CodexCLIEngine();
+    // "api" is the legacy value; loadConfig() migrates it to "anthropic-api",
+    // so accept both. "claude-oauth" also runs through the Anthropic SDK engine.
     case "api":
+    case "anthropic-api":
+    case "claude-oauth":
       return new ClaudeAPIEngine();
+    default:
+      throw new Error(
+        `The wizard does not support the "${type}" engine. ` +
+          `Use claude-code, gemini-cli, codex-cli, or the Anthropic API.`
+      );
   }
 }
 

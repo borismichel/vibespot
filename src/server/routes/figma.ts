@@ -150,15 +150,15 @@ function generateStyleguide(extraction: FigmaExtraction): string {
   // Colors
   if (designTokens.colors.length > 0) {
     lines.push("## Colors", "");
-    const sorted = [...designTokens.colors].sort((a, b) => b.count - a.count);
+    const sorted = [...designTokens.colors].sort((a, b) => b.occurrences - a.occurrences);
     const primary = sorted[0];
     const secondary = sorted[1];
-    if (primary) lines.push(`- **Primary:** \`${primary.hex}\` (${primary.name || "dominant color"})`);
-    if (secondary) lines.push(`- **Secondary:** \`${secondary.hex}\` (${secondary.name || "accent color"})`);
+    if (primary) lines.push(`- **Primary:** \`${primary.hex}\` (${primary.variableName || "dominant color"})`);
+    if (secondary) lines.push(`- **Secondary:** \`${secondary.hex}\` (${secondary.variableName || "accent color"})`);
     lines.push("");
     lines.push("### Full palette", "");
     for (const c of sorted.slice(0, 15)) {
-      const label = c.name ? `${c.name}` : `${c.count}× used`;
+      const label = c.variableName ? `${c.variableName}` : `${c.occurrences}× used`;
       lines.push(`- \`${c.hex}\` — ${label}`);
     }
     lines.push("");
@@ -187,7 +187,7 @@ function generateStyleguide(extraction: FigmaExtraction): string {
     const spacingValues = [...new Set(designTokens.spacing.map((s) => s.value))].sort((a, b) => a - b);
     lines.push(`**Scale:** ${spacingValues.join("px, ")}px`, "");
     for (const s of designTokens.spacing) {
-      lines.push(`- **${s.property}** (${s.context}): ${s.value}px`);
+      lines.push(`- **${s.type}** (${s.context}): ${s.value}px`);
     }
     lines.push("");
   }
@@ -196,8 +196,9 @@ function generateStyleguide(extraction: FigmaExtraction): string {
   if (designTokens.effects.length > 0) {
     lines.push("## Effects", "");
     for (const e of designTokens.effects) {
-      if (e.boxShadow) lines.push(`- **Box shadow:** \`${e.boxShadow}\``);
-      if (e.borderRadius) lines.push(`- **Border radius:** ${e.borderRadius}px`);
+      if (e.type === "shadow") lines.push(`- **Box shadow** (${e.context}): \`${e.cssValue}\``);
+      else if (e.type === "radius") lines.push(`- **Border radius** (${e.context}): ${e.cssValue}`);
+      else if (e.type === "blur") lines.push(`- **Blur** (${e.context}): ${e.cssValue}`);
     }
     lines.push("");
   }

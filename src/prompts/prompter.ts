@@ -30,11 +30,13 @@ export async function text(opts: {
   defaultValue?: string;
   validate?: (value: string) => string | undefined;
 }): Promise<string> {
+  const validate = opts.validate;
   const result = await p.text({
     message: theme.accent(opts.message),
     placeholder: opts.placeholder,
     defaultValue: opts.defaultValue,
-    validate: opts.validate,
+    // @clack passes `string | undefined`; normalise to a string for our callers.
+    validate: validate ? (value) => validate(value ?? "") : undefined,
   });
   handleCancel(result);
   return result as string;
@@ -58,7 +60,9 @@ export async function select<T extends string>(opts: {
 }): Promise<T> {
   const result = await p.select({
     message: theme.accent(opts.message),
-    options: opts.options,
+    // Our options match clack's Primitive-`Option` shape; the cast resolves the
+    // generic conditional type that TS can't narrow for an unresolved `T`.
+    options: opts.options as p.Option<T>[],
   });
   handleCancel(result);
   return result as T;

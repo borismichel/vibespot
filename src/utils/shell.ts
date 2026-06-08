@@ -20,8 +20,8 @@ export function run(
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 120_000,
       ...options,
-    }).trim();
-    return { stdout, stderr: "", success: true };
+    });
+    return { stdout: stdout.toString().trim(), stderr: "", success: true };
   } catch (err: unknown) {
     const e = err as { stdout?: Buffer | string; stderr?: Buffer | string };
     const stdout = (e.stdout ?? "").toString().trim();
@@ -66,7 +66,7 @@ export function runOrThrow(
     stdio: ["pipe", "pipe", "pipe"],
     timeout: 120_000,
     ...options,
-  }).trim();
+  }).toString().trim();
 }
 
 export function runPassthrough(

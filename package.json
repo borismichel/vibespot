@@ -17,6 +17,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsup",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "eval": "tsx test/eval/run-eval.ts",

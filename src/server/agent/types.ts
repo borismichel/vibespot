@@ -156,6 +156,8 @@ export interface PipelineResult {
   sharedCss: string;
   sharedJs: string;
   assistantMessage: string;
+  /** Content type the pipeline produced (page/email/blog); set from the plan. */
+  contentType?: ContentType;
   stats: {
     modulesGenerated: number;
     modulesUnchanged: number;
@@ -182,12 +184,19 @@ export interface SitePagePlan {
   slug: string;
 }
 
+export interface SitePageBlueprint {
+  pageId: string;
+  modules: { name: string; description: string; contentBrief: string; layoutNotes: string }[];
+  moduleOrder: string[];
+}
+
 export interface SiteBlueprint {
-  pages: {
-    pageId: string;
-    modules: { name: string; description: string; contentBrief: string; layoutNotes: string }[];
-    moduleOrder: string[];
-  }[];
+  designSystem: {
+    cssVariables: Record<string, string>;
+    sharedCss: string;
+    sharedJs?: string;
+  };
+  pages: SitePageBlueprint[];
   sharedModules: { name: string; description: string; contentBrief: string; layoutNotes: string }[];
   narrative: string;
 }
