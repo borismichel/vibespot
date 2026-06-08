@@ -1,4 +1,4 @@
-# Eval judge calibration — committed sample (VIB-1863)
+# Eval judge calibration — committed sample (VIB-1863, retuned in VIB-1864)
 
 This is a committed snapshot of `npm run eval:calibrate -- --judge=anthropic`
 (the live artifact lands in the gitignored `test/eval/output/calibration-*.md`).
@@ -12,25 +12,28 @@ for how to run it and what the flags mean.
 
 ## Headline
 
-**The judge discriminates well, but the default decision threshold is set too
-high.** Sonnet 4.6 scores every clearly-broken page ≤40% `overall` and every
-shippable page 55–70% — a clean separation — yet the default `overall ≥ 0.70 →
-PASS` rule mis-classifies three good pages as FAIL, giving **70%** exact-match
-accuracy. Re-binarising at `overall ≥ 0.50` recovers **90%**.
+**The judge discriminates cleanly, and the decision threshold is now tuned to
+where it actually separates good from bad.** Sonnet 4.6 scores every clearly-broken
+page ≤40% `overall` and every shippable page 55–70% — a clean separation. VIB-1863
+found that the original `overall ≥ 0.70 → PASS` rule sat *above* that gap and
+mis-classified good pages as FAIL (70% exact-match accuracy). **VIB-1864 retuned the
+default decision threshold to `overall ≥ 0.50`**, the centre of the 90%-exact-match
+plateau (0.45–0.55), which reaches **90%** exact-match accuracy with the widest
+margin from either class.
 
-**Recommendation: RETUNE THRESHOLD.** The judge's *ranking* is sound; the
-binarisation cut-point was set too high (the 4-dim average clusters good pages
-around 3/5 per dimension). Adopt the swept threshold (≈0.5), or normalise the
-judge's 4-dim scale, before leaning further on judge-based benchmarks. The
-underlying benchmark (VIB-1833) uses the judge's continuous `overall` (not a
-PASS/FAIL cut), so this is a calibration finding for any *thresholded* use of the
-judge, not a retraction of the published numbers.
+The judge's *ranking* was always sound; only the binarisation cut-point was wrong
+(the strict 4-dim average clusters good pages around 3/5 per dimension, so a
+shippable page lands near 0.55–0.65, not 0.70+). We lowered the **threshold** rather
+than renormalising the continuous `overall` scale, so the underlying benchmark
+(VIB-1833) — which uses the continuous `overall`, not a PASS/FAIL cut — is
+**unchanged**; no published number is retracted. This is a calibration fix for any
+*thresholded* use of the judge.
 
 ---
 
-_Generated 2026-06-07 · mode: **real** · judge: anthropic claude-sonnet-4-6 ·
-decision rule: judge `overall` ≥ 0.7 → PASS · dataset: `vibespot-judge-calibration`
-(10 human-labeled pages)_
+_Generated 2026-06-08 · mode: **real** · judge: anthropic claude-sonnet-4-6 ·
+decision rule: judge `overall` ≥ 0.5 → PASS (retuned from 0.7 in VIB-1864) ·
+dataset: `vibespot-judge-calibration` (10 human-labeled pages)_
 
 ## Result
 
@@ -38,8 +41,8 @@ decision rule: judge `overall` ≥ 0.7 → PASS · dataset: `vibespot-judge-cali
 | --- | --- |
 | Valid rows | 10 / 10 |
 | Invalid-label rows | 0 |
-| **Accuracy (exact match) @ 0.70** | **70%** |
-| Best achievable | **90%** at `overall ≥ 0.50` |
+| **Accuracy (exact match) @ 0.50** | **90%** |
+| (for reference) accuracy @ old 0.70 | 70% |
 
 ## Threshold sweep
 
@@ -48,50 +51,47 @@ Accuracy as the PASS cut-point moves — separates whether the judge
 
 | overall ≥ | accuracy | matches |
 | --- | --- | --- |
-| 0.40 | 90% | 9/10 |
+| 0.40 | 80% | 8/10 |
 | 0.45 | 90% | 9/10 |
-| 0.50 ◀ best | 90% | 9/10 |
+| 0.50 (current) ◀ best | 90% | 9/10 |
 | 0.55 | 90% | 9/10 |
 | 0.60 | 80% | 8/10 |
 | 0.65 | 80% | 8/10 |
-| 0.70 (current) | 70% | 7/10 |
+| 0.70 (old default) | 70% | 7/10 |
 | 0.75 | 60% | 6/10 |
 | 0.80 | 60% | 6/10 |
+
+Best achievable: **90%** at `overall ≥ 0.50` — and 0.50 is the centre of the
+0.45–0.55 plateau, the most robust cut-point against run-to-run judge variance.
 
 ## Per-fixture
 
 | Fixture | Brief | Human | Judge | Overall | Match |
 | --- | --- | --- | --- | --- | --- |
-| `saas-good` | saas-analytics | PASS | FAIL | 65% | ✗ |
-| `restaurant-good` | restaurant | PASS | FAIL | 55% | ✗ |
+| `saas-good` | saas-analytics | PASS | PASS | 65% | ✓ |
+| `restaurant-good` | restaurant | PASS | PASS | 55% | ✓ |
 | `webinar-good` | webinar-event | PASS | PASS | 70% | ✓ |
 | `empty-page` | saas-analytics | FAIL | FAIL | 20% | ✓ |
 | `saas-no-fields` | saas-analytics | FAIL | FAIL | 20% | ✓ |
 | `restaurant-broken-hubl` | restaurant | FAIL | FAIL | 20% | ✓ |
 | `webinar-generic` | webinar-event | FAIL | FAIL | 20% | ✓ |
 | `consulting-shell` | consulting | FAIL | FAIL | 20% | ✓ |
-| `saas-thin-copy` | saas-analytics | PASS | FAIL | 40% | ✗ |
+| `saas-thin-copy` | saas-analytics | PASS | FAIL | 35% | ✗ |
 | `restaurant-incomplete` | restaurant | FAIL | FAIL | 40% | ✓ |
 
-### Disagreements (all three are good pages scored too low)
+### Disagreements (the one remaining miss is the debatable human label)
 
-- **`saas-good`** (human PASS, judge FAIL @ 65%) — the judge agreed all seven
-  sections are present and the copy is "genuinely punchy and benefit-led," but
-  docked HubSpot-correctness for a few fields referenced in HTML yet not declared
-  in `fields.json`. A fair nitpick, but a human ships this (the auto-fixer / a
-  one-line edit closes the gap); the judge's strict 4-dim average pulls it under
-  0.70.
-- **`restaurant-good`** (human PASS, judge FAIL @ 55%) — same pattern: menu
-  correctly grouped, real address, but the judge penalised undeclared
-  field tokens and a "skeletal" single-dish-per-course default.
-- **`saas-thin-copy`** (human PASS, judge FAIL @ 40%) — the honest borderline:
-  complete and editable (would ship) but the copy is deliberately generic. The
-  judge is arguably *right* to be harsh here; this is the one disagreement where
-  the human label is the debatable one.
+- **`saas-thin-copy`** (human PASS, judge FAIL @ 35%) — the honest borderline:
+  complete and editable (would ship) but the copy is deliberately generic, and this
+  run the judge also flagged two thin brief sections and an undeclared field token.
+  The judge is arguably *right* to be harsh here; this is the one row where the
+  human label is the debatable one. At 0.70 the judge also failed `saas-good` and
+  `restaurant-good` (both genuine PASSes); the threshold drop fixes those without
+  introducing any false positive.
 
-The judge made **zero false positives** — it never passed a broken page. Its
-error is one-directional (too strict on good pages), which is exactly what a
-threshold drop corrects.
+The judge made **zero false positives** at the new threshold — it never passed a
+broken page. Its error is one-directional (too strict on the thin-copy borderline),
+which is exactly what the 0.50 cut leaves as the single principled disagreement.
 
 ---
 
@@ -99,5 +99,5 @@ _Simple-mode calibration (langfuse skill `judge-calibration`): exact-match
 accuracy on a bootstrap label set, not a held-out test split. Re-run with a
 larger / more borderline set (ideally real reviewed benchmark pages) before
 treating any single number as a final quality claim. LLM judge scores carry
-run-to-run variance of a few points; the threshold conclusion is stable across
-runs._
+run-to-run variance of a few points; the threshold conclusion (≈0.5, ~90%) is
+stable across runs._
