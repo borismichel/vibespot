@@ -70,12 +70,17 @@ function deduplicateFilename(dir: string, name: string): string {
   return `${base}-${counter}${ext}`;
 }
 
-/** Extract text from a PDF file using pdf-parse. */
+/** Extract text from a PDF file using pdf-parse (v2 `PDFParse` class API). */
 async function extractPdfText(filePath: string): Promise<string> {
-  const pdfParse = (await import("pdf-parse")).default;
+  const { PDFParse } = await import("pdf-parse");
   const buffer = readFileSync(filePath);
-  const data = await pdfParse(buffer);
-  return data.text;
+  const parser = new PDFParse({ data: buffer });
+  try {
+    const result = await parser.getText();
+    return result.text;
+  } finally {
+    await parser.destroy();
+  }
 }
 
 /** Extract text from a DOCX file using mammoth. */

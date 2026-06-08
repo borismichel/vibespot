@@ -311,7 +311,11 @@ export async function listDirectory(pak: string, remotePath: string): Promise<Fi
   const meta = await getMetadata(pak, remotePath);
   if (!meta) return [];
   if (!meta.folder) return [meta];
-  return meta.children || [];
+  // HubSpot may return children as bare name strings or full metadata objects;
+  // keep only the full objects so the FileMetadata[] contract holds.
+  return (meta.children || []).filter(
+    (child): child is FileMetadata => typeof child !== "string"
+  );
 }
 
 /**
