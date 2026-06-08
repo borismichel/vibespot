@@ -4,7 +4,7 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
-## Unreleased
+## 1.6.5 — 2026-06-08
 
 ### Added
 
