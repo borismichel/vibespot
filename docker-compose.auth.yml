@@ -4,16 +4,17 @@
 # request path so the vibespot web UI *and* the chat WebSocket require an
 # Entra login. Without this overlay the stack runs ungated, unchanged.
 #
-# Usage:
+# Usage (the `--profile auth` flag is REQUIRED — it activates oauth2-proxy):
 #   docker compose --profile auth -f docker-compose.yml -f docker-compose.auth.yml up -d
 #
 # Fill in the OAUTH2_* values in .env first (see the "Entra SSO" section there).
 #
 # Request path with the gate on:  Caddy (TLS) -> oauth2-proxy (Entra OIDC) -> vibespot:4200
 #
-# Fail-closed by design: this overlay re-points Caddy at oauth2-proxy:4180. If
-# the proxy isn't running (e.g. you forgot `--profile auth`), Caddy returns 502
-# rather than silently serving vibespot ungated.
+# Fail-closed by design: this overlay re-points Caddy at oauth2-proxy:4180 and
+# makes Caddy depend on it. Forget `--profile auth` and compose refuses to start
+# (oauth2-proxy is undefined) rather than silently serving vibespot ungated;
+# once running, a down proxy yields 502, never an open door.
 
 services:
   caddy:
