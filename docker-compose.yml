@@ -89,7 +89,7 @@ services:
       OAUTH2_PROXY_PROXY_WEBSOCKETS: "true"
       # Let unauthenticated health probes through so external monitors/LBs
       # hitting /healthz get 200, not a 302 to the Entra login.
-      OAUTH2_PROXY_SKIP_AUTH_ROUTES: "^/healthz$"
+      OAUTH2_PROXY_SKIP_AUTH_ROUTES: "^/healthz$$"
       # Sits behind Caddy, which terminates TLS — trust its X-Forwarded-* so
       # the login redirect is built with the correct public https scheme.
       OAUTH2_PROXY_REVERSE_PROXY: "true"
