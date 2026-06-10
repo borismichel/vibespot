@@ -361,7 +361,39 @@ Use an Ingress or Gateway API resource with TLS termination pointing at the Serv
 - **API keys** — never bake keys into a custom image. Pass them via `.env`, `-e` flags, or k8s Secrets.
 - **Network exposure** — without HTTPS, vibeSpot serves plain HTTP. Only expose port 4200 on trusted networks (LAN, VPN, Tailscale).
 - **CORS** — the server allows requests from `localhost`, `127.0.0.1`, and RFC 1918 / Tailscale IP ranges. Behind a same-origin reverse proxy, CORS is not a factor.
-- **No built-in authentication** — vibeSpot has no user login. For multi-user or internet-facing deployments, put an authenticating reverse proxy (OAuth2 Proxy, Authelia, Cloudflare Access) in front of it.
+- **No built-in app login** — vibeSpot itself has no user accounts. For internet-facing deployments, gate it with the bundled Entra SSO overlay below (or your own authenticating proxy — Authelia, Cloudflare Access, etc.).
+
+## Authentication gate — Azure Entra SSO (optional)
+
+The compose bundle ships an opt-in SSO gate (`oauth2-proxy`) that puts an Azure Entra (Entra ID) login in front of the web UI **and** the chat WebSocket. It is **off by default** — a plain `docker compose up` runs exactly as before, ungated.
+
+**1. Register an app in Entra.** In the Azure portal → *Entra ID → App registrations → New registration*, add a **Web** redirect URI of `https://<your-domain>/oauth2/callback`, then create a **client secret**.
+
+**2. Fill in `.env`** (see the *Entra SSO* section of `.env.example`):
+
+```bash
+OAUTH2_PROVIDER=oidc
+OAUTH2_ISSUER_URL=https://login.microsoftonline.com/<TENANT_ID>/v2.0   # tenant-scoped → only your org can sign in
+OAUTH2_CLIENT_ID=<application (client) id>
+OAUTH2_CLIENT_SECRET=<client secret value>
+OAUTH2_REDIRECT_URL=https://<your-domain>/oauth2/callback
+OAUTH2_COOKIE_SECRET=$(openssl rand -base64 32 | tr -- '+/' '-_')
+OAUTH2_EMAIL_DOMAINS=yourcompany.com   # REQUIRED — empty = fail closed (nobody gets in)
+```
+
+**3. Start with the auth overlay** (the `--profile auth` flag is required — it activates the proxy):
+
+```bash
+docker compose --profile auth -f docker-compose.yml -f docker-compose.auth.yml up -d
+```
+
+The overlay re-points Caddy from `vibespot:4200` to `oauth2-proxy:4180`, so the request path becomes **Caddy (TLS) → oauth2-proxy (Entra OIDC) → vibespot**. Access is restricted twice: the tenant-scoped issuer limits sign-in to your org, and `OAUTH2_EMAIL_DOMAINS` filters which of those users get in. An out-of-org user is denied; an unauthenticated request is redirected to the Entra login.
+
+Notes:
+- **WebSocket** — the chat socket upgrade and its auth cookie are proxied through (`OAUTH2_PROXY_PROXY_WEBSOCKETS=true`), so vibe coding works end-to-end behind the gate.
+- **Health checks** — `/healthz` is left unauthenticated (`OAUTH2_PROXY_SKIP_AUTH_ROUTES`) so external monitors get `200`, not a login redirect.
+- **Fail closed** — forget `--profile auth` and compose refuses to start rather than serving ungated; if the proxy is down, Caddy returns 502, never an open door.
+- This is a **gate only** — there is no per-user or per-theme isolation yet (every authorized user shares the same workspace).
 
 ## Troubleshooting
 

@@ -4,6 +4,14 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## Unreleased
+
+### Added
+
+- **Azure Entra (Entra ID) SSO gate for hosted deployments** ([VIB-1871](/VIB/issues/VIB-1871)) — the compose bundle already shipped a disabled `oauth2-proxy` placeholder ([VIB-450](/VIB/issues/VIB-450)) but enabling the `auth` profile alone never gated traffic, because Caddy's `VIBESPOT_UPSTREAM` still defaulted straight to `vibespot:4200`. Made the gate real for Entra and put it in the request path: a new `docker-compose.auth.yml` overlay re-points Caddy at `oauth2-proxy:4180` (request path becomes **Caddy → oauth2-proxy (Entra OIDC) → vibespot**), and the `oauth2-proxy` service is configured for Entra — `provider=oidc`, tenant-scoped issuer (`https://login.microsoftonline.com/<TENANT_ID>/v2.0`), client id/secret, redirect URL, cookie secret, and `OAUTH2_PROXY_REVERSE_PROXY` so the login redirect is built with the public https scheme behind TLS-terminating Caddy. The chat **WebSocket** upgrade (and its auth cookie) is proxied through (`OAUTH2_PROXY_PROXY_WEBSOCKETS=true`) so vibe coding works end-to-end behind the gate, and `/healthz` is left unauthenticated (`OAUTH2_PROXY_SKIP_AUTH_ROUTES`) so external monitors get `200`, not a 302. `OAUTH2_PROXY_EMAIL_DOMAINS` now **defaults empty (fail closed)** instead of `*` — set it to your org domain to filter which tenant users get in. Enable with `docker compose --profile auth -f docker-compose.yml -f docker-compose.auth.yml up -d`; every Entra var is documented in `.env.example` and `docs/docker-deployment.md`. **Opt-in only** — the default `docker compose up` behaviour is unchanged and ungated. Gate only; no per-theme isolation yet (a later, prepared-for step under [VIB-1870](/VIB/issues/VIB-1870)).
+
+---
+
 ## 1.6.5 — 2026-06-08
 
 ### Added
