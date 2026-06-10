@@ -69,9 +69,12 @@ services:
       timeout: 5s
       retries: 5
 
-  # Auth gate placeholder. The actual SSO/OIDC configuration lands in a
-  # sibling issue under VIB-446; until then this service stays disabled
-  # via the `disabled` profile so `docker compose up` is a no-op for it.
+  # Azure Entra (Entra ID) SSO gate (VIB-1871). Disabled by default via the
+  # `auth` profile so a plain `docker compose up` runs ungated, exactly as
+  # before. To turn the gate on, layer in the override that also re-points
+  # Caddy at this service:
+  #   docker compose --profile auth -f docker-compose.yml -f docker-compose.auth.yml up -d
+  # See `.env.example` (Entra SSO section) and docs/docker-deployment.md.
   oauth2-proxy:
     image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
     container_name: vibespot-oauth2-proxy
@@ -80,12 +83,28 @@ services:
     environment:
       OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
       OAUTH2_PROXY_UPSTREAMS: "http://vibespot:4200"
+      # Sits behind Caddy, which terminates TLS — trust its X-Forwarded-* so
+      # the login redirect is built with the correct public https scheme.
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      # Entra is the only IdP — skip the interstitial and go straight to login.
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_SCOPE: ${OAUTH2_SCOPE:-openid email profile}
+      # Forward the authenticated identity downstream to vibespot. Harmless
+      # today (the app ignores it) and the hook a later per-user RLS step
+      # consumes — see VIB-1870.
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
       OAUTH2_PROXY_PROVIDER: ${OAUTH2_PROVIDER:-oidc}
       OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_CLIENT_ID:-}
       OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:-}
       OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_COOKIE_SECRET:-}
+      # Membership is enforced primarily by the TENANT-SCOPED issuer URL below
+      # (only your org's users can authenticate). EMAIL_DOMAINS is an optional
+      # further filter; `*` = any user the tenant lets in.
       OAUTH2_PROXY_EMAIL_DOMAINS: ${OAUTH2_EMAIL_DOMAINS:-*}
       OAUTH2_PROXY_REDIRECT_URL: ${OAUTH2_REDIRECT_URL:-}
+      # Entra v2: https://login.microsoftonline.com/<TENANT_ID>/v2.0
       OAUTH2_PROXY_OIDC_ISSUER_URL: ${OAUTH2_ISSUER_URL:-}
     depends_on:
       - vibespot
