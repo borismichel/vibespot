@@ -45,8 +45,8 @@ Tags published:
 
 The compose bundle is the recommended deployment for the EU hosted variant.
 It includes Caddy (TLS + reverse proxy), Postgres (for the hosted-mode
-storage adapter), and an oauth2-proxy slot (auth gate ships in a sibling
-issue under [VIB-446](/VIB/issues/VIB-446)).
+storage adapter), and an optional Azure Entra SSO gate (`oauth2-proxy`,
+off by default — see [Enable the auth gate](#enable-the-auth-gate) below).
 
 ```bash
 git clone https://github.com/borismichel/vibespot.git
@@ -74,14 +74,24 @@ open http://localhost
 
 ### Enable the auth gate
 
-The `oauth2-proxy` service is gated behind the `auth` compose profile.
-When the upstream SSO/OIDC work lands, enable it with:
+The bundle ships an opt-in **Azure Entra (Entra ID) SSO gate** that puts a
+login in front of the web UI *and* the chat WebSocket. It is off by default —
+`docker compose up` runs ungated.
+
+> ⚠️ **Use the `docker-compose.auth.yml` overlay — not `--profile auth` alone.**
+> The profile only starts `oauth2-proxy`; it does **not** put it in the request
+> path, so Caddy keeps serving vibespot **ungated**. The overlay re-points
+> Caddy at the proxy (`Caddy → oauth2-proxy → vibespot`) and is fail-closed
+> (compose refuses to start if you forget `--profile auth`).
 
 ```bash
-docker compose --profile auth up -d
+docker compose --profile auth -f docker-compose.yml -f docker-compose.auth.yml up -d
 ```
 
-Wire `OAUTH2_*` variables in `.env` to your IdP before flipping this on.
+Set the `OAUTH2_*` variables in `.env` first. Full step-by-step (Entra App
+registration, redirect URI, client secret, tenant-scoped issuer, restricting
+to your org) is in
+[docs/docker-deployment.md → Authentication gate](docker-deployment.md#authentication-gate--azure-entra-sso-optional).
 
 ### Switch to Postgres storage
 

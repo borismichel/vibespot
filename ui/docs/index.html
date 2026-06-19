@@ -1500,7 +1500,7 @@ docker cp vibespot:/home/vibespot/vibespot-themes ./backup-themes</code></pre>
   </ul>
   <div class="doc-callout doc-callout--tip">
     <div class="doc-callout__label">&#9888;&#65039; Single instance &amp; auth</div>
-    <p>vibeSpot keeps active sessions in memory &mdash; run a single instance (no horizontal scaling without sticky sessions). It runs as a non-root user and has <strong>no built-in authentication</strong>. For internet-facing deployments, put an authenticating proxy (OAuth2 Proxy, Authelia, Cloudflare Access) in front. Persistence is filesystem-only on the named volumes &mdash; there is no database to run.</p>
+    <p>vibeSpot keeps active sessions in memory &mdash; run a single instance (no horizontal scaling without sticky sessions). It runs as a non-root user and has <strong>no built-in authentication</strong>. For internet-facing deployments, enable the bundled <strong>Azure Entra SSO gate</strong> (the <code>docker-compose.auth.yml</code> overlay) or put your own authenticating proxy (Authelia, Cloudflare Access) in front. Persistence is filesystem-only on the named volumes &mdash; there is no database to run.</p>
   </div>
 </div>
 
