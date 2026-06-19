@@ -4,11 +4,19 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
-## Unreleased
+## 1.6.6 — 2026-06-19
 
 ### Added
 
 - **Azure Entra (Entra ID) SSO gate for hosted deployments** ([VIB-1871](/VIB/issues/VIB-1871)) — the compose bundle already shipped a disabled `oauth2-proxy` placeholder ([VIB-450](/VIB/issues/VIB-450)) but enabling the `auth` profile alone never gated traffic, because Caddy's `VIBESPOT_UPSTREAM` still defaulted straight to `vibespot:4200`. Made the gate real for Entra and put it in the request path: a new `docker-compose.auth.yml` overlay re-points Caddy at `oauth2-proxy:4180` (request path becomes **Caddy → oauth2-proxy (Entra OIDC) → vibespot**), and the `oauth2-proxy` service is configured for Entra — `provider=oidc`, tenant-scoped issuer (`https://login.microsoftonline.com/<TENANT_ID>/v2.0`), client id/secret, redirect URL, cookie secret, and `OAUTH2_PROXY_REVERSE_PROXY` so the login redirect is built with the public https scheme behind TLS-terminating Caddy. The chat **WebSocket** upgrade (and its auth cookie) is proxied through (`OAUTH2_PROXY_PROXY_WEBSOCKETS=true`) so vibe coding works end-to-end behind the gate, and `/healthz` is left unauthenticated (`OAUTH2_PROXY_SKIP_AUTH_ROUTES`) so external monitors get `200`, not a 302. `OAUTH2_PROXY_EMAIL_DOMAINS` now **defaults empty (fail closed)** instead of `*` — set it to your org domain to filter which tenant users get in. Enable with `docker compose --profile auth -f docker-compose.yml -f docker-compose.auth.yml up -d`; every Entra var is documented in `.env.example` and `docs/docker-deployment.md`. **Opt-in only** — the default `docker compose up` behaviour is unchanged and ungated. Gate only; no per-theme isolation yet (a later, prepared-for step under [VIB-1870](/VIB/issues/VIB-1870)).
+
+### Fixed
+
+- **Corrected dangerous auth-gate enable instructions** ([VIB-1875](/VIB/issues/VIB-1875)) — `docs/docker.md` still told operators to enable the gate with `docker compose --profile auth up -d`, which only starts `oauth2-proxy` but leaves Caddy pointed straight at `vibespot:4200` — serving the UI **ungated while it looks protected** (the exact bypass [VIB-1871](/VIB/issues/VIB-1871) closed). The docs now require the `docker-compose.auth.yml` overlay, warn about the bypass, note the fail-closed startup behaviour, and link to the full Entra runbook; the in-app deployment note (`ui/docs/index.html`) now points at the bundled gate too.
+
+### Maintenance
+
+- Dependency bumps: production deps `@anthropic-ai/sdk` 0.99.0 → 0.104.1, `@clack/prompts`, `commander`, `marked` ([#196](https://github.com/borismichel/vibespot/pull/196)); dev deps `@types/node`, `tsx`, `vitest` (v3 → v4) ([#190](https://github.com/borismichel/vibespot/pull/190)). Full build + 189-test suite green on the updated toolchain.
 
 ---
 
