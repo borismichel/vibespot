@@ -8332,3 +8332,51 @@ body { display: flex; }
 .chat__send--oneshot:hover:not(:disabled) {
   opacity: 1;
 }
+
+/* Brand-intake gate (VIB-1878) — front-of-flow ask-back card. */
+.brand-intake__choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+.brand-intake__choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  padding: var(--space-3);
+  height: auto;
+}
+.brand-intake__choice-title { font-weight: 600; }
+.brand-intake__choice-hint { font-size: var(--text-sm); opacity: 0.75; }
+.brand-intake__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+.brand-intake__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.brand-intake__label { font-size: var(--text-sm); font-weight: 600; }
+.brand-intake__input {
+  width: 100%;
+  font-family: inherit;
+  font-size: var(--text-base);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  resize: vertical;
+}
+.brand-intake__form-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+.brand-intake__top-actions { margin-top: var(--space-2); }

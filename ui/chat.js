@@ -2353,7 +2353,7 @@ function handleCheckpointCancelled() {
   appendSystemMessage("Cancelled — nothing was built.");
 }
 
-function resolveCheckpoint(action, note) {
+function resolveCheckpoint(action, note, extra) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   removeCheckpointCard();
   if (action === "cancel") {
@@ -2363,10 +2363,21 @@ function resolveCheckpoint(action, note) {
     startStreaming();
     setStatus("Generating...");
   }
-  ws.send(JSON.stringify({ type: "checkpoint_resolve", action, note: note || undefined }));
+  ws.send(JSON.stringify({
+    type: "checkpoint_resolve",
+    action,
+    note: note || undefined,
+    // Brand-intake channels (VIB-1878), only set when bringing a brand.
+    brandIntake: extra && extra.brandIntake ? extra.brandIntake : undefined,
+  }));
 }
 
 function renderCheckpointCard(preview, data, estCostNext) {
+  // Brand-intake gate (VIB-1878) — the front-of-flow ask-back; different card.
+  if (preview && preview.kind === "brand_intake") {
+    return renderBrandIntakeCard(preview, data);
+  }
+
   const div = document.createElement("div");
   div.className = "chat-msg chat-msg--assistant";
 
@@ -2434,6 +2445,107 @@ function renderCheckpointCard(preview, data, estCostNext) {
       div.querySelectorAll(".checkpoint__btn").forEach((b) => (b.disabled = true));
       resolveCheckpoint(action, note);
     });
+  });
+
+  return div;
+}
+
+// ---------------------------------------------------------------------------
+// Brand-intake gate card (VIB-1878) — the front-of-flow ask-back shown when a
+// new page has no style system yet: "Surprise me" (AI invents) vs "Bring your
+// brand" (paste colors/code/voice, or point at a site/theme → seed the design).
+// ---------------------------------------------------------------------------
+
+function renderBrandIntakeCard(preview, data) {
+  const div = document.createElement("div");
+  div.className = "chat-msg chat-msg--assistant";
+
+  const channels = Array.isArray(data.channels) ? data.channels : [];
+  const fields = channels.map((c) => {
+    const id = `brand-${escapeHtml(c.key)}`;
+    const input = c.multiline
+      ? `<textarea class="brand-intake__input" data-key="${escapeHtml(c.key)}" rows="3" placeholder="${escapeHtml(c.placeholder || "")}"></textarea>`
+      : `<input class="brand-intake__input" data-key="${escapeHtml(c.key)}" type="text" placeholder="${escapeHtml(c.placeholder || "")}" />`;
+    return `<label class="brand-intake__field" for="${id}">
+        <span class="brand-intake__label">${escapeHtml(c.label || c.key)}</span>
+        ${input}
+      </label>`;
+  }).join("");
+
+  div.innerHTML = `
+    <div class="chat-msg__avatar chat-msg__avatar--ai">AI</div>
+    <div class="chat-msg__content">
+      <div class="checkpoint brand-intake">
+        <div class="checkpoint__head">
+          <span class="checkpoint__badge">Brand checkpoint</span>
+          <span class="checkpoint__headline">${escapeHtml(preview.headline || "Match your brand, or surprise you?")}</span>
+        </div>
+        <div class="brand-intake__choices">
+          <button class="btn btn--primary brand-intake__choice" data-choice="surprise">
+            <span class="brand-intake__choice-title">${escapeHtml(data.surpriseLabel || "Surprise me")}</span>
+            <span class="brand-intake__choice-hint">${escapeHtml(data.surpriseHint || "")}</span>
+          </button>
+          <button class="btn brand-intake__choice" data-choice="bring">
+            <span class="brand-intake__choice-title">${escapeHtml(data.bringLabel || "Bring your brand")}</span>
+            <span class="brand-intake__choice-hint">${escapeHtml(data.bringHint || "")}</span>
+          </button>
+        </div>
+        <div class="brand-intake__form hidden">
+          ${fields}
+          <div class="brand-intake__form-actions">
+            <button class="btn btn--primary brand-intake__submit">Use my brand</button>
+            <button class="btn btn--ghost brand-intake__back">Back</button>
+          </div>
+        </div>
+        <div class="checkpoint__actions brand-intake__top-actions">
+          <button class="btn btn--ghost checkpoint__btn" data-action="cancel">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+
+  const form = div.querySelector(".brand-intake__form");
+  const choices = div.querySelector(".brand-intake__choices");
+
+  div.querySelector('[data-choice="surprise"]').addEventListener("click", () => {
+    div.querySelectorAll("button").forEach((b) => (b.disabled = true));
+    // "Surprise me" = skip the brand step; the AI invents the design system.
+    resolveCheckpoint("skip");
+  });
+
+  div.querySelector('[data-choice="bring"]').addEventListener("click", () => {
+    if (choices) choices.classList.add("hidden");
+    if (form) form.classList.remove("hidden");
+    const first = div.querySelector(".brand-intake__input");
+    if (first) first.focus();
+  });
+
+  const backBtn = div.querySelector(".brand-intake__back");
+  if (backBtn) backBtn.addEventListener("click", () => {
+    if (form) form.classList.add("hidden");
+    if (choices) choices.classList.remove("hidden");
+  });
+
+  const submitBtn = div.querySelector(".brand-intake__submit");
+  if (submitBtn) submitBtn.addEventListener("click", () => {
+    const brandIntake = {};
+    div.querySelectorAll(".brand-intake__input").forEach((el) => {
+      const v = (el.value || "").trim();
+      if (v) brandIntake[el.dataset.key] = v;
+    });
+    if (Object.keys(brandIntake).length === 0) {
+      // Nothing filled in → treat as "surprise me" rather than a no-op.
+      div.querySelectorAll("button").forEach((b) => (b.disabled = true));
+      resolveCheckpoint("skip");
+      return;
+    }
+    div.querySelectorAll("button").forEach((b) => (b.disabled = true));
+    resolveCheckpoint("approve", undefined, { brandIntake });
+  });
+
+  const cancelBtn = div.querySelector('.checkpoint__btn[data-action="cancel"]');
+  if (cancelBtn) cancelBtn.addEventListener("click", () => {
+    div.querySelectorAll("button").forEach((b) => (b.disabled = true));
+    resolveCheckpoint("cancel");
   });
 
   return div;

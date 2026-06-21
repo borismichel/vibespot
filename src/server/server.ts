@@ -1485,6 +1485,11 @@ ${errorContext}`;
           kind: pending.kind,
           action: action as CheckpointAction,
           note: typeof msg.note === "string" ? msg.note : undefined,
+          // Brand-intake channels (VIB-1878) — only meaningful for a
+          // brand_intake gate resolved with "Bring your brand" (approve).
+          ...(pending.kind === "brand_intake" && msg.brandIntake && typeof msg.brandIntake === "object"
+            ? { brandIntake: msg.brandIntake as CheckpointResolution["brandIntake"] }
+            : {}),
         };
 
         // Plan checkpoint (VIB-1880): resolved through the same protocol, but
