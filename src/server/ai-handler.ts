@@ -21,7 +21,8 @@ import {
 } from "./ai-engines.js";
 import { hasValidOAuthToken, getValidAccessToken } from "../utils/claude-oauth.js";
 import { getFileContexts } from "./routes/upload-files.js";
-import { runAgentPipeline, isAgenticCapable, isCLIEngine } from "./agent/pipeline.js";
+import { runAgentPipeline, resumeAgentPipeline, isAgenticCapable, isCLIEngine } from "./agent/pipeline.js";
+import type { CheckpointResolution } from "./agent/types.js";
 import { runWithTrace, setTraceOutput } from "./langfuse.js";
 import type { AgentEngine } from "./agent/engine-adapter.js";
 import type { PipelineEvent, PipelineResult, MultiPagePipelineResult } from "./agent/types.js";
@@ -335,6 +336,7 @@ export async function handleAgenticGenerate(
   userMessage: string,
   onEvent: (event: PipelineEvent) => void,
   fileIds?: string[],
+  checkpointsEnabled = false,
 ): Promise<PipelineResult> {
   const session = getSession();
   if (!session) throw new Error("No active session");
@@ -401,6 +403,7 @@ export async function handleAgenticGenerate(
             concurrency,
             onEvent,
             libraryModules,
+            checkpointsEnabled,
           );
           setTraceOutput(summarizePipelineOutput(r));
           return r;
@@ -413,6 +416,70 @@ export async function handleAgenticGenerate(
     const current = getSession();
     if (!current || current.id !== capturedSessionId) {
       log.warn("ai-handler", "Session changed during agentic generation — discarding output");
+      throw new Error("Session changed during generation");
+    }
+
+    return result;
+  } finally {
+    generatingSessionId = null;
+  }
+}
+
+/**
+ * Resume a pipeline parked at a checkpoint gate (VIB-1877) with the user's
+ * resolution. Mirrors `handleAgenticGenerate`'s scoping (cost tracking + trace)
+ * so the continuation's model calls roll into the same per-page cost. Returns
+ * the final `PipelineResult`, OR — for `steer` — another paused result with a
+ * fresh `pendingCheckpoint`.
+ */
+export async function handleAgenticResume(
+  resumeToken: string,
+  resolution: CheckpointResolution,
+  onEvent: (event: PipelineEvent) => void,
+): Promise<PipelineResult> {
+  const session = getSession();
+  if (!session) throw new Error("No active session");
+
+  const capturedSessionId = session.id;
+  generatingSessionId = capturedSessionId;
+
+  try {
+    const config = loadConfig();
+    const { engine, apiKey, model } = resolveAgenticEngine(config);
+    const concurrency = config.agenticConcurrency || 20;
+
+    const snapshot = takeSnapshot();
+
+    const { result, cost } = await runWithCostTracking(() =>
+      runWithTrace(
+        {
+          name: "agent_pipeline_resume",
+          sessionId: snapshot.themeName,
+          input: { action: resolution.action, kind: resolution.kind },
+          metadata: { engine, model, concurrency },
+          tags: ["vibespot", "agentic-pipeline", "checkpoint-resume"],
+        },
+        async () => {
+          const r = await resumeAgentPipeline(
+            resumeToken,
+            resolution,
+            snapshot,
+            engine,
+            apiKey,
+            model,
+            concurrency,
+            onEvent,
+          );
+          setTraceOutput(summarizePipelineOutput(r));
+          return r;
+        },
+      ),
+    );
+    result.cost = cost;
+
+    const current = getSession();
+    if (!current || current.id !== capturedSessionId) {
+      log.warn("ai-handler", "Session changed during checkpoint resume — discarding output");
       throw new Error("Session changed during generation");
     }
 

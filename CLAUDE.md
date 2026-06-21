@@ -107,7 +107,17 @@ Langfuse-managed prompts via **bundle-at-build** (no runtime dependency on our i
 - `module_progress` — Per-module status (queued, generating, complete, failed)
 - `design_system_ready` — CSS pushed to session for themed placeholders
 - `blueprint_ready` — Module order set for placeholder positioning
+- `checkpoint_requested` — Pipeline parked at a gate; carries the preview card + `estCostNext` (see Checkpoint gate)
 - `pipeline_complete` / `pipeline_partial` — Final stats
+
+### Checkpoint gate (VIB-1877, conversational pipeline)
+
+A reusable **park-and-re-enter** primitive that pauses the pipeline at a cheap seam so the user can intervene before the expensive build — generalizing the older `plan_approve` pause. C1 ships one seam: the **design checkpoint**.
+
+- **Mechanism (crash-safe):** when checkpoints are on, `runAgentPipeline` (`agent/pipeline.ts`) splits Stage 2 at the design seam — it runs only `runDesignSystem` (2a), then **returns at the gate** with `PipelineResult.pendingCheckpoint` set, instead of awaiting Stage 3. No dangling promise. The resume state (plan + design system + finalized CSS) is held in an in-memory `Map` keyed by an opaque `resumeToken`; the token + preview are persisted on `session.pendingCheckpoint`. An unresolved gate is dropped on server restart (resume then errors → user re-sends).
+- **Resume:** `checkpoint_resolve { action: approve|steer|skip|cancel }` (WS) → `handleAgenticResume` → `resumeAgentPipeline`. **approve/skip** run `runModulePlanner` (2b, extracted from `runPageArchitect`) against the parked design then `runBuildPhase` (Stage 3+4, shared with the one-shot path); **steer** re-runs ONLY `runDesignSystem` with the note appended and re-parks with a fresh preview; **cancel** drops the run (nothing written). Resume reuses the same `runWithCostTracking` + `runWithTrace` scoping so continuation cost rolls into the page total.
+- **Preview:** `agent/design-preview.ts` `buildDesignPreview()` builds the card payload — palette swatches + heading/body type specimen + one representative hero — **deterministically from the design tokens, no model call**. The hero is a self-contained HTML string rendered in a sandboxed iframe `srcdoc` in `ui/chat.js`. `estCostNext` reuses `cost-tracker.ts` `peekCurrentCost()` (spend-so-far × `STAGE3_COST_MULTIPLIER`); omitted for CLI engines (no usage).
+- **Interaction model:** checkpoints are **on by default** for non-email `needsArchitect` runs. The send button's one-tap **one-shot** affordance (`#chat-send-oneshot` → `oneShot:true` on the `chat` message → `checkpointsEnabled=false`) skips all gates (= prior behavior). `plan_approve` runs pass `checkpointsEnabled=false` (the plan already gated). No three-mode selector.
 
 ### Observability (Langfuse)
 

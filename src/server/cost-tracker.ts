@@ -127,3 +127,14 @@ export function recordCostSample(model: string, usage: TokenUsage | undefined): 
 export function emptyPageCost(): PageCost {
   return toPageCost(newAccumulator());
 }
+
+/**
+ * Read the cost accumulated so far in the active scope, without closing it.
+ * Returns null outside a `runWithCostTracking` scope (e.g. CLI engines never
+ * open one with usage). Used by the checkpoint gate (VIB-1877) to estimate the
+ * spend a user avoids by cancelling, reusing the same per-page cost machinery.
+ */
+export function peekCurrentCost(): PageCost | null {
+  const acc = store.getStore();
+  return acc ? toPageCost(acc) : null;
+}

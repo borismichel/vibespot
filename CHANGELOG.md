@@ -4,6 +4,14 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## Unreleased
+
+### Added
+
+- **Design checkpoint — review the look before building the page** ([VIB-1877](/VIB/issues/VIB-1877)) — the agentic pipeline no longer runs all four stages in one blocking shot. It now pauses at a natural seam: after the cheap design-system stage (Stage 2a) and *before* the expensive parallel module build (Stage 3), it parks and shows a **design checkpoint card** — palette swatches, the heading/body type specimen, and one representative hero rendered straight from the design tokens (no extra model call). You choose **approve** (build it), **steer** (type a note → re-runs *only* the design stage, then re-previews), **skip** (build now and suppress further gates this run), or **cancel** (nothing is written). The card also shows the estimated cost of the build it gates, reusing the per-page cost tracker ([VIB-1770](/VIB/issues/VIB-1770)). This is the first slice of the conversational pipeline ([VIB-1876](/VIB/issues/VIB-1876)): a general **checkpoint-gate primitive** (`checkpoint_requested` event / `checkpoint_resolve` message / park-and-re-enter resume token) that generalizes the existing plan-approve pause and is crash-safe (the pipeline returns at the gate rather than holding an open promise). **Checkpoints are on by default**; a one-tap **one-shot** button next to send skips all gates (= the previous one-call behavior). Email generation and plan-approved runs never gate.
+
+---
+
 ## 1.6.6 — 2026-06-19
 
 ### Added

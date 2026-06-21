@@ -20,7 +20,8 @@ import {
 } from "./session.js";
 import { commitThemeState, commitTemplateState, isGitAvailable } from "./project-git.js";
 import { buildPreviewHtml, buildModulePreviewHtml } from "./preview.js";
-import { handleGenerateStream, handleAgenticGenerate, handleFigmaImport, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine, handlePlanModeStream, isPlanModeActive, isGenerating } from "./ai-handler.js";
+import { handleGenerateStream, handleAgenticGenerate, handleAgenticResume, handleFigmaImport, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine, handlePlanModeStream, isPlanModeActive, isGenerating } from "./ai-handler.js";
+import type { CheckpointResolution, CheckpointAction } from "./agent/types.js";
 import { handlePlanEditRoute, handlePlanDiscardRoute, handlePlanTemplatesRoute, handlePlanTemplateRoute, savePlan, clearPlan } from "./routes/plan.js";
 import { parsePlanResponse } from "./plan-parser.js";
 import { loadConfig, saveConfig, getHubSpotPak, getActiveHubSpotAccount } from "../utils/config.js";
@@ -719,6 +720,15 @@ function handleWsConnection(ws: WebSocket): void {
 
         const fileIds = Array.isArray(msg.fileIds) ? msg.fileIds as string[] : undefined;
 
+        // A fresh chat supersedes any parked checkpoint gate (VIB-1877).
+        {
+          const sess = getSession();
+          if (sess?.pendingCheckpoint) {
+            sess.pendingCheckpoint = undefined;
+            saveSession();
+          }
+        }
+
         // ---------------------------------------------------------------
         // Plan-mode branch — DELIBERATION PHASE, no module generation.
         //
@@ -793,11 +803,32 @@ function handleWsConnection(ws: WebSocket): void {
             const pipelineSteps: { step: string; label: string; decisions?: string[] }[] = [];
             const pipelineModules: { name: string; status: "complete" | "failed" }[] = [];
 
+            // Checkpoints are ON by default (VIB-1877). The send-button's
+            // "one-shot it" affordance sets msg.oneShot to skip all gates
+            // (= today's behavior).
+            const checkpointsEnabled = !msg.oneShot;
+
             const result = await handleAgenticGenerate(
               userMessage,
               buildPipelineOnEvent(pipelineSteps, pipelineModules),
               fileIds,
+              checkpointsEnabled,
             );
+
+            // Parked at a checkpoint gate: persist the resume token on the
+            // session and stop here. No modules were built, nothing is written
+            // or committed. The UI shows the checkpoint card (sent via the
+            // checkpoint_requested event) and resolves it with checkpoint_resolve.
+            if (result.pendingCheckpoint) {
+              const sess = getSession();
+              if (sess) {
+                sess.pendingCheckpoint = result.pendingCheckpoint;
+                saveSession();
+              }
+              sendGenerationCost(result);
+              clearPipelineEventLog();
+              break;
+            }
 
             applyPipelineResult(result, {
               steps: pipelineSteps,
@@ -1336,6 +1367,124 @@ ${errorContext}`;
         clearPlan();
         saveConfig({ planMode: false });
         ws.send(JSON.stringify({ type: "plan_discarded" }));
+        break;
+      }
+
+      // ---------------------------------------------------------------
+      // Checkpoint resolution (VIB-1877) — the user clicked approve /
+      // steer / skip / cancel on a checkpoint card. Re-enters the parked
+      // pipeline at the gate. approve/skip build & commit; steer re-parks
+      // with a fresh card; cancel drops the run.
+      // ---------------------------------------------------------------
+      case "checkpoint_resolve": {
+        const session = getSession();
+        if (!session) {
+          ws.send(JSON.stringify({ type: "error", message: "No active session" }));
+          break;
+        }
+        const pending = session.pendingCheckpoint;
+        if (!pending) {
+          ws.send(JSON.stringify({ type: "error", message: "No checkpoint is awaiting resolution." }));
+          break;
+        }
+
+        const action = String(msg.action || "");
+        if (!["approve", "steer", "skip", "cancel"].includes(action)) {
+          ws.send(JSON.stringify({ type: "error", message: `Invalid checkpoint action: ${action}` }));
+          break;
+        }
+
+        const resolution: CheckpointResolution = {
+          kind: pending.kind,
+          action: action as CheckpointAction,
+          note: typeof msg.note === "string" ? msg.note : undefined,
+        };
+        const resumeToken = pending.resumeToken;
+
+        // Clear the gate up front; a `steer` re-parks with a fresh token below.
+        session.pendingCheckpoint = undefined;
+        saveSession();
+
+        try {
+          clearPipelineEventLog();
+          const pipelineSteps: { step: string; label: string; decisions?: string[] }[] = [];
+          const pipelineModules: { name: string; status: "complete" | "failed" }[] = [];
+
+          const result = await handleAgenticResume(
+            resumeToken,
+            resolution,
+            buildPipelineOnEvent(pipelineSteps, pipelineModules),
+          );
+
+          // Cancelled — nothing built.
+          if (result.canceled) {
+            sendToClient({ type: "checkpoint_cancelled" });
+            sendToClient({ type: "generation_complete" });
+            clearPipelineEventLog();
+            break;
+          }
+
+          // Steered — re-parked at a fresh gate. Persist and wait again.
+          if (result.pendingCheckpoint) {
+            const sess = getSession();
+            if (sess) {
+              sess.pendingCheckpoint = result.pendingCheckpoint;
+              saveSession();
+            }
+            sendGenerationCost(result);
+            clearPipelineEventLog();
+            break;
+          }
+
+          // approve / skip — the build completed. Apply, commit, finish
+          // (mirrors the agentic chat path).
+          applyPipelineResult(result, {
+            steps: pipelineSteps,
+            modules: pipelineModules,
+            stats: result.stats,
+            cost: result.cost,
+          });
+          sendGenerationCost(result);
+
+          const currentSession = getSession();
+          if (currentSession) {
+            writeModulesToDisk();
+            const activeTpl = getActiveTemplate();
+            let commitHash: string | null = null;
+            if (activeTpl) {
+              const filePaths = activeTpl.moduleOrder.map((n: string) => `modules/${n}.module`);
+              if (activeTpl.templateFile) filePaths.push(activeTpl.templateFile);
+              if (activeTpl.sharedCss) filePaths.push(`css/${currentSession.themeName}-theme.css`);
+              if (activeTpl.sharedJs) filePaths.push(`js/${currentSession.themeName}-animations.js`);
+              commitHash = commitTemplateState(currentSession.themePath, activeTpl.id, "Checkpoint approved: implementation", filePaths);
+            } else {
+              commitHash = commitThemeState(currentSession.themePath, "Checkpoint approved: implementation");
+            }
+            if (commitHash) {
+              sendToClient({ type: "version_created", hash: commitHash });
+            }
+          }
+
+          sendToClient({ type: "generation_complete" });
+          {
+            const sess = getSession();
+            sendToClient({
+              type: "modules_updated",
+              modules: getOrderedModules().map((m) => m.moduleName),
+              templateId: sess?.activeTemplateId || null,
+              templates: (sess?.templates || []).map((t) => ({
+                id: t.id, label: t.label, pageType: t.pageType, moduleCount: t.modules.length,
+              })),
+            });
+          }
+          clearPipelineEventLog();
+        } catch (err) {
+          clearPipelineEventLog();
+          sendToClient({
+            type: "error",
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
         break;
       }
 
