@@ -162,6 +162,18 @@ export interface BrandIntakeInput {
   siteUrl?: string;
 }
 
+/**
+ * One module in a structure-checkpoint outline as edited by the user (VIB-1879).
+ * `sourceIndex` ties a row back to the planned module it came from so the build
+ * keeps that module's contentBrief/layoutNotes across rename/reorder; rows with
+ * no `sourceIndex` are sections the user added by hand.
+ */
+export interface StructureOutlineItem {
+  name: string;
+  description?: string;
+  sourceIndex?: number;
+}
+
 /** Inbound resolution of a pending checkpoint (UI → server). */
 export interface CheckpointResolution {
   kind: CheckpointKind;
@@ -174,6 +186,11 @@ export interface CheckpointResolution {
    * "Surprise me" (action === "skip").
    */
   brandIntake?: BrandIntakeInput;
+  /**
+   * Edited module outline from a structure checkpoint (VIB-1879). Honored on
+   * approve/skip — the build uses exactly these modules, in this order.
+   */
+  outline?: StructureOutlineItem[];
 }
 
 export type PipelineEvent =

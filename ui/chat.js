@@ -2367,7 +2367,8 @@ function resolveCheckpoint(action, note, extra) {
     type: "checkpoint_resolve",
     action,
     note: note || undefined,
-    // Brand-intake channels (VIB-1878), only set when bringing a brand.
+    // Structure checkpoint (VIB-1879) outline; brand-intake channels (VIB-1878).
+    outline: extra && extra.outline ? extra.outline : undefined,
     brandIntake: extra && extra.brandIntake ? extra.brandIntake : undefined,
   }));
 }
@@ -2376,6 +2377,11 @@ function renderCheckpointCard(preview, data, estCostNext) {
   // Brand-intake gate (VIB-1878) — the front-of-flow ask-back; different card.
   if (preview && preview.kind === "brand_intake") {
     return renderBrandIntakeCard(preview, data);
+  }
+  // Structure checkpoint (VIB-1879) renders an editable module outline instead
+  // of the design palette/hero.
+  if (preview && preview.kind === "structure") {
+    return renderStructureCheckpointCard(preview, data, estCostNext);
   }
 
   const div = document.createElement("div");
@@ -2444,6 +2450,126 @@ function renderCheckpointCard(preview, data, estCostNext) {
       const note = action === "steer" && steerInput ? steerInput.value.trim() : undefined;
       div.querySelectorAll(".checkpoint__btn").forEach((b) => (b.disabled = true));
       resolveCheckpoint(action, note);
+    });
+  });
+
+  return div;
+}
+
+// Structure checkpoint card (VIB-1879) — the planned module skeleton as an
+// editable outline (reorder / cut / add / rename) before the parallel build.
+function renderStructureCheckpointCard(preview, data, estCostNext) {
+  const div = document.createElement("div");
+  div.className = "chat-msg chat-msg--assistant";
+
+  const modules = Array.isArray(data.modules) ? data.modules : [];
+  const narrative = typeof data.narrative === "string" ? data.narrative : "";
+  const costLine = (typeof estCostNext === "number" && estCostNext > 0)
+    ? `<span class="checkpoint__cost">Building all modules will cost ~$${estCostNext.toFixed(2)}</span>`
+    : "";
+
+  div.innerHTML = `
+    <div class="chat-msg__avatar chat-msg__avatar--ai">AI</div>
+    <div class="chat-msg__content">
+      <div class="checkpoint checkpoint--structure">
+        <div class="checkpoint__head">
+          <span class="checkpoint__badge">Structure checkpoint</span>
+          <span class="checkpoint__headline">${escapeHtml(preview.headline || "Review the structure before building")}</span>
+        </div>
+        ${narrative ? `<div class="checkpoint__narrative">${escapeHtml(narrative)}</div>` : ""}
+        <div class="checkpoint__outline"></div>
+        <button type="button" class="btn btn--ghost checkpoint__add">+ Add section</button>
+        ${costLine ? `<div class="checkpoint__meta">${costLine}</div>` : ""}
+        <div class="checkpoint__steer hidden">
+          <textarea class="checkpoint__steer-input" rows="2" placeholder="What should change? e.g. add a pricing section, drop the FAQ..."></textarea>
+        </div>
+        <div class="checkpoint__actions">
+          <button class="btn btn--primary checkpoint__btn" data-action="approve">Build these sections</button>
+          <button class="btn checkpoint__btn" data-action="steer">Re-plan structure</button>
+          <button class="btn checkpoint__btn" data-action="skip" title="Build now and don't ask again this run">Skip checkpoints</button>
+          <button class="btn btn--ghost checkpoint__btn" data-action="cancel">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+
+  const listEl = div.querySelector(".checkpoint__outline");
+
+  function makeRow(name, description, sourceIndex) {
+    const row = document.createElement("div");
+    row.className = "checkpoint__row";
+    if (sourceIndex != null) row.dataset.sourceIndex = String(sourceIndex);
+    if (description) row.dataset.desc = description;
+    row.innerHTML = `
+      <div class="checkpoint__row-move">
+        <button type="button" class="checkpoint__row-btn" data-move="up" title="Move up" aria-label="Move up">▲</button>
+        <button type="button" class="checkpoint__row-btn" data-move="down" title="Move down" aria-label="Move down">▼</button>
+      </div>
+      <div class="checkpoint__row-main">
+        <input class="checkpoint__row-name" value="${escapeHtml(name || "")}" placeholder="section-name" spellcheck="false" />
+        <span class="checkpoint__row-desc">${escapeHtml(description || "")}</span>
+      </div>
+      <button type="button" class="checkpoint__row-remove" data-remove title="Remove section" aria-label="Remove section">✕</button>`;
+
+    row.querySelector('[data-move="up"]').addEventListener("click", () => {
+      const prev = row.previousElementSibling;
+      if (prev) listEl.insertBefore(row, prev);
+    });
+    row.querySelector('[data-move="down"]').addEventListener("click", () => {
+      const next = row.nextElementSibling;
+      if (next) listEl.insertBefore(next, row);
+    });
+    row.querySelector("[data-remove]").addEventListener("click", () => {
+      row.remove();
+    });
+    return row;
+  }
+
+  modules.forEach((m) =>
+    listEl.appendChild(makeRow(m.name, m.description, m.sourceIndex)),
+  );
+
+  div.querySelector(".checkpoint__add").addEventListener("click", () => {
+    const row = makeRow("", "", null);
+    listEl.appendChild(row);
+    const input = row.querySelector(".checkpoint__row-name");
+    if (input) input.focus();
+  });
+
+  function collectOutline() {
+    return [...listEl.querySelectorAll(".checkpoint__row")]
+      .map((row) => {
+        const name = (row.querySelector(".checkpoint__row-name").value || "").trim();
+        const si = row.dataset.sourceIndex;
+        return {
+          name,
+          description: row.dataset.desc || undefined,
+          sourceIndex: si !== undefined && si !== "" ? Number(si) : undefined,
+        };
+      })
+      .filter((it) => it.name);
+  }
+
+  const steerWrap = div.querySelector(".checkpoint__steer");
+  const steerInput = div.querySelector(".checkpoint__steer-input");
+  const steerBtn = div.querySelector('.checkpoint__btn[data-action="steer"]');
+  let steerArmed = false;
+
+  div.querySelectorAll(".checkpoint__btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.action;
+      // Steer is two-step: first click reveals the note box, second submits.
+      if (action === "steer" && !steerArmed) {
+        steerArmed = true;
+        steerWrap.classList.remove("hidden");
+        steerBtn.textContent = "Apply re-plan";
+        if (steerInput) steerInput.focus();
+        return;
+      }
+      const note = action === "steer" && steerInput ? steerInput.value.trim() : undefined;
+      // approve/skip carry the edited outline; steer/cancel don't.
+      const outline = action === "approve" || action === "skip" ? collectOutline() : undefined;
+      div.querySelectorAll(".checkpoint__btn").forEach((b) => (b.disabled = true));
+      resolveCheckpoint(action, note, { outline });
     });
   });
 
