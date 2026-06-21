@@ -385,3 +385,135 @@ export async function runPageArchitect(
     narrative: modulePlan.narrative,
   };
 }
+
+/**
+ * Run ONLY the Module Planner half (Stage 2b) against an already-computed design
+ * system. The checkpoint gate (VIB-1877) splits the architect at the design seam:
+ * `runDesignSystem` (2a) runs before the gate, then this runs on resume with the
+ * parked design. Mirrors the 2b block inside `runPageArchitect` so the one-shot
+ * path stays byte-identical.
+ */
+export async function runModulePlanner(
+  userMessage: string,
+  plan: PipelinePlan,
+  snapshot: SessionSnapshot,
+  designSystem: DesignSystemOutput,
+  sharedCss: string,
+  engine: AgentEngine,
+  apiKey: string,
+  model: string,
+  onEvent: (event: PipelineEvent) => void,
+): Promise<PageBlueprint> {
+  const isEmail = plan.contentType === "email";
+  const vars = designSystem.cssVariables;
+  const thinkingBudget = resolveThinkingBudget(engine);
+
+  onEvent({
+    type: "agent_step",
+    step: "designing",
+    label: "Planning modules...",
+  });
+
+  const plannerPrompt = isEmail
+    ? buildEmailModulePlannerPrompt(
+        snapshot.themeName,
+        vars || {},
+        snapshot.brandAssets,
+        plan.guidesNeeded,
+      )
+    : buildModulePlannerPrompt(
+        snapshot.themeName,
+        sharedCss,
+        snapshot.brandAssets,
+        plan.guidesNeeded,
+      );
+
+  let plannerUserContent = `## User Request\n${userMessage}`;
+  if (plan.newModules.length > 0) {
+    plannerUserContent += `\n\n## Planned Modules\n${plan.newModules.map((m, i) => `${i + 1}. **${m.name}** — ${m.description}`).join("\n")}`;
+  }
+
+  if (snapshot.modules.length > 0) {
+    const affected = new Set(plan.affectedModules);
+    const modifying = snapshot.modules.filter((m) => affected.has(m.moduleName));
+    const keeping = snapshot.modules.filter((m) => !affected.has(m.moduleName));
+
+    if (modifying.length > 0) {
+      plannerUserContent +=
+        `\n\n## Existing Modules to Re-plan (PRESERVE THESE EXACT NAMES)\n` +
+        `These already exist and are being regenerated. Your output's module names MUST match these exactly — do NOT rename, retitle-case, or "improve" them. Their content/layout may change; their identifier must not.\n` +
+        modifying.map((m) => `- \`${m.moduleName}\``).join("\n");
+    }
+
+    if (keeping.length > 0) {
+      plannerUserContent +=
+        `\n\n## Existing Modules to Keep (do not re-plan)\n` +
+        `These stay as-is. Do NOT include them in your output. They will appear in the final \`moduleOrder\` (you can reference them by name when you list it).\n` +
+        keeping.map((m) => `- \`${m.moduleName}\``).join("\n");
+    }
+  }
+
+  const plannerResult = await runWithSpan("module-planner", () =>
+    callAgent(engine, apiKey, model, {
+      systemPrompt: plannerPrompt,
+      messages: [{ role: "user", content: plannerUserContent }],
+      structuredOutput: {
+        schema: MODULE_PLANNER_SCHEMA as unknown as Record<string, unknown>,
+        name: "module_plan",
+      },
+      maxTokens: 8000,
+      ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
+      ...(isEmail ? {} : { prompt: stagePromptLink("module-planner") }),
+    }),
+  );
+
+  let modulePlan: { modules: PageBlueprint["modules"]; moduleOrder: string[]; narrative: string };
+
+  const fallbackPlan = {
+    modules: plan.newModules.map((m) => ({
+      name: m.name,
+      description: m.description,
+      contentBrief: "Generate appropriate content",
+      layoutNotes: "Use responsive layout",
+    })),
+    moduleOrder: plan.newModules.map((m) => m.name),
+    narrative: "Page generated from user request",
+  };
+
+  if (plannerResult.type !== "structured") {
+    log.warn("page-architect", "Module planner: did not get structured output, using fallback");
+    modulePlan = fallbackPlan;
+  } else {
+    const raw = plannerResult.data as Record<string, unknown>;
+    if (Array.isArray(raw?.modules) && raw.modules.length > 0) {
+      modulePlan = raw as typeof modulePlan;
+      modulePlan.moduleOrder = modulePlan.moduleOrder || modulePlan.modules.map((m) => m.name);
+      modulePlan.narrative = modulePlan.narrative || "Page generated from user request";
+    } else {
+      log.warn("page-architect", "Module planner: structured output missing 'modules' array, using fallback", {
+        keys: raw ? Object.keys(raw) : [],
+      });
+      modulePlan = fallbackPlan;
+    }
+    log.info("page-architect", "Module plan", {
+      moduleCount: modulePlan.modules.length,
+    });
+  }
+
+  onEvent({
+    type: "agent_decision",
+    step: "designing",
+    decision: `Page: ${modulePlan.narrative} | ${modulePlan.modules.length} modules planned`,
+  });
+
+  return {
+    designSystem: {
+      cssVariables: designSystem.cssVariables || {},
+      sharedCss,
+      sharedJs: designSystem.sharedJs,
+    },
+    modules: modulePlan.modules,
+    moduleOrder: modulePlan.moduleOrder,
+    narrative: modulePlan.narrative,
+  };
+}

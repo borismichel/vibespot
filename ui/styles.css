@@ -8216,3 +8216,119 @@ body { display: flex; }
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Checkpoint gate card (VIB-1877) — design preview before the module build.
+   --------------------------------------------------------------------------- */
+.checkpoint {
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 520px;
+}
+.checkpoint__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.checkpoint__badge {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-radius: var(--radius-pill);
+  padding: 3px 9px;
+}
+.checkpoint__headline {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  color: var(--text);
+}
+.checkpoint__hero {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #000;
+}
+.checkpoint__hero-frame {
+  display: block;
+  width: 100%;
+  height: 230px;
+  border: 0;
+}
+.checkpoint__tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+.checkpoint__palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex: 1 1 220px;
+}
+.checkpoint__swatch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+.checkpoint__swatch-chip {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border-hover);
+  display: inline-block;
+}
+.checkpoint__type {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.checkpoint__type-row {
+  font-size: var(--text-lg);
+  color: var(--text);
+  line-height: 1.2;
+}
+.checkpoint__type-row--body {
+  font-size: var(--text-base);
+  color: var(--text-dim);
+}
+.checkpoint__muted { color: var(--text-dim); font-size: var(--text-sm); }
+.checkpoint__meta { font-size: var(--text-sm); color: var(--text-dim); }
+.checkpoint__cost { color: var(--text-dim); }
+.checkpoint__steer-input {
+  width: 100%;
+  resize: vertical;
+  background: var(--bg-input);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--text-base);
+  padding: var(--space-2);
+}
+.checkpoint__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.checkpoint__btn { font-size: var(--text-base); }
+.checkpoint__btn:disabled { opacity: 0.5; cursor: default; }
+
+/* One-shot send button — slightly dimmer than the primary send. */
+.chat__send--oneshot {
+  opacity: 0.7;
+}
+.chat__send--oneshot:hover:not(:disabled) {
+  opacity: 1;
+}

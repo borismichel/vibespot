@@ -235,6 +235,14 @@ export interface PipelineResult {
    * `runWithCostTracking`. Absent for CLI engines (no usage reported).
    */
   cost?: PageCost;
+  /**
+   * Set when the run parked at a checkpoint gate (VIB-1877) instead of
+   * finishing. No modules were built; the handler persists this on the session
+   * and waits for the user's resolution. `modules` carries the pre-run state.
+   */
+  pendingCheckpoint?: PendingCheckpoint;
+  /** Set when a parked run was cancelled at the gate — nothing was built. */
+  canceled?: boolean;
 }
 
 // ---------------------------------------------------------------------------

@@ -18,15 +18,67 @@ import type {
   MultiPagePipelineResult,
   ModuleSpec,
   PageBlueprint,
+  PipelinePlan,
+  DesignSystemOutput,
+  CheckpointResolution,
 } from "./types.js";
 import { runIntentAnalyzer } from "./stages/intent-analyzer.js";
-import { runPageArchitect, runDesignSystem } from "./stages/page-architect.js";
+import { runPageArchitect, runDesignSystem, runModulePlanner } from "./stages/page-architect.js";
 import { runSiteModulePlanner } from "./stages/site-module-planner.js";
 import { runModuleDeveloper } from "./stages/module-developer.js";
 import { validateModules, validateNavLinks } from "./stages/validator.js";
+import { buildDesignPreview } from "./design-preview.js";
+import { peekCurrentCost } from "../cost-tracker.js";
 import { log } from "../log.js";
 import { runWithSpan } from "../langfuse.js";
 import { execSync } from "node:child_process";
+
+// ---------------------------------------------------------------------------
+// Checkpoint gate resume store (VIB-1877)
+//
+// When the pipeline parks at a gate it returns immediately (no dangling
+// promise) and stashes the state needed to continue here, keyed by an opaque
+// resume token. `resumeAgentPipeline` looks it up on the user's resolution.
+// In-memory by design: an unresolved gate is dropped if the server restarts
+// (the session's `pendingCheckpoint` is likewise treated as stale on reload).
+// ---------------------------------------------------------------------------
+
+/** Stage 3 (parallel module build) dominates total spend; design+intent are a
+ * small fraction. Used to project the spend a user avoids by cancelling. */
+const STAGE3_COST_MULTIPLIER = 6;
+
+interface CheckpointResumeState {
+  kind: "design";
+  /** Enriched user message used by this run. */
+  userMessage: string;
+  plan: PipelinePlan;
+  /** Design system produced before the gate (Stage 2a). */
+  designSystem: DesignSystemOutput;
+  /** Finalized shared CSS/JS (with :root injected). */
+  sharedCss: string;
+  sharedJs: string;
+  startTime: number;
+  libraryModules: { name: string; usedIn: string[] }[];
+}
+
+const checkpointResumeStore = new Map<string, CheckpointResumeState>();
+
+function newResumeToken(): string {
+  return `cp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** Discard a parked checkpoint's resume state (on cancel or after re-entry). */
+export function discardCheckpoint(resumeToken: string): void {
+  checkpointResumeStore.delete(resumeToken);
+}
+
+/** Project the USD spend the gate guards (Stage 3). Undefined for CLI engines
+ * (no usage reported → no cost accumulated), per the event contract. */
+function estimateGatedCost(): number | undefined {
+  const spent = peekCurrentCost();
+  if (!spent || spent.costUsd <= 0) return undefined;
+  return Math.round(spent.costUsd * STAGE3_COST_MULTIPLIER * 100) / 100;
+}
 
 export { isAgenticCapable, isCLIEngine } from "./engine-adapter.js";
 
@@ -51,6 +103,7 @@ export async function runAgentPipeline(
   concurrency: number,
   onEvent: (event: PipelineEvent) => void,
   libraryModules: { name: string; usedIn: string[] }[],
+  checkpointsEnabled = false,
 ): Promise<PipelineResult> {
   const startTime = Date.now();
 
@@ -141,7 +194,32 @@ export async function runAgentPipeline(
     plan.intent === "create" || plan.designSystemChanges;
 
   if (needsArchitect) {
-    // Stage 2 now runs two sequential calls:
+    // -----------------------------------------------------------------------
+    // Design checkpoint (VIB-1877): when checkpoints are on, split the
+    // architect at the design seam. Run only Stage 2a (cheap design system),
+    // then PARK — return at the gate with a palette/type/hero preview before
+    // committing to the expensive parallel module build. The user's
+    // approve/steer/skip/cancel re-enters via `resumeAgentPipeline`.
+    // Email has no shared CSS to preview, so it never gates here.
+    // -----------------------------------------------------------------------
+    if (checkpointsEnabled && plan.contentType !== "email") {
+      const ds = await runDesignSystem(
+        userMessage,
+        plan,
+        snapshot,
+        engine,
+        apiKey,
+        model,
+        onEvent,
+      );
+      return parkAtDesignCheckpoint(
+        { kind: "design", userMessage, plan, designSystem: ds, sharedCss: ds.sharedCss, sharedJs: ds.sharedJs || sharedJs, startTime, libraryModules },
+        snapshot,
+        onEvent,
+      );
+    }
+
+    // Stage 2 runs two sequential calls (one-shot path, no gate):
     // 2a: Design System (CSS vars + shared CSS/JS) — emits design_system_ready
     // 2b: Module Planner (module specs + order) — uses the finalized CSS
     blueprint = await runPageArchitect(
@@ -166,6 +244,190 @@ export async function runAgentPipeline(
       sharedJs,
     });
   }
+
+  return runBuildPhase(
+    userMessage,
+    plan,
+    snapshot,
+    blueprint,
+    sharedCss,
+    sharedJs,
+    engine,
+    apiKey,
+    model,
+    effectiveConcurrency,
+    onEvent,
+    libraryModules,
+    startTime,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Checkpoint park / resume (VIB-1877)
+// ---------------------------------------------------------------------------
+
+/**
+ * Stash resume state and return a paused result carrying the design preview.
+ * The handler persists `pendingCheckpoint` on the session and stops — no
+ * modules are built, nothing is committed, until the user resolves the gate.
+ */
+function parkAtDesignCheckpoint(
+  state: CheckpointResumeState,
+  snapshot: SessionSnapshot,
+  onEvent: (event: PipelineEvent) => void,
+): PipelineResult {
+  const resumeToken = newResumeToken();
+  checkpointResumeStore.set(resumeToken, state);
+
+  const preview = buildDesignPreview(state.designSystem);
+  const estCostNext = estimateGatedCost();
+
+  onEvent({
+    type: "checkpoint_requested",
+    kind: "design",
+    preview,
+    ...(estCostNext != null ? { estCostNext } : {}),
+  });
+
+  return {
+    modules: [...snapshot.modules],
+    moduleOrder: snapshot.moduleOrder as string[],
+    sharedCss: state.sharedCss,
+    sharedJs: state.sharedJs,
+    assistantMessage: "",
+    contentType: state.plan.contentType,
+    stats: { modulesGenerated: 0, modulesUnchanged: snapshot.modules.length, modulesFailed: 0, durationMs: Date.now() - state.startTime },
+    pendingCheckpoint: {
+      kind: "design",
+      resumeToken,
+      preview,
+      createdAt: new Date().toISOString(),
+    },
+  };
+}
+
+/**
+ * Re-enter a parked pipeline at the design seam with the user's resolution.
+ * approve/skip → run the Module Planner against the parked design, then build.
+ * steer → re-run ONLY the design system with the note, then re-park.
+ * cancel → drop the run (handler clears the session gate).
+ */
+export async function resumeAgentPipeline(
+  resumeToken: string,
+  resolution: CheckpointResolution,
+  snapshot: SessionSnapshot,
+  engine: AgentEngine,
+  apiKey: string,
+  model: string,
+  concurrency: number,
+  onEvent: (event: PipelineEvent) => void,
+): Promise<PipelineResult> {
+  const state = checkpointResumeStore.get(resumeToken);
+  if (!state) {
+    throw new Error("This checkpoint has expired (the server may have restarted). Send your request again to start over.");
+  }
+
+  // Cancel: discard the parked run. Nothing is built.
+  if (resolution.action === "cancel") {
+    discardCheckpoint(resumeToken);
+    return {
+      modules: [...snapshot.modules],
+      moduleOrder: snapshot.moduleOrder as string[],
+      sharedCss: snapshot.sharedCss,
+      sharedJs: snapshot.sharedJs,
+      assistantMessage: "Cancelled — nothing was built.",
+      canceled: true,
+      stats: { modulesGenerated: 0, modulesUnchanged: snapshot.modules.length, modulesFailed: 0, durationMs: 0 },
+    };
+  }
+
+  // Steer: re-run ONLY the design system with the note appended, then re-park.
+  if (resolution.action === "steer") {
+    discardCheckpoint(resumeToken);
+    const note = (resolution.note || "").trim();
+    const steeredMessage = note
+      ? `${state.userMessage}\n\n## Design steer (revise the design system to honor this)\n${note}`
+      : state.userMessage;
+    const ds = await runDesignSystem(
+      steeredMessage,
+      state.plan,
+      snapshot,
+      engine,
+      apiKey,
+      model,
+      onEvent,
+    );
+    return parkAtDesignCheckpoint(
+      { ...state, userMessage: steeredMessage, designSystem: ds, sharedCss: ds.sharedCss, sharedJs: ds.sharedJs || state.sharedJs },
+      snapshot,
+      onEvent,
+    );
+  }
+
+  // approve / skip: continue the build with the parked design.
+  // (`skip` suppresses any further gates this run; C1 has only this one, so
+  // there are no later gates to suppress — handled identically here.)
+  discardCheckpoint(resumeToken);
+
+  const blueprint = await runModulePlanner(
+    state.userMessage,
+    state.plan,
+    snapshot,
+    state.designSystem,
+    state.sharedCss,
+    engine,
+    apiKey,
+    model,
+    onEvent,
+  );
+
+  const sharedCss = state.plan.contentType !== "email" ? (blueprint.designSystem.sharedCss || state.sharedCss) : state.sharedCss;
+  const sharedJs = state.plan.contentType !== "email" ? (blueprint.designSystem.sharedJs || state.sharedJs) : state.sharedJs;
+
+  onEvent({
+    type: "blueprint_ready",
+    moduleOrder: blueprint.moduleOrder,
+    sharedCss,
+    sharedJs,
+  });
+
+  return runBuildPhase(
+    state.userMessage,
+    state.plan,
+    snapshot,
+    blueprint,
+    sharedCss,
+    sharedJs ?? "",
+    engine,
+    apiKey,
+    model,
+    concurrency,
+    onEvent,
+    state.libraryModules,
+    state.startTime,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Build phase — Stage 3 (module dev) + Stage 4 (validate) + assemble.
+// Shared by the one-shot path and the checkpoint-resume path.
+// ---------------------------------------------------------------------------
+
+async function runBuildPhase(
+  userMessage: string,
+  plan: PipelinePlan,
+  snapshot: SessionSnapshot,
+  blueprint: PageBlueprint | null,
+  sharedCss: string,
+  sharedJs: string,
+  engine: AgentEngine,
+  apiKey: string,
+  model: string,
+  effectiveConcurrency: number,
+  onEvent: (event: PipelineEvent) => void,
+  libraryModules: { name: string; usedIn: string[] }[],
+  startTime: number,
+): Promise<PipelineResult> {
 
   // -----------------------------------------------------------------------
   // Build module specs for Stage 3

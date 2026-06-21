@@ -36,6 +36,7 @@ let lastGenerationBubbleEl = null;
 const messagesEl = document.getElementById("chat-messages");
 const inputEl = document.getElementById("chat-input");
 const sendBtn = document.getElementById("chat-send");
+const oneShotBtn = document.getElementById("chat-send-oneshot");
 const statusText = document.getElementById("status-text");
 const statusEngine = document.getElementById("status-engine");
 const statusTheme = document.getElementById("status-theme");
@@ -750,6 +751,12 @@ function handleWsMessage(msg) {
       break;
     case "pipeline_partial":
       handlePipelinePartial(msg);
+      break;
+    case "checkpoint_requested":
+      handleCheckpointRequested(msg);
+      break;
+    case "checkpoint_cancelled":
+      handleCheckpointCancelled();
       break;
     case "generation_cost":
       handleGenerationCost(msg);
@@ -1745,7 +1752,7 @@ fileInputEl.addEventListener("change", () => {
 // Sending messages
 // ---------------------------------------------------------------------------
 
-async function sendMessage(text) {
+async function sendMessage(text, opts = {}) {
   const hasFiles = pendingFiles.length > 0;
   if ((!text.trim() && !hasFiles) || isStreaming || !ws || ws.readyState !== WebSocket.OPEN) return;
 
@@ -1794,6 +1801,8 @@ async function sendMessage(text) {
   if (uploadedFiles.length > 0) {
     payload.fileIds = uploadedFiles.map((f) => f.id);
   }
+  // One-shot: skip the design checkpoint and build the whole page (VIB-1877).
+  if (opts.oneShot) payload.oneShot = true;
   ws.send(JSON.stringify(payload));
 
   // Clear input
@@ -1836,6 +1845,7 @@ function startStreaming() {
   streamBuffer = "";
   lastStreamStatus = "";
   sendBtn.disabled = true;
+  if (oneShotBtn) oneShotBtn.disabled = true;
   streamStartTime = Date.now();
   if (typeof window.setSelectModeDisabled === "function") {
     window.setSelectModeDisabled(true);
@@ -1988,6 +1998,7 @@ function finishStreaming() {
   if (!isStreaming) return;
   isStreaming = false;
   sendBtn.disabled = false;
+  if (oneShotBtn) oneShotBtn.disabled = false;
   if (typeof window.setSelectModeDisabled === "function") {
     window.setSelectModeDisabled(false);
   }
@@ -2244,6 +2255,134 @@ function appendSystemMessage(text) {
   div.innerHTML = `<div class="chat-msg__system">${escapeHtml(text)}</div>`;
   messagesEl.appendChild(div);
   scrollToBottom();
+}
+
+// ---------------------------------------------------------------------------
+// Checkpoint gate card (VIB-1877) — the design preview the user approves /
+// steers / skips / cancels before the expensive module build.
+// ---------------------------------------------------------------------------
+
+let checkpointCardEl = null;
+
+function setSendDisabled(disabled) {
+  sendBtn.disabled = disabled;
+  if (oneShotBtn) oneShotBtn.disabled = disabled;
+}
+
+function removeCheckpointCard() {
+  if (checkpointCardEl && checkpointCardEl.parentNode) {
+    checkpointCardEl.parentNode.removeChild(checkpointCardEl);
+  }
+  checkpointCardEl = null;
+}
+
+function handleCheckpointRequested(msg) {
+  // Settle the in-flight "thinking" bubble; the gate now waits on the user.
+  clearStreamStatus();
+  finishStreaming();
+  removeCheckpointCard();
+
+  const preview = msg.preview || {};
+  const data = preview.data || {};
+  checkpointCardEl = renderCheckpointCard(preview, data, msg.estCostNext);
+  messagesEl.appendChild(checkpointCardEl);
+  scrollToBottom();
+
+  // Hold the send buttons until the gate is resolved.
+  setSendDisabled(true);
+  setStatus("Awaiting your call");
+}
+
+function handleCheckpointCancelled() {
+  removeCheckpointCard();
+  setSendDisabled(false);
+  appendSystemMessage("Cancelled — nothing was built.");
+}
+
+function resolveCheckpoint(action, note) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  removeCheckpointCard();
+  if (action === "cancel") {
+    setSendDisabled(false);
+  } else {
+    // approve / steer / skip — work resumes; show the progress spinner again.
+    startStreaming();
+    setStatus("Generating...");
+  }
+  ws.send(JSON.stringify({ type: "checkpoint_resolve", action, note: note || undefined }));
+}
+
+function renderCheckpointCard(preview, data, estCostNext) {
+  const div = document.createElement("div");
+  div.className = "chat-msg chat-msg--assistant";
+
+  const palette = Array.isArray(data.palette) ? data.palette : [];
+  const swatches = palette.map((p) =>
+    `<div class="checkpoint__swatch" title="${escapeHtml(p.label)}: ${escapeHtml(p.value)}">
+       <span class="checkpoint__swatch-chip" style="background:${escapeHtml(p.value)}"></span>
+       <span class="checkpoint__swatch-label">${escapeHtml(p.label)}</span>
+     </div>`).join("");
+
+  const typo = data.typography || {};
+  const heroSrc = typeof data.heroHtml === "string" ? data.heroHtml : "";
+  const costLine = (typeof estCostNext === "number" && estCostNext > 0)
+    ? `<span class="checkpoint__cost">Building all modules will cost ~$${estCostNext.toFixed(2)}</span>`
+    : "";
+
+  div.innerHTML = `
+    <div class="chat-msg__avatar chat-msg__avatar--ai">AI</div>
+    <div class="chat-msg__content">
+      <div class="checkpoint">
+        <div class="checkpoint__head">
+          <span class="checkpoint__badge">Design checkpoint</span>
+          <span class="checkpoint__headline">${escapeHtml(preview.headline || "Review the design before building")}</span>
+        </div>
+        <div class="checkpoint__hero">
+          <iframe class="checkpoint__hero-frame" title="Hero preview" sandbox="" srcdoc="${escapeHtml(heroSrc)}"></iframe>
+        </div>
+        <div class="checkpoint__tokens">
+          <div class="checkpoint__palette">${swatches || '<span class="checkpoint__muted">No palette tokens</span>'}</div>
+          <div class="checkpoint__type">
+            <div class="checkpoint__type-row" style="font-family:${escapeHtml(typo.heading || "")}">Aa — ${escapeHtml(typo.heading || "Heading font")}</div>
+            <div class="checkpoint__type-row checkpoint__type-row--body" style="font-family:${escapeHtml(typo.body || "")}">Body — ${escapeHtml(typo.body || "Body font")}</div>
+          </div>
+        </div>
+        ${costLine ? `<div class="checkpoint__meta">${costLine}</div>` : ""}
+        <div class="checkpoint__steer hidden">
+          <textarea class="checkpoint__steer-input" rows="2" placeholder="What should change? e.g. warmer palette, bigger headings..."></textarea>
+        </div>
+        <div class="checkpoint__actions">
+          <button class="btn btn--primary checkpoint__btn" data-action="approve">Looks good — build it</button>
+          <button class="btn checkpoint__btn" data-action="steer">Tweak the design</button>
+          <button class="btn checkpoint__btn" data-action="skip" title="Build now and don't ask again this run">Skip checkpoints</button>
+          <button class="btn btn--ghost checkpoint__btn" data-action="cancel">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+
+  const steerWrap = div.querySelector(".checkpoint__steer");
+  const steerInput = div.querySelector(".checkpoint__steer-input");
+  const steerBtn = div.querySelector('.checkpoint__btn[data-action="steer"]');
+  let steerArmed = false;
+
+  div.querySelectorAll(".checkpoint__btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.action;
+      // Steer is two-step: first click reveals the note box, second submits.
+      if (action === "steer" && !steerArmed) {
+        steerArmed = true;
+        steerWrap.classList.remove("hidden");
+        steerBtn.textContent = "Apply tweak";
+        if (steerInput) steerInput.focus();
+        return;
+      }
+      const note = action === "steer" && steerInput ? steerInput.value.trim() : undefined;
+      div.querySelectorAll(".checkpoint__btn").forEach((b) => (b.disabled = true));
+      resolveCheckpoint(action, note);
+    });
+  });
+
+  return div;
 }
 
 // ---------------------------------------------------------------------------
@@ -3136,6 +3275,13 @@ function setupDragReorder(container) {
 sendBtn.addEventListener("click", () => {
   sendMessage(inputEl.value);
 });
+
+// One-shot button — build the whole page, skipping the design checkpoint.
+if (oneShotBtn) {
+  oneShotBtn.addEventListener("click", () => {
+    sendMessage(inputEl.value, { oneShot: true });
+  });
+}
 
 // Enter to send (Shift+Enter for newline)
 inputEl.addEventListener("keydown", (e) => {
