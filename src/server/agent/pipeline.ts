@@ -22,6 +22,7 @@ import type {
   DesignSystemOutput,
   CheckpointResolution,
 } from "./types.js";
+import { PipelineAbortError } from "./types.js";
 import { runIntentAnalyzer } from "./stages/intent-analyzer.js";
 import { runPageArchitect, runDesignSystem, runModulePlanner } from "./stages/page-architect.js";
 import { runSiteModulePlanner } from "./stages/site-module-planner.js";
@@ -104,6 +105,7 @@ export async function runAgentPipeline(
   onEvent: (event: PipelineEvent) => void,
   libraryModules: { name: string; usedIn: string[] }[],
   checkpointsEnabled = false,
+  signal?: AbortSignal,
 ): Promise<PipelineResult> {
   const startTime = Date.now();
 
@@ -142,6 +144,10 @@ export async function runAgentPipeline(
     libraryModules,
   );
 
+  // Barge-in (VIB-1880): a newer message may have aborted this run while the
+  // intent call was in flight — bail before any expensive architect/build work.
+  if (signal?.aborted) throw new PipelineAbortError();
+
   // Short-circuit for questions
   if (plan.intent === "question" && plan.answer) {
     const durationMs = Date.now() - startTime;
@@ -179,6 +185,7 @@ export async function runAgentPipeline(
       concurrency,
       onEvent,
       startTime,
+      signal,
     );
   }
 
@@ -245,6 +252,9 @@ export async function runAgentPipeline(
     });
   }
 
+  // Barge-in (VIB-1880): bail if aborted during the architect, before Stage 3.
+  if (signal?.aborted) throw new PipelineAbortError();
+
   return runBuildPhase(
     userMessage,
     plan,
@@ -259,6 +269,7 @@ export async function runAgentPipeline(
     onEvent,
     libraryModules,
     startTime,
+    signal,
   );
 }
 
@@ -321,6 +332,7 @@ export async function resumeAgentPipeline(
   model: string,
   concurrency: number,
   onEvent: (event: PipelineEvent) => void,
+  signal?: AbortSignal,
 ): Promise<PipelineResult> {
   const state = checkpointResumeStore.get(resumeToken);
   if (!state) {
@@ -405,6 +417,7 @@ export async function resumeAgentPipeline(
     onEvent,
     state.libraryModules,
     state.startTime,
+    signal,
   );
 }
 
@@ -427,6 +440,7 @@ async function runBuildPhase(
   onEvent: (event: PipelineEvent) => void,
   libraryModules: { name: string; usedIn: string[] }[],
   startTime: number,
+  signal?: AbortSignal,
 ): Promise<PipelineResult> {
 
   // -----------------------------------------------------------------------
@@ -497,6 +511,7 @@ async function runBuildPhase(
           plan.guidesNeeded,
           snapshot.brandAssets,
           plan.contentType,
+          signal,
         ),
       { metadata: { moduleCount: moduleSpecs.length } },
     );
@@ -559,6 +574,7 @@ async function runBuildPhase(
               plan.guidesNeeded,
               snapshot.brandAssets,
               plan.contentType,
+              signal,
             ),
           { metadata: { moduleCount: retrySpecs.length } },
         );
@@ -724,6 +740,7 @@ async function runMultiPageFlow(
   concurrency: number,
   onEvent: (event: PipelineEvent) => void,
   startTime: number,
+  signal?: AbortSignal,
 ): Promise<PipelineResult> {
   const pages = plan.pages!;
   const sharedModuleNames = plan.sharedModules || ["site-header", "site-footer"];
@@ -812,6 +829,7 @@ async function runMultiPageFlow(
         plan.guidesNeeded,
         snapshot.brandAssets,
         plan.contentType,
+        signal,
       ),
     { metadata: { moduleCount: allSpecs.length } },
   );
@@ -874,6 +892,7 @@ async function runMultiPageFlow(
               plan.guidesNeeded,
               snapshot.brandAssets,
               plan.contentType,
+              signal,
             ),
           { metadata: { moduleCount: retrySpecs.length } },
         );

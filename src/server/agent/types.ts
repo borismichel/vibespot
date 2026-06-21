@@ -97,11 +97,13 @@ export type ModuleStatus =
 // ---------------------------------------------------------------------------
 // Checkpoint gate (VIB-1877) — pauses the pipeline at a natural seam so the
 // user can approve / steer / skip before the expensive module build. One
-// primitive, reused at several seams (design, structure, brand-intake).
-// Generalizes the existing plan_approve pause.
+// primitive, reused at several seams (design, structure, brand-intake, plan).
+// Plan mode (VIB-1880) is the heaviest variant: the whole deliberation phase
+// is one "plan" checkpoint, resolved through the same `checkpoint_resolve`
+// protocol instead of a separate plan_approve branch.
 // ---------------------------------------------------------------------------
 
-export type CheckpointKind = "design" | "structure" | "brand_intake";
+export type CheckpointKind = "design" | "structure" | "brand_intake" | "plan";
 
 /** Action the user takes at a checkpoint. */
 export type CheckpointAction =
@@ -311,13 +313,64 @@ export interface ModuleSpec {
 // Concurrency limiter helper
 // ---------------------------------------------------------------------------
 
-export function createConcurrencyLimiter(maxConcurrent: number) {
+/**
+ * Error thrown when a limited task is skipped/cancelled because the run was
+ * aborted (barge-in, VIB-1880). Distinct so callers can tell a deliberate
+ * cancellation apart from a genuine module-generation failure.
+ */
+export class PipelineAbortError extends Error {
+  readonly aborted = true;
+  constructor(message = "Pipeline aborted") {
+    super(message);
+    this.name = "PipelineAbortError";
+  }
+}
+
+/** True for any abort-flavoured error (our own, DOMException AbortError, or the
+ * Anthropic SDK's APIUserAbortError) so seam checks can treat them uniformly. */
+export function isAbortError(err: unknown): boolean {
+  if (err instanceof PipelineAbortError) return true;
+  const name = (err as { name?: string } | null)?.name;
+  if (name === "AbortError" || name === "APIUserAbortError") return true;
+  const msg = err instanceof Error ? err.message : "";
+  return /\baborted\b/i.test(msg);
+}
+
+/**
+ * Concurrency limiter with optional cancellation (VIB-1880).
+ *
+ * When `signal` aborts, queued tasks that have not yet started reject with a
+ * `PipelineAbortError` (so the build stops spawning new module calls), and any
+ * task entering `limit()` after the abort is rejected up front. In-flight calls
+ * are cancelled separately by threading the same `signal` into the provider
+ * request (see engine-adapter); the limiter only governs not-yet-started work.
+ */
+export function createConcurrencyLimiter(
+  maxConcurrent: number,
+  signal?: AbortSignal,
+) {
   let running = 0;
-  const queue: Array<() => void> = [];
+  const queue: Array<{ resolve: () => void; reject: (err: unknown) => void }> = [];
+
+  if (signal) {
+    signal.addEventListener(
+      "abort",
+      () => {
+        // Drain everything still waiting for a slot — none of it should run.
+        while (queue.length > 0) {
+          queue.shift()!.reject(new PipelineAbortError());
+        }
+      },
+      { once: true },
+    );
+  }
 
   return async function limit<T>(fn: () => Promise<T>): Promise<T> {
+    if (signal?.aborted) throw new PipelineAbortError();
     if (running >= maxConcurrent) {
-      await new Promise<void>((resolve) => queue.push(resolve));
+      await new Promise<void>((resolve, reject) => queue.push({ resolve, reject }));
+      // Re-check: the abort may have fired while we were queued.
+      if (signal?.aborted) throw new PipelineAbortError();
     }
     running++;
     try {
@@ -325,7 +378,7 @@ export function createConcurrencyLimiter(maxConcurrent: number) {
     } finally {
       running--;
       if (queue.length > 0) {
-        queue.shift()!();
+        queue.shift()!.resolve();
       }
     }
   };

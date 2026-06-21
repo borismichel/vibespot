@@ -8,7 +8,7 @@ import type { ModuleFiles } from "../../../ai/engine.js";
 import type { AgentEngine } from "../engine-adapter.js";
 import { callAgent } from "../engine-adapter.js";
 import type { ContentType, ModuleSpec, PipelineEvent } from "../types.js";
-import { createConcurrencyLimiter } from "../types.js";
+import { createConcurrencyLimiter, PipelineAbortError, isAbortError } from "../types.js";
 import {
   buildModuleDeveloperPrompt,
   buildModuleDeveloperPromptBlocks,
@@ -49,6 +49,7 @@ export async function runModuleDeveloper(
   guidesNeeded?: string[],
   brandAssets?: { styleguide?: string; brandvoice?: string; humanify?: boolean },
   contentType?: ContentType,
+  signal?: AbortSignal,
 ): Promise<ModuleDevResult[]> {
   const isEmail = contentType === "email";
   const isBlog = contentType === "blog";
@@ -74,7 +75,7 @@ export async function runModuleDeveloper(
         : buildModuleDeveloperPromptBlocks(themeName, sharedCss, guidesNeeded, brandAssets)
     : undefined;
 
-  const limit = createConcurrencyLimiter(concurrency);
+  const limit = createConcurrencyLimiter(concurrency, signal);
   const total = specs.length;
 
   const outputSchema = isEmail
@@ -99,6 +100,8 @@ export async function runModuleDeveloper(
 
       let lastError = "";
       for (let attempt = 0; attempt < 2; attempt++) {
+        // Barge-in (VIB-1880): stop retrying / starting work once aborted.
+        if (signal?.aborted) throw new PipelineAbortError();
         try {
           if (attempt > 0) {
             log.warn("module-developer", `${spec.name}: retrying after failure (attempt ${attempt + 1})`);
@@ -124,6 +127,7 @@ export async function runModuleDeveloper(
             outputSchema,
             isBlog,
             promptLink,
+            signal,
           );
 
           onEvent({
@@ -137,6 +141,9 @@ export async function runModuleDeveloper(
 
           return { moduleName: spec.name, module };
         } catch (err) {
+          // Don't retry or swallow an abort — let it reject the task so the
+          // build phase can bail (barge-in, VIB-1880).
+          if (isAbortError(err)) throw err instanceof PipelineAbortError ? err : new PipelineAbortError();
           lastError =
             err instanceof Error ? err.message
               : typeof err === "object" && err !== null ? JSON.stringify(err)
@@ -162,6 +169,10 @@ export async function runModuleDeveloper(
 
   const results = await Promise.allSettled(promises);
 
+  // Barge-in (VIB-1880): if the run was aborted, bail the whole stage rather
+  // than returning a half-built page that the pipeline would try to assemble.
+  if (signal?.aborted) throw new PipelineAbortError();
+
   return results.map((r) => {
     if (r.status === "fulfilled") return r.value;
     return {
@@ -184,6 +195,7 @@ async function generateSingleModule(
   schema: Record<string, unknown> = MODULE_DEVELOPER_SCHEMA as unknown as Record<string, unknown>,
   isBlog = false,
   promptLink?: StagePromptLink,
+  signal?: AbortSignal,
 ): Promise<ModuleFiles> {
   const userContent = isEmail
     ? buildEmailModuleUserMessage(userMessage, spec, spec.existingCode)
@@ -201,6 +213,7 @@ async function generateSingleModule(
     },
     maxTokens: 16000,
     ...(promptLink ? { prompt: promptLink } : {}),
+    signal,
   });
 
   if (result.type !== "structured") {
@@ -222,6 +235,7 @@ async function generateSingleModule(
         schema,
         isBlog,
         promptLink,
+        signal,
       );
     }
     throw new Error(

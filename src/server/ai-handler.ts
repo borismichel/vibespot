@@ -23,6 +23,7 @@ import { hasValidOAuthToken, getValidAccessToken } from "../utils/claude-oauth.j
 import { getFileContexts } from "./routes/upload-files.js";
 import { runAgentPipeline, resumeAgentPipeline, isAgenticCapable, isCLIEngine } from "./agent/pipeline.js";
 import type { CheckpointResolution } from "./agent/types.js";
+import { isAbortError } from "./agent/types.js";
 import { runWithTrace, setTraceOutput } from "./langfuse.js";
 import type { AgentEngine } from "./agent/engine-adapter.js";
 import type { PipelineEvent, PipelineResult, MultiPagePipelineResult } from "./agent/types.js";
@@ -46,6 +47,47 @@ let generatingSessionId: string | null = null;
 
 export function isGenerating(): boolean {
   return generatingSessionId !== null;
+}
+
+// ---------------------------------------------------------------------------
+// Barge-in cancellation (VIB-1880)
+//
+// The active agentic run registers an AbortController here. A chat message that
+// arrives mid-build calls `cancelActiveGeneration()` to abort it (cancel-and-
+// replan); the signal threads down through the pipeline → concurrency limiter →
+// provider requests so in-flight generation stops spending immediately. Each
+// run is tagged with a monotonic id so a settling old run never clears a newer
+// run's controller.
+// ---------------------------------------------------------------------------
+
+interface ActiveRun {
+  id: number;
+  abort: AbortController;
+}
+let activeRun: ActiveRun | null = null;
+let runCounter = 0;
+
+/** Begin tracking a cancellable run. Returns the run handle + its signal. */
+function beginCancellableRun(): { run: ActiveRun; signal: AbortSignal } {
+  const run: ActiveRun = { id: ++runCounter, abort: new AbortController() };
+  activeRun = run;
+  return { run, signal: run.abort.signal };
+}
+
+/** Stop tracking a run, but only if it's still the current one. */
+function endCancellableRun(run: ActiveRun): void {
+  if (activeRun === run) activeRun = null;
+}
+
+/**
+ * Abort the in-flight agentic run, if any (barge-in). Returns true if a run was
+ * actually signalled. The run unwinds on its own; callers should wait for
+ * `isGenerating()` to clear before starting a replacement.
+ */
+export function cancelActiveGeneration(): boolean {
+  if (!activeRun) return false;
+  activeRun.abort.abort();
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -343,6 +385,7 @@ export async function handleAgenticGenerate(
 
   const capturedSessionId = session.id;
   generatingSessionId = capturedSessionId;
+  const { run, signal } = beginCancellableRun();
 
   try {
     const config = loadConfig();
@@ -404,13 +447,24 @@ export async function handleAgenticGenerate(
             onEvent,
             libraryModules,
             checkpointsEnabled,
+            signal,
           );
           setTraceOutput(summarizePipelineOutput(r));
           return r;
         },
       ),
-    );
+    ).catch((err) => {
+      // Barge-in (VIB-1880): a newer message aborted this run — return a clean
+      // "canceled" result instead of surfacing the abort as an error.
+      if (isAbortError(err)) {
+        log.info("ai-handler", "Agentic run cancelled (barge-in)");
+        return { result: canceledPipelineResult(snapshot), cost: undefined };
+      }
+      throw err;
+    });
     result.cost = cost;
+
+    if (result.canceled) return result;
 
     // Verify session hasn't changed during generation
     const current = getSession();
@@ -422,7 +476,22 @@ export async function handleAgenticGenerate(
     return result;
   } finally {
     generatingSessionId = null;
+    endCancellableRun(run);
   }
+}
+
+/** A no-op pipeline result for a cancelled (barge-in) run — nothing was built,
+ * pre-run state is preserved so the caller skips apply/commit. */
+function canceledPipelineResult(snapshot: ReturnType<typeof takeSnapshot>): PipelineResult {
+  return {
+    modules: [...snapshot.modules],
+    moduleOrder: snapshot.moduleOrder as string[],
+    sharedCss: snapshot.sharedCss,
+    sharedJs: snapshot.sharedJs,
+    assistantMessage: "",
+    canceled: true,
+    stats: { modulesGenerated: 0, modulesUnchanged: snapshot.modules.length, modulesFailed: 0, durationMs: 0 },
+  };
 }
 
 /**
@@ -442,6 +511,7 @@ export async function handleAgenticResume(
 
   const capturedSessionId = session.id;
   generatingSessionId = capturedSessionId;
+  const { run, signal } = beginCancellableRun();
 
   try {
     const config = loadConfig();
@@ -469,13 +539,22 @@ export async function handleAgenticResume(
             model,
             concurrency,
             onEvent,
+            signal,
           );
           setTraceOutput(summarizePipelineOutput(r));
           return r;
         },
       ),
-    );
+    ).catch((err) => {
+      if (isAbortError(err)) {
+        log.info("ai-handler", "Checkpoint resume cancelled (barge-in)");
+        return { result: canceledPipelineResult(snapshot), cost: undefined };
+      }
+      throw err;
+    });
     result.cost = cost;
+
+    if (result.canceled) return result;
 
     const current = getSession();
     if (!current || current.id !== capturedSessionId) {
@@ -486,6 +565,7 @@ export async function handleAgenticResume(
     return result;
   } finally {
     generatingSessionId = null;
+    endCancellableRun(run);
   }
 }
 

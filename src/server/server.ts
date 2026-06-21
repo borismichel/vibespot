@@ -20,7 +20,8 @@ import {
 } from "./session.js";
 import { commitThemeState, commitTemplateState, isGitAvailable } from "./project-git.js";
 import { buildPreviewHtml, buildModulePreviewHtml } from "./preview.js";
-import { handleGenerateStream, handleAgenticGenerate, handleAgenticResume, handleFigmaImport, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine, handlePlanModeStream, isPlanModeActive, isGenerating } from "./ai-handler.js";
+import { handleGenerateStream, handleAgenticGenerate, handleAgenticResume, handleFigmaImport, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine, handlePlanModeStream, isPlanModeActive, isGenerating, cancelActiveGeneration } from "./ai-handler.js";
+import type { PipelineResult } from "./agent/types.js";
 import type { CheckpointResolution, CheckpointAction } from "./agent/types.js";
 import { handlePlanEditRoute, handlePlanDiscardRoute, handlePlanTemplatesRoute, handlePlanTemplateRoute, savePlan, clearPlan } from "./routes/plan.js";
 import { parsePlanResponse } from "./plan-parser.js";
@@ -224,6 +225,190 @@ function sendGenerationCost(result: import("./agent/types.js").PipelineResult): 
     cost,
     projectTotal: sess?.costTotal,
   });
+}
+
+/**
+ * Wait for any in-flight agentic generation to unwind (barge-in, VIB-1880).
+ * Used after `cancelActiveGeneration()` so a replacement run never overlaps the
+ * one it superseded. Resolves early once `isGenerating()` clears; gives up after
+ * `timeoutMs` (the new run uses its own controller, so a slow unwind is safe).
+ */
+async function waitForGenerationIdle(timeoutMs = 10000): Promise<void> {
+  const start = Date.now();
+  while (isGenerating() && Date.now() - start < timeoutMs) {
+    await new Promise((r) => setTimeout(r, 50));
+  }
+}
+
+/**
+ * Apply a completed agentic pipeline result to the session, persist + commit it
+ * for version history, and notify the client (cost, preview, module list).
+ * Shared by the chat, checkpoint-resume, and plan-approve paths (VIB-1880) so
+ * the build+commit tail lives in exactly one place.
+ */
+function finalizeAgenticGeneration(
+  result: PipelineResult,
+  opts: {
+    steps: { step: string; label: string; decisions?: string[] }[];
+    modules: { name: string; status: "complete" | "failed" }[];
+    commitLabel: string;
+  },
+): void {
+  applyPipelineResult(result, {
+    steps: opts.steps,
+    modules: opts.modules,
+    stats: result.stats,
+    cost: result.cost,
+  });
+  sendGenerationCost(result);
+
+  const currentSession = getSession();
+  if (currentSession) {
+    writeModulesToDisk();
+    const activeTpl = getActiveTemplate();
+    let commitHash: string | null = null;
+    if (activeTpl) {
+      const filePaths = activeTpl.moduleOrder.map((n: string) => `modules/${n}.module`);
+      if (activeTpl.templateFile) filePaths.push(activeTpl.templateFile);
+      if (activeTpl.sharedCss) filePaths.push(`css/${currentSession.themeName}-theme.css`);
+      if (activeTpl.sharedJs) filePaths.push(`js/${currentSession.themeName}-animations.js`);
+      commitHash = commitTemplateState(currentSession.themePath, activeTpl.id, opts.commitLabel, filePaths);
+    } else {
+      commitHash = commitThemeState(currentSession.themePath, opts.commitLabel);
+    }
+    if (commitHash) {
+      sendToClient({ type: "version_created", hash: commitHash });
+    }
+  }
+
+  sendToClient({ type: "generation_complete" });
+  {
+    const sess = getSession();
+    sendToClient({
+      type: "modules_updated",
+      modules: getOrderedModules().map((m) => m.moduleName),
+      templateId: sess?.activeTemplateId || null,
+      templates: (sess?.templates || []).map((t) => ({
+        id: t.id, label: t.label, pageType: t.pageType, moduleCount: t.modules.length,
+      })),
+    });
+  }
+  clearPipelineEventLog();
+}
+
+// ---------------------------------------------------------------------------
+// Plan mode as a checkpoint variant (VIB-1880)
+//
+// Plan mode is the heaviest checkpoint: the whole deliberation phase is one
+// "plan" checkpoint. These helpers are shared by the chat plan-mode branch and
+// the `checkpoint_resolve {kind:"plan"}` path so plan deliberation, approval,
+// and discard each live in one place — collapsing the old plan_approve branch.
+// ---------------------------------------------------------------------------
+
+/** Stream a plan-mode deliberation turn, persist the plan, and park a "plan"
+ * checkpoint so the user can approve/steer/cancel through checkpoint_resolve. */
+async function runPlanDeliberation(userMessage: string, fileIds?: string[]): Promise<void> {
+  addMessage("user", userMessage);
+  saveSession();
+
+  try {
+    sendToClient({ type: "stream_status", content: "Planning..." });
+    let fullResponse = "";
+    const fullText = await handlePlanModeStream(
+      userMessage,
+      (chunk) => {
+        fullResponse += chunk;
+        sendToClient({ type: "stream", content: chunk });
+      },
+      fileIds,
+    );
+
+    const parsed = parsePlanResponse(fullText || fullResponse);
+
+    if (parsed.plan) {
+      savePlan(parsed.plan);
+      sendToClient({ type: "plan_updated", plan: parsed.plan });
+      const sess = getSession();
+      if (sess) {
+        sess.pendingCheckpoint = {
+          kind: "plan",
+          resumeToken: "plan",
+          preview: { kind: "plan", headline: "Plan ready for review", data: { plan: parsed.plan } },
+          createdAt: new Date().toISOString(),
+        };
+        saveSession();
+      }
+    }
+    if (parsed.choices) {
+      sendToClient({
+        type: "plan_choices",
+        question: parsed.choices.question,
+        options: parsed.choices.options,
+      });
+    }
+
+    addMessage("assistant", parsed.cleanedContent);
+    saveSession();
+
+    sendToClient({ type: "plan_complete", cleanedContent: parsed.cleanedContent });
+    sendToClient({ type: "generation_complete" });
+  } catch (err) {
+    sendToClient({ type: "error", message: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+/** Approve the parked plan: exit plan mode and run the build (the approved plan
+ * is auto-prepended as the brief by handleAgenticGenerate). One-shot — the plan
+ * has already gated, so no design checkpoint. */
+async function runPlanApproval(): Promise<void> {
+  const session = getSession();
+  if (!session) {
+    sendToClient({ type: "error", message: "No active session" });
+    return;
+  }
+  const planMd = session.brandAssets?.plan;
+  if (!planMd || !planMd.trim()) {
+    sendToClient({ type: "error", message: "No plan to approve. Send a chat message first." });
+    return;
+  }
+
+  saveConfig({ planMode: false });
+  if (session.pendingCheckpoint?.kind === "plan") session.pendingCheckpoint = undefined;
+
+  const approvalMessage = "Implement the approved plan.";
+  addMessage("user", approvalMessage);
+  saveSession();
+
+  try {
+    clearPipelineEventLog();
+    const steps: { step: string; label: string; decisions?: string[] }[] = [];
+    const modules: { name: string; status: "complete" | "failed" }[] = [];
+
+    const result = await handleAgenticGenerate(
+      approvalMessage,
+      buildPipelineOnEvent(steps, modules),
+    );
+
+    if (result.canceled) {
+      clearPipelineEventLog();
+      return;
+    }
+
+    finalizeAgenticGeneration(result, { steps, modules, commitLabel: "Approved plan: implementation" });
+  } catch (err) {
+    clearPipelineEventLog();
+    sendToClient({ type: "error", message: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+/** Discard the plan and exit plan mode (the plan checkpoint's "cancel"). */
+function runPlanDiscard(): void {
+  const session = getSession();
+  if (session?.pendingCheckpoint?.kind === "plan") session.pendingCheckpoint = undefined;
+  clearPlan();
+  saveConfig({ planMode: false });
+  saveSession();
+  sendToClient({ type: "plan_discarded" });
 }
 
 // ---------------------------------------------------------------------------
@@ -720,6 +905,17 @@ function handleWsConnection(ws: WebSocket): void {
 
         const fileIds = Array.isArray(msg.fileIds) ? msg.fileIds as string[] : undefined;
 
+        // Barge-in (VIB-1880): a message that arrives mid-build supersedes the
+        // running generation. Cancel it (cancel-and-replan) and wait for it to
+        // unwind before starting fresh, so the two runs never overlap. A
+        // non-cancellable op (e.g. Figma import) just makes us wait for it.
+        if (isGenerating()) {
+          if (cancelActiveGeneration()) {
+            sendToClient({ type: "generation_superseded" });
+          }
+          await waitForGenerationIdle();
+        }
+
         // A fresh chat supersedes any parked checkpoint gate (VIB-1877).
         {
           const sess = getSession();
@@ -732,54 +928,14 @@ function handleWsConnection(ws: WebSocket): void {
         // ---------------------------------------------------------------
         // Plan-mode branch — DELIBERATION PHASE, no module generation.
         //
-        // While planMode is active, the chat handler routes to the
-        // plan-mode stream and refuses to enter the agentic pipeline.
-        // Generation is reachable only via an explicit `plan_approve`
-        // WebSocket message, which clears the gate for one call.
+        // While planMode is active, the chat handler routes to the plan-mode
+        // stream and refuses to enter the agentic pipeline. When a plan is
+        // produced it parks a "plan" checkpoint (VIB-1880) so approval/discard
+        // run through the same `checkpoint_resolve` protocol as design — plan
+        // mode is just the heaviest checkpoint variant.
         // ---------------------------------------------------------------
         if (isPlanModeActive()) {
-          addMessage("user", userMessage);
-          saveSession();
-
-          try {
-            ws.send(JSON.stringify({ type: "stream_status", content: "Planning..." }));
-            let fullResponse = "";
-            const fullText = await handlePlanModeStream(
-              userMessage,
-              (chunk) => {
-                fullResponse += chunk;
-                ws.send(JSON.stringify({ type: "stream", content: chunk }));
-              },
-              fileIds,
-            );
-
-            // Parse out plan + choices blocks; persist plan; emit cleaned chat.
-            const parsed = parsePlanResponse(fullText || fullResponse);
-
-            if (parsed.plan) {
-              savePlan(parsed.plan);
-              ws.send(JSON.stringify({ type: "plan_updated", plan: parsed.plan }));
-            }
-            if (parsed.choices) {
-              ws.send(JSON.stringify({
-                type: "plan_choices",
-                question: parsed.choices.question,
-                options: parsed.choices.options,
-              }));
-            }
-
-            // Persist the cleaned (chat-visible) content as the assistant message.
-            addMessage("assistant", parsed.cleanedContent);
-            saveSession();
-
-            ws.send(JSON.stringify({ type: "plan_complete", cleanedContent: parsed.cleanedContent }));
-            ws.send(JSON.stringify({ type: "generation_complete" }));
-          } catch (err) {
-            ws.send(JSON.stringify({
-              type: "error",
-              message: err instanceof Error ? err.message : String(err),
-            }));
-          }
+          await runPlanDeliberation(userMessage, fileIds);
           break;
         }
 
@@ -814,6 +970,14 @@ function handleWsConnection(ws: WebSocket): void {
               fileIds,
               checkpointsEnabled,
             );
+
+            // Barge-in (VIB-1880): this run was itself superseded by an even
+            // newer message. Stop quietly — the superseding run owns the UI and
+            // will emit its own completion. Nothing was built or committed.
+            if (result.canceled) {
+              clearPipelineEventLog();
+              break;
+            }
 
             // Parked at a checkpoint gate: persist the resume token on the
             // session and stop here. No modules were built, nothing is written
@@ -1280,93 +1444,16 @@ ${errorContext}`;
       // mode (so the next agentic call is allowed), prepend the plan as
       // a design brief, and run the existing agentic pipeline.
       // ---------------------------------------------------------------
+      // Plan approve/discard are now thin aliases over the unified plan
+      // checkpoint (VIB-1880). The canonical path is checkpoint_resolve
+      // {kind:"plan"}; these remain for older clients.
       case "plan_approve": {
-        const session = getSession();
-        if (!session) {
-          ws.send(JSON.stringify({ type: "error", message: "No active session" }));
-          break;
-        }
-        const planMd = session.brandAssets?.plan;
-        if (!planMd || !planMd.trim()) {
-          ws.send(JSON.stringify({ type: "error", message: "No plan to approve. Send a chat message first." }));
-          break;
-        }
-
-        // Flip plan mode off so this agentic call (and any subsequent ones
-        // until the user re-enables) goes through the normal pipeline.
-        saveConfig({ planMode: false });
-
-        const approvalMessage = "Implement the approved plan.";
-        addMessage("user", approvalMessage);
-        saveSession();
-
-        try {
-          clearPipelineEventLog();
-          const pipelineSteps: { step: string; label: string; decisions?: string[] }[] = [];
-          const pipelineModules: { name: string; status: "complete" | "failed" }[] = [];
-
-          const result = await handleAgenticGenerate(
-            approvalMessage,
-            buildPipelineOnEvent(pipelineSteps, pipelineModules),
-          );
-
-          applyPipelineResult(result, {
-            steps: pipelineSteps,
-            modules: pipelineModules,
-            stats: result.stats,
-            cost: result.cost,
-          });
-          sendGenerationCost(result);
-
-          const currentSession = getSession();
-          if (currentSession) {
-            writeModulesToDisk();
-            const activeTpl = getActiveTemplate();
-            let commitHash: string | null = null;
-            if (activeTpl) {
-              const filePaths = activeTpl.moduleOrder.map((n: string) => `modules/${n}.module`);
-              if (activeTpl.templateFile) filePaths.push(activeTpl.templateFile);
-              if (activeTpl.sharedCss) filePaths.push(`css/${currentSession.themeName}-theme.css`);
-              if (activeTpl.sharedJs) filePaths.push(`js/${currentSession.themeName}-animations.js`);
-              commitHash = commitTemplateState(currentSession.themePath, activeTpl.id, "Approved plan: implementation", filePaths);
-            } else {
-              commitHash = commitThemeState(currentSession.themePath, "Approved plan: implementation");
-            }
-            if (commitHash) {
-              sendToClient({ type: "version_created", hash: commitHash });
-            }
-          }
-
-          sendToClient({ type: "generation_complete" });
-          {
-            const sess = getSession();
-            sendToClient({
-              type: "modules_updated",
-              modules: getOrderedModules().map((m) => m.moduleName),
-              templateId: sess?.activeTemplateId || null,
-              templates: (sess?.templates || []).map((t) => ({
-                id: t.id, label: t.label, pageType: t.pageType, moduleCount: t.modules.length,
-              })),
-            });
-          }
-          clearPipelineEventLog();
-        } catch (err) {
-          clearPipelineEventLog();
-          sendToClient({
-            type: "error",
-            message: err instanceof Error ? err.message : String(err),
-          });
-        }
+        await runPlanApproval();
         break;
       }
 
-      // ---------------------------------------------------------------
-      // Plan discard — clear plan and exit plan mode in one step.
-      // ---------------------------------------------------------------
       case "plan_discard": {
-        clearPlan();
-        saveConfig({ planMode: false });
-        ws.send(JSON.stringify({ type: "plan_discarded" }));
+        runPlanDiscard();
         break;
       }
 
@@ -1399,6 +1486,23 @@ ${errorContext}`;
           action: action as CheckpointAction,
           note: typeof msg.note === "string" ? msg.note : undefined,
         };
+
+        // Plan checkpoint (VIB-1880): resolved through the same protocol, but
+        // the plan lives on the session — no in-memory resume store. approve →
+        // build, steer → re-deliberate + re-park, cancel → drop plan.
+        if (pending.kind === "plan") {
+          session.pendingCheckpoint = undefined;
+          saveSession();
+          if (action === "cancel") {
+            runPlanDiscard();
+          } else if (action === "steer") {
+            await runPlanDeliberation(resolution.note?.trim() || "Refine the plan further.");
+          } else {
+            await runPlanApproval();
+          }
+          break;
+        }
+
         const resumeToken = pending.resumeToken;
 
         // Clear the gate up front; a `steer` re-parks with a fresh token below.
@@ -1436,48 +1540,12 @@ ${errorContext}`;
             break;
           }
 
-          // approve / skip — the build completed. Apply, commit, finish
-          // (mirrors the agentic chat path).
-          applyPipelineResult(result, {
+          // approve / skip — the build completed. Apply, commit, finish.
+          finalizeAgenticGeneration(result, {
             steps: pipelineSteps,
             modules: pipelineModules,
-            stats: result.stats,
-            cost: result.cost,
+            commitLabel: "Checkpoint approved: implementation",
           });
-          sendGenerationCost(result);
-
-          const currentSession = getSession();
-          if (currentSession) {
-            writeModulesToDisk();
-            const activeTpl = getActiveTemplate();
-            let commitHash: string | null = null;
-            if (activeTpl) {
-              const filePaths = activeTpl.moduleOrder.map((n: string) => `modules/${n}.module`);
-              if (activeTpl.templateFile) filePaths.push(activeTpl.templateFile);
-              if (activeTpl.sharedCss) filePaths.push(`css/${currentSession.themeName}-theme.css`);
-              if (activeTpl.sharedJs) filePaths.push(`js/${currentSession.themeName}-animations.js`);
-              commitHash = commitTemplateState(currentSession.themePath, activeTpl.id, "Checkpoint approved: implementation", filePaths);
-            } else {
-              commitHash = commitThemeState(currentSession.themePath, "Checkpoint approved: implementation");
-            }
-            if (commitHash) {
-              sendToClient({ type: "version_created", hash: commitHash });
-            }
-          }
-
-          sendToClient({ type: "generation_complete" });
-          {
-            const sess = getSession();
-            sendToClient({
-              type: "modules_updated",
-              modules: getOrderedModules().map((m) => m.moduleName),
-              templateId: sess?.activeTemplateId || null,
-              templates: (sess?.templates || []).map((t) => ({
-                id: t.id, label: t.label, pageType: t.pageType, moduleCount: t.modules.length,
-              })),
-            });
-          }
-          clearPipelineEventLog();
         } catch (err) {
           clearPipelineEventLog();
           sendToClient({
