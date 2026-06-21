@@ -107,6 +107,15 @@ export interface VibeSession {
    */
   costTotal?: ProjectCostTotal;
 
+  /**
+   * Set while an agentic run is parked at a checkpoint gate (VIB-1877), awaiting
+   * the user's approve/steer/skip/cancel. Holds a resume token (not a live
+   * promise) so the pause is crash-safe, mirroring the plan_approve re-entry
+   * pattern. Cleared when the checkpoint is resolved. Not persisted long-term —
+   * an unresolved gate is dropped on reload.
+   */
+  pendingCheckpoint?: import("../agent/types.js").PendingCheckpoint;
+
   // Legacy flat fields — kept for backward compat, redirected to active template
   messages: ChatMessage[];
   modules: ModuleFiles[];

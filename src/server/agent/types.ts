@@ -94,8 +94,73 @@ export type ModuleStatus =
   | "complete"
   | "failed";
 
+// ---------------------------------------------------------------------------
+// Checkpoint gate (VIB-1877) — pauses the pipeline at a natural seam so the
+// user can approve / steer / skip before the expensive module build. One
+// primitive, reused at several seams (design, structure, brand-intake).
+// Generalizes the existing plan_approve pause.
+// ---------------------------------------------------------------------------
+
+export type CheckpointKind = "design" | "structure" | "brand_intake";
+
+/** Action the user takes at a checkpoint. */
+export type CheckpointAction =
+  /** Continue the pipeline from the parked stage, unchanged. */
+  | "approve"
+  /** Re-run ONLY the stage that produced this checkpoint, with `note` appended. */
+  | "steer"
+  /** Approve and suppress all remaining checkpoints for this run. */
+  | "skip"
+  /** Discard the run; nothing is written to disk. */
+  | "cancel";
+
+/**
+ * What the UI renders in a checkpoint card. Stage-specific shape is carried in
+ * `data`; the renderer keys off `kind`. Kept small so it survives persistence.
+ */
+export interface CheckpointPreview {
+  kind: CheckpointKind;
+  /** Short headline for the card, e.g. "Here's the look" / "Here's the structure". */
+  headline: string;
+  /** Stage-specific payload (palette+type+hero for design, module outline for structure, …). */
+  data: Record<string, unknown>;
+}
+
+/**
+ * Persisted on the session while the pipeline is parked at a gate. Holding a
+ * resume token (not a live promise) keeps the pause crash-safe and mirrors the
+ * plan_approve re-entry pattern.
+ */
+export interface PendingCheckpoint {
+  kind: CheckpointKind;
+  /** Opaque id the parked pipeline run resumes from. */
+  resumeToken: string;
+  preview: CheckpointPreview;
+  /** When the gate was raised (ISO-8601), for staleness/telemetry. */
+  createdAt: string;
+}
+
+/** Inbound resolution of a pending checkpoint (UI → server). */
+export interface CheckpointResolution {
+  kind: CheckpointKind;
+  action: CheckpointAction;
+  /** Free-text steer instruction; only meaningful when action === "steer". */
+  note?: string;
+}
+
 export type PipelineEvent =
   | { type: "agent_step"; step: PipelineStep; label: string }
+  | {
+      type: "checkpoint_requested";
+      kind: CheckpointKind;
+      preview: CheckpointPreview;
+      /**
+       * Estimated USD cost of the work this checkpoint gates (i.e. the spend
+       * the user avoids by cancelling here). Reuses per-page cost (VIB-1770).
+       * Omitted when no estimate is available (e.g. CLI engines report no usage).
+       */
+      estCostNext?: number;
+    }
   | { type: "agent_decision"; step: string; decision: string }
   | {
       type: "module_progress";
