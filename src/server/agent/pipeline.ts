@@ -21,6 +21,8 @@ import type {
   PipelinePlan,
   DesignSystemOutput,
   CheckpointResolution,
+  CheckpointPreview,
+  CheckpointKind,
 } from "./types.js";
 import { PipelineAbortError } from "./types.js";
 import { runIntentAnalyzer } from "./stages/intent-analyzer.js";
@@ -30,6 +32,7 @@ import { runModuleDeveloper } from "./stages/module-developer.js";
 import { validateModules, validateNavLinks } from "./stages/validator.js";
 import { buildDesignPreview, buildBrandIntakePreview } from "./design-preview.js";
 import { routeBrandIntake } from "./brand-intake.js";
+import { buildStructurePreview, applyStructureEdits } from "./structure-preview.js";
 import { peekCurrentCost } from "../cost-tracker.js";
 import { log } from "../log.js";
 import { runWithSpan } from "../langfuse.js";
@@ -49,12 +52,13 @@ import { execSync } from "node:child_process";
  * small fraction. Used to project the spend a user avoids by cancelling. */
 const STAGE3_COST_MULTIPLIER = 6;
 
-interface CheckpointResumeState {
-  /**
-   * Which gate this run is parked at. `brand_intake` (VIB-1878) sits in front
-   * of `design` (VIB-1877): resolving brand intake produces a design system and
-   * re-parks at the design gate.
-   */
+/**
+ * Parked at the design gate (Stage 2a). `brand_intake` (VIB-1878) also uses
+ * this shape and sits in front of `design` (VIB-1877): resolving brand intake
+ * produces a design system and re-parks at the design gate, so `designSystem`
+ * is absent at the brand-intake park and set by the time we reach `design`.
+ */
+interface DesignCheckpointState {
   kind: "design" | "brand_intake";
   /** Enriched user message used by this run. */
   userMessage: string;
@@ -67,6 +71,25 @@ interface CheckpointResumeState {
   startTime: number;
   libraryModules: { name: string; usedIn: string[] }[];
 }
+
+/**
+ * Parked at the structure gate (VIB-1879): the module planner (Stage 2b) has
+ * run, so we carry the full blueprint plus the design system needed to re-plan
+ * on steer. The user's edited outline (if any) is folded in on resume.
+ */
+interface StructureCheckpointState {
+  kind: "structure";
+  userMessage: string;
+  plan: PipelinePlan;
+  designSystem: DesignSystemOutput;
+  blueprint: PageBlueprint;
+  sharedCss: string;
+  sharedJs: string;
+  startTime: number;
+  libraryModules: { name: string; usedIn: string[] }[];
+}
+
+type CheckpointResumeState = DesignCheckpointState | StructureCheckpointState;
 
 const checkpointResumeStore = new Map<string, CheckpointResumeState>();
 
@@ -300,28 +323,27 @@ export async function runAgentPipeline(
 // ---------------------------------------------------------------------------
 
 /**
- * Stash resume state and return a paused result carrying the design preview.
+ * Stash resume state and return a paused result carrying the gate's preview.
  * The handler persists `pendingCheckpoint` on the session and stops — no
  * modules are built, nothing is committed, until the user resolves the gate.
+ * Shared by every seam (design, structure, …); the only per-seam difference is
+ * which preview the caller hands in.
  */
-function parkAtDesignCheckpoint(
+function parkAtCheckpoint(
+  kind: CheckpointKind,
   state: CheckpointResumeState,
+  preview: CheckpointPreview,
   snapshot: SessionSnapshot,
   onEvent: (event: PipelineEvent) => void,
 ): PipelineResult {
   const resumeToken = newResumeToken();
   checkpointResumeStore.set(resumeToken, state);
 
-  // A design-kind park always carries a design system (built before this call).
-  if (!state.designSystem) {
-    throw new Error("Cannot park at the design checkpoint without a design system.");
-  }
-  const preview = buildDesignPreview(state.designSystem);
   const estCostNext = estimateGatedCost();
 
   onEvent({
     type: "checkpoint_requested",
-    kind: "design",
+    kind,
     preview,
     ...(estCostNext != null ? { estCostNext } : {}),
   });
@@ -335,12 +357,35 @@ function parkAtDesignCheckpoint(
     contentType: state.plan.contentType,
     stats: { modulesGenerated: 0, modulesUnchanged: snapshot.modules.length, modulesFailed: 0, durationMs: Date.now() - state.startTime },
     pendingCheckpoint: {
-      kind: "design",
+      kind,
       resumeToken,
       preview,
       createdAt: new Date().toISOString(),
     },
   };
+}
+
+/** Park at the design seam (Stage 2a done) with the palette/type/hero preview. */
+function parkAtDesignCheckpoint(
+  state: DesignCheckpointState,
+  snapshot: SessionSnapshot,
+  onEvent: (event: PipelineEvent) => void,
+): PipelineResult {
+  // A design park always carries a design system (brand_intake re-parks here
+  // with one set before this call); narrows the optional field for the preview.
+  if (!state.designSystem) {
+    throw new Error("Cannot park at the design checkpoint without a design system.");
+  }
+  return parkAtCheckpoint("design", state, buildDesignPreview(state.designSystem), snapshot, onEvent);
+}
+
+/** Park at the structure seam (Stage 2b done) with the editable module outline. */
+function parkAtStructureCheckpoint(
+  state: StructureCheckpointState,
+  snapshot: SessionSnapshot,
+  onEvent: (event: PipelineEvent) => void,
+): PipelineResult {
+  return parkAtCheckpoint("structure", state, buildStructurePreview(state.blueprint), snapshot, onEvent);
 }
 
 /**
@@ -487,10 +532,20 @@ async function resumeBrandIntake(
 }
 
 /**
- * Re-enter a parked pipeline at the design seam with the user's resolution.
- * approve/skip → run the Module Planner against the parked design, then build.
- * steer → re-run ONLY the design system with the note, then re-park.
- * cancel → drop the run (handler clears the session gate).
+ * Re-enter a parked pipeline at whichever seam it stopped at, with the user's
+ * resolution. Three seams exist:
+ *
+ * Brand-intake gate (VIB-1878): resolves to a design system (brand-seeded for
+ * "Bring your brand", plain for "Surprise me") and re-parks at the design gate.
+ *
+ * Design gate (VIB-1877): approve → run the Module Planner, then PARK at the
+ * structure gate; skip → run the planner and build straight through (suppress
+ * the next gate); steer → re-run ONLY the design system and re-park; cancel →
+ * drop.
+ *
+ * Structure gate (VIB-1879): approve/skip → fold the user's edited outline into
+ * the blueprint and build; steer → re-run ONLY the module planner with the note
+ * and re-park; cancel → drop.
  */
 export async function resumeAgentPipeline(
   resumeToken: string,
@@ -508,7 +563,7 @@ export async function resumeAgentPipeline(
     throw new Error("This checkpoint has expired (the server may have restarted). Send your request again to start over.");
   }
 
-  // Cancel: discard the parked run. Nothing is built.
+  // Cancel: discard the parked run. Nothing is built. (Same for every seam.)
   if (resolution.action === "cancel") {
     discardCheckpoint(resumeToken);
     return {
@@ -522,16 +577,76 @@ export async function resumeAgentPipeline(
     };
   }
 
-  // -----------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Brand-intake gate resolution (VIB-1878). Resolving it produces a design
   // system and re-parks at the design gate (the next seam). "Surprise me"
   // (skip) runs the design system with no brand; "Bring your brand" (approve)
   // routes the intake channels, seeds the design system, and merges the brand
   // `:root` so the design checkpoint renders it.
-  // -----------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   if (state.kind === "brand_intake") {
     return resumeBrandIntake(resumeToken, state, resolution, snapshot, engine, apiKey, model, onEvent);
   }
+
+  // -------------------------------------------------------------------------
+  // Structure gate (VIB-1879) — the blueprint already exists.
+  // -------------------------------------------------------------------------
+  if (state.kind === "structure") {
+    discardCheckpoint(resumeToken);
+
+    // Steer: re-plan ONLY the module structure with the note, then re-park.
+    if (resolution.action === "steer") {
+      const note = (resolution.note || "").trim();
+      const steeredMessage = note
+        ? `${state.userMessage}\n\n## Structure steer (revise the module plan to honor this)\n${note}`
+        : state.userMessage;
+      const blueprint = await runModulePlanner(
+        steeredMessage,
+        state.plan,
+        snapshot,
+        state.designSystem,
+        state.sharedCss,
+        engine,
+        apiKey,
+        model,
+        onEvent,
+      );
+      return parkAtStructureCheckpoint(
+        { ...state, userMessage: steeredMessage, blueprint },
+        snapshot,
+        onEvent,
+      );
+    }
+
+    // approve / skip: build exactly the (possibly edited) outline the user kept.
+    const blueprint = applyStructureEdits(state.blueprint, resolution.outline);
+    onEvent({
+      type: "blueprint_ready",
+      moduleOrder: blueprint.moduleOrder,
+      sharedCss: state.sharedCss,
+      sharedJs: state.sharedJs,
+    });
+    return runBuildPhase(
+      state.userMessage,
+      state.plan,
+      snapshot,
+      blueprint,
+      state.sharedCss,
+      state.sharedJs ?? "",
+      engine,
+      apiKey,
+      model,
+      concurrency,
+      onEvent,
+      state.libraryModules,
+      state.startTime,
+      signal,
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Design gate (VIB-1877) — only Stage 2a has run.
+  // -------------------------------------------------------------------------
 
   // Steer: re-run ONLY the design system with the note appended, then re-park.
   if (resolution.action === "steer") {
@@ -556,9 +671,7 @@ export async function resumeAgentPipeline(
     );
   }
 
-  // approve / skip: continue the build with the parked design.
-  // (`skip` suppresses any further gates this run; C1 has only this one, so
-  // there are no later gates to suppress — handled identically here.)
+  // approve / skip: run the Module Planner against the parked design.
   discardCheckpoint(resumeToken);
 
   // A design-kind gate always carries a design system (brand_intake is handled
@@ -581,6 +694,26 @@ export async function resumeAgentPipeline(
 
   const sharedCss = state.plan.contentType !== "email" ? (blueprint.designSystem.sharedCss || state.sharedCss) : state.sharedCss;
   const sharedJs = state.plan.contentType !== "email" ? (blueprint.designSystem.sharedJs || state.sharedJs) : state.sharedJs;
+
+  // approve → stop again at the structure gate so the user can shape the module
+  // skeleton before the build. skip → suppress it and build straight through.
+  if (resolution.action !== "skip") {
+    return parkAtStructureCheckpoint(
+      {
+        kind: "structure",
+        userMessage: state.userMessage,
+        plan: state.plan,
+        designSystem: state.designSystem,
+        blueprint,
+        sharedCss,
+        sharedJs: sharedJs ?? "",
+        startTime: state.startTime,
+        libraryModules: state.libraryModules,
+      },
+      snapshot,
+      onEvent,
+    );
+  }
 
   onEvent({
     type: "blueprint_ready",

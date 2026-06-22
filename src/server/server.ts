@@ -1481,10 +1481,24 @@ ${errorContext}`;
           break;
         }
 
+        // Structure checkpoint (VIB-1879) carries an edited module outline back
+        // on approve/skip. Coerce defensively — the build re-sanitizes names.
+        const outline = Array.isArray(msg.outline)
+          ? msg.outline
+              .filter((it: unknown): it is Record<string, unknown> => !!it && typeof (it as Record<string, unknown>).name === "string")
+              .map((it: Record<string, unknown>) => ({
+                name: String(it.name),
+                description: typeof it.description === "string" ? it.description : undefined,
+                sourceIndex: Number.isInteger(it.sourceIndex) ? (it.sourceIndex as number) : undefined,
+              }))
+          : undefined;
+
         const resolution: CheckpointResolution = {
           kind: pending.kind,
           action: action as CheckpointAction,
           note: typeof msg.note === "string" ? msg.note : undefined,
+          // Structure checkpoint (VIB-1879) carries the edited outline.
+          outline,
           // Brand-intake channels (VIB-1878) — only meaningful for a
           // brand_intake gate resolved with "Bring your brand" (approve).
           ...(pending.kind === "brand_intake" && msg.brandIntake && typeof msg.brandIntake === "object"
