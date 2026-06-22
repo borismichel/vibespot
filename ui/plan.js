@@ -561,8 +561,9 @@
     }
     // Collapse plan sidebar so user watches modules generate.
     hidePlanView();
-    // Server flips planMode off + runs the agentic pipeline.
-    ws.send(JSON.stringify({ type: "plan_approve" }));
+    // Resolve the parked "plan" checkpoint — plan mode is unified onto the
+    // checkpoint primitive (VIB-1880). Server flips planMode off + builds.
+    ws.send(JSON.stringify({ type: "checkpoint_resolve", kind: "plan", action: "approve" }));
     // Local state will be refreshed by the next init or modules_updated event.
     planModeActive = false;
     window.planModeActive = false;
@@ -573,7 +574,9 @@
   function discardPlan() {
     if (!confirm("Discard the current plan and exit plan mode?")) return;
     if (typeof ws !== "undefined" && ws && ws.readyState === 1) {
-      ws.send(JSON.stringify({ type: "plan_discard" }));
+      // Cancel the parked "plan" checkpoint (VIB-1880); falls back to plan_discard
+      // semantics server-side. HTTP fallback below for a dropped socket.
+      ws.send(JSON.stringify({ type: "checkpoint_resolve", kind: "plan", action: "cancel" }));
     } else {
       // Fallback to HTTP
       fetch("/api/plan/discard", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });

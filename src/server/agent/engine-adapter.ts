@@ -21,6 +21,7 @@ import {
   type TokenUsage,
 } from "../pricing.js";
 import { reportModelUsage } from "../langfuse.js";
+import { PipelineAbortError } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -82,6 +83,13 @@ export interface AgentCallOptions {
    * pass `stagePromptLink(id)` on the registry-managed (page-mode) path only.
    */
   prompt?: { name: string; version: number; source?: string };
+  /**
+   * Cancellation signal (VIB-1880, barge-in). When it aborts, the underlying
+   * provider request is cancelled (Anthropic SDK request option / fetch
+   * `signal`) so an in-flight generation stops spending immediately. A call
+   * entering after the abort throws up front.
+   */
+  signal?: AbortSignal;
 }
 
 export type AgentCallResult =
@@ -232,7 +240,7 @@ async function callAnthropic(
         ...(opts.thinkingBudgetTokens
           ? { thinking: { type: "enabled" as const, budget_tokens: opts.thinkingBudgetTokens } }
           : {}),
-      });
+      }, { signal: opts.signal });
 
       // Extract tool_use input from the response
       const usage = mapAnthropicUsage(response.usage);
@@ -270,7 +278,7 @@ async function callAnthropic(
       ...(opts.thinkingBudgetTokens
         ? { thinking: { type: "enabled" as const, budget_tokens: opts.thinkingBudgetTokens } }
         : {}),
-    });
+    }, { signal: opts.signal });
 
     for await (const event of stream) {
       if (
@@ -342,7 +350,7 @@ async function callAnthropicOAuth(
         ...(opts.thinkingBudgetTokens
           ? { thinking: { type: "enabled" as const, budget_tokens: opts.thinkingBudgetTokens } }
           : {}),
-      });
+      }, { signal: opts.signal });
 
       const usage = mapAnthropicUsage(response.usage);
       for (const block of response.content) {
@@ -371,7 +379,7 @@ async function callAnthropicOAuth(
       ...(opts.thinkingBudgetTokens
         ? { thinking: { type: "enabled" as const, budget_tokens: opts.thinkingBudgetTokens } }
         : {}),
-    });
+    }, { signal: opts.signal });
 
     for await (const event of stream) {
       if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
@@ -479,6 +487,7 @@ async function callOpenAI(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
+    signal: opts.signal,
   });
 
   if (!response.ok) {
@@ -554,6 +563,7 @@ async function callGemini(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: opts.signal,
   });
 
   if (!response.ok) {
@@ -925,6 +935,9 @@ export async function callAgent(
   model: string,
   opts: AgentCallOptions,
 ): Promise<AgentCallResult> {
+  // Barge-in (VIB-1880): bail before spending if the run was already aborted.
+  if (opts.signal?.aborted) throw new PipelineAbortError();
+
   if (API_ENGINES.has(engine)) {
     return callAgentAPI(engine, apiKey, model, opts);
   }

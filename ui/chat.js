@@ -8,6 +8,10 @@
 
 let ws = null;
 let isStreaming = false;
+// True while an agentic pipeline is actively building (Stage 3) — the window in
+// which a new message barges in to cancel-and-replan (VIB-1880). False when
+// parked at a checkpoint gate or running single-call mode.
+let agenticRunning = false;
 let streamingMsgEl = null;
 let streamBuffer = "";
 let streamStartTime = 0;
@@ -37,6 +41,8 @@ const messagesEl = document.getElementById("chat-messages");
 const inputEl = document.getElementById("chat-input");
 const sendBtn = document.getElementById("chat-send");
 const oneShotBtn = document.getElementById("chat-send-oneshot");
+// Remembered so the barge-in hint placeholder can be restored after a run.
+const chatInputDefaultPlaceholder = (inputEl && inputEl.placeholder) || "";
 const statusText = document.getElementById("status-text");
 const statusEngine = document.getElementById("status-engine");
 const statusTheme = document.getElementById("status-theme");
@@ -744,7 +750,13 @@ function handleWsMessage(msg) {
       handleAgentDecision(msg);
       break;
     case "module_progress":
+      enableBargeIn();
       handleModuleProgress(msg);
+      break;
+    case "generation_superseded":
+      // The server confirmed our barge-in cancelled the prior run; the fresh
+      // run's events follow. Nothing to do — supersedeCurrentRun already reset.
+      setStatus("Redirecting…");
       break;
     case "pipeline_complete":
       handlePipelineComplete(msg);
@@ -979,6 +991,8 @@ function setPipelineDetail(text) {
 }
 
 function handleAgentStep(msg) {
+  // The expensive build stage is the barge-in window (VIB-1880).
+  if (msg.step === "developing") enableBargeIn();
   ensurePipelineBubble();
 
   const incoming = msg.step;
@@ -1754,7 +1768,14 @@ fileInputEl.addEventListener("change", () => {
 
 async function sendMessage(text, opts = {}) {
   const hasFiles = pendingFiles.length > 0;
-  if ((!text.trim() && !hasFiles) || isStreaming || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  if (!text.trim() && !hasFiles) return;
+  // Block sends while busy — EXCEPT during an active agentic build, where a new
+  // message barges in to cancel-and-replan (VIB-1880). Single-call streaming and
+  // checkpoint gates stay locked.
+  if (isStreaming && !agenticRunning) return;
+  const isBargeIn = isStreaming && agenticRunning;
+  if (isBargeIn) supersedeCurrentRun();
 
   // Remove welcome screen
   const welcome = messagesEl.querySelector(".chat__welcome");
@@ -1994,9 +2015,42 @@ function clearStreamStatus() {
   if (statusEl) statusEl.remove();
 }
 
+// Open the barge-in window: the build is running, so re-enable the composer and
+// let the user redirect the run mid-flight (VIB-1880).
+function enableBargeIn() {
+  if (agenticRunning) return;
+  agenticRunning = true;
+  sendBtn.disabled = false;
+  if (oneShotBtn) oneShotBtn.disabled = false;
+  if (inputEl) inputEl.placeholder = "Building… send a message to steer or redirect";
+}
+
+// Tear down the superseded run's transient UI so the replacement run renders
+// fresh (called when a barge-in send cancels the active build).
+function supersedeCurrentRun() {
+  stopStreamTimer();
+  clearStreamStatus();
+  const streamingEl = messagesEl.querySelector(".chat-msg--streaming");
+  if (streamingEl) {
+    streamingEl.classList.remove("chat-msg--streaming");
+    const bubble = streamingEl.querySelector(".chat-msg__bubble");
+    if (bubble && !bubble.textContent.trim()) {
+      bubble.innerHTML = '<em class="message__placeholder">Superseded by your next message.</em>';
+    }
+  }
+  removeCheckpointCard();
+  isStreaming = false;
+  agenticRunning = false;
+  streamingMsgEl = null;
+  streamBuffer = "";
+  resetPipelineState();
+}
+
 function finishStreaming() {
   if (!isStreaming) return;
   isStreaming = false;
+  agenticRunning = false;
+  if (inputEl) inputEl.placeholder = chatInputDefaultPlaceholder;
   sendBtn.disabled = false;
   if (oneShotBtn) oneShotBtn.disabled = false;
   if (typeof window.setSelectModeDisabled === "function") {
