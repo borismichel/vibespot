@@ -142,12 +142,38 @@ export interface PendingCheckpoint {
   createdAt: string;
 }
 
+/**
+ * Brand-intake payload (VIB-1878). Carried on a `brand_intake` checkpoint
+ * resolution when the user chose "Bring your brand". Every field is optional;
+ * each populated channel is routed to its matching extractor and contributes a
+ * `:root` / brand context that seeds the design system. All channels are
+ * deterministic (no model call) so the gate stays cheap.
+ */
+export interface BrandIntakeInput {
+  /** Free-form colors (hex / rgb / "Name #hex" lines) → parsed into `:root`. */
+  colors?: string;
+  /** Pasted CSS or HTML → token extraction (`:root` vars, colors, fonts). */
+  code?: string;
+  /** Tone-of-voice description → brandvoice asset (steers copy in build). */
+  voice?: string;
+  /** Local HubSpot theme path → inverse-analyzer token extraction. */
+  themePath?: string;
+  /** Public site URL → fetch + CSS token extraction (best-effort). */
+  siteUrl?: string;
+}
+
 /** Inbound resolution of a pending checkpoint (UI → server). */
 export interface CheckpointResolution {
   kind: CheckpointKind;
   action: CheckpointAction;
   /** Free-text steer instruction; only meaningful when action === "steer". */
   note?: string;
+  /**
+   * Brand-intake channels; only meaningful when kind === "brand_intake" and the
+   * user chose "Bring your brand" (action === "approve"). Absent for
+   * "Surprise me" (action === "skip").
+   */
+  brandIntake?: BrandIntakeInput;
 }
 
 export type PipelineEvent =
@@ -245,6 +271,17 @@ export interface PipelineResult {
   pendingCheckpoint?: PendingCheckpoint;
   /** Set when a parked run was cancelled at the gate — nothing was built. */
   canceled?: boolean;
+  /**
+   * Brand assets derived at the brand-intake gate (VIB-1878) that the handler
+   * should persist to the live session before continuing. Set when the user
+   * brought their brand; the design system is built from them. Persisting here
+   * (rather than mutating the session from inside the pipeline) keeps the
+   * pipeline pure and lets future edits inherit the brand.
+   */
+  brandAssetsUpdate?: {
+    styleguide?: string;
+    brandvoice?: string;
+  };
 }
 
 // ---------------------------------------------------------------------------

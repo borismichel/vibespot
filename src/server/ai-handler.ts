@@ -22,6 +22,7 @@ import {
 import { hasValidOAuthToken, getValidAccessToken } from "../utils/claude-oauth.js";
 import { getFileContexts } from "./routes/upload-files.js";
 import { runAgentPipeline, resumeAgentPipeline, isAgenticCapable, isCLIEngine } from "./agent/pipeline.js";
+import { saveBrandAssetToTheme } from "./brand-enrichment.js";
 import type { CheckpointResolution } from "./agent/types.js";
 import { isAbortError } from "./agent/types.js";
 import { runWithTrace, setTraceOutput } from "./langfuse.js";
@@ -560,6 +561,18 @@ export async function handleAgenticResume(
     if (!current || current.id !== capturedSessionId) {
       log.warn("ai-handler", "Session changed during checkpoint resume — discarding output");
       throw new Error("Session changed during generation");
+    }
+
+    // Brand intake (VIB-1878): persist the derived brand assets so the design
+    // build and all future edits inherit them. Writes to .vibespot/*.md too.
+    if (result.brandAssetsUpdate) {
+      if (result.brandAssetsUpdate.styleguide) {
+        saveBrandAssetToTheme(current, "styleguide", result.brandAssetsUpdate.styleguide);
+      }
+      if (result.brandAssetsUpdate.brandvoice) {
+        saveBrandAssetToTheme(current, "brandvoice", result.brandAssetsUpdate.brandvoice);
+      }
+      saveSession();
     }
 
     return result;

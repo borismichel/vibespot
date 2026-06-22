@@ -143,3 +143,30 @@ export function buildDesignPreview(
     data: data as unknown as Record<string, unknown>,
   };
 }
+
+/**
+ * Build the brand-intake checkpoint card payload (VIB-1878). Fires at the front
+ * of the flow when a theme has no style system yet, offering two branches:
+ * "Surprise me" (AI invents the design) or "Bring your brand" (intake channels).
+ * Deterministic, no model call — the card's content is static.
+ */
+export function buildBrandIntakePreview(): CheckpointPreview {
+  return {
+    kind: "brand_intake",
+    headline: "Want me to match your brand, or should I surprise you?",
+    data: {
+      surpriseLabel: "Surprise me",
+      surpriseHint: "I'll invent a design system that fits your request.",
+      bringLabel: "Bring your brand",
+      bringHint: "Paste colors, code, a tone of voice, or point me at a site/theme.",
+      // Channel descriptors the UI renders as labelled inputs.
+      channels: [
+        { key: "colors", label: "Brand colors", placeholder: "Primary #e8613a\nInk #0f1115\nSurface #ffffff", multiline: true },
+        { key: "code", label: "Paste CSS or HTML", placeholder: ":root { --brand: #e8613a } …", multiline: true },
+        { key: "voice", label: "Tone of voice", placeholder: "Direct, specific, no buzzword soup", multiline: true },
+        { key: "siteUrl", label: "Site URL", placeholder: "https://yourbrand.com", multiline: false },
+        { key: "themePath", label: "HubSpot theme path", placeholder: "/path/to/theme", multiline: false },
+      ],
+    },
+  };
+}

@@ -28,7 +28,8 @@ import { runPageArchitect, runDesignSystem, runModulePlanner } from "./stages/pa
 import { runSiteModulePlanner } from "./stages/site-module-planner.js";
 import { runModuleDeveloper } from "./stages/module-developer.js";
 import { validateModules, validateNavLinks } from "./stages/validator.js";
-import { buildDesignPreview } from "./design-preview.js";
+import { buildDesignPreview, buildBrandIntakePreview } from "./design-preview.js";
+import { routeBrandIntake } from "./brand-intake.js";
 import { peekCurrentCost } from "../cost-tracker.js";
 import { log } from "../log.js";
 import { runWithSpan } from "../langfuse.js";
@@ -49,12 +50,17 @@ import { execSync } from "node:child_process";
 const STAGE3_COST_MULTIPLIER = 6;
 
 interface CheckpointResumeState {
-  kind: "design";
+  /**
+   * Which gate this run is parked at. `brand_intake` (VIB-1878) sits in front
+   * of `design` (VIB-1877): resolving brand intake produces a design system and
+   * re-parks at the design gate.
+   */
+  kind: "design" | "brand_intake";
   /** Enriched user message used by this run. */
   userMessage: string;
   plan: PipelinePlan;
-  /** Design system produced before the gate (Stage 2a). */
-  designSystem: DesignSystemOutput;
+  /** Design system produced before the gate (Stage 2a). Absent at brand intake. */
+  designSystem?: DesignSystemOutput;
   /** Finalized shared CSS/JS (with :root injected). */
   sharedCss: string;
   sharedJs: string;
@@ -210,6 +216,22 @@ export async function runAgentPipeline(
     // Email has no shared CSS to preview, so it never gates here.
     // -----------------------------------------------------------------------
     if (checkpointsEnabled && plan.contentType !== "email") {
+      // ---------------------------------------------------------------------
+      // Brand-intake gate (VIB-1878): the FRONT-of-flow ask-back. Fires only
+      // when creating a page that has no style system yet — no styleguide and
+      // no `:root` in the shared CSS. An imported theme or a prior session
+      // already carries a style system, so we use it and skip the ask
+      // (Boris-locked). The user picks "Surprise me" (AI invents — today's
+      // behavior) or "Bring your brand" (intake → seed the design system).
+      // ---------------------------------------------------------------------
+      if (plan.intent === "create" && !hasStyleSystem(snapshot)) {
+        return parkAtBrandIntakeCheckpoint(
+          { kind: "brand_intake", userMessage, plan, sharedCss, sharedJs, startTime, libraryModules },
+          snapshot,
+          onEvent,
+        );
+      }
+
       const ds = await runDesignSystem(
         userMessage,
         plan,
@@ -290,6 +312,10 @@ function parkAtDesignCheckpoint(
   const resumeToken = newResumeToken();
   checkpointResumeStore.set(resumeToken, state);
 
+  // A design-kind park always carries a design system (built before this call).
+  if (!state.designSystem) {
+    throw new Error("Cannot park at the design checkpoint without a design system.");
+  }
   const preview = buildDesignPreview(state.designSystem);
   const estCostNext = estimateGatedCost();
 
@@ -315,6 +341,149 @@ function parkAtDesignCheckpoint(
       createdAt: new Date().toISOString(),
     },
   };
+}
+
+/**
+ * True when the session already has a style system to build on (VIB-1878):
+ * an extracted styleguide (imported-theme brand enrichment) or shared CSS that
+ * already declares `:root` variables (a prior session / starter). When true,
+ * the brand-intake ask-back is skipped and that style system is used.
+ */
+function hasStyleSystem(snapshot: SessionSnapshot): boolean {
+  if (snapshot.brandAssets?.styleguide && snapshot.brandAssets.styleguide.trim()) return true;
+  if (snapshot.sharedCss && snapshot.sharedCss.includes(":root")) return true;
+  return false;
+}
+
+/**
+ * Park at the brand-intake gate (VIB-1878). No design system has been built
+ * yet — this is the cheapest possible seam. The card offers "Surprise me" vs
+ * "Bring your brand"; the resolution re-enters via `resumeAgentPipeline`.
+ */
+function parkAtBrandIntakeCheckpoint(
+  state: CheckpointResumeState,
+  snapshot: SessionSnapshot,
+  onEvent: (event: PipelineEvent) => void,
+): PipelineResult {
+  const resumeToken = newResumeToken();
+  checkpointResumeStore.set(resumeToken, state);
+
+  const preview = buildBrandIntakePreview();
+  const estCostNext = estimateGatedCost();
+
+  onEvent({
+    type: "checkpoint_requested",
+    kind: "brand_intake",
+    preview,
+    ...(estCostNext != null ? { estCostNext } : {}),
+  });
+
+  return {
+    modules: [...snapshot.modules],
+    moduleOrder: snapshot.moduleOrder as string[],
+    sharedCss: state.sharedCss,
+    sharedJs: state.sharedJs,
+    assistantMessage: "",
+    contentType: state.plan.contentType,
+    stats: { modulesGenerated: 0, modulesUnchanged: snapshot.modules.length, modulesFailed: 0, durationMs: Date.now() - state.startTime },
+    pendingCheckpoint: {
+      kind: "brand_intake",
+      resumeToken,
+      preview,
+      createdAt: new Date().toISOString(),
+    },
+  };
+}
+
+/**
+ * Resolve the brand-intake gate (VIB-1878). Always advances to the design gate:
+ * builds a design system (brand-seeded for "Bring your brand", plain for
+ * "Surprise me"), then parks at the design checkpoint via the C1 primitive.
+ */
+async function resumeBrandIntake(
+  resumeToken: string,
+  state: CheckpointResumeState,
+  resolution: CheckpointResolution,
+  snapshot: SessionSnapshot,
+  engine: AgentEngine,
+  apiKey: string,
+  model: string,
+  onEvent: (event: PipelineEvent) => void,
+): Promise<PipelineResult> {
+  discardCheckpoint(resumeToken);
+
+  // "Bring your brand" = approve with channels. Anything else (skip / steer /
+  // empty intake) is "Surprise me" — let the AI invent the design system.
+  const intake = resolution.action === "approve" ? resolution.brandIntake : undefined;
+  let brandSnapshot = snapshot;
+  let brandAssetsUpdate: PipelineResult["brandAssetsUpdate"];
+  let brand: Awaited<ReturnType<typeof routeBrandIntake>> | null = null;
+
+  if (intake) {
+    brand = await routeBrandIntake(intake);
+    if (brand.channels.length > 0) {
+      // Merge the brand brief into the styleguide the design prompt reads, and
+      // seed the brand voice. Persisted by the handler via brandAssetsUpdate.
+      const mergedStyleguide = [snapshot.brandAssets?.styleguide, brand.styleguide]
+        .filter((s) => s && s.trim())
+        .join("\n\n");
+      brandAssetsUpdate = {
+        ...(mergedStyleguide ? { styleguide: mergedStyleguide } : {}),
+        ...(brand.brandvoice ? { brandvoice: brand.brandvoice } : {}),
+      };
+      brandSnapshot = {
+        ...snapshot,
+        brandAssets: {
+          ...snapshot.brandAssets,
+          ...(mergedStyleguide ? { styleguide: mergedStyleguide } : {}),
+          ...(brand.brandvoice ? { brandvoice: brand.brandvoice } : {}),
+        },
+        sharedCss: brand.rootCss || snapshot.sharedCss,
+      };
+      onEvent({
+        type: "agent_decision",
+        step: "designing",
+        decision: `Brand intake: using ${brand.channels.join(", ")} → ${Object.keys(brand.cssVariables).length} brand token(s)`,
+      });
+    }
+  }
+
+  const ds = await runDesignSystem(
+    state.userMessage,
+    state.plan,
+    brandSnapshot,
+    engine,
+    apiKey,
+    model,
+    onEvent,
+  );
+
+  // Guarantee the brand `:root` is honored regardless of the model's output:
+  // merge the brand tokens (brand wins) so the design checkpoint renders them,
+  // and append a brand override block so they win the cascade in the built page.
+  if (brand && Object.keys(brand.cssVariables).length > 0) {
+    ds.cssVariables = { ...(ds.cssVariables || {}), ...brand.cssVariables };
+    if (brand.rootCss && !ds.sharedCss.includes(brand.rootCss.trim())) {
+      ds.sharedCss = `${ds.sharedCss}\n\n/* Brand intake overrides (VIB-1878) */\n${brand.rootCss}`;
+    }
+  }
+
+  const parked = parkAtDesignCheckpoint(
+    {
+      kind: "design",
+      userMessage: state.userMessage,
+      plan: state.plan,
+      designSystem: ds,
+      sharedCss: ds.sharedCss,
+      sharedJs: ds.sharedJs || state.sharedJs,
+      startTime: state.startTime,
+      libraryModules: state.libraryModules,
+    },
+    snapshot,
+    onEvent,
+  );
+  if (brandAssetsUpdate) parked.brandAssetsUpdate = brandAssetsUpdate;
+  return parked;
 }
 
 /**
@@ -353,6 +522,17 @@ export async function resumeAgentPipeline(
     };
   }
 
+  // -----------------------------------------------------------------------
+  // Brand-intake gate resolution (VIB-1878). Resolving it produces a design
+  // system and re-parks at the design gate (the next seam). "Surprise me"
+  // (skip) runs the design system with no brand; "Bring your brand" (approve)
+  // routes the intake channels, seeds the design system, and merges the brand
+  // `:root` so the design checkpoint renders it.
+  // -----------------------------------------------------------------------
+  if (state.kind === "brand_intake") {
+    return resumeBrandIntake(resumeToken, state, resolution, snapshot, engine, apiKey, model, onEvent);
+  }
+
   // Steer: re-run ONLY the design system with the note appended, then re-park.
   if (resolution.action === "steer") {
     discardCheckpoint(resumeToken);
@@ -380,6 +560,12 @@ export async function resumeAgentPipeline(
   // (`skip` suppresses any further gates this run; C1 has only this one, so
   // there are no later gates to suppress — handled identically here.)
   discardCheckpoint(resumeToken);
+
+  // A design-kind gate always carries a design system (brand_intake is handled
+  // above and re-parks here with one set).
+  if (!state.designSystem) {
+    throw new Error("Checkpoint resume state is missing its design system. Send your request again to start over.");
+  }
 
   const blueprint = await runModulePlanner(
     state.userMessage,
