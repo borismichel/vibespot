@@ -4,9 +4,11 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
-## Unreleased
+## 1.7.0 — 2026-06-22
 
 ### Added
+
+The **conversational agent pipeline** ([VIB-1876](/VIB/issues/VIB-1876)) lands in four slices. The agentic build is no longer one blocking shot: it now pauses at cheap seams — **brand-intake → design → structure → build** — so you can review, steer, or bail *before* the expensive parallel module build, can barge in mid-build to redirect, and plan mode is folded onto the same checkpoint primitive.
 
 - **Barge-in mid-build + plan mode folded onto the checkpoint primitive** ([VIB-1880](/VIB/issues/VIB-1880)) — two final pieces of the conversational pipeline ([VIB-1876](/VIB/issues/VIB-1876)). **Barge-in:** a chat message sent *during* the parallel module build no longer sits ignored behind a disabled composer — it now **cancels the running build and replans** with your new instruction. Cancellation threads a real `AbortSignal` from the handler down through the pipeline → the concurrency limiter (queued module calls reject instead of starting) → the provider request itself (Anthropic SDK / `fetch` `signal`), so an in-flight generation stops spending immediately rather than finishing wasted work. The composer stays live while the build runs (placeholder hints "send a message to steer or redirect"); the superseded run unwinds and the fresh one takes over. **Plan fold:** plan mode is now just the heaviest **checkpoint** variant. When a plan is ready it parks a `kind:"plan"` checkpoint, and approve / steer / cancel flow through the same `checkpoint_resolve` protocol as the design checkpoint — collapsing the separate `plan_approve` / `plan_discard` branches. The build-and-commit tail (apply → write → git commit → notify) now lives in one shared helper used by the chat, design-resume, and plan-approve paths.
 
