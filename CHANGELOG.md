@@ -4,6 +4,14 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## 1.7.5 — 2026-06-27
+
+### Changed
+
+- **Checkpoint decision records now include the content/facts** ([VIB-1876](/VIB/issues/VIB-1876)) — the one-line record left when a checkpoint resolves now carries the substance, not just the verb: the **design** record shows the approved palette + heading/body type; the **structure** record lists the kept module outline (`Sections (4): hero, features, pricing, cta`); the **brand-intake** record shows the inputs provided (`Colors: …`, `Site: …`, `Voice: …`, pasted code/theme); a **steer** shows the note. Facts render as a muted second line under the decision.
+
+---
+
 ## 1.7.4 — 2026-06-27
 
 ### Fixed
