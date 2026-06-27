@@ -129,6 +129,49 @@ export interface CheckpointPreview {
 }
 
 /**
+ * Resume state for a pipeline parked at the design or brand-intake gate. The
+ * `brand_intake` gate (VIB-1878) reuses this shape and sits in front of `design`
+ * (VIB-1877): resolving brand intake builds a design system and re-parks at the
+ * design gate, so `designSystem` is absent at the brand-intake park and set by
+ * the time we reach `design`. Every field is JSON-serializable so the whole
+ * state survives a session-to-disk round-trip (VIB-1883).
+ */
+export interface DesignCheckpointState {
+  kind: "design" | "brand_intake";
+  /** Enriched user message used by this run. */
+  userMessage: string;
+  plan: PipelinePlan;
+  /** Design system produced before the gate (Stage 2a). Absent at brand intake. */
+  designSystem?: DesignSystemOutput;
+  /** Finalized shared CSS/JS (with :root injected). */
+  sharedCss: string;
+  sharedJs: string;
+  startTime: number;
+  libraryModules: { name: string; usedIn: string[] }[];
+}
+
+/**
+ * Resume state for a pipeline parked at the structure gate (VIB-1879): the
+ * module planner (Stage 2b) has run, so we carry the full blueprint plus the
+ * design system needed to re-plan on steer. JSON-serializable for the same
+ * disk round-trip as the design state (VIB-1883).
+ */
+export interface StructureCheckpointState {
+  kind: "structure";
+  userMessage: string;
+  plan: PipelinePlan;
+  designSystem: DesignSystemOutput;
+  blueprint: PageBlueprint;
+  sharedCss: string;
+  sharedJs: string;
+  startTime: number;
+  libraryModules: { name: string; usedIn: string[] }[];
+}
+
+/** Union of every gate's resume state. All members are JSON-serializable. */
+export type CheckpointResumeState = DesignCheckpointState | StructureCheckpointState;
+
+/**
  * Persisted on the session while the pipeline is parked at a gate. Holding a
  * resume token (not a live promise) keeps the pause crash-safe and mirrors the
  * plan_approve re-entry pattern.
@@ -140,6 +183,16 @@ export interface PendingCheckpoint {
   preview: CheckpointPreview;
   /** When the gate was raised (ISO-8601), for staleness/telemetry. */
   createdAt: string;
+  /**
+   * The full resume state (plan, design system, blueprint, …) needed to
+   * continue the parked run. Persisted to disk with the session so the gate
+   * survives a *server* restart, not just a client refresh (VIB-1883): on
+   * resolve the in-memory `checkpointResumeStore` is rehydrated from this if
+   * the process was restarted. Omitted from payloads sent to the client (the
+   * UI only needs kind/resumeToken/preview). Absent on `plan` checkpoints —
+   * the plan lives on `session.brandAssets.plan`, not the resume store.
+   */
+  resumeState?: CheckpointResumeState;
 }
 
 /**

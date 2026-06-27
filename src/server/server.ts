@@ -1537,6 +1537,10 @@ ${errorContext}`;
             resumeToken,
             resolution,
             buildPipelineOnEvent(pipelineSteps, pipelineModules),
+            // Rehydrate the in-memory resume store from the persisted state if
+            // the server restarted while parked (VIB-1883). `pending` is the
+            // pre-clear snapshot taken at the top of this handler.
+            pending.resumeState,
           );
 
           // Cancelled — nothing built.
@@ -1625,7 +1629,11 @@ ${errorContext}`;
       isGenerating: generating,
       // A parked checkpoint survives a client refresh / device sleep — the
       // server keeps the gate, so re-send it so the client can resume (VIB-1876).
-      pendingCheckpoint: session.pendingCheckpoint || null,
+      // Strip the internal `resumeState` (VIB-1883): it's a server-only disk
+      // payload (plan/design system/blueprint); the UI only needs the preview.
+      pendingCheckpoint: session.pendingCheckpoint
+        ? { ...session.pendingCheckpoint, resumeState: undefined }
+        : null,
       // Per-project running generation cost (VIB-1770)
       costTotal: session.costTotal || null,
     }));
