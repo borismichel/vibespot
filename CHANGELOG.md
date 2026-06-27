@@ -4,6 +4,14 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## 1.7.3 — 2026-06-27
+
+### Changed
+
+- **Clearer "Cancel" on the queued-message chip** ([VIB-1876](/VIB/issues/VIB-1876)) — the queued-message chip's discard control is now a labelled **✕ Cancel** button (was a bare ✕ icon) so dropping a queued mid-build message is unmistakable, alongside **Interrupt now**.
+
+---
+
 ## 1.7.2 — 2026-06-27
 
 ### Changed

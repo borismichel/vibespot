@@ -2095,7 +2095,7 @@ function renderQueuedChip() {
     '<span style="opacity:.7;white-space:nowrap;">Queued — runs next:</span>' +
     '<span class="queued-msg__text" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>' +
     '<button type="button" class="queued-msg__interrupt" style="flex:none;cursor:pointer;border:1px solid var(--border,#e2e2e2);background:var(--surface,#fff);border-radius:6px;padding:3px 8px;font-size:12px;">Interrupt now</button>' +
-    '<button type="button" class="queued-msg__cancel" aria-label="Cancel queued message" style="flex:none;cursor:pointer;border:none;background:none;font-size:14px;opacity:.6;">✕</button>';
+    '<button type="button" class="queued-msg__cancel" aria-label="Cancel queued message" style="flex:none;cursor:pointer;border:1px solid var(--border,#e2e2e2);background:var(--surface,#fff);border-radius:6px;padding:3px 8px;font-size:12px;">✕ Cancel</button>';
   queuedChipEl.querySelector(".queued-msg__text").textContent = preview;
   queuedChipEl.querySelector(".queued-msg__interrupt").onclick = interruptWithQueued;
   queuedChipEl.querySelector(".queued-msg__cancel").onclick = clearQueuedMessage;
