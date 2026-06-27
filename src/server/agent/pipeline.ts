@@ -23,6 +23,9 @@ import type {
   CheckpointResolution,
   CheckpointPreview,
   CheckpointKind,
+  CheckpointResumeState,
+  DesignCheckpointState,
+  StructureCheckpointState,
 } from "./types.js";
 import { PipelineAbortError } from "./types.js";
 import { runIntentAnalyzer } from "./stages/intent-analyzer.js";
@@ -44,52 +47,19 @@ import { execSync } from "node:child_process";
 // When the pipeline parks at a gate it returns immediately (no dangling
 // promise) and stashes the state needed to continue here, keyed by an opaque
 // resume token. `resumeAgentPipeline` looks it up on the user's resolution.
-// In-memory by design: an unresolved gate is dropped if the server restarts
-// (the session's `pendingCheckpoint` is likewise treated as stale on reload).
+// The same state is also persisted on `session.pendingCheckpoint.resumeState`
+// (written to disk with the session), so a gate now survives a *server*
+// restart too (VIB-1883): on resolve, a store miss is rehydrated from the
+// caller-supplied fallback state before the resume proceeds.
 // ---------------------------------------------------------------------------
 
 /** Stage 3 (parallel module build) dominates total spend; design+intent are a
  * small fraction. Used to project the spend a user avoids by cancelling. */
 const STAGE3_COST_MULTIPLIER = 6;
 
-/**
- * Parked at the design gate (Stage 2a). `brand_intake` (VIB-1878) also uses
- * this shape and sits in front of `design` (VIB-1877): resolving brand intake
- * produces a design system and re-parks at the design gate, so `designSystem`
- * is absent at the brand-intake park and set by the time we reach `design`.
- */
-interface DesignCheckpointState {
-  kind: "design" | "brand_intake";
-  /** Enriched user message used by this run. */
-  userMessage: string;
-  plan: PipelinePlan;
-  /** Design system produced before the gate (Stage 2a). Absent at brand intake. */
-  designSystem?: DesignSystemOutput;
-  /** Finalized shared CSS/JS (with :root injected). */
-  sharedCss: string;
-  sharedJs: string;
-  startTime: number;
-  libraryModules: { name: string; usedIn: string[] }[];
-}
-
-/**
- * Parked at the structure gate (VIB-1879): the module planner (Stage 2b) has
- * run, so we carry the full blueprint plus the design system needed to re-plan
- * on steer. The user's edited outline (if any) is folded in on resume.
- */
-interface StructureCheckpointState {
-  kind: "structure";
-  userMessage: string;
-  plan: PipelinePlan;
-  designSystem: DesignSystemOutput;
-  blueprint: PageBlueprint;
-  sharedCss: string;
-  sharedJs: string;
-  startTime: number;
-  libraryModules: { name: string; usedIn: string[] }[];
-}
-
-type CheckpointResumeState = DesignCheckpointState | StructureCheckpointState;
+// The resume-state shapes (DesignCheckpointState / StructureCheckpointState /
+// CheckpointResumeState) live in ./types.js so PendingCheckpoint can carry them
+// for disk persistence (VIB-1883).
 
 const checkpointResumeStore = new Map<string, CheckpointResumeState>();
 
@@ -361,6 +331,9 @@ function parkAtCheckpoint(
       resumeToken,
       preview,
       createdAt: new Date().toISOString(),
+      // Persist the resume state with the session so the gate survives a server
+      // restart, not just a client refresh (VIB-1883).
+      resumeState: state,
     },
   };
 }
@@ -436,6 +409,8 @@ function parkAtBrandIntakeCheckpoint(
       resumeToken,
       preview,
       createdAt: new Date().toISOString(),
+      // Persist the resume state with the session (VIB-1883).
+      resumeState: state,
     },
   };
 }
@@ -567,8 +542,16 @@ export async function resumeAgentPipeline(
   concurrency: number,
   onEvent: (event: PipelineEvent) => void,
   signal?: AbortSignal,
+  fallbackState?: CheckpointResumeState,
 ): Promise<PipelineResult> {
-  const state = checkpointResumeStore.get(resumeToken);
+  // After a server restart the in-memory store is empty, but the resume state
+  // was persisted on the session and is handed back here (VIB-1883). Rehydrate
+  // the store from it and continue as if the process never died.
+  let state = checkpointResumeStore.get(resumeToken);
+  if (!state && fallbackState) {
+    state = fallbackState;
+    checkpointResumeStore.set(resumeToken, state);
+  }
   if (!state) {
     throw new Error("This checkpoint has expired (the server may have restarted). Send your request again to start over.");
   }

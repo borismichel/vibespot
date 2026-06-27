@@ -23,7 +23,7 @@ import { hasValidOAuthToken, getValidAccessToken } from "../utils/claude-oauth.j
 import { getFileContexts } from "./routes/upload-files.js";
 import { runAgentPipeline, resumeAgentPipeline, isAgenticCapable, isCLIEngine } from "./agent/pipeline.js";
 import { saveBrandAssetToTheme } from "./brand-enrichment.js";
-import type { CheckpointResolution } from "./agent/types.js";
+import type { CheckpointResolution, CheckpointResumeState } from "./agent/types.js";
 import { isAbortError } from "./agent/types.js";
 import { runWithTrace, setTraceOutput } from "./langfuse.js";
 import type { AgentEngine } from "./agent/engine-adapter.js";
@@ -506,6 +506,7 @@ export async function handleAgenticResume(
   resumeToken: string,
   resolution: CheckpointResolution,
   onEvent: (event: PipelineEvent) => void,
+  fallbackState?: CheckpointResumeState,
 ): Promise<PipelineResult> {
   const session = getSession();
   if (!session) throw new Error("No active session");
@@ -541,6 +542,7 @@ export async function handleAgenticResume(
             concurrency,
             onEvent,
             signal,
+            fallbackState,
           );
           setTraceOutput(summarizePipelineOutput(r));
           return r;

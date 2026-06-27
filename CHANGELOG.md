@@ -4,6 +4,14 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## 1.7.7 — 2026-06-27
+
+### Fixed
+
+- **Parked checkpoints now survive a full server restart** ([VIB-1883](/VIB/issues/VIB-1883)) — completing the durability story from 1.7.6. The resume state behind a parked gate (plan, design system, blueprint, shared CSS/JS, your message) is now persisted onto the session (`pendingCheckpoint.resumeState`) and written to disk, so killing and restarting the server while you're at a design / structure / brand-intake checkpoint no longer drops it. On reconnect, resolving the checkpoint rehydrates the server's in-memory state from disk and the build continues instead of erroring "this checkpoint has expired." The persisted state stays server-side (it's stripped from the payload sent to the browser).
+
+---
+
 ## 1.7.6 — 2026-06-27
 
 ### Fixed
