@@ -12,6 +12,11 @@ let isStreaming = false;
 // which a new message barges in to cancel-and-replan (VIB-1880). False when
 // parked at a checkpoint gate or running single-call mode.
 let agenticRunning = false;
+// Softened barge-in (VIB-1876): a message sent during an active build is QUEUED
+// by default and dispatched when the build finishes. The queued chip carries an
+// "Interrupt now" button that triggers the old cancel-and-replan barge-in.
+let queuedMessage = null; // { text, opts }
+let queuedChipEl = null;
 let streamingMsgEl = null;
 let streamBuffer = "";
 let streamStartTime = 0;
@@ -698,6 +703,7 @@ function handleWsMessage(msg) {
       highlightOnNextModulesUpdated = true;
       // Refresh the Library tab's module list so it stays in sync
       if (typeof refreshDashboard === "function") refreshDashboard();
+      flushQueuedMessage();
       break;
 
     case "modules_updated":
@@ -1306,6 +1312,7 @@ function handlePipelineComplete(msg) {
   lastGenerationBubbleEl = bubble;
 
   resetPipelineState();
+  flushQueuedMessage();
 }
 
 function handlePipelinePartial(msg) {
@@ -1336,6 +1343,7 @@ function handlePipelinePartial(msg) {
   lastGenerationBubbleEl = bubble;
 
   resetPipelineState();
+  flushQueuedMessage();
 }
 
 function resetPipelineState() {
@@ -1770,12 +1778,17 @@ async function sendMessage(text, opts = {}) {
   const hasFiles = pendingFiles.length > 0;
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   if (!text.trim() && !hasFiles) return;
-  // Block sends while busy — EXCEPT during an active agentic build, where a new
-  // message barges in to cancel-and-replan (VIB-1880). Single-call streaming and
-  // checkpoint gates stay locked.
+  // Block sends while busy — EXCEPT during an active agentic build. There, a new
+  // message is QUEUED by default and runs when the build finishes (VIB-1876);
+  // an explicit Interrupt (opts.interrupt) triggers the cancel-and-replan
+  // barge-in (VIB-1880). Single-call streaming and checkpoint gates stay locked.
   if (isStreaming && !agenticRunning) return;
-  const isBargeIn = isStreaming && agenticRunning;
-  if (isBargeIn) supersedeCurrentRun();
+  const buildActive = isStreaming && agenticRunning;
+  if (buildActive && !opts.interrupt) {
+    queueMessage(text, opts);
+    return;
+  }
+  if (buildActive && opts.interrupt) supersedeCurrentRun();
 
   // Remove welcome screen
   const welcome = messagesEl.querySelector(".chat__welcome");
@@ -2022,7 +2035,70 @@ function enableBargeIn() {
   agenticRunning = true;
   sendBtn.disabled = false;
   if (oneShotBtn) oneShotBtn.disabled = false;
-  if (inputEl) inputEl.placeholder = "Building… send a message to steer or redirect";
+  if (inputEl) inputEl.placeholder = "Building… your message will queue (or Interrupt to redirect now)";
+}
+
+// --- Softened barge-in: queue-by-default with an Interrupt button (VIB-1876) ---
+
+// Queue a message sent mid-build instead of cancelling the run. Latest wins.
+function queueMessage(text, opts) {
+  if (!text.trim() && pendingFiles.length === 0) return;
+  queuedMessage = { text, opts: { ...opts } };
+  if (inputEl) {
+    inputEl.value = "";
+    inputEl.dispatchEvent(new Event("input"));
+  }
+  renderQueuedChip();
+  setStatus("Message queued");
+}
+
+function clearQueuedMessage() {
+  queuedMessage = null;
+  if (queuedChipEl) {
+    queuedChipEl.remove();
+    queuedChipEl = null;
+  }
+}
+
+// Trigger the real barge-in (cancel-and-replan) with the queued message.
+function interruptWithQueued() {
+  if (!queuedMessage) return;
+  const { text, opts } = queuedMessage;
+  clearQueuedMessage();
+  sendMessage(text, { ...opts, interrupt: true });
+}
+
+// Dispatch the queued message once the current build has finished.
+function flushQueuedMessage() {
+  if (!queuedMessage) return;
+  const { text, opts } = queuedMessage;
+  clearQueuedMessage();
+  // Defer so the just-finished run's UI settles before the next one starts.
+  setTimeout(() => sendMessage(text, opts), 0);
+}
+
+function renderQueuedChip() {
+  if (!queuedMessage) return clearQueuedMessage();
+  const area = inputEl && inputEl.closest(".chat__input-area");
+  if (!area) return;
+  if (!queuedChipEl) {
+    queuedChipEl = document.createElement("div");
+    queuedChipEl.className = "queued-msg";
+    queuedChipEl.style.cssText =
+      "display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:8px 10px;border:1px solid var(--border,#e2e2e2);border-radius:8px;background:var(--surface-2,#faf7f5);font-size:13px;";
+    area.insertBefore(queuedChipEl, area.firstChild);
+  }
+  const t = queuedMessage.text || "(files attached)";
+  const preview = t.length > 90 ? t.slice(0, 90) + "…" : t;
+  queuedChipEl.innerHTML =
+    '<span aria-hidden="true">⏳</span>' +
+    '<span style="opacity:.7;white-space:nowrap;">Queued — runs next:</span>' +
+    '<span class="queued-msg__text" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>' +
+    '<button type="button" class="queued-msg__interrupt" style="flex:none;cursor:pointer;border:1px solid var(--border,#e2e2e2);background:var(--surface,#fff);border-radius:6px;padding:3px 8px;font-size:12px;">Interrupt now</button>' +
+    '<button type="button" class="queued-msg__cancel" aria-label="Cancel queued message" style="flex:none;cursor:pointer;border:none;background:none;font-size:14px;opacity:.6;">✕</button>';
+  queuedChipEl.querySelector(".queued-msg__text").textContent = preview;
+  queuedChipEl.querySelector(".queued-msg__interrupt").onclick = interruptWithQueued;
+  queuedChipEl.querySelector(".queued-msg__cancel").onclick = clearQueuedMessage;
 }
 
 // Tear down the superseded run's transient UI so the replacement run renders
@@ -2369,6 +2445,7 @@ function handleCheckpointCancelled() {
   removeCheckpointCard();
   setSendDisabled(false);
   appendSystemMessage("Cancelled — nothing was built.");
+  flushQueuedMessage();
 }
 
 function resolveCheckpoint(action, note, extra) {

@@ -4,6 +4,14 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## 1.7.2 — 2026-06-27
+
+### Changed
+
+- **Softened barge-in: queue-by-default with an explicit Interrupt** ([VIB-1876](/VIB/issues/VIB-1876)) — sending a message while a build is running no longer immediately cancels and replans it. By default the message is **queued** — a "Queued — runs next" chip appears and it's dispatched automatically when the current build finishes. The chip carries an **Interrupt now** button that triggers the original cancel-and-replan barge-in for when you do want to redirect immediately (plus a ✕ to drop the queued message). Less destructive by default; the aggressive redirect is now opt-in.
+
+---
+
 ## 1.7.1 — 2026-06-27
 
 ### Fixed
