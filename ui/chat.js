@@ -2411,6 +2411,7 @@ function appendSystemMessage(text) {
 // ---------------------------------------------------------------------------
 
 let checkpointCardEl = null;
+let currentCheckpointKind = null;
 
 function setSendDisabled(disabled) {
   sendBtn.disabled = disabled;
@@ -2424,14 +2425,54 @@ function removeCheckpointCard() {
   checkpointCardEl = null;
 }
 
+// One-line record of what the user decided at a checkpoint (VIB-1876). Boris:
+// keep the decision in the transcript rather than dropping the turn entirely.
+function summarizeDecision(kind, action, note, extra) {
+  const label =
+    kind === "brand_intake" ? "Brand" : kind === "structure" ? "Structure" : kind === "plan" ? "Plan" : "Design";
+  if (action === "cancel") return `${label}: cancelled — nothing was built.`;
+  if (action === "steer") return `${label}: steered${note ? " — " + note : ""}.`;
+  if (kind === "brand_intake") {
+    if (action !== "approve") return "Brand: surprise me — generating a design system.";
+    const ch =
+      extra && extra.brandIntake
+        ? Object.keys(extra.brandIntake).filter((k) => extra.brandIntake[k])
+        : [];
+    return `Brand: bringing your brand${ch.length ? " (" + ch.join(", ") + ")" : ""}.`;
+  }
+  if (action === "skip") return `${label}: skipped remaining checkpoints — building now.`;
+  return `${label}: approved.`;
+}
+
+// Convert the live checkpoint card into a static decision record so the turn
+// keeps meaning in the transcript instead of leaving an empty bubble (VIB-1876).
+// Rebuilds a standard assistant bubble (the card renderers use bespoke markup).
+function finalizeCheckpointCard(action, note, extra) {
+  if (!checkpointCardEl) return;
+  const text = summarizeDecision(currentCheckpointKind || "design", action, note, extra);
+  const glyph = action === "cancel" ? "✕" : "✓";
+  const time = formatMessageTime(Date.now());
+  checkpointCardEl.className = "chat-msg chat-msg--assistant chat-msg--checkpoint-resolved";
+  checkpointCardEl.innerHTML =
+    '<div class="chat-msg__avatar chat-msg__avatar--ai">AI</div>' +
+    '<div class="chat-msg__content">' +
+    '<div class="chat-msg__header"><span class="chat-msg__sender">vibeSpot AI</span>' +
+    '<span class="chat-msg__time">' + time + "</span></div>" +
+    '<div class="chat-msg__bubble"><span class="checkpoint-decision" style="opacity:.85;"></span></div>' +
+    "</div>";
+  checkpointCardEl.querySelector(".checkpoint-decision").textContent = glyph + " " + text;
+  checkpointCardEl = null;
+}
+
 function handleCheckpointRequested(msg) {
-  // Settle the in-flight "thinking" bubble; the gate now waits on the user.
+  // Settle the in-flight progress bubble; the gate now waits on the user.
   clearStreamStatus();
   finishStreaming();
   removeCheckpointCard();
 
   const preview = msg.preview || {};
   const data = preview.data || {};
+  currentCheckpointKind = preview.kind || "design";
   checkpointCardEl = renderCheckpointCard(preview, data, msg.estCostNext);
   messagesEl.appendChild(checkpointCardEl);
   scrollToBottom();
@@ -2450,12 +2491,24 @@ function handleCheckpointCancelled() {
 
 function resolveCheckpoint(action, note, extra) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  removeCheckpointCard();
+  // Leave the decision in the transcript (card → one-line record), not an empty
+  // bubble (VIB-1876).
+  finalizeCheckpointCard(action, note, extra);
   if (action === "cancel") {
     setSendDisabled(false);
   } else {
-    // approve / steer / skip — work resumes; show the progress spinner again.
-    startStreaming();
+    // Work resumes. Don't pre-create an empty bubble — clear the prior turn's
+    // pipeline refs so the resume's first progress event builds its OWN stepper
+    // bubble (ensurePipelineBubble returns early while pipelineBubbleEl is set).
+    isStreaming = true;
+    setSendDisabled(true);
+    pipelineBubbleEl = null;
+    pipelineStepperEl = null;
+    pipelineDetailEl = null;
+    pipelineModulesEl = null;
+    pipelineEstimateEl = null;
+    streamingMsgEl = null;
+    streamStartTime = Date.now();
     setStatus("Generating...");
   }
   ws.send(JSON.stringify({

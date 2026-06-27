@@ -4,6 +4,14 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## 1.7.4 — 2026-06-27
+
+### Fixed
+
+- **Checkpoint decisions are now recorded in the chat (no more empty bubbles)** ([VIB-1876](/VIB/issues/VIB-1876)) — resolving a checkpoint card now leaves a one-line **decision record** in the transcript ("✓ Design: approved.", "✓ Structure: steered — make it darker.", "✓ Brand: bringing your brand (colors, siteUrl).", "✕ Design: cancelled — nothing was built.") instead of a blank bubble. Root cause of the persisting empties: on resume the pipeline reused a stale progress-bubble reference, so the freshly-created streaming bubble was never populated; the resume now clears those refs and builds its own progress stepper rather than pre-creating an empty bubble. The earlier 1.7.1 cleanup remains as a safety net.
+
+---
+
 ## 1.7.3 — 2026-06-27
 
 ### Changed
