@@ -37,11 +37,21 @@ Requires Node.js 18+. No HubSpot CLI install needed — vibeSpot talks to HubSpo
 
 Type what you want on the left. Watch real HubSpot modules render on the right — Split, Plan, and Code views, all live. A four-stage agentic pipeline (Intent → Architect → Module Developer → Quality Check) generates modules in parallel and auto-fixes common HubL issues before they reach you.
 
-### 2. Deliberate before you generate — Plan mode
+### 2. Check the work before the expensive build — Checkpoints
 
-<img src="assets/readme/02-plan-mode.png" alt="Plan mode: AI asks elicitation questions and builds a markdown plan" width="100%">
+<p align="center">
+  <img src="assets/readme/02-checkpoints.png" alt="Design checkpoint card: palette, type specimen, sample hero, and the estimated build cost — with approve, steer, skip, and cancel actions" width="360">
+</p>
 
-Vague brief? Toggle Plan mode. vibeSpot asks the questions a senior designer would — audience, primary CTA, sections, voice — and builds a markdown plan in the right pane. Generation is hard-gated until you approve. Pre-canned templates skip the cold start for common page types.
+By default vibeSpot doesn't run the whole pipeline in one blind shot. It pauses at cheap seams and shows you a card before spending tokens on the parallel module build:
+
+- **Brand intake** — when your theme has no style system yet, vibeSpot asks first: bring your brand (colors, code, an existing theme, a live site, your voice) or let it choose for you.
+- **Design checkpoint** — palette swatches, a type specimen, and one sample hero, rendered straight from the design tokens. No extra model call.
+- **Structure checkpoint** — the planned modules as an editable outline. Reorder, rename, cut, or add sections before a single module is built.
+
+Each card shows the estimated cost of the build it gates. **Approve** to continue, **steer** with a note to redo just that stage, **skip** to build now, or **cancel** to write nothing. In a hurry? The one-tap **one-shot** button next to send skips every gate — the old one-call behaviour.
+
+**Plan mode** is the heaviest checkpoint variant. Toggle it on for a vague brief and vibeSpot asks the questions a senior designer would — audience, primary CTA, sections, voice — and builds a markdown plan in the right pane. Generation is hard-gated until you approve. Pre-canned templates skip the cold start for common page types.
 
 ### 3. Translate Figma 1:1
 

@@ -86,6 +86,10 @@
     <a class="doc-nav__link doc-nav__link--sub" href="#intent-types">Intents</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#prompt-tips">Prompt Tips</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#brand-assets">Brand Assets</a>
+    <a class="doc-nav__link" href="#checkpoints">Checkpoints</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#checkpoints-seams">The Three Seams</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#checkpoints-card">The Checkpoint Card</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#checkpoints-oneshot">One-Shot Escape Hatch</a>
     <a class="doc-nav__link" href="#plan-mode">Plan Mode</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#plan-mode-when">When to Use</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#plan-mode-flow">The Flow</a>
@@ -955,11 +959,48 @@ testimonial carousel, and a minimal footer with social links.</code></pre>
 </div>
 
 <!-- ============================================================
+     Section: Checkpoints
+     ============================================================ -->
+<div class="doc-section" id="checkpoints">
+  <h2 id="checkpoints-heading">Checkpoints <a href="#checkpoints" class="doc-anchor">#</a></h2>
+  <p class="doc-subtitle">The default generation flow. Instead of running all four pipeline stages in one blocking shot, vibeSpot pauses at cheap seams and shows you a review card <em>before</em> spending tokens on the expensive parallel module build &mdash; so you steer the look and the skeleton while changes are still free.</p>
+
+  <p>The <a href="#agentic-pipeline">agentic pipeline</a> has a natural cost cliff: the design system (Stage 2a) and the module plan (Stage 2b) are a handful of cheap calls, but the module build (Stage 3) fans out one generation per module in parallel &mdash; the bulk of the spend and the wait. Checkpoints park the pipeline at the seams before that cliff. You see what the AI decided, adjust it, and only then pay for the build. Each gate is rendered from data the pipeline already produced, so showing the card costs nothing extra.</p>
+
+  <img class="doc-screenshot" style="max-width:360px" src="screenshots/checkpoint-card.png" alt="Design checkpoint card in the chat panel: a DESIGN CHECKPOINT badge, a rendered hero preview, the palette swatches and heading/body type specimen, the estimated build cost, and Approve / Steer / Skip / Cancel buttons">
+
+  <h3 id="checkpoints-seams">The Three Seams</h3>
+  <p>For a from-scratch page, checkpoints fire in order: <strong>brand intake &rarr; design &rarr; structure &rarr; build</strong>. Modifications to an existing page, email generation, and plan-approved runs build straight through without gating.</p>
+  <ol class="doc-steps">
+    <li><strong>Brand intake.</strong> When you ask for a new page and the theme has no style system yet, vibeSpot asks first instead of guessing: <strong>bring your brand</strong> (paste colors, drop in CSS/code, point at an existing theme or a live URL, describe your voice) or <strong>let it choose</strong>. What you provide seeds the <code>:root</code> design tokens that feed the design checkpoint. Skipped when the theme already has a style system.</li>
+    <li><strong>Design checkpoint.</strong> After the design-system stage, the pipeline parks and shows a <strong>design card</strong>: palette swatches, a heading/body type specimen, and one representative hero rendered straight from the design tokens. No extra model call &mdash; it's a deterministic preview of the tokens the build will use.</li>
+    <li><strong>Structure checkpoint.</strong> After the module planner, the pipeline parks again and shows the planned modules as an <strong>editable outline</strong>. Reorder rows (&#9650;/&#9660;), cut them (&#10005;), rename inline, or add a section &mdash; all client-side, no model call. The build honors exactly the outline you keep: a reorder or rename preserves that module's planned brief; an added row gets a sensible default brief.</li>
+  </ol>
+
+  <h3 id="checkpoints-card">The Checkpoint Card</h3>
+  <p>Every checkpoint card offers the same four actions, plus a cost estimate:</p>
+  <ul>
+    <li><strong>Approve</strong> &mdash; accept what's shown and continue to the next seam (or the build, at the last gate).</li>
+    <li><strong>Steer</strong> &mdash; type a note and vibeSpot re-runs <em>only</em> that stage with your guidance, then re-previews. Cheap to iterate, because you're redoing one stage, not the whole page.</li>
+    <li><strong>Skip</strong> &mdash; build now and suppress any remaining gates for this run. Skipping at the design gate suppresses the structure gate too.</li>
+    <li><strong>Cancel</strong> &mdash; drop the run. Nothing is written.</li>
+  </ul>
+  <p>Each card also shows the <strong>estimated cost of the build it gates</strong>, computed from spend-so-far via the per-page <a href="#observability">cost tracker</a> &mdash; so you know what Approve will cost before you click it. (CLI engines report no usage, so the estimate is omitted for them.)</p>
+  <div class="doc-callout doc-callout--tip">
+    <div class="doc-callout__label">&#128268; Crash-safe by design</div>
+    <p>A parked checkpoint isn't a paused, open promise &mdash; the pipeline <em>returns</em> at the gate and your resolution re-enters it via a resume token. If the server restarts while a gate is open, the run is simply dropped and you re-send your prompt, rather than leaving a hung generation behind.</p>
+  </div>
+
+  <h3 id="checkpoints-oneshot">One-Shot Escape Hatch</h3>
+  <p>Checkpoints are <strong>on by default</strong> for from-scratch page generation. When you already know what you want and don't need to review, the <strong>one-shot</strong> button next to send runs the whole pipeline in one go &mdash; the previous one-call behaviour, no gates. It's a per-message choice: tap one-shot for this prompt, or hit send to go through the checkpoints.</p>
+</div>
+
+<!-- ============================================================
      Section: Plan Mode
      ============================================================ -->
 <div class="doc-section" id="plan-mode">
   <h2 id="plan-mode-heading">Plan Mode <a href="#plan-mode" class="doc-anchor">#</a></h2>
-  <p class="doc-subtitle">A deliberation phase that runs <em>before</em> any code is generated. Plan mode turns vague briefs into well-scoped plans through guided dialogue, then runs the agentic pipeline against the approved plan as a high-fidelity design brief.</p>
+  <p class="doc-subtitle">A deliberation phase that runs <em>before</em> any code is generated. Plan mode turns vague briefs into well-scoped plans through guided dialogue, then runs the agentic pipeline against the approved plan as a high-fidelity design brief. It is the heaviest variant of the <a href="#checkpoints">checkpoint</a> flow &mdash; a full written plan you approve, rather than a single review card.</p>
 
   <p>Without plan mode, vibeSpot generates immediately on every chat message &mdash; fast, but unforgiving on vague prompts. The AI guesses at audience, content, and structure, and you find out what it guessed only after a full generation cycle. Plan mode flips the order: the AI asks targeted questions first, surfaces what's missing, and only generates after you've reviewed and approved a written plan. The plan is markdown, persisted to <code>{theme}/.vibespot/plan.md</code>, and reviewable in a dedicated tab in the right pane.</p>
 
@@ -1009,6 +1050,11 @@ testimonial carousel, and a minimal footer with social links.</code></pre>
     <li><strong>Discard &amp; start over</strong> &mdash; Clears <code>plan.md</code>, exits plan mode, returns the chat to normal generation. Used when you want to scrap the current direction entirely.</li>
   </ul>
   <p>The plan persists across vibeSpot restarts. Open the same theme weeks later, toggle plan mode on, and your in-progress plan is right where you left it.</p>
+
+  <div class="doc-callout doc-callout--info">
+    <div class="doc-callout__label">&#128279; One primitive under the hood</div>
+    <p>Plan approval now runs on the same park-and-re-enter machinery as the design and structure <a href="#checkpoints">checkpoints</a>. <strong>Approve plan</strong> and <strong>Discard &amp; start over</strong> resolve through the shared <code>checkpoint_resolve</code> path (approve &rarr; build, cancel &rarr; discard), so plan mode, the design gate, and the structure gate are three faces of one gating model rather than separate code paths. A plan-approved run builds straight through &mdash; it doesn't re-gate at the design or structure seams, because the plan already covered that deliberation.</p>
+  </div>
 
   <div class="doc-callout doc-callout--tip">
     <div class="doc-callout__label">&#10024; Plan mode + brand assets</div>
