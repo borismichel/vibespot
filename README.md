@@ -39,7 +39,9 @@ Type what you want on the left. Watch real HubSpot modules render on the right �
 
 ### 2. Check the work before the expensive build — Checkpoints
 
-<img src="assets/readme/02-plan-mode.png" alt="Checkpoint card: review the design and structure before vibeSpot builds the page" width="100%">
+<p align="center">
+  <img src="assets/readme/02-checkpoints.png" alt="Design checkpoint card: palette, type specimen, sample hero, and the estimated build cost — with approve, steer, skip, and cancel actions" width="360">
+</p>
 
 By default vibeSpot doesn't run the whole pipeline in one blind shot. It pauses at cheap seams and shows you a card before spending tokens on the parallel module build:
 

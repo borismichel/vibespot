@@ -967,6 +967,8 @@ testimonial carousel, and a minimal footer with social links.</code></pre>
 
   <p>The <a href="#agentic-pipeline">agentic pipeline</a> has a natural cost cliff: the design system (Stage 2a) and the module plan (Stage 2b) are a handful of cheap calls, but the module build (Stage 3) fans out one generation per module in parallel &mdash; the bulk of the spend and the wait. Checkpoints park the pipeline at the seams before that cliff. You see what the AI decided, adjust it, and only then pay for the build. Each gate is rendered from data the pipeline already produced, so showing the card costs nothing extra.</p>
 
+  <img class="doc-screenshot" style="max-width:360px" src="screenshots/checkpoint-card.png" alt="Design checkpoint card in the chat panel: a DESIGN CHECKPOINT badge, a rendered hero preview, the palette swatches and heading/body type specimen, the estimated build cost, and Approve / Steer / Skip / Cancel buttons">
+
   <h3 id="checkpoints-seams">The Three Seams</h3>
   <p>For a from-scratch page, checkpoints fire in order: <strong>brand intake &rarr; design &rarr; structure &rarr; build</strong>. Modifications to an existing page, email generation, and plan-approved runs build straight through without gating.</p>
   <ol class="doc-steps">
