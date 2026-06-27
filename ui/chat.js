@@ -2073,6 +2073,24 @@ function finishStreaming() {
   if (streamingEl) {
     streamingEl.classList.remove("chat-msg--streaming");
 
+    // Agentic seams (a checkpoint gate, or a resume that re-parks / just builds
+    // modules) leave a streaming bubble that never received any text or progress
+    // stepper. Don't finalize it into an empty bubble with a lone duration —
+    // drop it (VIB-1876 follow-up). A bubble carrying the pipeline stepper or
+    // any rendered content has child nodes, so it's kept.
+    const bubbleEl = streamingEl.querySelector(".chat-msg__bubble");
+    const hasContent =
+      !!bubbleEl && (bubbleEl.children.length > 0 || bubbleEl.textContent.trim().length > 0);
+    const willRenderText = !!streamBuffer && streamBuffer.trim().length > 0;
+    if (!hasContent && !willRenderText) {
+      streamingEl.remove();
+      streamingMsgEl = null;
+      streamBuffer = "";
+      setStatus("Ready");
+      scrollToBottom();
+      return;
+    }
+
     // Add duration metadata beneath the bubble (inside .chat-msg__content)
     const meta = document.createElement("div");
     meta.className = "chat-msg__meta";

@@ -4,6 +4,15 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## 1.7.1 — 2026-06-27
+
+### Fixed
+
+- **Checkpoint turns no longer leave empty chat bubbles** ([VIB-1876](/VIB/issues/VIB-1876)) — in the conversational pipeline, each checkpoint gate (and every resume that re-parked or went straight to the build) finalized an assistant bubble that had received no streamed text, leaving a blank message with only a duration ("15s", "2m 52s"). `finishStreaming` now drops a streaming bubble that has no text and no progress stepper instead of stamping it, so the transcript only keeps turns with real content (the progress card and the checkpoint cards).
+- **Brand-intake site-URL extraction is far more robust** ([VIB-1876](/VIB/issues/VIB-1876)) — pasting a page URL under "Bring your brand" often came back with no design tokens. The fetch now sends browser-like headers (many sites 403 / serve a stripped page to a header-less request), follows protocol-relative and multi-token `rel` stylesheet links (up to 6), and also scans `<meta name="theme-color">`, inline `style=` attributes, and the raw HTML so colors are still found on utility/CSS-in-JS pages. When nothing usable can be extracted, the build now says so explicitly instead of silently falling back to a generated palette.
+
+---
+
 ## 1.7.0 — 2026-06-22
 
 ### Added
