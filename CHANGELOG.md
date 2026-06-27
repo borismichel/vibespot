@@ -4,6 +4,15 @@ All notable changes to vibeSpot are documented here.
 
 ---
 
+## 1.7.6 — 2026-06-27
+
+### Fixed
+
+- **Parked checkpoints survive a browser refresh / device sleep** ([VIB-1876](/VIB/issues/VIB-1876)) — locking an iPad or refreshing the tab no longer loses an open checkpoint. The server already kept the gate on the session across a client disconnect; the `init` payload now includes `pendingCheckpoint`, and on (re)connect the client re-renders the checkpoint card so you resume exactly where you were. (A full server restart still drops the in-memory resume state — tracked separately for durable persistence.)
+- **Older stepper cards mark completed stages done** ([VIB-1876](/VIB/issues/VIB-1876)) — when the run parks at a gate and a fresh progress card is appended for the resume, the previous card's reached stages are now checked off (e.g. intent ✓) instead of frozen mid-stage.
+
+---
+
 ## 1.7.5 — 2026-06-27
 
 ### Changed

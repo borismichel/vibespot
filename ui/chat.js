@@ -674,6 +674,13 @@ function handleWsMessage(msg) {
         }
       }
 
+      // Rehydrate a parked checkpoint after a refresh / device sleep (VIB-1876):
+      // the server kept the gate, so re-render the card and let the user resume
+      // from where they were. Plan-mode parks are rehydrated by planController.
+      if (msg.pendingCheckpoint && msg.pendingCheckpoint.preview && msg.pendingCheckpoint.kind !== "plan") {
+        handleCheckpointRequested({ preview: msg.pendingCheckpoint.preview });
+      }
+
       // If setup handed us an initial prompt (describe-it path), send it now
       // that the session is live. Skip if the project already has history
       // (e.g. resumed session) to avoid double-submitting.
@@ -2507,9 +2514,21 @@ function finalizeCheckpointCard(action, note, extra) {
   checkpointCardEl = null;
 }
 
+// When a stepper card is left behind (the run parks at a gate), mark the stages
+// it actually reached as done so the older card reads "complete up to here"
+// rather than frozen mid-stage (VIB-1876).
+function finalizeStepperProgress() {
+  if (!pipelineStepperEl) return;
+  pipelineStepperEl.querySelectorAll(".pipeline-stage--active").forEach((el) => {
+    const step = el.getAttribute("data-stage");
+    if (step) setStageStatus(step, "done");
+  });
+}
+
 function handleCheckpointRequested(msg) {
   // Settle the in-flight progress bubble; the gate now waits on the user.
   clearStreamStatus();
+  finalizeStepperProgress();
   finishStreaming();
   removeCheckpointCard();
 

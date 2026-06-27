@@ -1623,6 +1623,9 @@ ${errorContext}`;
       plan: session.brandAssets?.plan || "",
       // Active generation state for reconnecting clients
       isGenerating: generating,
+      // A parked checkpoint survives a client refresh / device sleep — the
+      // server keeps the gate, so re-send it so the client can resume (VIB-1876).
+      pendingCheckpoint: session.pendingCheckpoint || null,
       // Per-project running generation cost (VIB-1770)
       costTotal: session.costTotal || null,
     }));
