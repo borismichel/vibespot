@@ -2412,6 +2412,7 @@ function appendSystemMessage(text) {
 
 let checkpointCardEl = null;
 let currentCheckpointKind = null;
+let currentCheckpointData = null;
 
 function setSendDisabled(disabled) {
   sendBtn.disabled = disabled;
@@ -2444,12 +2445,49 @@ function summarizeDecision(kind, action, note, extra) {
   return `${label}: approved.`;
 }
 
+// The substantive content/facts behind a decision (VIB-1876): the palette/type
+// approved, the module outline kept, or the brand inputs provided — so the
+// transcript records *what*, not just the verb. Returns "" when there's nothing.
+function decisionFacts(kind, action, note, extra, data) {
+  if (action === "cancel") return "";
+  if (action === "steer") return note ? "Note: " + note : "";
+  const parts = [];
+  const clip = (s) => String(s).replace(/\s+/g, " ").trim().slice(0, 80);
+  if (kind === "design" || kind === "plan") {
+    const pal = Array.isArray(data && data.palette)
+      ? data.palette.map((p) => p && p.value).filter(Boolean).slice(0, 5)
+      : [];
+    if (pal.length) parts.push("Palette: " + pal.join(", "));
+    const typo = (data && data.typography) || {};
+    if (typo.heading || typo.body) parts.push("Type: " + [typo.heading, typo.body].filter(Boolean).join(" / "));
+  } else if (kind === "structure") {
+    const rows =
+      extra && Array.isArray(extra.outline) && extra.outline.length
+        ? extra.outline
+        : data && Array.isArray(data.modules)
+          ? data.modules
+          : [];
+    const names = rows.map((r) => r && (r.name || r.label)).filter(Boolean);
+    if (names.length) parts.push(`Sections (${names.length}): ` + names.join(", "));
+  } else if (kind === "brand_intake") {
+    const bi = (extra && extra.brandIntake) || {};
+    if (bi.colors) parts.push("Colors: " + clip(bi.colors));
+    if (bi.siteUrl) parts.push("Site: " + clip(bi.siteUrl));
+    if (bi.themePath) parts.push("Theme: " + clip(bi.themePath));
+    if (bi.code) parts.push("Pasted code");
+    if (bi.voice) parts.push("Voice: " + clip(bi.voice));
+  }
+  return parts.join(" · ");
+}
+
 // Convert the live checkpoint card into a static decision record so the turn
 // keeps meaning in the transcript instead of leaving an empty bubble (VIB-1876).
 // Rebuilds a standard assistant bubble (the card renderers use bespoke markup).
 function finalizeCheckpointCard(action, note, extra) {
   if (!checkpointCardEl) return;
-  const text = summarizeDecision(currentCheckpointKind || "design", action, note, extra);
+  const kind = currentCheckpointKind || "design";
+  const text = summarizeDecision(kind, action, note, extra);
+  const facts = decisionFacts(kind, action, note, extra, currentCheckpointData);
   const glyph = action === "cancel" ? "✕" : "✓";
   const time = formatMessageTime(Date.now());
   checkpointCardEl.className = "chat-msg chat-msg--assistant chat-msg--checkpoint-resolved";
@@ -2458,9 +2496,14 @@ function finalizeCheckpointCard(action, note, extra) {
     '<div class="chat-msg__content">' +
     '<div class="chat-msg__header"><span class="chat-msg__sender">vibeSpot AI</span>' +
     '<span class="chat-msg__time">' + time + "</span></div>" +
-    '<div class="chat-msg__bubble"><span class="checkpoint-decision" style="opacity:.85;"></span></div>' +
-    "</div>";
+    '<div class="chat-msg__bubble">' +
+    '<div class="checkpoint-decision" style="opacity:.85;"></div>' +
+    '<div class="checkpoint-decision__facts" style="opacity:.6;font-size:12px;margin-top:2px;"></div>' +
+    "</div></div>";
   checkpointCardEl.querySelector(".checkpoint-decision").textContent = glyph + " " + text;
+  const factsEl = checkpointCardEl.querySelector(".checkpoint-decision__facts");
+  if (facts) factsEl.textContent = facts;
+  else factsEl.remove();
   checkpointCardEl = null;
 }
 
@@ -2473,6 +2516,7 @@ function handleCheckpointRequested(msg) {
   const preview = msg.preview || {};
   const data = preview.data || {};
   currentCheckpointKind = preview.kind || "design";
+  currentCheckpointData = data;
   checkpointCardEl = renderCheckpointCard(preview, data, msg.estCostNext);
   messagesEl.appendChild(checkpointCardEl);
   scrollToBottom();
