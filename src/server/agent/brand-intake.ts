@@ -127,31 +127,61 @@ function tokensFromColors(raw: string): DesignTokens {
   return tokens;
 }
 
-/** Best-effort fetch of a site's HTML + linked stylesheets, concatenated. */
+// Browser-like headers — many sites return 403 / a JS challenge / a stripped
+// page to a header-less fetch, which was the main reason site-URL intake came
+// back empty (VIB-1876 follow-up).
+const FETCH_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,text/css,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+};
+
+/**
+ * Best-effort fetch of a site's HTML + linked stylesheets, concatenated. The
+ * result also folds in inline `style=` attributes and `<meta name="theme-color">`
+ * so colors are still found on utility/CSS-in-JS pages that ship no separate
+ * stylesheet; if nothing else is found it falls back to the raw HTML.
+ */
 async function fetchSiteCss(url: string): Promise<string> {
   const normalized = /^https?:\/\//i.test(url) ? url : `https://${url}`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  const timer = setTimeout(() => controller.abort(), 10000);
   try {
-    const res = await fetch(normalized, { signal: controller.signal, redirect: "follow" });
-    if (!res.ok) return "";
+    const res = await fetch(normalized, { signal: controller.signal, redirect: "follow", headers: FETCH_HEADERS });
+    if (!res.ok) {
+      log.warn("brand-intake", `site fetch ${normalized} → HTTP ${res.status}`);
+      return "";
+    }
     const html = await res.text();
     let css = "";
     // Inline <style> blocks.
     for (const m of html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)) css += `\n${m[1]}`;
-    // Linked stylesheets (first few only).
+    // <meta name="theme-color"> + inline style="" attributes carry colors even
+    // when the page ships no fetchable stylesheet.
+    for (const m of html.matchAll(/<meta[^>]+name=["']theme-color["'][^>]*>/gi)) {
+      const c = /content=["']([^"']+)["']/i.exec(m[0])?.[1];
+      if (c) css += `\n--theme-color: ${c};`;
+    }
+    for (const m of html.matchAll(/style=["']([^"']+)["']/gi)) css += `\n.inline{${m[1]}}`;
+    // Linked stylesheets (rel may list multiple tokens, e.g. "preload stylesheet").
     const hrefs: string[] = [];
-    for (const m of html.matchAll(/<link[^>]+rel=["']?stylesheet["']?[^>]*>/gi)) {
-      const href = /href=["']([^"']+)["']/i.exec(m[0])?.[1];
+    for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
+      const tag = m[0];
+      if (!/rel=["'][^"']*stylesheet[^"']*["']/i.test(tag)) continue;
+      const href = /href=["']([^"']+)["']/i.exec(tag)?.[1];
       if (href) hrefs.push(href);
     }
-    for (const href of hrefs.slice(0, 3)) {
+    for (const href of hrefs.slice(0, 6)) {
       try {
-        const abs = new URL(href, normalized).toString();
-        const sheet = await fetch(abs, { signal: controller.signal, redirect: "follow" });
+        // Resolve protocol-relative (//cdn/...) and relative hrefs.
+        const abs = new URL(href.startsWith("//") ? `https:${href}` : href, normalized).toString();
+        const sheet = await fetch(abs, { signal: controller.signal, redirect: "follow", headers: FETCH_HEADERS });
         if (sheet.ok) css += `\n${await sheet.text()}`;
       } catch { /* skip individual sheet failures */ }
     }
+    // Last resort: scan the raw HTML so inline colors aren't entirely missed.
+    if (!css.trim()) css = html;
     return css;
   } catch (err) {
     log.warn("brand-intake", `site fetch failed for ${normalized}: ${err instanceof Error ? err.message : String(err)}`);

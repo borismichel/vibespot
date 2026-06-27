@@ -490,6 +490,16 @@ async function resumeBrandIntake(
         step: "designing",
         decision: `Brand intake: using ${brand.channels.join(", ")} → ${Object.keys(brand.cssVariables).length} brand token(s)`,
       });
+    } else {
+      // User chose "Bring your brand" but no channel yielded usable tokens (e.g.
+      // a JS-rendered site that ships no fetchable CSS). Tell them instead of
+      // silently falling back to a generated palette (VIB-1876 follow-up).
+      onEvent({
+        type: "agent_decision",
+        step: "designing",
+        decision:
+          "Brand intake: couldn't extract usable design tokens from what you provided — generating a design system instead. Try pasting your brand colors or CSS directly.",
+      });
     }
   }
 

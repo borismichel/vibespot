@@ -1,7 +1,7 @@
 {
   "name": "vibespot",
-  "version": "1.7.0",
-  "description": "AI-powered HubSpot CMS landing page builder — vibe coding & React converter",
+  "version": "1.7.1",
+  "description": "AI-powered HubSpot CMS landing page builder \u2014 vibe coding & React converter",
   "type": "module",
   "bin": {
     "vibespot": "bin/vibespot.mjs"
