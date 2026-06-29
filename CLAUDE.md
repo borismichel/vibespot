@@ -240,6 +240,14 @@ The expensive work is on-demand:
 
 Client (`ui/settings.js`): `refreshSettings()` renders instantly from `/status`; `fetchModels`/`fetchTools` layer their results over the fast payload via `applyScanCaches` (module-level `liveModels` / `scannedTools` / `scannedEngines` / `scannedGroups`). Per-tab **Refresh models** / **Scan AI tools** / **Check** buttons trigger the on-demand routes, and one non-blocking background scan (`maybeStartBackgroundScan`, `group=all` + models) runs once per open. (Note: `handleSetupInfoRoute` in `routes/setup.ts` still calls the full `detectEnvironment()` — separate flow, out of scope here.)
 
+### "What's new" release dialog (VIB-1885)
+
+A one-time post-upgrade dialog: the first time the web UI loads on a new version, it shows the release highlights + a changelog link, then stays dismissed until the next release.
+
+- **Content is generated, not hand-kept.** `scripts/gen-whats-new.ts` (`npm run whatsnew:gen`, wired into `npm run build` → so `prepublishOnly` and every build refresh it) parses the **installed version's** section out of `CHANGELOG.md` and writes `assets/whats-new.json` (`{ version, date, changelogUrl, highlights[] }`). Each top-level `- **Bold title** … — body` bullet becomes a highlight (title = bold lead, body = trimmed snippet, markdown/issue-refs stripped, capped at 5). Defensive: any parse failure still writes valid JSON with empty `highlights` (→ `show:false`), so a build never breaks and the dialog never renders empty. **This is the "add it to the release workflow" step** — bumping the version + writing the CHANGELOG section is all a release needs; the next build bakes the matching notes.
+- **Server** (`routes/whats-new.ts`): `GET /api/whats-new` → `{ show, content, currentVersion }`, where `show` is true only when the asset has highlights AND `content.version === getVersion()` AND `content.version !== config.lastSeenVersion`. `POST /api/whats-new/dismiss` writes `lastSeenVersion` (new `VibeSpotConfig` field in `~/.vibespot/config.json`).
+- **UI** (`ui/whats-new.js`): on load (non-demo), `_wnInitProd()` fetches `/api/whats-new` and, if `show`, renders the modal via `maybeShowWhatsNew()` (reuses the `dialog.js` overlay pattern + design tokens; `role="dialog"`, focus trap, Esc, `prefers-reduced-motion`). Dismissing POSTs to `/dismiss`. A network failure silently skips — the dialog never blocks the app. `?whatsnew=1` (search or post-hash) self-renders the modal with bundled sample content for screenshots/demo.
+
 ## Critical Constraints
 
 - **Pure ESM** — `"type": "module"` in package.json. No CommonJS `require()`. All internal imports use `.js` extensions.

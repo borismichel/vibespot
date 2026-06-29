@@ -16,7 +16,8 @@
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsup",
+    "build": "npm run whatsnew:gen && tsup",
+    "whatsnew:gen": "tsx scripts/gen-whats-new.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -43,6 +43,9 @@ export interface VibeSpotConfig {
   langdockProvider?: "anthropic" | "openai" | "google" | "mistral";
   lastThemePath?: string;
   lastSourcePath?: string;
+  // "What's new" release dialog (VIB-1885) — the version whose release notes the
+  // user last dismissed. The dialog shows once when the installed version differs.
+  lastSeenVersion?: string;
   // HubSpot account management
   hubspotAccounts?: HubSpotAccountConfig[];
   activeHubSpotAccount?: string; // portalId
