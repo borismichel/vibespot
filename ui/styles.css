@@ -8463,3 +8463,180 @@ body { display: flex; }
   margin-top: var(--space-1);
 }
 .brand-intake__top-actions { margin-top: var(--space-2); }
+
+/* ===========================================================================
+   "What's new" release dialog (VIB-1886)
+   One-time post-upgrade modal. Reuses overlay/dialog tokens — no one-off values.
+   =========================================================================== */
+.whatsnew-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-bg);
+  z-index: var(--z-confirm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  animation: fadeIn var(--duration-fast) var(--ease-default);
+}
+
+.whatsnew-dialog {
+  position: relative;
+  background: var(--bg-panel-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  width: 460px;
+  max-width: 100%;
+  max-height: calc(100vh - var(--space-8));
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+  animation: whatsnewIn var(--duration-slow) var(--ease-spring);
+}
+
+@keyframes whatsnewIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+.whatsnew__close {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-default),
+              background var(--duration-fast) var(--ease-default);
+}
+.whatsnew__close:hover { color: var(--text); background: var(--bg-hover); }
+.whatsnew__close:focus-visible { box-shadow: var(--shadow-focus); outline: none; }
+
+/* Brand lockup — accent star on its dark container (brand rule: container intact) */
+.whatsnew__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+.whatsnew__logo {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.whatsnew__wordmark {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+.whatsnew__version {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wide);
+  color: var(--accent);
+  background: var(--accent-tint);
+  border: 1px solid var(--accent-dim);
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-2);
+}
+
+.whatsnew__title {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+  margin: 0 0 var(--space-1);
+}
+.whatsnew__date {
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+  margin: 0 0 var(--space-5);
+}
+
+.whatsnew__list {
+  list-style: none;
+  margin: 0 0 var(--space-6);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.whatsnew__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.whatsnew__marker {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-tint);
+  border-radius: var(--radius-sm);
+}
+.whatsnew__marker svg { width: 16px; height: 16px; }
+.whatsnew__item-text { display: flex; flex-direction: column; gap: 2px; }
+.whatsnew__item-title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  line-height: var(--leading-tight);
+}
+.whatsnew__item-body {
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: var(--text-dim);
+}
+
+.whatsnew__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+.whatsnew__actions .btn { text-decoration: none; }
+
+/* Narrow widths — modal becomes a bottom-anchored sheet, actions stack full-width */
+@media (max-width: 520px) {
+  .whatsnew-overlay { align-items: flex-end; padding: 0; }
+  .whatsnew-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: 90vh;
+    padding: var(--space-5);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-bottom: none;
+    animation: whatsnewSheetIn var(--duration-slow) var(--ease-out);
+  }
+  .whatsnew__title { font-size: var(--text-xl); }
+  .whatsnew__actions { flex-direction: column-reverse; }
+  .whatsnew__actions .btn { width: 100%; }
+}
+
+@keyframes whatsnewSheetIn {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .whatsnew-overlay,
+  .whatsnew-dialog { animation: none; }
+}
