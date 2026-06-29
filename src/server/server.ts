@@ -63,6 +63,10 @@ import {
   handleSettingsJobRoute,
 } from "./routes/settings.js";
 import {
+  handleWhatsNewRoute,
+  handleWhatsNewDismissRoute,
+} from "./routes/whats-new.js";
+import {
   handleClaudeOAuthSaveRoute,
   handleClaudeOAuthStatusRoute,
   handleClaudeOAuthLogoutRoute,
@@ -617,6 +621,17 @@ function handleApiRoute(
 
     case "/api/starters":
       if (method === "GET") handleStartersListRoute(res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    // "What's new" release dialog (VIB-1885)
+    case "/api/whats-new":
+      if (method === "GET") handleWhatsNewRoute(res);
+      else jsonResponse(res, 405, { error: "Method not allowed" });
+      break;
+
+    case "/api/whats-new/dismiss":
+      if (method === "POST") handleWhatsNewDismissRoute(req, res);
       else jsonResponse(res, 405, { error: "Method not allowed" });
       break;
 

@@ -128,6 +128,7 @@ vibespot doctor       # Diagnose environment issues
 
 ## What's new in v1.3
 
+- **Release highlights on upgrade** — open the builder on a new version and a dialog shows what changed, with a link to the full changelog. Dismiss it and it stays gone until the next release.
 - **Email template generation** — full pipeline for HubSpot emails: table layouts, MSO/VML compatibility, email validator auto-fix, 3 email starters.
 - **Multi-page sites** — single prompt → full site with shared header/footer, page tree, navigation validation.
 - **Inline WYSIWYG editing** — edit text, images, and links directly in the live preview with per-section visual controls.

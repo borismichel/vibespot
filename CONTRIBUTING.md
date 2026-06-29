@@ -25,6 +25,12 @@ npm run build        # Build with tsup -> dist/index.js
 node bin/vibespot.mjs # Run the built CLI (requires build first)
 ```
 
+`npm run build` first runs `npm run whatsnew:gen`, which regenerates `assets/whats-new.json` from the top (current-version) section of `CHANGELOG.md`. That file backs the post-upgrade **"What's new"** dialog.
+
+### Releasing
+
+When cutting a release, the only step the "What's new" dialog needs is the one you already do: bump `package.json` and write that version's `CHANGELOG.md` section. The next `npm run build` (and `prepublishOnly`) regenerates `assets/whats-new.json` so the dialog surfaces the new notes automatically — no separate content file to maintain. To preview it before publishing, run `npm run whatsnew:gen` and check `assets/whats-new.json`.
+
 ### Validation
 
 There is no unit test suite yet. After code changes, run:

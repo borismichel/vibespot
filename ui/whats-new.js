@@ -210,8 +210,40 @@ function _wnInitDemo() {
   }
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", _wnInitDemo);
-} else {
+// --- Production bootstrap (VIB-1885) ----------------------------------------
+// On launch, ask the server whether there's an undismissed release to show.
+// The server reads assets/whats-new.json (generated from CHANGELOG.md) and
+// gates on config.lastSeenVersion, so this surfaces once per upgrade. Dismissing
+// persists lastSeenVersion via POST /api/whats-new/dismiss so it never nags again.
+function _wnInitProd() {
+  if (_wnDemoRequested()) return; // demo path owns the modal
+  fetch("/api/whats-new")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (!data || !data.show || !data.content) return;
+      maybeShowWhatsNew({
+        currentVersion: data.content.version,
+        lastSeenVersion: null, // server already decided show=true
+        content: data.content,
+        onDismiss: (version) => {
+          fetch("/api/whats-new/dismiss", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ version }),
+          }).catch(() => {});
+        },
+      });
+    })
+    .catch(() => {}); // network/offline: silently skip — never block the app
+}
+
+function _wnInit() {
   _wnInitDemo();
+  _wnInitProd();
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", _wnInit);
+} else {
+  _wnInit();
 }

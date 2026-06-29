@@ -1,0 +1,11 @@
+{
+  "version": "1.7.7",
+  "date": "2026-06-27",
+  "changelogUrl": "https://github.com/borismichel/vibespot/blob/main/CHANGELOG.md",
+  "highlights": [
+    {
+      "title": "Parked checkpoints now survive a full server restart",
+      "body": "completing the durability story from 1.7.6."
+    }
+  ]
+}

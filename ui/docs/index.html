@@ -372,8 +372,13 @@ vibespot</code></pre>
       <tr><td><code>langfusePublicKey</code></td><td>string</td><td>Langfuse public key (<code>pk-lf-</code>)</td></tr>
       <tr><td><code>langfuseSecretKey</code></td><td>string</td><td>Langfuse secret key (<code>sk-lf-</code>)</td></tr>
       <tr><td><code>langfuseBaseUrl</code></td><td>string</td><td>Langfuse ingestion endpoint (default: <code>https://cloud.langfuse.com</code>)</td></tr>
+      <tr><td><code>lastSeenVersion</code></td><td>string</td><td>The version whose release notes you last dismissed in the <a href="#whats-new">What's new</a> dialog. Set automatically on dismiss; the dialog reappears when you upgrade to a newer version.</td></tr>
     </tbody>
   </table>
+
+  <h3 id="whats-new">What's new dialog</h3>
+  <p>The first time you open the builder after upgrading, a dialog shows the highlights of the new version with a link to the full changelog. Dismiss it &mdash; with the <strong>&times;</strong>, <strong>Got it</strong>, a click outside, or <kbd>Esc</kbd> &mdash; and it stays hidden until the next release. One card per version, never a repeat nag.</p>
+  <p>The highlights are pulled straight from <a href="https://github.com/borismichel/vibespot/blob/main/CHANGELOG.md"><code>CHANGELOG.md</code></a> at build time, so every release shows its own notes. Your dismissal is remembered per machine via <code>lastSeenVersion</code> in <code>~/.vibespot/config.json</code>.</p>
 
   <h3 id="env-vars">Environment Variables</h3>
   <p>API keys and server settings can be set as environment variables. The config file takes precedence &mdash; environment variables are used as fallbacks when no key is set in the config. In Docker deployments, env vars are the primary configuration method (see <a href="#docker-deployment">Docker Deployment</a>).</p>
