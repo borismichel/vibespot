@@ -51,6 +51,8 @@ By default vibeSpot doesn't run the whole pipeline in one blind shot. It pauses 
 
 Each card shows the estimated cost of the build it gates. **Approve** to continue, **steer** with a note to redo just that stage, **skip** to build now, or **cancel** to write nothing. In a hurry? The one-tap **one-shot** button next to send skips every gate — the old one-call behaviour.
 
+Type while a build is running and your message **queues** ("runs next") instead of cancelling it — or hit **Interrupt now** to stop the build and replan immediately.
+
 **Plan mode** is the heaviest checkpoint variant. Toggle it on for a vague brief and vibeSpot asks the questions a senior designer would — audience, primary CTA, sections, voice — and builds a markdown plan in the right pane. Generation is hard-gated until you approve. Pre-canned templates skip the cold start for common page types.
 
 ### 3. Translate Figma 1:1

@@ -10,6 +10,11 @@ All notable changes to vibeSpot are documented here.
 
 - **A "What's new" dialog after you upgrade** ([VIB-1885](/VIB/issues/VIB-1885)) — the first time you open the builder on a new version, a dialog shows the release highlights with a link to the full changelog. Dismiss it (✕, "Got it", backdrop, or Esc) and it stays gone until the next release — one card per version, never a nag. The highlights are generated from this changelog at build time (`npm run whatsnew:gen`, wired into `npm run build`), so each release surfaces its own notes automatically. Dismissal is remembered per machine in `~/.vibespot/config.json` (`lastSeenVersion`).
 
+### Documentation
+
+- **Send a message mid-build without losing the build** ([VIB-1885](/VIB/issues/VIB-1885)) — documented the existing queue-by-default behaviour: typing while a page generates queues your message ("runs next") instead of cancelling, with **Interrupt now** to barge in and replan immediately. Now covered in the in-app docs and README (the feature shipped earlier; this backfills the docs).
+- **A written release process** ([VIB-1885](/VIB/issues/VIB-1885)) — added `RELEASE.md` and a `release` skill so every release updates the CHANGELOG, README, in-app docs, and the "What's new" modal as part of the same change as the code, not an afterthought.
+
 ---
 
 ## 1.7.7 — 2026-06-27
