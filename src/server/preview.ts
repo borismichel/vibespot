@@ -10,7 +10,7 @@ import {
   type FieldDef,
 } from "../hubl/renderer.js";
 import { getSession, getOrderedModules } from "./session.js";
-import { getServerContentMode } from "./server.js";
+import { getServerContentMode } from "./server-context.js";
 
 /**
  * Detect if the current session contains email modules.

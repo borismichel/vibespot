@@ -45,7 +45,7 @@ The default command (no subcommand) runs the vibe coding web UI. Subcommands: `w
 
 ### Key Directories
 - `src/commands/` — One file per CLI command, each exports a single action function
-- `src/server/` — HTTP server, WebSocket, AI handler, session management, preview builder, version history (git)
+- `src/server/` — HTTP server, WebSocket, AI handler, session management, preview builder, version history (git). `server.ts` owns the server lifecycle, the single auth-gate seam (`handleRequest`, VIB-1889), and static/preview serving; the `/api/*` dispatch is a route table in `routes/api-router.ts`, the WebSocket protocol lives in `ws-handler.ts`, and run-state (content mode, active preview origin) in `server-context.ts` (VIB-1932)
 - `src/server/agent/` — Agentic pipeline (see below)
 - `src/server/session/` — Session management split into submodules (state, store, disk, templates, types)
 - `src/wizard/` — Step implementations for the wizard flow: preflight → source → theme-setup → conversion → uploader → next-steps

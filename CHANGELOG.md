@@ -6,6 +6,10 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### Changed
+
+- **server.ts split into router + WebSocket modules** ([VIB-1932](/VIB/issues/VIB-1932)) — internal refactor, no behavior change. The ~78-case `/api/*` switch is now a declarative route table + dispatcher (`src/server/routes/api-router.ts`, exact paths with per-verb 405s plus the two pattern routes), the WebSocket protocol (`chat`, `figma_import`, `extract_brand_assets`, `start_upload`, `upload_fix_with_ai`, `checkpoint_resolve` + plan aliases) lives in `src/server/ws-handler.ts`, and run-state (content mode, active preview origin) moved to `src/server/server-context.ts` so the extracted modules don't import `server.ts`. The VIB-1889 auth gate remains the single middleware seam in `server.ts:handleRequest`; the inline `/api/changelog` and `/api/preview-origin` handlers moved into `routes/`.
+
 ### Fixed
 
 - **Interact mode: link-edit popup Save/Cancel buttons work** ([VIB-1926](/VIB/issues/VIB-1926)) — the interact-mode capture-phase document click handler ran `preventDefault`/`stopPropagation` on every click, including clicks inside the agent's own link-edit popup, so Save (and Enter, which synthesizes the same click) silently discarded the edit and Cancel never ran its own handler. Clicks inside the agent's edit UI (link popup, image URL input) now early-return before interception, letting the popup's buttons receive them. Link editing now commits end-to-end (`vs:edit-commit` → `POST /api/field`).
