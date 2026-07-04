@@ -21,7 +21,7 @@ import {
   AUTH_COOKIE,
   type SecurityConfig,
 } from "./security.js";
-import { startPreviewOrigin, type StartedPreviewOrigin } from "./preview-origin.js";
+import { startPreviewOrigin, normalizePublicOrigin, type StartedPreviewOrigin } from "./preview-origin.js";
 import {
   setServerContentMode,
   setActivePreviewOrigin,
@@ -124,20 +124,47 @@ export function startServer(opts: ServerOptions): Promise<StartedServer> {
   const started = async (boundPort: number): Promise<StartedServer> => {
     let previewOrigin: StartedPreviewOrigin | null = null;
     if (opts.enablePreviewOrigin !== false) {
+      // Reverse-proxy deployments (VIB-1933): VIBESPOT_PREVIEW_PUBLIC_ORIGIN
+      // is the browser-facing URL of the preview origin (the bind port is not
+      // reachable from outside the container), VIBESPOT_PUBLIC_ORIGIN the
+      // browser-facing URL of the app itself.
+      const previewPublicOrigin = normalizePublicOrigin(
+        process.env.VIBESPOT_PREVIEW_PUBLIC_ORIGIN,
+        "VIBESPOT_PREVIEW_PUBLIC_ORIGIN"
+      );
+      const appPublicOrigin = normalizePublicOrigin(
+        process.env.VIBESPOT_PUBLIC_ORIGIN,
+        "VIBESPOT_PUBLIC_ORIGIN"
+      );
       // frame-ancestors: on a loopback bind, allow both loopback spellings so
       // a user browsing via `localhost` still embeds a `127.0.0.1`-announced
       // preview. On a non-loopback bind (Docker/tailnet) the browser-facing
-      // hostname is unknowable at boot, so fall back to any ancestor — the
-      // access token still gates who can load the doc at all.
+      // hostname is unknowable at boot, so pin to the configured public app
+      // origin when there is one and only otherwise fall back to any
+      // ancestor — the access token still gates who can load the doc at all.
       const isLoopback = security.host === "127.0.0.1" || security.host === "localhost" || security.host === "::1";
       const frameAncestors = isLoopback
-        ? [`http://127.0.0.1:${boundPort}`, `http://localhost:${boundPort}`]
-        : ["*"];
+        ? [
+            `http://127.0.0.1:${boundPort}`,
+            `http://localhost:${boundPort}`,
+            ...(appPublicOrigin ? [appPublicOrigin] : []),
+          ]
+        : appPublicOrigin
+          ? [appPublicOrigin]
+          : ["*"];
+      if (previewPublicOrigin && !appPublicOrigin && !isLoopback) {
+        console.warn(
+          "VIBESPOT_PREVIEW_PUBLIC_ORIGIN is set without VIBESPOT_PUBLIC_ORIGIN — " +
+            "the preview's frame-ancestors falls back to *; set VIBESPOT_PUBLIC_ORIGIN " +
+            "to pin embedding to your app origin."
+        );
+      }
       previewOrigin = await startPreviewOrigin({
         port: boundPort + 2,
         host: security.host,
         frameAncestors,
         uiDir,
+        publicOrigin: previewPublicOrigin,
       });
     }
     setActivePreviewOrigin(previewOrigin);

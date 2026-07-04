@@ -8,8 +8,12 @@ import { jsonResponse } from "../route-helpers.js";
 import { getActivePreviewOrigin } from "../server-context.js";
 
 /**
- * Tell the UI where the separate preview origin lives (VIB-1892). The origin
- * hostname is derived from the request's Host header so the answer is
+ * Tell the UI where the separate preview origin lives (VIB-1892). When the
+ * operator configured a public URL (`VIBESPOT_PREVIEW_PUBLIC_ORIGIN`,
+ * VIB-1933 — reverse-proxy/Docker deployments where the bind port is never
+ * browser-reachable), announce that verbatim; it is scheme-aware, so an
+ * https app page gets an https preview (no mixed content). Otherwise the
+ * origin hostname is derived from the request's Host header so the answer is
  * reachable from wherever the browser actually is (localhost vs 127.0.0.1 vs
  * a Docker/tailnet hostname); only the port differs between app and preview.
  * The token doubles as the postMessage handshake secret — this route sits
@@ -19,6 +23,13 @@ export function handlePreviewOriginRoute(req: IncomingMessage, res: ServerRespon
   const activePreviewOrigin = getActivePreviewOrigin();
   if (!activePreviewOrigin) {
     jsonResponse(res, 200, { origin: null });
+    return;
+  }
+  if (activePreviewOrigin.publicOrigin) {
+    jsonResponse(res, 200, {
+      origin: activePreviewOrigin.publicOrigin,
+      token: activePreviewOrigin.token,
+    });
     return;
   }
   const hostHeader = req.headers.host || `${activePreviewOrigin.host}:0`;

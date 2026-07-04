@@ -13,7 +13,10 @@ run the app without installing Node.js, npm, or any system dependencies.
 - Docker 24+ and the `docker compose` plugin
 - A valid AI API key (Anthropic, OpenAI, or Gemini) for end-to-end generation
 - A public domain pointed at the host (production only — local testing works
-  on `localhost`)
+  on `localhost`). The live preview is served from a second hostname,
+  `preview.<your-domain>` by default, so point a DNS record at the host for
+  that too (an extra A/CNAME record; Caddy provisions its certificate the
+  same way).
 
 ## Option A — Pull the published image
 
@@ -56,20 +59,29 @@ cp .env.example .env
 docker compose up -d
 ```
 
-On first boot Caddy will request a Let's Encrypt certificate for
-`VIBESPOT_DOMAIN`. Visit `https://<your-domain>` and you should land on the
-vibe-coding setup screen.
+On first boot Caddy will request Let's Encrypt certificates for
+`VIBESPOT_DOMAIN` **and** `preview.<VIBESPOT_DOMAIN>` (the live-preview
+origin — override the hostname with `VIBESPOT_PREVIEW_DOMAIN` if needed;
+both need DNS records pointing at the host). Visit `https://<your-domain>`
+and you should land on the vibe-coding setup screen.
 
 ### Local testing
 
-Set `VIBESPOT_DOMAIN=localhost` in `.env` to skip Let's Encrypt and serve
-HTTP only:
+Set `VIBESPOT_DOMAIN=localhost` in `.env` to skip Let's Encrypt and use
+Caddy's locally-generated certificates:
 
 ```bash
 echo "VIBESPOT_DOMAIN=localhost" >> .env
 docker compose up -d
-open http://localhost
+open https://localhost
 ```
+
+The live preview loads from `https://preview.localhost` (browsers resolve
+`*.localhost` to the loopback address). Because the local certificates are
+signed by Caddy's own CA, the preview iframe will stay blank until the
+browser trusts that certificate — either visit <https://preview.localhost>
+once and accept the warning, or trust Caddy's root CA
+(`docker compose exec caddy cat /data/caddy/pki/authorities/local/root.crt`).
 
 ### Enable the auth gate
 
@@ -111,9 +123,13 @@ image strips dev dependencies via `npm prune --omit=dev`.
   `vibespot-config` (`~/.vibespot/` — API keys, sessions, project state),
   and `vibespot-workspace` (theme working dirs). Postgres storage is not
   supported by this image; `VIBESPOT_STORAGE` and `DATABASE_URL` are ignored.
-- **Ports.** Caddy publishes `:80` and `:443`. The vibespot service itself
-  is internal-only when running via compose. For direct access without
-  Caddy, expose `4200` on the `vibespot` service.
+- **Ports.** Caddy publishes `:80` and `:443` and serves two hostnames: the
+  app (`VIBESPOT_DOMAIN` → `vibespot:4200`) and the live-preview origin
+  (`VIBESPOT_PREVIEW_DOMAIN`, default `preview.<VIBESPOT_DOMAIN>` →
+  `vibespot:4202`; VIB-1933). The vibespot service itself is internal-only
+  when running via compose. For direct access without Caddy, publish `4200`
+  **and** `4202` on the `vibespot` service (the preview iframe loads from
+  app port + 2).
 - **Image size.** Target is ≤ 200 MB; if a future dependency pushes us over,
   drop to `node:22-slim` instead of alpine.
 
@@ -126,3 +142,4 @@ image strips dev dependencies via `npm prune --omit=dev`.
 | `/api/starters` returns `[]`                | Image build dropped `starters/`. Rebuild with the supplied `.dockerignore`.                     |
 | Let's Encrypt certificate request fails     | Make sure ports 80/443 are reachable from the public internet and `VIBESPOT_DOMAIN` resolves.   |
 | Generation fails with "no AI engine"        | No provider key set. Add `ANTHROPIC_API_KEY` (or another) to `.env` and `docker compose up -d`. |
+| Preview pane blank / "live preview disabled" | The preview origin isn't reachable. Check DNS for `preview.<your-domain>`, that `VIBESPOT_PREVIEW_PUBLIC_ORIGIN` matches the Caddy preview site, and (localhost) that the browser trusts Caddy's local CA — see [Local testing](#local-testing). |

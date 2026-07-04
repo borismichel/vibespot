@@ -58,7 +58,8 @@ ENV NODE_ENV=production \
     VIBESPOT_HOST=0.0.0.0 \
     HOME=/home/vibespot
 
-EXPOSE 4200
+# 4200 = app; 4202 = live-preview origin (app port + 2, VIB-1892/VIB-1933).
+EXPOSE 4200 4202
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -qO- http://127.0.0.1:${VIBESPOT_PORT}/healthz >/dev/null 2>&1 || exit 1

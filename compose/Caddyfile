@@ -24,3 +24,22 @@
 		header_up X-Forwarded-Proto {scheme}
 	}
 }
+
+# Live-preview origin (VIB-1933). The app serves the preview iframe from a
+# *separate origin* (in-container port 4202, VIB-1892) so AI-generated page
+# code stays cross-origin to the app; this site block gives that origin a
+# public https hostname. It deliberately proxies straight to the vibespot
+# container — never through oauth2-proxy in the auth overlay — because an
+# iframe load cannot complete an OIDC redirect; the origin is instead gated
+# by its per-boot access token (?t=) and its CSP pins frame-ancestors to the
+# app origin, so only the authenticated app UI can embed or address it.
+{$VIBESPOT_PREVIEW_DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy {$VIBESPOT_PREVIEW_UPSTREAM} {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

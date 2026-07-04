@@ -54,6 +54,14 @@ export interface PreviewOriginOptions {
   uiDir: string;
   /** Override the generated handshake/access token (tests only). */
   token?: string;
+  /**
+   * Browser-facing URL of this origin when a reverse proxy fronts it
+   * (VIB-1933, `VIBESPOT_PREVIEW_PUBLIC_ORIGIN`). When set,
+   * `/api/preview-origin` announces this instead of synthesizing
+   * `http://<host>:<port>` — required for Docker/HTTPS deployments where the
+   * bind port is never reachable from the browser.
+   */
+  publicOrigin?: string | null;
 }
 
 export interface StartedPreviewOrigin {
@@ -61,12 +69,41 @@ export interface StartedPreviewOrigin {
   host: string;
   /** Per-boot secret gating this origin AND the postMessage handshake. */
   token: string;
+  /** Configured public URL for browsers, or null to derive from Host (VIB-1933). */
+  publicOrigin: string | null;
   close: () => void;
 }
 
 const PREVIEW_AGENT_FILENAME = "preview-agent.js";
 /** How many consecutive ports to try before giving up. */
 const MAX_PORT_ATTEMPTS = 10;
+
+/**
+ * Validate + normalize an operator-supplied public origin (VIB-1933), e.g.
+ * `VIBESPOT_PREVIEW_PUBLIC_ORIGIN` / `VIBESPOT_PUBLIC_ORIGIN`. Accepts only an
+ * absolute http(s) URL with no path/query/hash (a bare trailing `/` is fine)
+ * and returns the canonical `URL.origin` (lowercased host, default ports
+ * dropped). Returns null — with a console warning — on anything else, so a
+ * typo degrades to the previous behavior instead of announcing a broken URL.
+ */
+export function normalizePublicOrigin(raw: string | undefined | null, envName?: string): string | null {
+  const value = (raw || "").trim();
+  if (!value) return null;
+  const warn = (reason: string): null => {
+    console.warn(`Ignoring ${envName || "public origin"} (${reason}): ${value}`);
+    return null;
+  };
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return warn("not an absolute URL");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return warn("must be http or https");
+  if (url.pathname !== "/" || url.search || url.hash) return warn("must not have a path, query, or fragment");
+  if (url.username || url.password) return warn("must not carry credentials");
+  return url.origin;
+}
 
 const ASSET_MIME: Record<string, string> = {
   ".png": "image/png",
@@ -290,6 +327,7 @@ export function startPreviewOrigin(opts: PreviewOriginOptions): Promise<StartedP
           port,
           host: opts.host,
           token,
+          publicOrigin: opts.publicOrigin || null,
           close: () => server.close(),
         });
       });
