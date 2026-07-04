@@ -113,6 +113,16 @@ Every model produced valid, complete pages — 100% validator pass and section c
 3. **Run it** — `npx vibespot`. The browser opens.
 4. **Connect HubSpot** — Settings → HubSpot → add a Personal Access Key. vibeSpot connects via the HubSpot API directly. No CLI install.
 
+### Access from another device (LAN / Tailscale)
+
+For security, vibeSpot binds to `127.0.0.1` only — other devices can't reach it out of the box. To use it from an iPad or another machine:
+
+```bash
+VIBESPOT_HOST=0.0.0.0 npx vibespot
+```
+
+The terminal prints a URL containing a one-time access token (`?token=...`). Open **that exact URL** on the other device — it's the auth secret, and it's exchanged for a session cookie on first load. Pin a stable token with `VIBESPOT_AUTH_TOKEN`, e.g. `openssl rand -hex 24`. Behind `tailscale serve` (which keeps the loopback bind), set `VIBESPOT_AUTH_TOKEN` and open the tokenized URL the same way.
+
 ## Commands
 
 Most users only need `npx vibespot`. The web UI handles everything else.

@@ -8,6 +8,7 @@ All notable changes to vibeSpot are documented here.
 
 ### Security
 
+- **⚠ Breaking — the server now binds to `127.0.0.1` by default.** If you access vibeSpot from another device (LAN, iPad, Tailscale — including self-hosted instances), you must now start it with `VIBESPOT_HOST=0.0.0.0` and open the tokenized URL printed at boot (or pin `VIBESPOT_AUTH_TOKEN`). Docker images set the host automatically; the token is still required. See "Access from another device" in the README.
 - **The local server is no longer an open door** ([VIB-1889](/VIB/issues/VIB-1889)) — previously the HTTP API and chat WebSocket bound to `0.0.0.0` with no authentication, so anyone who could reach the port could spend your AI credits, push to your connected HubSpot portal, and browse local directories. Now:
   - The server binds to `127.0.0.1` by default; set `VIBESPOT_HOST=0.0.0.0` (Docker does this) to expose it.
   - Any non-loopback bind requires a shared-secret token (`VIBESPOT_AUTH_TOKEN`, or one generated at boot). The printed URL carries it once; a session cookie takes over from there, including for the WebSocket. `VIBESPOT_DISABLE_AUTH=1` opts out for deploys behind their own auth gate (e.g. the Entra SSO overlay, which now sets it automatically).
