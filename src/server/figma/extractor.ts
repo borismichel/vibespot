@@ -8,7 +8,7 @@
  * - Frame screenshots and embedded images
  */
 
-import { writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { join, basename } from "node:path";
 import { randomUUID } from "node:crypto";
 import { log } from "../log.js";
@@ -31,10 +31,29 @@ import type {
 // ---------------------------------------------------------------------------
 
 const FIGMA_URL_RE =
-  /figma\.com\/(?:design|file|proto)\/([a-zA-Z0-9]+)(?:\/([^?]*))?/;
+  /^\/(?:design|file|proto)\/([a-zA-Z0-9]+)(?:\/([^?]*))?/;
+const FIGMA_PAGE_HOSTS = new Set(["figma.com", "www.figma.com"]);
+const FIGMA_IMAGE_HOSTS = new Set([
+  "s3-alpha.figma.com",
+  "s3-alpha-sig.figma.com",
+  "figma-alpha-api.s3.amazonaws.com",
+  "figma-alpha-api.s3.us-west-2.amazonaws.com",
+]);
+const MAX_FIGMA_IMAGE_BYTES = 25 * 1024 * 1024;
 
 export function parseFigmaUrl(url: string): FigmaUrlParts | null {
-  const match = url.match(FIGMA_URL_RE);
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+
+  if (parsed.protocol !== "https:" || !FIGMA_PAGE_HOSTS.has(parsed.hostname.toLowerCase())) {
+    return null;
+  }
+
+  const match = parsed.pathname.match(FIGMA_URL_RE);
   if (!match) return null;
 
   const fileKey = match[1];
@@ -42,15 +61,17 @@ export function parseFigmaUrl(url: string): FigmaUrlParts | null {
 
   // Extract node-id from query params (format: 123-456 in URL, 123:456 for API)
   let nodeId: string | undefined;
-  try {
-    const parsed = new URL(url);
-    const rawNodeId = parsed.searchParams.get("node-id");
-    if (rawNodeId) {
-      nodeId = rawNodeId.replace(/-/g, ":");
-    }
-  } catch { /* invalid URL — nodeId stays undefined */ }
+  const rawNodeId = parsed.searchParams.get("node-id");
+  if (rawNodeId) {
+    nodeId = rawNodeId.replace(/-/g, ":");
+    if (!/^[a-zA-Z0-9:]+$/.test(nodeId)) return null;
+  }
 
   return { fileKey, nodeId, fileName };
+}
+
+export function encodeFigmaNodeIds(nodeIds: string[]): string {
+  return nodeIds.map((id) => encodeURIComponent(id)).join(",");
 }
 
 // ---------------------------------------------------------------------------
@@ -481,10 +502,35 @@ function findImageNodes(frames: FigmaNode[]): { nodeId: string; name: string }[]
 // Image downloading
 // ---------------------------------------------------------------------------
 
-async function downloadImage(url: string, destPath: string): Promise<void> {
-  const res = await fetch(url);
+export function isAllowedFigmaImageDownloadUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  return parsed.protocol === "https:" && FIGMA_IMAGE_HOSTS.has(parsed.hostname.toLowerCase());
+}
+
+export async function downloadFigmaImage(url: string, destPath: string): Promise<void> {
+  if (!isAllowedFigmaImageDownloadUrl(url)) {
+    throw new Error("Figma image download URL is not on the allowed Figma CDN host list");
+  }
+
+  const res = await fetch(url, { redirect: "manual" });
   if (!res.ok) throw new Error(`Failed to download image: ${res.status}`);
+  const contentLength = Number(res.headers.get("content-length") || "0");
+  if (Number.isFinite(contentLength) && contentLength > MAX_FIGMA_IMAGE_BYTES) {
+    throw new Error(`Figma image download exceeds ${MAX_FIGMA_IMAGE_BYTES} bytes`);
+  }
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.toLowerCase().startsWith("image/")) {
+    throw new Error(`Figma image download returned non-image content: ${contentType || "unknown"}`);
+  }
   const buffer = Buffer.from(await res.arrayBuffer());
+  if (buffer.byteLength > MAX_FIGMA_IMAGE_BYTES) {
+    throw new Error(`Figma image download exceeds ${MAX_FIGMA_IMAGE_BYTES} bytes`);
+  }
   writeFileSync(destPath, buffer);
 }
 
@@ -500,7 +546,7 @@ async function exportFrameImages(
   mkdirSync(targetDir, { recursive: true });
 
   const nodeIds = frames.map((f) => f.id);
-  const idParam = nodeIds.join(",");
+  const idParam = encodeFigmaNodeIds(nodeIds);
 
   if (onStatus) onStatus("Exporting frame screenshots...");
 
@@ -516,7 +562,7 @@ async function exportFrameImages(
     const safeName = nodeId.replace(/:/g, "-");
     const destPath = join(targetDir, `frame-${safeName}.png`);
     try {
-      await downloadImage(imageUrl, destPath);
+      await downloadFigmaImage(imageUrl, destPath);
       result.set(nodeId, destPath);
       log.info("figma", `Downloaded frame screenshot: ${destPath}`);
     } catch (err) {
@@ -544,7 +590,7 @@ async function exportEmbeddedImages(
 
   for (let i = 0; i < imageNodes.length; i += batchSize) {
     const batch = imageNodes.slice(i, i + batchSize);
-    const idParam = batch.map((n) => n.nodeId).join(",");
+    const idParam = encodeFigmaNodeIds(batch.map((n) => n.nodeId));
 
     if (onStatus) onStatus(`Exporting images (${i + 1}-${Math.min(i + batchSize, imageNodes.length)} of ${imageNodes.length})...`);
 
@@ -562,7 +608,7 @@ async function exportEmbeddedImages(
       const destPath = join(assetsDir, fileName);
 
       try {
-        await downloadImage(imageUrl, destPath);
+        await downloadFigmaImage(imageUrl, destPath);
         assets.push({ name: node.name, localPath: destPath, nodeId: node.nodeId, format: "png" });
         log.info("figma", `Downloaded asset: ${fileName}`);
       } catch (err) {
@@ -588,7 +634,7 @@ export async function extractFigmaDesign(
   // 1. Fetch the file tree
   if (onStatus) onStatus("Fetching Figma file...");
   const endpoint = nodeId
-    ? `/v1/files/${fileKey}?ids=${nodeId}&geometry=paths`
+    ? `/v1/files/${fileKey}?ids=${encodeURIComponent(nodeId)}&geometry=paths`
     : `/v1/files/${fileKey}?geometry=paths`;
 
   const fileData = await withRetry(
