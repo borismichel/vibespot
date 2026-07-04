@@ -31,6 +31,15 @@ import { applyAutoFixes, parseUploadErrors, parseApiErrors } from "./auto-fix.js
 import { startStreamingJob, startJobSafe, getJob, addJobListener, removeJobListener } from "./process-manager.js";
 import { uploadTheme, type UploadFileError } from "../hubspot/uploader.js";
 import { jsonResponse } from "./route-helpers.js";
+import { publicErrorMessage } from "./errors.js";
+import {
+  resolveSecurityConfig,
+  checkRequestAuth,
+  isAllowedOrigin,
+  isLoopbackHost,
+  AUTH_COOKIE,
+  type SecurityConfig,
+} from "./security.js";
 import { getChangelog } from "../utils/fs.js";
 import { runWithTrace, runWithSpan } from "./langfuse.js";
 
@@ -357,7 +366,7 @@ async function runPlanDeliberation(userMessage: string, fileIds?: string[]): Pro
     sendToClient({ type: "plan_complete", cleanedContent: parsed.cleanedContent });
     sendToClient({ type: "generation_complete" });
   } catch (err) {
-    sendToClient({ type: "error", message: err instanceof Error ? err.message : String(err) });
+    sendToClient({ type: "error", message: publicErrorMessage(err) });
   }
 }
 
@@ -401,7 +410,7 @@ async function runPlanApproval(): Promise<void> {
     finalizeAgenticGeneration(result, { steps, modules, commitLabel: "Approved plan: implementation" });
   } catch (err) {
     clearPipelineEventLog();
-    sendToClient({ type: "error", message: err instanceof Error ? err.message : String(err) });
+    sendToClient({ type: "error", message: publicErrorMessage(err) });
   }
 }
 
@@ -423,44 +432,76 @@ export interface ServerOptions {
   port: number;
   uiDir: string;
   contentMode?: "page" | "email";
+  /** Bind address; defaults to VIBESPOT_HOST or 127.0.0.1 (VIB-1889). */
+  host?: string;
+}
+
+export interface StartedServer {
+  port: number;
+  host: string;
+  /** Shared-secret auth token, when token auth is active (VIB-1889). */
+  authToken: string | null;
+  close: () => void;
 }
 
 let serverContentMode: "page" | "email" = "page";
+
+// Security policy for the running server — set once in startServer, read by
+// the request/upgrade handlers (same module-state pattern as contentMode).
+let security: SecurityConfig = resolveSecurityConfig();
 
 export function getServerContentMode(): "page" | "email" {
   return serverContentMode;
 }
 
-export function startServer(opts: ServerOptions): Promise<{ port: number; close: () => void }> {
+export function startServer(opts: ServerOptions): Promise<StartedServer> {
   const { port, uiDir } = opts;
   serverContentMode = opts.contentMode || "page";
+  security = resolveSecurityConfig(opts.host);
+
+  if (!isLoopbackHost(security.host) && !security.authToken) {
+    console.warn(
+      "  ! vibeSpot is bound to a non-loopback address with auth disabled.\n" +
+      "  ! Anyone who can reach the port can use your AI keys and HubSpot account.\n" +
+      "  ! Only do this behind a trusted auth proxy (see docker-compose.auth.yml)."
+    );
+  }
 
   const server = createServer((req, res) => handleRequest(req, res, uiDir));
 
-  // WebSocket server — upgrade on the same HTTP server
-  const wss = new WebSocketServer({ server });
+  // WebSocket server — upgrade on the same HTTP server. Browsers do not apply
+  // CORS to WebSockets, so the upgrade enforces the Origin allow-list
+  // (anti-CSWSH) plus the same auth gate as HTTP routes (VIB-1889).
+  const wss = new WebSocketServer({
+    server,
+    verifyClient: (info: { origin?: string; req: IncomingMessage }) => {
+      if (!isAllowedOrigin(info.origin, info.req.headers.host)) return false;
+      return checkRequestAuth(info.req, security).ok;
+    },
+  });
   wss.on("connection", (ws) => handleWsConnection(ws));
+
+  const started = (boundPort: number): StartedServer => ({
+    port: boundPort,
+    host: security.host,
+    authToken: security.authToken,
+    close: () => { server.close(); wss.close(); },
+  });
 
   return new Promise((resolve, reject) => {
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") {
         // Try next port
-        server.listen(port + 1, "0.0.0.0", () => {
-          resolve({
-            port: port + 1,
-            close: () => { server.close(); wss.close(); },
-          });
+        server.listen(port + 1, security.host, () => {
+          resolve(started(port + 1));
         });
       } else {
         reject(err);
       }
     });
 
-    server.listen(port, "0.0.0.0", () => {
-      resolve({
-        port,
-        close: () => { server.close(); wss.close(); },
-      });
+    server.listen(port, security.host, () => {
+      resolve(started(port));
     });
   });
 }
@@ -485,6 +526,34 @@ function handleRequest(req: IncomingMessage, res: ServerResponse, uiDir: string)
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ status: "ok" }));
     return;
+  }
+
+  // Auth gate (VIB-1889) — every route except /healthz and CORS preflights.
+  // OPTIONS is exempt because preflights never carry credentials and
+  // trigger no state change.
+  if (method !== "OPTIONS") {
+    const auth = checkRequestAuth(req, security);
+    if (!auth.ok) {
+      if (url.pathname.startsWith("/api/")) {
+        jsonResponse(res, 401, { error: "Authentication required" });
+      } else {
+        res.writeHead(401, { "Content-Type": "text/html; charset=utf-8" });
+        res.end("<!doctype html><title>vibeSpot</title><body style=\"font-family:system-ui;padding:2rem\"><h1>Authentication required</h1><p>Open vibeSpot using the exact URL printed in the terminal where it was started (it includes a <code>?token=</code> secret).</p></body>");
+      }
+      return;
+    }
+    // First page load via the tokenized URL: persist the token as a session
+    // cookie (rides on every later request incl. the WebSocket upgrade) and
+    // strip the secret out of the address bar.
+    if (auth.viaQueryToken && method === "GET" && !url.pathname.startsWith("/api/") && security.authToken) {
+      url.searchParams.delete("token");
+      res.writeHead(302, {
+        "Set-Cookie": `${AUTH_COOKIE}=${security.authToken}; HttpOnly; SameSite=Strict; Path=/`,
+        Location: url.pathname + url.search,
+      });
+      res.end();
+      return;
+    }
   }
 
   // API routes
@@ -542,17 +611,26 @@ function handleApiRoute(
   req: IncomingMessage,
   res: ServerResponse
 ): void {
-  // CORS — allow localhost and private/Tailscale IPs
-  const origin = req.headers.origin || "";
-  if (/^https?:\/\/(localhost|127\.0\.0\.1|100\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin)) {
+  // CORS — reflect only same-origin or local/private origins (VIB-1889).
+  const origin = req.headers.origin;
+  const originAllowed = isAllowedOrigin(origin, req.headers.host);
+  if (origin && originAllowed) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Vibespot-Token");
 
   if (method === "OPTIONS") {
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  // Cross-origin mutation guard (VIB-1889): CORS stops reads but not simple
+  // no-preflight writes (e.g. text/plain POSTs from a hostile page). Reject
+  // state-changing requests whose browser Origin fails the allow-list.
+  if (origin && !originAllowed && method !== "GET" && method !== "HEAD") {
+    jsonResponse(res, 403, { error: "Origin not allowed" });
     return;
   }
 
@@ -1081,7 +1159,7 @@ function handleWsConnection(ws: WebSocket): void {
           clearPipelineEventLog();
           sendToClient({
             type: "error",
-            message: err instanceof Error ? err.message : String(err),
+            message: publicErrorMessage(err),
           });
         }
         break;
@@ -1166,7 +1244,7 @@ function handleWsConnection(ws: WebSocket): void {
           clearPipelineEventLog();
           sendToClient({
             type: "error",
-            message: err instanceof Error ? err.message : String(err),
+            message: publicErrorMessage(err),
           });
         }
         break;
@@ -1257,7 +1335,7 @@ function handleWsConnection(ws: WebSocket): void {
           } catch (err) {
             ws.send(JSON.stringify({
               type: "brand_extraction_error",
-              message: err instanceof Error ? err.message : String(err),
+              message: publicErrorMessage(err),
             }));
           }
         })();
@@ -1377,7 +1455,7 @@ function handleWsConnection(ws: WebSocket): void {
         } catch (err) {
           ws.send(JSON.stringify({
             type: "error",
-            message: err instanceof Error ? err.message : String(err),
+            message: publicErrorMessage(err),
           }));
         }
         break;
@@ -1441,8 +1519,8 @@ ${errorContext}`;
         } catch (err) {
           ws.send(JSON.stringify({
             type: "upload_failed",
-            output: err instanceof Error ? err.message : String(err),
-            errors: [{ file: "AI fix", message: err instanceof Error ? err.message : String(err), fixable: false }],
+            output: publicErrorMessage(err),
+            errors: [{ file: "AI fix", message: publicErrorMessage(err), fixable: false }],
           }));
         }
         break;
@@ -1588,7 +1666,7 @@ ${errorContext}`;
           clearPipelineEventLog();
           sendToClient({
             type: "error",
-            message: err instanceof Error ? err.message : String(err),
+            message: publicErrorMessage(err),
           });
         }
         break;
