@@ -8,6 +8,11 @@ All notable changes to vibeSpot are documented here.
 
 ### Security
 
+- **Shell/command injection eliminated across every subprocess launch** ([VIB-1890](/VIB/issues/VIB-1890)) — a theme name like `x"; rm -rf ~; echo "` could previously execute arbitrary commands through the `hs cms upload/fetch/delete` subprocesses (background jobs and the wizard), and the Codex/Gemini single-call engines passed the multi-KB AI prompt through a shell, where backticks or `$(…)` in generated content would execute. Now:
+  - Every process launch passes arguments as a literal argv array — no `shell: true` on POSIX, no string interpolation. The string-based `startJob` helper is gone; background jobs go through the argv-based `startJobSafe`/`startStreamingJob`, and the wizard's `hs` calls use the new `runFile` helper.
+  - The Codex/Gemini single-call engines send the prompt via stdin (same convention as the agentic pipeline).
+  - Theme names are validated (`isSafeThemeName`) before reaching a HubSpot CLI subprocess — defense-in-depth that also covers Windows, where `.cmd` shim resolution still involves a shell.
+  - Regression tests (`test/command-injection.test.ts`) prove shell-metacharacter payloads stay inert.
 - **⚠ Breaking — the server now binds to `127.0.0.1` by default.** If you access vibeSpot from another device (LAN, iPad, Tailscale — including self-hosted instances), you must now start it with `VIBESPOT_HOST=0.0.0.0` and open the tokenized URL printed at boot (or pin `VIBESPOT_AUTH_TOKEN`). Docker images set the host automatically; the token is still required. See "Access from another device" in the README.
 - **The local server is no longer an open door** ([VIB-1889](/VIB/issues/VIB-1889)) — previously the HTTP API and chat WebSocket bound to `0.0.0.0` with no authentication, so anyone who could reach the port could spend your AI credits, push to your connected HubSpot portal, and browse local directories. Now:
   - The server binds to `127.0.0.1` by default; set `VIBESPOT_HOST=0.0.0.0` (Docker does this) to expose it.

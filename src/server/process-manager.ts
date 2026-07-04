@@ -46,7 +46,7 @@ function _attachJobHandlers(child: ChildProcess, job: ProcessJob, timeout?: numb
       job.output += "\nProcess timed out";
       job.completedAt = Date.now();
     }
-  }, t);
+  }, t).unref();
 }
 
 /**
@@ -91,38 +91,6 @@ export function startJobSafe(
   return id;
 }
 
-export function startJob(
-  command: string,
-  description: string,
-  opts?: { cwd?: string; env?: Record<string, string>; timeout?: number }
-): string {
-  const id = `job-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-
-  const job: ProcessJob = {
-    id,
-    command,
-    description,
-    status: "running",
-    output: "",
-    exitCode: null,
-    startedAt: Date.now(),
-    completedAt: null,
-  };
-
-  jobs.set(id, job);
-
-  const parts = command.split(" ");
-  const child: ChildProcess = spawn(parts[0], parts.slice(1), {
-    cwd: opts?.cwd,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, ...opts?.env },
-    shell: true,
-  });
-
-  _attachJobHandlers(child, job, opts?.timeout);
-  return id;
-}
-
 export function getJob(id: string): ProcessJob | undefined {
   return jobs.get(id);
 }
@@ -136,8 +104,8 @@ export function cleanupOldJobs(): void {
   }
 }
 
-// Clean up periodically
-setInterval(cleanupOldJobs, 10 * 60 * 1000);
+// Clean up periodically (unref'd so it never keeps the process alive)
+setInterval(cleanupOldJobs, 10 * 60 * 1000).unref();
 
 // ---------------------------------------------------------------------------
 // Streaming jobs — same as regular jobs but also emit output chunks to listeners
@@ -147,8 +115,13 @@ export interface StreamingJob extends ProcessJob {
   listeners: Set<(chunk: string) => void>;
 }
 
+/**
+ * Streaming variant of startJobSafe: argv array, no shell interpolation.
+ * User-controlled values (theme names/paths) must only ever appear in `args`.
+ */
 export function startStreamingJob(
-  command: string,
+  cmd: string,
+  args: string[],
   description: string,
   opts?: { cwd?: string; env?: Record<string, string>; timeout?: number }
 ): string {
@@ -156,7 +129,7 @@ export function startStreamingJob(
 
   const job: StreamingJob = {
     id,
-    command,
+    command: `${cmd} ${args.join(" ")}`,
     description,
     status: "running",
     output: "",
@@ -168,12 +141,12 @@ export function startStreamingJob(
 
   jobs.set(id, job);
 
-  const parts = command.split(" ");
-  const child: ChildProcess = spawn(parts[0], parts.slice(1), {
+  const child: ChildProcess = spawn(cmd, args, {
     cwd: opts?.cwd,
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, ...opts?.env },
-    shell: true,
+    // Windows needs shell to resolve .cmd/.bat from PATH; args array prevents injection
+    shell: process.platform === "win32",
   });
 
   const emitChunk = (chunk: string) => {
@@ -217,7 +190,7 @@ export function startStreamingJob(
       job.completedAt = Date.now();
       job.listeners.clear();
     }
-  }, timeout);
+  }, timeout).unref();
 
   return id;
 }

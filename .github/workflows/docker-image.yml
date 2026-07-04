@@ -34,8 +34,14 @@ jobs:
           platforms: linux/amd64
 
       - name: Boot container
+        env:
+          # The image binds 0.0.0.0 (non-loopback), which requires an auth token
+          # for every route except /healthz (VIB-1889). Pin a known token so the
+          # smoke test can exercise the real auth path instead of a 401.
+          VIBESPOT_AUTH_TOKEN: ci-smoke-token
         run: |
-          docker run -d --name vibespot-smoke -p 4200:4200 -e VIBESPOT_AUTH_TOKEN=vibespot-ci-smoke-token vibespot:ci
+          docker run -d --name vibespot-smoke -p 4200:4200 \
+            -e VIBESPOT_AUTH_TOKEN="$VIBESPOT_AUTH_TOKEN" vibespot:ci
           echo "::group::wait for /healthz"
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:4200/healthz > /tmp/healthz.json; then
@@ -54,8 +60,11 @@ jobs:
           echo "::endgroup::"
 
       - name: Verify bundled assets via /api/starters
+        env:
+          VIBESPOT_AUTH_TOKEN: ci-smoke-token
         run: |
-          curl -fsS -H "Authorization: Bearer vibespot-ci-smoke-token" http://127.0.0.1:4200/api/starters > /tmp/starters.json
+          curl -fsS -H "X-Vibespot-Token: $VIBESPOT_AUTH_TOKEN" \
+            http://127.0.0.1:4200/api/starters > /tmp/starters.json
           count=$(jq '.starters | length' /tmp/starters.json 2>/dev/null || echo 0)
           echo "starters count: $count"
           if [ "$count" -lt 5 ]; then
