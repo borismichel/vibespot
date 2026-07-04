@@ -97,6 +97,69 @@ describe("renderHubL — variables", () => {
     const c: RenderContext = { module: { text: "line1\\nline2" } };
     expect(renderHubL("{{ module.text }}", c)).toBe("line1 line2");
   });
+
+  it("escapes expression output by default", () => {
+    const c: RenderContext = {
+      module: {
+        text: `</script><script>window.pwned=1</script><img src=x onerror="alert('x')">`,
+      },
+    };
+    expect(renderHubL("<p>{{ module.text }}</p>", c)).toBe(
+      "<p>&lt;/script&gt;&lt;script&gt;window.pwned=1&lt;/script&gt;&lt;img src=x onerror=&quot;alert(&#39;x&#39;)&quot;&gt;</p>",
+    );
+  });
+
+  it("renders richtext field defaults as sanitized HTML in body content", () => {
+    const fields: FieldDef[] = [
+      {
+        name: "bio_text",
+        type: "richtext",
+        default: `<p>I'm a designer.</p><img src=x onerror="window.pwned=1"><script>window.pwned=1</script>`,
+      },
+    ];
+    const ctx: RenderContext = { module: buildContextFromFields(fields) };
+
+    expect(renderHubL('<div class="bio">{{ module.bio_text }}</div>', ctx)).toBe(
+      '<div class="bio"><p>I\'m a designer.</p><img src="x"></div>',
+    );
+  });
+
+  it("strips slash-separated event handlers from richtext field defaults", () => {
+    const fields: FieldDef[] = [
+      {
+        name: "bio_text",
+        type: "richtext",
+        default: [
+          '<img/src="x"/onerror="window.imgPwned=1">',
+          '<svg/onload="window.svgPwned=1"></svg>',
+          '<body/onpageshow="window.bodyPwned=1">copy</body>',
+          '<details/open/ontoggle="window.detailsPwned=1"><summary>More</summary></details>',
+        ].join(""),
+      },
+    ];
+    const ctx: RenderContext = { module: buildContextFromFields(fields) };
+
+    const rendered = renderHubL("{{ module.bio_text }}", ctx);
+
+    expect(rendered).toBe(
+      '<img src="x">copy<details open><summary>More</summary></details>',
+    );
+    expect(rendered).not.toContain("onerror");
+    expect(rendered).not.toContain("onload");
+    expect(rendered).not.toContain("onpageshow");
+    expect(rendered).not.toContain("ontoggle");
+  });
+
+  it("escapes richtext fields when rendered inside HTML attributes", () => {
+    const fields: FieldDef[] = [
+      { name: "bio_text", type: "richtext", default: "<p>Bio</p>" },
+    ];
+    const ctx: RenderContext = { module: buildContextFromFields(fields) };
+
+    expect(renderHubL('<div data-bio="{{ module.bio_text }}"></div>', ctx)).toBe(
+      '<div data-bio="&lt;p&gt;Bio&lt;/p&gt;"></div>',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -128,6 +191,11 @@ describe("renderHubL — filters", () => {
     expect(renderHubL("{{ module.html|escape }}", c)).toBe(
       "&lt;b&gt;&quot;hi&quot;&lt;/b&gt;",
     );
+  });
+
+  it("does not double-escape explicit |escape output", () => {
+    const c: RenderContext = { module: { html: "<b>hi</b>" } };
+    expect(renderHubL("{{ module.html|escape }}", c)).toBe("&lt;b&gt;hi&lt;/b&gt;");
   });
 
   it("applies |default(fallback) when value is empty", () => {
@@ -169,6 +237,42 @@ describe("renderHubL — filters", () => {
     expect(renderHubL("{{ module.name|upper|truncate(5) }}", ctx)).toBe(
       "HELLO...",
     );
+  });
+
+  it("supports |safe as sanitized HTML without reopening script injection", () => {
+    const c: RenderContext = {
+      module: { html: '<p>Safe copy</p><a href="javascript:alert(1)" onclick="alert(2)">link</a>' },
+    };
+
+    expect(renderHubL("{{ module.html|safe }}", c)).toBe(
+      '<p>Safe copy</p><a href="#">link</a>',
+    );
+  });
+
+  it("decodes URL entities before checking |safe href schemes", () => {
+    const c: RenderContext = {
+      module: {
+        html: '<a href="java&#x73;cript:alert(1)">hex</a><a href="java&Tab;script&colon;alert(2)">named</a>',
+      },
+    };
+
+    expect(renderHubL("{{ module.html|safe }}", c)).toBe(
+      '<a href="#">hex</a><a href="#">named</a>',
+    );
+  });
+
+  it("strips slash-separated event handlers from |safe output", () => {
+    const c: RenderContext = {
+      module: {
+        html: '<svg/onload="window.svgPwned=1"></svg><details/open/ontoggle="window.detailsPwned=1">Details</details>',
+      },
+    };
+
+    const rendered = renderHubL("{{ module.html|safe }}", c);
+
+    expect(rendered).toBe("<details open>Details</details>");
+    expect(rendered).not.toContain("onload");
+    expect(rendered).not.toContain("ontoggle");
   });
 });
 
@@ -240,6 +344,33 @@ describe("renderHubL — conditionals", () => {
     ).toBe("big");
   });
 
+  it("selects elif branches without leaking else bodies", () => {
+    const ctx: RenderContext = { module: { tier: "pro" } };
+    const tpl = '{% if module.tier == "enterprise" %}enterprise{% elif module.tier == "pro" %}pro{% else %}basic{% endif %}';
+    expect(renderHubL(tpl, ctx)).toBe("pro");
+  });
+
+  it("keeps nested conditionals associated with their owning branch", () => {
+    const ctx: RenderContext = { module: { outer: false, inner: true, alt: true } };
+    const tpl = [
+      "{% if module.outer %}",
+      "outer",
+      "{% if module.inner %}inner{% else %}inner-else{% endif %}",
+      "{% elif module.alt %}",
+      "alt",
+      "{% else %}",
+      "fallback",
+      "{% endif %}",
+    ].join("");
+    expect(renderHubL(tpl, ctx)).toBe("alt");
+  });
+
+  it("handles comparison text inside a true branch", () => {
+    const ctx: RenderContext = { module: { count: 12 } };
+    const tpl = "{% if module.count > 10 %}<span>5 > 3</span>{% elif module.count > 5 %}mid{% else %}low{% endif %}";
+    expect(renderHubL(tpl, ctx)).toBe("<span>5 > 3</span>");
+  });
+
   it("empty string is falsy", () => {
     const ctx: RenderContext = { module: { val: "" } };
     expect(
@@ -252,6 +383,17 @@ describe("renderHubL — conditionals", () => {
     expect(
       renderHubL("{% if module.items %}yes{% else %}no{% endif %}", ctx),
     ).toBe("no");
+  });
+
+  it("processes more than 50 sibling conditionals", () => {
+    const ctx: RenderContext = { module: { show: true } };
+    const tpl = Array.from({ length: 60 }, (_unused, index) => (
+      `{% if module.show %}${index},{% else %}hidden,{% endif %}`
+    )).join("");
+
+    expect(renderHubL(tpl, ctx)).toBe(
+      Array.from({ length: 60 }, (_unused, index) => `${index},`).join(""),
+    );
   });
 });
 
@@ -382,6 +524,21 @@ describe("assemblePreview", () => {
     expect(html).toContain("<div>hi</div>");
     expect(html).not.toContain("<style></style>");
   });
+
+  it("does not allow CSS or JS to break out of preview tags", () => {
+    const html = assemblePreview({
+      renderedModules: ["<div>hi</div>"],
+      sharedCss: "body{color:red}</style><script>window.cssPwned=1</script>",
+      moduleCssArray: [],
+      sharedJs: "console.log('</script><script>window.jsPwned=1</script>')",
+      moduleJsArray: [],
+    });
+
+    expect(html).toContain("<\\/style><script>window.cssPwned=1</script>");
+    expect(html).toContain("<\\/script><script>window.jsPwned=1<\\/script>");
+    expect(html).not.toContain("</style><script>window.cssPwned=1</script>");
+    expect(html).not.toContain("</script><script>window.jsPwned=1</script>");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -465,5 +622,29 @@ describe("rgba composition (the GPT vs Anthropic split)", () => {
     ];
     const ctx: RenderContext = { module: buildContextFromFields(fields) };
     expect(renderHubL(tpl, ctx)).toBe("background: rgba(, );");
+  });
+});
+
+describe("inline style/script expression escaping", () => {
+  it("preserves CSS values without HTML entity escaping and blocks style breakouts", () => {
+    const ctx: RenderContext = {
+      module: { label: 'Tom & "June" </style><script>window.pwned=1</script>' },
+    };
+    const rendered = renderHubL('<style>.hero::before{content:"{{ module.label }}"}</style>', ctx);
+
+    expect(rendered).toContain('Tom & "June" <\\/style><script>window.pwned=1</script>');
+    expect(rendered).not.toContain("Tom &amp;");
+    expect(rendered).not.toContain("</style><script>window.pwned=1</script>");
+  });
+
+  it("preserves JavaScript string values without HTML entities and blocks script breakouts", () => {
+    const ctx: RenderContext = {
+      module: { label: 'Tom & "June" </script><script>window.pwned=1</script>' },
+    };
+    const rendered = renderHubL('<script>const label = "{{ module.label }}";</script>', ctx);
+
+    expect(rendered).toContain('Tom & \\"June\\" <\\\\/script><script>window.pwned=1<\\\\/script>');
+    expect(rendered).not.toContain("Tom &amp;");
+    expect(rendered).not.toContain("</script><script>window.pwned=1</script>");
   });
 });
