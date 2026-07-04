@@ -620,6 +620,10 @@
     }
 
     var onClick = function (e) {
+      // Clicks inside the agent's own edit UI (link popup, image URL input)
+      // must reach their own listeners — Save/Cancel live there. Guard before
+      // preventDefault/stopPropagation or the popup can never commit.
+      if (e.target.closest && e.target.closest(".vibespot-link-edit-popup, .vibespot-image-edit-input")) return;
       e.preventDefault();
       e.stopPropagation();
 
