@@ -9,10 +9,46 @@ export function jsonResponse(res: ServerResponse, status: number, data: unknown)
   res.end(JSON.stringify(data));
 }
 
-export function readBody(req: IncomingMessage, callback: (body: string) => void): void {
+/**
+ * Cap on buffered request bodies (VIB-1889) — an unbounded readBody lets any
+ * client OOM the process. JSON payloads (module code, brand CSS, plans) stay
+ * far below this; large file uploads stream through Busboy with its own cap.
+ */
+export const MAX_BODY_BYTES = 5 * 1024 * 1024;
+
+export function readBody(
+  req: IncomingMessage,
+  callback: (body: string) => void,
+  opts: { res?: ServerResponse; maxBytes?: number } = {}
+): void {
+  const maxBytes = opts.maxBytes ?? MAX_BODY_BYTES;
   const chunks: Buffer[] = [];
-  req.on("data", (chunk) => chunks.push(chunk));
-  req.on("end", () => callback(Buffer.concat(chunks).toString("utf-8")));
+  let received = 0;
+  let overLimit = false;
+
+  req.on("data", (chunk: Buffer) => {
+    if (overLimit) return;
+    received += chunk.length;
+    if (received > maxBytes) {
+      overLimit = true;
+      chunks.length = 0;
+      if (opts.res && !opts.res.headersSent) {
+        // Stop reading, answer 413, and let `Connection: close` end the
+        // socket after the response flushes — destroying the request here
+        // would RST the shared socket and eat the response.
+        req.pause();
+        opts.res.writeHead(413, { "Content-Type": "application/json", "Connection": "close" });
+        opts.res.end(JSON.stringify({ error: "Request body too large" }));
+      } else {
+        req.destroy();
+      }
+      return;
+    }
+    chunks.push(chunk);
+  });
+  req.on("end", () => {
+    if (!overLimit) callback(Buffer.concat(chunks).toString("utf-8"));
+  });
 }
 
 /**
@@ -30,5 +66,5 @@ export function readJsonBody<T = Record<string, unknown>>(
     } catch {
       jsonResponse(res, 400, { error: "Invalid JSON in request body" });
     }
-  });
+  }, { res });
 }
