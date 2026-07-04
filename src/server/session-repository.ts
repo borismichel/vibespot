@@ -1,9 +1,8 @@
 /**
  * SessionRepository interface — abstraction layer for session storage.
  *
- * The current CLI implementation uses FileSessionRepository (backed by
- * ~/.vibespot/sessions/ JSON files). For SaaS, implement DatabaseSessionRepository
- * backed by PostgreSQL or similar.
+ * The current implementation uses FileSessionRepository (backed by
+ * ~/.vibespot/sessions/ JSON files).
  *
  * This interface captures the storage contract. Business logic (module updates,
  * field editing, template management) lives in session.ts and operates on

@@ -44,9 +44,8 @@ Tags published:
 ## Option B — Clone and use the compose bundle
 
 The compose bundle is the recommended deployment for the EU hosted variant.
-It includes Caddy (TLS + reverse proxy), Postgres (for the hosted-mode
-storage adapter), and an optional Azure Entra SSO gate (`oauth2-proxy`,
-off by default — see [Enable the auth gate](#enable-the-auth-gate) below).
+It includes Caddy (TLS + reverse proxy) and an optional Azure Entra SSO gate
+(`oauth2-proxy`, off by default — see [Enable the auth gate](#enable-the-auth-gate) below).
 
 ```bash
 git clone https://github.com/borismichel/vibespot.git
