@@ -437,8 +437,9 @@ export interface ServerOptions {
   /** Bind address; defaults to VIBESPOT_HOST or 127.0.0.1 (VIB-1889). */
   host?: string;
   /**
-   * Start the separate preview origin (VIB-1892). Default off until the UI
-   * iframe flips from `srcdoc` to the preview-origin `src`.
+   * Start the separate preview origin (VIB-1892). Default ON — the live
+   * preview iframe loads from this origin so AI-generated page code runs
+   * cross-origin to the app. Pass `false` only in tests that don't need it.
    */
   enablePreviewOrigin?: boolean;
 }
@@ -454,6 +455,10 @@ export interface StartedServer {
 }
 
 let serverContentMode: "page" | "email" = "page";
+
+// The running preview origin (VIB-1892) — set by startServer, read by the
+// /api/preview-origin route so the UI can point the preview iframe at it.
+let activePreviewOrigin: StartedPreviewOrigin | null = null;
 
 // Security policy for the running server — set once in startServer, read by
 // the request/upgrade handlers (same module-state pattern as contentMode).
@@ -501,20 +506,35 @@ export function startServer(opts: ServerOptions): Promise<StartedServer> {
   // `port + 2` (and walks forward itself if that is taken).
   const started = async (boundPort: number): Promise<StartedServer> => {
     let previewOrigin: StartedPreviewOrigin | null = null;
-    if (opts.enablePreviewOrigin) {
+    if (opts.enablePreviewOrigin !== false) {
+      // frame-ancestors: on a loopback bind, allow both loopback spellings so
+      // a user browsing via `localhost` still embeds a `127.0.0.1`-announced
+      // preview. On a non-loopback bind (Docker/tailnet) the browser-facing
+      // hostname is unknowable at boot, so fall back to any ancestor — the
+      // access token still gates who can load the doc at all.
+      const isLoopback = security.host === "127.0.0.1" || security.host === "localhost" || security.host === "::1";
+      const frameAncestors = isLoopback
+        ? [`http://127.0.0.1:${boundPort}`, `http://localhost:${boundPort}`]
+        : ["*"];
       previewOrigin = await startPreviewOrigin({
         port: boundPort + 2,
         host: security.host,
-        frameAncestors: [`http://${security.host}:${boundPort}`],
+        frameAncestors,
         uiDir,
       });
     }
+    activePreviewOrigin = previewOrigin;
     return {
       port: boundPort,
       host: security.host,
       authToken: security.authToken,
       previewOrigin,
-      close: () => { server.close(); wss.close(); previewOrigin?.close(); },
+      close: () => {
+        server.close();
+        wss.close();
+        previewOrigin?.close();
+        if (activePreviewOrigin === previewOrigin) activePreviewOrigin = null;
+      },
     };
   };
 
@@ -667,6 +687,10 @@ function handleApiRoute(
   switch (path) {
     case "/api/session":
       handleSessionRoute(method, res);
+      break;
+
+    case "/api/preview-origin":
+      handlePreviewOriginRoute(req, res);
       break;
 
     case "/api/modules":
@@ -1005,6 +1029,29 @@ function handleApiRoute(
         jsonResponse(res, 404, { error: "Not found" });
       }
   }
+}
+
+/**
+ * Tell the UI where the separate preview origin lives (VIB-1892). The origin
+ * hostname is derived from the request's Host header so the answer is
+ * reachable from wherever the browser actually is (localhost vs 127.0.0.1 vs
+ * a Docker/tailnet hostname); only the port differs between app and preview.
+ * The token doubles as the postMessage handshake secret — this route sits
+ * behind the app auth gate, so only an authenticated UI can read it.
+ */
+function handlePreviewOriginRoute(req: IncomingMessage, res: ServerResponse): void {
+  if (!activePreviewOrigin) {
+    jsonResponse(res, 200, { origin: null });
+    return;
+  }
+  const hostHeader = req.headers.host || `${activePreviewOrigin.host}:0`;
+  const hostname = hostHeader.startsWith("[")
+    ? hostHeader.slice(0, hostHeader.indexOf("]") + 1)
+    : hostHeader.split(":")[0];
+  jsonResponse(res, 200, {
+    origin: `http://${hostname}:${activePreviewOrigin.port}`,
+    token: activePreviewOrigin.token,
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -125,6 +125,21 @@ describe("preview doc composition helpers", () => {
     expect(out).toContain("\\u003c/script>"); // escaped, inert inside the JSON block
   });
 
+  it("embeds the per-module field definitions for the in-frame agent", () => {
+    const out = injectPreviewAgent("<head></head>", "tok", {
+      hero: [{ name: "bg_color", type: "color", default: { color: "#fff" } }],
+    });
+    expect(out).toContain('id="vs-preview-fields"');
+    expect(out).toContain('"bg_color"');
+    // Field blocks are data, not executable script.
+    expect(out).toContain('type="application/json"');
+    // A field default must not be able to break out of the JSON block.
+    const evil = injectPreviewAgent("<head></head>", "tok", {
+      hero: [{ name: "x", type: "text", default: "</script><script>alert(1)" }],
+    });
+    expect(evil).not.toContain("</script><script>alert(1)");
+  });
+
   it("rewrites theme-asset URLs to carry the access token", () => {
     const html = '<img src="/theme-assets/hero.png"> <div style="background:url(/theme-assets/bg.jpg)">';
     const out = rewriteThemeAssetUrls(html, "tok");

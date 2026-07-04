@@ -36,7 +36,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import { tokenMatches } from "./security.js";
 import { buildPreviewHtml } from "./preview.js";
-import { getSession } from "./session.js";
+import { getSession, getOrderedModules } from "./session.js";
 import { resolveContainedPath } from "../utils/path-safety.js";
 
 export interface PreviewOriginOptions {
@@ -88,17 +88,45 @@ const ASSET_MIME: Record<string, string> = {
 };
 
 /**
- * Prepend the trusted agent bootstrap to the composed preview doc: a JSON
- * config block (token + protocol version) and the agent script tag, injected
- * at the top of <head> so the agent boots before any AI module script runs.
+ * Per-module field definitions embedded into the composed doc so the in-frame
+ * agent can build the section-controls toolbar without any API access (the
+ * preview origin has no `/api/*`). Parsed from each module's fields.json;
+ * modules with unparseable fields are simply omitted.
  */
-export function injectPreviewAgent(html: string, token: string): string {
-  const config = JSON.stringify({ v: 1, token });
+export function buildFieldsMap(): Record<string, unknown[]> {
+  const map: Record<string, unknown[]> = {};
+  const session = getSession();
+  if (!session) return map;
+  for (const mod of getOrderedModules()) {
+    try {
+      const parsed = JSON.parse(mod.fieldsJson);
+      if (Array.isArray(parsed)) map[mod.moduleName] = parsed;
+    } catch { /* omit */ }
+  }
+  return map;
+}
+
+/** Serialize JSON for a same-document `<script type="application/json">`. */
+function inlineJson(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
+/**
+ * Prepend the trusted agent bootstrap to the composed preview doc: a JSON
+ * config block (token + protocol version), the per-module field definitions,
+ * and the agent script tag, injected at the top of <head> so the agent boots
+ * before any AI module script runs.
+ */
+export function injectPreviewAgent(
+  html: string,
+  token: string,
+  fieldsMap: Record<string, unknown[]> = {}
+): string {
   // The token is hex (randomBytes) or test-supplied; JSON.stringify plus the
-  // <-escape below keeps the inline block safe even for exotic test tokens.
-  const safeConfig = config.replace(/</g, "\\u003c");
+  // <-escape in inlineJson keeps the inline blocks safe even for exotic input.
   const bootstrap =
-    `<script id="vs-preview-config" type="application/json">${safeConfig}</script>` +
+    `<script id="vs-preview-config" type="application/json">${inlineJson({ v: 1, token })}</script>` +
+    `<script id="vs-preview-fields" type="application/json">${inlineJson(fieldsMap)}</script>` +
     `<script src="/${PREVIEW_AGENT_FILENAME}"></script>`;
   if (html.includes("<head>")) {
     return html.replace("<head>", `<head>${bootstrap}`);
@@ -211,7 +239,7 @@ function handlePreviewRequest(
   if (url.pathname === "/") {
     if (!requireToken(url, opts.token, res)) return;
     const composed = rewriteThemeAssetUrls(
-      injectPreviewAgent(buildPreviewHtml(), opts.token),
+      injectPreviewAgent(buildPreviewHtml(), opts.token, buildFieldsMap()),
       opts.token
     );
     res.writeHead(200, {
