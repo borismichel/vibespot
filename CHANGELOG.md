@@ -8,6 +8,7 @@ All notable changes to vibeSpot are documented here.
 
 ### Fixed
 
+- **Interact mode: link-edit popup Save/Cancel buttons work** ([VIB-1926](/VIB/issues/VIB-1926)) — the interact-mode capture-phase document click handler ran `preventDefault`/`stopPropagation` on every click, including clicks inside the agent's own link-edit popup, so Save (and Enter, which synthesizes the same click) silently discarded the edit and Cancel never ran its own handler. Clicks inside the agent's edit UI (link popup, image URL input) now early-return before interception, letting the popup's buttons receive them. Link editing now commits end-to-end (`vs:edit-commit` → `POST /api/field`).
 - **UI shell robustness: plan-renderer XSS, job-poll hangs, fetch guards, brand upload** ([VIB-1899](/VIB/issues/VIB-1899)):
   - The plan pane's markdown renderer escapes double/single quotes and validates link URLs, closing an attribute-injection XSS reachable from AI-generated plan text (`[x](https://a" onmouseover="…)`); the brand-kit logo preview only assigns `http(s)` URLs to `img.src` (no more `javascript:`/`data:` from the free-text field) and recovers cleanly from a bad URL instead of wedging.
   - Install/Sign-in job polling no longer hangs forever: a 404'd job (server restart/GC) is terminal, failures surface the job output, and a 5-minute deadline reports a timeout instead of a silent spinner (setup walkthrough + HubSpot CLI install dialog now share one `pollJob`).
