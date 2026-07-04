@@ -747,6 +747,136 @@ export async function resumeAgentPipeline(
 // Shared by the one-shot path and the checkpoint-resume path.
 // ---------------------------------------------------------------------------
 
+/**
+ * Stage 3 + Stage 4 core shared by the single-page and multi-page flows
+ * (VIB-1902): run the module developer over `specs`, validate, retry any
+ * modules whose fieldsJson was reset due to invalid JSON, then re-validate.
+ * Flow-specific follow-ups (issue summaries, nav-link validation) stay with
+ * the callers. `validationResults` is null when no modules were generated.
+ */
+async function developAndValidate(
+  userMessage: string,
+  specs: ModuleSpec[],
+  sharedCss: string,
+  plan: PipelinePlan,
+  snapshot: SessionSnapshot,
+  engine: AgentEngine,
+  apiKey: string,
+  model: string,
+  concurrency: number,
+  onEvent: (event: PipelineEvent) => void,
+  signal?: AbortSignal,
+): Promise<{
+  generatedModules: ModuleFiles[];
+  failedModules: string[];
+  validationResults: import("./stages/validator.js").ValidationResult[] | null;
+}> {
+  const generatedModules: ModuleFiles[] = [];
+  const failedModules: string[] = [];
+
+  if (specs.length > 0) {
+    const devResults = await runWithSpan(
+      "module-development",
+      () =>
+        runModuleDeveloper(
+          userMessage,
+          specs,
+          sharedCss,
+          snapshot.themeName,
+          engine,
+          apiKey,
+          model,
+          concurrency,
+          onEvent,
+          plan.guidesNeeded,
+          snapshot.brandAssets,
+          plan.contentType,
+          signal,
+        ),
+      { metadata: { moduleCount: specs.length } },
+    );
+
+    for (const r of devResults) {
+      if (r.module) {
+        generatedModules.push(r.module);
+      } else {
+        failedModules.push(r.moduleName);
+      }
+    }
+  }
+
+  let validationResults: import("./stages/validator.js").ValidationResult[] | null = null;
+
+  if (generatedModules.length > 0) {
+    validationResults = validateModules(
+      generatedModules,
+      snapshot.themeName,
+      onEvent,
+      plan.contentType,
+      snapshot.brandAssets?.brandKit,
+    );
+
+    // Retry modules whose fieldsJson was reset due to invalid JSON
+    const modulesNeedingRetry = validationResults
+      .filter((r) => r.issues.some((i) => i.field === "fieldsJson" && i.message.includes("reset to empty")))
+      .map((r) => r.module.moduleName);
+
+    if (modulesNeedingRetry.length > 0) {
+      const retrySpecs = modulesNeedingRetry
+        .map((name) => specs.find((s) => s.name === name))
+        .filter((s): s is ModuleSpec => s != null);
+
+      if (retrySpecs.length > 0) {
+        log.info("pipeline", `Retrying ${retrySpecs.length} module(s) with broken fieldsJson: ${retrySpecs.map((s) => s.name).join(", ")}`);
+        onEvent({
+          type: "agent_decision",
+          step: "quality_check",
+          decision: `Regenerating ${retrySpecs.length} module(s) with invalid fields JSON...`,
+        });
+
+        const retryResults = await runWithSpan(
+          "module-development-retry",
+          () =>
+            runModuleDeveloper(
+              userMessage,
+              retrySpecs,
+              sharedCss,
+              snapshot.themeName,
+              engine,
+              apiKey,
+              model,
+              concurrency,
+              onEvent,
+              plan.guidesNeeded,
+              snapshot.brandAssets,
+              plan.contentType,
+              signal,
+            ),
+          { metadata: { moduleCount: retrySpecs.length } },
+        );
+
+        for (const r of retryResults) {
+          if (r.module) {
+            const idx = generatedModules.findIndex((m) => m.moduleName === r.moduleName);
+            if (idx >= 0) generatedModules[idx] = r.module;
+          }
+        }
+
+        // Re-validate after retry
+        validationResults = validateModules(
+          generatedModules,
+          snapshot.themeName,
+          onEvent,
+          plan.contentType,
+          snapshot.brandAssets?.brandKit,
+        );
+      }
+    }
+  }
+
+  return { generatedModules, failedModules, validationResults };
+}
+
 async function runBuildPhase(
   userMessage: string,
   plan: PipelinePlan,
@@ -812,112 +942,24 @@ async function runBuildPhase(
   // Stage 3: Module Developer (parallel)
   // -----------------------------------------------------------------------
 
-  let generatedModules: ModuleFiles[] = [];
-  let failedModules: string[] = [];
+  const devOutcome = await developAndValidate(
+    userMessage,
+    moduleSpecs,
+    sharedCss,
+    plan,
+    snapshot,
+    engine,
+    apiKey,
+    model,
+    effectiveConcurrency,
+    onEvent,
+    signal,
+  );
+  let generatedModules = devOutcome.generatedModules;
+  const failedModules = devOutcome.failedModules;
+  const validationResults = devOutcome.validationResults;
 
-  if (moduleSpecs.length > 0) {
-    const devResults = await runWithSpan(
-      "module-development",
-      () =>
-        runModuleDeveloper(
-          userMessage,
-          moduleSpecs,
-          sharedCss,
-          snapshot.themeName,
-          engine,
-          apiKey,
-          model,
-          effectiveConcurrency,
-          onEvent,
-          plan.guidesNeeded,
-          snapshot.brandAssets,
-          plan.contentType,
-          signal,
-        ),
-      { metadata: { moduleCount: moduleSpecs.length } },
-    );
-
-    for (const r of devResults) {
-      if (r.module) {
-        generatedModules.push(r.module);
-      } else {
-        failedModules.push(r.moduleName);
-      }
-    }
-  }
-
-  // -----------------------------------------------------------------------
-  // Stage 4: Quality Check
-  // -----------------------------------------------------------------------
-
-  let validationResults: import("./stages/validator.js").ValidationResult[] | null = null;
-
-  if (generatedModules.length > 0) {
-    validationResults = validateModules(
-      generatedModules,
-      snapshot.themeName,
-      onEvent,
-      plan.contentType,
-      snapshot.brandAssets?.brandKit,
-    );
-
-    // Retry modules whose fieldsJson was reset due to invalid JSON
-    const modulesNeedingRetry = validationResults
-      .filter((r) => r.issues.some((i) => i.field === "fieldsJson" && i.message.includes("reset to empty")))
-      .map((r) => r.module.moduleName);
-
-    if (modulesNeedingRetry.length > 0) {
-      const retrySpecs = modulesNeedingRetry
-        .map((name) => moduleSpecs.find((s) => s.name === name))
-        .filter((s): s is ModuleSpec => s != null);
-
-      if (retrySpecs.length > 0) {
-        log.info("pipeline", `Retrying ${retrySpecs.length} module(s) with broken fieldsJson: ${retrySpecs.map((s) => s.name).join(", ")}`);
-        onEvent({
-          type: "agent_decision",
-          step: "quality_check",
-          decision: `Regenerating ${retrySpecs.length} module(s) with invalid fields JSON...`,
-        });
-
-        const retryResults = await runWithSpan(
-          "module-development-retry",
-          () =>
-            runModuleDeveloper(
-              userMessage,
-              retrySpecs,
-              sharedCss,
-              snapshot.themeName,
-              engine,
-              apiKey,
-              model,
-              effectiveConcurrency,
-              onEvent,
-              plan.guidesNeeded,
-              snapshot.brandAssets,
-              plan.contentType,
-              signal,
-            ),
-          { metadata: { moduleCount: retrySpecs.length } },
-        );
-
-        for (const r of retryResults) {
-          if (r.module) {
-            const idx = generatedModules.findIndex((m) => m.moduleName === r.moduleName);
-            if (idx >= 0) generatedModules[idx] = r.module;
-          }
-        }
-
-        // Re-validate after retry
-        validationResults = validateModules(
-          generatedModules,
-          snapshot.themeName,
-          onEvent,
-          plan.contentType,
-          snapshot.brandAssets?.brandKit,
-        );
-      }
-    }
-
+  if (validationResults) {
     // Replace generated modules with validated/auto-fixed versions
     generatedModules = validationResults.map((r) => r.module);
 
@@ -1136,109 +1178,29 @@ async function runMultiPageFlow(
     }
   }
 
-  const devResults = await runWithSpan(
-    "module-development",
-    () =>
-      runModuleDeveloper(
-        userMessage,
-        allSpecs,
-        sharedCss,
-        snapshot.themeName,
-        engine,
-        apiKey,
-        model,
-        concurrency,
-        onEvent,
-        plan.guidesNeeded,
-        snapshot.brandAssets,
-        plan.contentType,
-        signal,
-      ),
-    { metadata: { moduleCount: allSpecs.length } },
+  const devOutcome = await developAndValidate(
+    userMessage,
+    allSpecs,
+    sharedCss,
+    plan,
+    snapshot,
+    engine,
+    apiKey,
+    model,
+    concurrency,
+    onEvent,
+    signal,
   );
+  const generatedModules = devOutcome.generatedModules;
+  const failedModules = devOutcome.failedModules;
 
-  const generatedModules: ModuleFiles[] = [];
-  const failedModules: string[] = [];
-
-  for (const r of devResults) {
-    if (r.module) {
-      generatedModules.push(r.module);
-    } else {
-      failedModules.push(r.moduleName);
-    }
-  }
-
-  // Stage 4: Quality Check
+  // Stage 4 follow-ups specific to multi-page: nav-link validation + summary
   let validatedModules = generatedModules;
   let validationIssues: { module: string; message: string; autoFixed: boolean }[] = [];
 
-  if (generatedModules.length > 0) {
-    let validationResults = validateModules(
-      generatedModules,
-      snapshot.themeName,
-      onEvent,
-      plan.contentType,
-      snapshot.brandAssets?.brandKit,
-    );
-
-    // Retry modules whose fieldsJson was reset due to invalid JSON
-    const modulesNeedingRetry = validationResults
-      .filter((r) => r.issues.some((i) => i.field === "fieldsJson" && i.message.includes("reset to empty")))
-      .map((r) => r.module.moduleName);
-
-    if (modulesNeedingRetry.length > 0) {
-      const retrySpecs = modulesNeedingRetry
-        .map((name) => allSpecs.find((s) => s.name === name))
-        .filter((s): s is ModuleSpec => s != null);
-
-      if (retrySpecs.length > 0) {
-        log.info("pipeline", `Retrying ${retrySpecs.length} module(s) with broken fieldsJson`);
-        onEvent({
-          type: "agent_decision",
-          step: "quality_check",
-          decision: `Regenerating ${retrySpecs.length} module(s) with invalid fields JSON...`,
-        });
-
-        const retryResults = await runWithSpan(
-          "module-development-retry",
-          () =>
-            runModuleDeveloper(
-              userMessage,
-              retrySpecs,
-              sharedCss,
-              snapshot.themeName,
-              engine,
-              apiKey,
-              model,
-              concurrency,
-              onEvent,
-              plan.guidesNeeded,
-              snapshot.brandAssets,
-              plan.contentType,
-              signal,
-            ),
-          { metadata: { moduleCount: retrySpecs.length } },
-        );
-
-        for (const r of retryResults) {
-          if (r.module) {
-            const idx = generatedModules.findIndex((m) => m.moduleName === r.moduleName);
-            if (idx >= 0) generatedModules[idx] = r.module;
-          }
-        }
-
-        validationResults = validateModules(
-          generatedModules,
-          snapshot.themeName,
-          onEvent,
-          plan.contentType,
-          snapshot.brandAssets?.brandKit,
-        );
-      }
-    }
-
-    validatedModules = validationResults.map((r) => r.module);
-    validationIssues = validationResults.flatMap((r) => r.issues);
+  if (devOutcome.validationResults) {
+    validatedModules = devOutcome.validationResults.map((r) => r.module);
+    validationIssues = devOutcome.validationResults.flatMap((r) => r.issues);
 
     // Cross-page navigation validation
     const navIssues = validateNavLinks(
