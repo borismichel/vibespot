@@ -30,6 +30,14 @@ export interface RenderContext {
   [key: string]: unknown;
 }
 
+const FIELD_TYPES = Symbol("hublFieldTypes");
+
+interface TypedContextObject extends Record<string, unknown> {
+  [FIELD_TYPES]?: Map<string, string>;
+}
+
+type ExpressionContext = "htmlText" | "htmlTag" | "style" | "script";
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -38,20 +46,28 @@ export interface RenderContext {
  * Build a render context from a fields.json array, using each field's default.
  */
 export function buildContextFromFields(fields: FieldDef[]): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
+  const result: TypedContextObject = {};
+  const fieldTypes = new Map<string, string>();
 
   for (const field of fields) {
+    fieldTypes.set(field.name, field.type);
+
     if (field.type === "group" && field.occurrence && Array.isArray(field.default)) {
       // Repeater group — default is an array of objects
-      result[field.name] = field.default;
+      result[field.name] = field.children
+        ? annotateRepeaterDefaults(field.default, field.children)
+        : field.default;
     } else if (field.type === "group" && field.children) {
       // Nested group (e.g. styles) — recurse into children
-      result[field.name] = buildContextFromFields(field.children);
+      const childContext = buildContextFromFields(field.children);
+      mergeFieldTypes(fieldTypes, field.name, childContext);
+      result[field.name] = childContext;
     } else {
       result[field.name] = field.default ?? "";
     }
   }
 
+  defineFieldTypes(result, fieldTypes);
   return result;
 }
 
@@ -193,6 +209,56 @@ function stripDirectives(tpl: string): string {
   return tpl;
 }
 
+function defineFieldTypes(target: TypedContextObject, fieldTypes: Map<string, string>): void {
+  Object.defineProperty(target, FIELD_TYPES, {
+    value: fieldTypes,
+    enumerable: false,
+    configurable: false,
+  });
+}
+
+function mergeFieldTypes(target: Map<string, string>, prefix: string, childContext: Record<string, unknown>): void {
+  const childTypes = getFieldTypes(childContext);
+  if (!childTypes) return;
+
+  for (const [path, type] of childTypes) {
+    target.set(`${prefix}.${path}`, type);
+  }
+}
+
+function annotateRepeaterDefaults(defaults: unknown[], children: FieldDef[]): unknown[] {
+  return defaults.map((item) => {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) return item;
+
+    const annotated = { ...(item as Record<string, unknown>) } as TypedContextObject;
+    const childTypes = buildFieldTypes(children);
+    defineFieldTypes(annotated, childTypes);
+    return annotated;
+  });
+}
+
+function buildFieldTypes(fields: FieldDef[], prefix = ""): Map<string, string> {
+  const fieldTypes = new Map<string, string>();
+
+  for (const field of fields) {
+    const path = prefix ? `${prefix}.${field.name}` : field.name;
+    fieldTypes.set(path, field.type);
+    if (field.type === "group" && field.children) {
+      const childTypes = buildFieldTypes(field.children, path);
+      for (const [childPath, type] of childTypes) {
+        fieldTypes.set(childPath, type);
+      }
+    }
+  }
+
+  return fieldTypes;
+}
+
+function getFieldTypes(value: unknown): Map<string, string> | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  return (value as TypedContextObject)[FIELD_TYPES];
+}
+
 /**
  * Process {% for VAR in PATH %}...{% endfor %} loops.
  * Uses balanced tag matching to handle nested for-loops correctly.
@@ -274,8 +340,9 @@ function findOutermostFor(tpl: string): { varName: string; iterExpr: string; bod
 function processConditionals(tpl: string, context: RenderContext): string {
   let result = tpl;
   let safety = 0;
+  const maxBlocks = countIfBlocks(tpl);
 
-  while (safety < 50) {
+  while (safety < maxBlocks) {
     safety++;
     const block = findInnermostIfBlock(result);
     if (!block) break;
@@ -285,6 +352,11 @@ function processConditionals(tpl: string, context: RenderContext): string {
   }
 
   return result;
+}
+
+function countIfBlocks(tpl: string): number {
+  const matches = tpl.match(/\{%[-\s]*if\s+/g);
+  return matches ? matches.length : 0;
 }
 
 function findInnermostIfBlock(tpl: string): { condition: string; body: string; start: number; end: number } | null {
@@ -358,8 +430,9 @@ function renderConditionalBlock(condition: string, body: string, context: Render
  * Resolve all {{ expression }} references in the template.
  */
 function resolveExpressions(tpl: string, context: RenderContext): string {
-  return tpl.replace(/\{\{[-\s]*(.*?)[-\s]*\}\}/g, (_match, expr: string) => {
+  return tpl.replace(/\{\{[-\s]*(.*?)[-\s]*\}\}/g, (_match, expr: string, offset: number) => {
     const trimmed = expr.trim();
+    const expressionContext = getExpressionContext(tpl, offset);
 
     // Handle filters: {{ value|filter }}
     const filterParts = trimmed.split("|");
@@ -367,13 +440,17 @@ function resolveExpressions(tpl: string, context: RenderContext): string {
 
     let value = resolveValueExpr(context, path);
     let escapedByFilter = false;
+    let safeByFilter = false;
 
     // Apply basic filters
     for (let i = 1; i < filterParts.length; i++) {
       const filter = filterParts[i].trim();
+      const filterName = getFilterName(filter);
       value = applyFilter(value, filter);
-      if (getFilterName(filter) === "escape" || getFilterName(filter) === "e") {
+      if (filterName === "escape" || filterName === "e") {
         escapedByFilter = true;
+      } else if (filterName === "safe") {
+        safeByFilter = true;
       }
     }
 
@@ -382,8 +459,59 @@ function resolveExpressions(tpl: string, context: RenderContext): string {
     // Strip literal \n sequences that AI sometimes puts in field defaults
     let str = String(value);
     str = str.replace(/\\n/g, " ").replace(/\n/g, " ");
-    return escapedByFilter ? str : escapeHtml(str);
+
+    if (escapedByFilter) return str;
+
+    if (expressionContext === "style") return escapeStyleContent(str);
+    if (expressionContext === "script") return escapeScriptExpression(str);
+
+    if (
+      expressionContext === "htmlText" &&
+      (safeByFilter || isHtmlFieldPath(context, path))
+    ) {
+      return sanitizeTrustedHtml(str);
+    }
+
+    return escapeHtml(str);
   });
+}
+
+function getExpressionContext(tpl: string, offset: number): ExpressionContext {
+  const before = tpl.slice(0, offset);
+  const lastScriptOpen = before.toLowerCase().lastIndexOf("<script");
+  const lastScriptClose = before.toLowerCase().lastIndexOf("</script");
+  if (lastScriptOpen > lastScriptClose) return "script";
+
+  const lastStyleOpen = before.toLowerCase().lastIndexOf("<style");
+  const lastStyleClose = before.toLowerCase().lastIndexOf("</style");
+  if (lastStyleOpen > lastStyleClose) return "style";
+
+  const lastTagOpen = before.lastIndexOf("<");
+  const lastTagClose = before.lastIndexOf(">");
+  return lastTagOpen > lastTagClose ? "htmlTag" : "htmlText";
+}
+
+function isHtmlFieldPath(context: RenderContext, path: string): boolean {
+  const parts = path.split(".");
+  if (parts.length < 2) return false;
+
+  let current: unknown = context;
+  let metadataPath = "";
+
+  for (let i = 0; i < parts.length; i++) {
+    if (current === null || typeof current !== "object") return false;
+
+    const fieldTypes = getFieldTypes(current);
+    if (fieldTypes) {
+      metadataPath = parts.slice(i).join(".");
+      const type = fieldTypes.get(metadataPath);
+      return type === "richtext" || type === "html";
+    }
+
+    current = (current as Record<string, unknown>)[parts[i]];
+  }
+
+  return false;
 }
 
 /**
@@ -563,6 +691,8 @@ function applyFilter(value: unknown, filter: string): unknown {
     case "escape":
     case "e":
       return escapeHtml(str);
+    case "safe":
+      return value;
     case "lower":
       return str.toLowerCase();
     case "upper":
@@ -625,6 +755,29 @@ function escapeStyleContent(value: string): string {
 
 function escapeScriptContent(value: string): string {
   return value.replace(/<\/script/gi, "<\\/script");
+}
+
+function escapeScriptExpression(value: string): string {
+  return escapeScriptContent(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, "\\r")
+    .replace(/\n/g, "\\n")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
+function sanitizeTrustedHtml(value: string): string {
+  return value
+    .replace(/<\s*(script|style|iframe|object|embed)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
+    .replace(/<\s*\/?\s*(script|style|iframe|object|embed|link|meta)\b[^>]*>/gi, "")
+    .replace(/\s+on[\w:-]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s+(href|src|xlink:href|formaction)\s*=\s*"\s*(javascript:|data:text\/html)[^"]*"/gi, (_match, attr: string) => ` ${attr}="#"`)
+    .replace(/\s+(href|src|xlink:href|formaction)\s*=\s*'\s*(javascript:|data:text\/html)[^']*'/gi, (_match, attr: string) => ` ${attr}="#"`)
+    .replace(/\s+(href|src|xlink:href|formaction)\s*=\s*(javascript:|data:text\/html)[^\s>]*/gi, (_match, attr: string) => ` ${attr}="#"`)
+    .replace(/<\/style/gi, "<\\/style")
+    .replace(/<\/script/gi, "<\\/script");
 }
 
 /**
