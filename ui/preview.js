@@ -1,63 +1,140 @@
 /**
  * Preview management — iframe loading and module scrolling.
+ *
+ * VIB-1892: the live preview loads from a SEPARATE ORIGIN (see
+ * src/server/preview-origin.ts), so AI-generated page code is cross-origin to
+ * the app and can never touch this document or the app's /api routes. The
+ * parent never reaches into contentDocument; everything in-frame is done by
+ * the trusted preview agent over the narrow vs:* postMessage protocol
+ * (src/server/preview-protocol.ts). This file owns the parent end of that
+ * channel; inline-edit.js / section-controls.js register handlers on it.
  */
 
 const previewFrame = document.getElementById("preview-frame");
 const previewEmptyState = document.getElementById("preview-empty-state");
 
-// Highlights to apply once the iframe finishes loading after the next refresh.
+// ---------------------------------------------------------------------------
+// Preview-origin channel (parent end)
+// ---------------------------------------------------------------------------
+
+const VS_PROTOCOL_V = 1;
+/** Preview -> parent verbs the parent will dispatch. Locked to
+ * src/server/preview-protocol.ts by test/preview-protocol-parity.test.ts. */
+const VS_PREVIEW_TO_PARENT = new Set([
+  "vs:ready",
+  "vs:empty-state",
+  "vs:select-module",
+  "vs:edit-commit",
+  "vs:field-commit",
+  "vs:content-height",
+]);
+
+/** { origin, token } once /api/preview-origin resolves; null while loading. */
+let previewOriginInfo = null;
+let previewOriginPromise = null;
+/** True between the agent's vs:ready and the next navigation. */
+let previewAgentReady = false;
+/** Bumped per navigation to force a fresh document load. */
+let previewLoadSeq = 0;
+/** Current interaction mode, re-sent to the agent on every (re)load. */
+let currentPreviewMode = "view";
+
+const previewMessageHandlers = new Map();
+
+/** Register a parent-side handler for a preview->parent verb. */
+function onPreviewMessage(type, handler) {
+  previewMessageHandlers.set(type, handler);
+}
+
+/** Send a command to the in-frame agent (drops silently until ready). */
+function sendPreviewCommand(type, payload) {
+  if (!previewOriginInfo || !previewAgentReady || !previewFrame.contentWindow) return;
+  previewFrame.contentWindow.postMessage(
+    { v: VS_PROTOCOL_V, token: previewOriginInfo.token, type, payload },
+    previewOriginInfo.origin
+  );
+}
+
+/** Track + broadcast the interaction mode (called by inline-edit.js). */
+function setPreviewMode(mode) {
+  currentPreviewMode = mode === "interact" || mode === "section" ? mode : "view";
+  sendPreviewCommand("vs:set-mode", { mode: currentPreviewMode });
+}
+
+function fetchPreviewOriginInfo() {
+  if (previewOriginPromise) return previewOriginPromise;
+  previewOriginPromise = fetch("/api/preview-origin")
+    .then((res) => res.json())
+    .then((data) => {
+      if (data && typeof data.origin === "string" && typeof data.token === "string") {
+        previewOriginInfo = { origin: data.origin.replace(/\/$/, ""), token: data.token };
+      } else {
+        console.error("Preview origin unavailable — live preview disabled.");
+      }
+      return previewOriginInfo;
+    })
+    .catch((err) => {
+      console.error("Failed to resolve preview origin:", err);
+      previewOriginPromise = null; // allow a retry on the next refresh
+      return null;
+    });
+  return previewOriginPromise;
+}
+
+window.addEventListener("message", (event) => {
+  // Gate 1: the message must come from the preview origin AND from our frame.
+  if (!previewOriginInfo) return;
+  if (event.origin !== previewOriginInfo.origin) return;
+  if (event.source !== previewFrame.contentWindow) return;
+  // Gate 2: envelope — version, token, direction-scoped verb allow-list.
+  const env = event.data;
+  if (!env || typeof env !== "object") return;
+  if (env.v !== VS_PROTOCOL_V) return;
+  if (typeof env.token !== "string" || env.token !== previewOriginInfo.token) return;
+  if (!VS_PREVIEW_TO_PARENT.has(env.type)) return;
+
+  if (env.type === "vs:ready") {
+    previewAgentReady = true;
+    sendPreviewCommand("vs:init", { mode: currentPreviewMode });
+    flushPendingHighlights();
+    return;
+  }
+  const handler = previewMessageHandlers.get(env.type);
+  if (handler) handler(env.payload || {});
+});
+
+// ---------------------------------------------------------------------------
+// Empty state + change highlighting
+// ---------------------------------------------------------------------------
+
+// Highlights to apply once the agent reports ready after the next refresh.
 let pendingChangedModules = null;
 let pendingNewModules = null;
 
 /**
- * Show or hide the preview empty state. Called when generation starts or when
- * the iframe finishes loading and we can detect whether any modules rendered.
+ * Show or hide the preview empty state. Driven by the agent's vs:empty-state
+ * report after each load (the parent cannot inspect the cross-origin doc).
  */
 function setPreviewEmptyState(show) {
   if (!previewEmptyState) return;
   previewEmptyState.setAttribute("aria-hidden", show ? "false" : "true");
 }
 
-/**
- * Inspect iframe contents post-load and toggle the empty state accordingly.
- * Empty state stays visible if the rendered preview has no module content.
- */
-function syncEmptyStateFromFrame() {
-  if (!previewEmptyState) return;
-  try {
-    const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
-    if (!doc || !doc.body) {
-      setPreviewEmptyState(true);
-      return;
-    }
-    const hasModules = doc.querySelector("[data-module]") !== null;
-    setPreviewEmptyState(!hasModules);
-  } catch {
-    // cross-origin — assume content is present
-    setPreviewEmptyState(false);
-  }
-}
+onPreviewMessage("vs:empty-state", (p) => {
+  setPreviewEmptyState(!p.hasModules);
+});
 
-previewFrame.addEventListener("load", () => {
-  syncEmptyStateFromFrame();
+function flushPendingHighlights() {
   if (!pendingChangedModules && !pendingNewModules) return;
   const changed = pendingChangedModules;
   const fresh = pendingNewModules;
   pendingChangedModules = null;
   pendingNewModules = null;
-  try {
-    const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
-    if (!doc || !doc.body) return;
-    ensureChangeHighlightStyles(doc);
-    if (fresh && fresh.length) animateNewModules(doc, fresh);
-    if (changed && changed.length) highlightChangedModules(doc, changed, fresh || []);
-  } catch {
-    // cross-origin — skip
-  }
-});
+  sendPreviewCommand("vs:highlight-changed", { changed: changed || [], fresh: fresh || [] });
+}
 
 /**
- * Refresh the preview iframe by reloading from /preview endpoint.
+ * Refresh the preview iframe by (re)navigating it to the preview origin.
  *
  * @param {Object} [opts]
  * @param {string[]} [opts.changedModules] Module names that were just regenerated.
@@ -68,121 +145,30 @@ function refreshPreview(opts) {
     pendingChangedModules = opts.changedModules || null;
     pendingNewModules = opts.newModules || null;
   }
-  // Use srcdoc approach: fetch preview HTML and set as srcdoc
-  // This avoids cache issues and allows the iframe to update smoothly
-  fetch("/preview")
-    .then((res) => res.text())
-    .then((html) => {
-      previewFrame.srcdoc = html;
-    })
-    .catch((err) => {
-      console.error("Preview refresh failed:", err);
-    });
-}
-
-// ---------------------------------------------------------------------------
-// Change highlighting — outline glow on regenerated modules and slide-in for
-// brand-new modules. Styles are injected into the sandboxed preview iframe.
-// ---------------------------------------------------------------------------
-
-function ensureChangeHighlightStyles(doc) {
-  if (doc.getElementById("vibespot-change-highlight-css")) return;
-  const style = doc.createElement("style");
-  style.id = "vibespot-change-highlight-css";
-  style.textContent = `
-    @keyframes vibespot-change-glow {
-      0%   { outline-color: rgba(232, 97, 58, 0.85); box-shadow: 0 0 0 6px rgba(232, 97, 58, 0.18); }
-      70%  { outline-color: rgba(232, 97, 58, 0.55); box-shadow: 0 0 0 4px rgba(232, 97, 58, 0.10); }
-      100% { outline-color: rgba(232, 97, 58, 0);    box-shadow: 0 0 0 0 rgba(232, 97, 58, 0);    }
-    }
-    .vibespot-module--changed {
-      outline: 2px solid rgba(232, 97, 58, 0.85);
-      outline-offset: 4px;
-      border-radius: 2px;
-      animation: vibespot-change-glow 2s ease-out forwards;
-    }
-    @keyframes vibespot-module-slide-in {
-      0%   { opacity: 0; transform: translateY(24px); }
-      100% { opacity: 1; transform: translateY(0); }
-    }
-    .vibespot-module--new {
-      animation: vibespot-module-slide-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .vibespot-module--changed,
-      .vibespot-module--new { animation: none; }
-      .vibespot-module--changed { outline-color: transparent; }
-    }
-  `;
-  doc.head.appendChild(style);
-}
-
-function highlightChangedModules(doc, moduleNames, newModuleNames) {
-  // Skip modules that are already getting the slide-in animation — the slide-in
-  // is a stronger signal on its own.
-  const newSet = new Set(newModuleNames);
-  for (const name of moduleNames) {
-    if (newSet.has(name)) continue;
-    const el = doc.querySelector(`[data-module="${cssEscape(name)}"]`);
-    if (!el) continue;
-    el.classList.remove("vibespot-module--changed");
-    // Force a reflow so the animation restarts if the class was just removed.
-    void el.offsetWidth;
-    el.classList.add("vibespot-module--changed");
-    setTimeout(() => {
-      el.classList.remove("vibespot-module--changed");
-    }, 2200);
-  }
-}
-
-function animateNewModules(doc, moduleNames) {
-  for (const name of moduleNames) {
-    const el = doc.querySelector(`[data-module="${cssEscape(name)}"]`);
-    if (!el) continue;
-    el.classList.add("vibespot-module--new");
-    setTimeout(() => {
-      el.classList.remove("vibespot-module--new");
-    }, 700);
-  }
-}
-
-function cssEscape(value) {
-  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
-    return CSS.escape(value);
-  }
-  return String(value).replace(/["\\]/g, "\\$&");
+  fetchPreviewOriginInfo().then((info) => {
+    if (!info) return;
+    previewAgentReady = false;
+    previewLoadSeq += 1;
+    // The `r` param defeats bfcache/no-op navigations; `t` is the access token.
+    previewFrame.removeAttribute("srcdoc");
+    previewFrame.src = `${info.origin}/?t=${encodeURIComponent(info.token)}&r=${previewLoadSeq}`;
+  });
 }
 
 /**
  * Scroll the preview iframe to a specific module by name.
  */
 function scrollPreviewToModule(moduleName) {
-  try {
-    const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
-    const el = doc.querySelector(`[data-module="${moduleName}"]`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-
-      // Brief highlight effect
-      el.style.outline = "2px solid #e8613a";
-      el.style.outlineOffset = "4px";
-      el.style.transition = "outline-color 0.5s ease";
-      setTimeout(() => {
-        el.style.outlineColor = "transparent";
-        setTimeout(() => { el.style.outline = ""; el.style.outlineOffset = ""; }, 500);
-      }, 1500);
-    }
-  } catch {
-    // Cross-origin issues — fall back to simple reload
-  }
+  sendPreviewCommand("vs:scroll-to", { module: moduleName });
 }
 
 /**
  * Show the generating preview — spinner + rotating fun messages.
- * Called when AI generation starts to entertain the user while waiting.
+ * Trusted static content (no AI code), so srcdoc is fine here.
  */
 function showGeneratingPreview() {
   setPreviewEmptyState(false);
+  previewAgentReady = false;
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -259,161 +245,40 @@ function showGeneratingPreview() {
 <\/script>
 </body>
 </html>`;
+  previewFrame.removeAttribute("src");
   previewFrame.srcdoc = html;
 }
 
 // ---------------------------------------------------------------------------
-// "Working on it" overlay for modules being regenerated
+// "Working on it" overlays — forwarded to the in-frame agent
 // ---------------------------------------------------------------------------
 
-const WORKING_MESSAGES = [
-  "Rethinking this section\u2026",
-  "Rewriting the code\u2026",
-  "Giving this a fresh coat of paint\u2026",
-  "Making it better\u2026",
-  "Tweaking the layout\u2026",
-  "Polishing the details\u2026",
-  "Almost there\u2026",
-  "Updating the design\u2026",
-  "Improving the copy\u2026",
-  "Refining the structure\u2026",
-];
-
 /**
- * Inject the overlay CSS into the preview iframe (once).
- */
-function ensureOverlayStyles(doc) {
-  if (doc.getElementById("vibespot-working-css")) return;
-  const style = doc.createElement("style");
-  style.id = "vibespot-working-css";
-  style.textContent = `
-    .vibespot-module--working { position: relative; }
-    .vibespot-module--working > *:not(.vibespot-working-overlay) {
-      filter: blur(3px) saturate(0.4);
-      opacity: 0.5;
-      transition: filter 0.4s ease, opacity 0.4s ease;
-      pointer-events: none;
-    }
-    .vibespot-working-overlay {
-      position: absolute; inset: 0;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      z-index: 9999;
-      pointer-events: none;
-    }
-    .vibespot-working-overlay__spinner {
-      width: 36px; height: 36px;
-      border: 3px solid rgba(232,97,58,0.15);
-      border-top-color: rgba(232,97,58,0.8);
-      border-radius: 50%;
-      animation: vw-spin 0.8s linear infinite;
-      margin-bottom: 12px;
-    }
-    .vibespot-working-overlay__text {
-      font-family: system-ui, -apple-system, sans-serif;
-      font-size: 14px; font-weight: 500;
-      color: rgba(255,255,255,0.7);
-      text-align: center;
-      max-width: 280px;
-      transition: opacity 0.5s ease;
-    }
-    .vibespot-working-overlay__text.fade { opacity: 0; }
-    @keyframes vw-spin { to { transform: rotate(360deg); } }
-  `;
-  doc.head.appendChild(style);
-}
-
-/** Active carousel intervals keyed by module name */
-const workingIntervals = new Map();
-
-/**
- * Mark modules as "being worked on" — adds blur overlay with rotating messages.
+ * Mark modules as "being worked on" — the agent adds the blur overlay with
+ * rotating messages in-frame.
  */
 function markModulesWorking(moduleNames) {
-  try {
-    const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
-    if (!doc || !doc.body) return;
-    ensureOverlayStyles(doc);
-
-    for (const name of moduleNames) {
-      const el = doc.querySelector(`[data-module="${name}"]`);
-      if (!el || el.classList.contains("vibespot-module--working")) continue;
-
-      el.classList.add("vibespot-module--working");
-
-      const overlay = doc.createElement("div");
-      overlay.className = "vibespot-working-overlay";
-      overlay.innerHTML = `
-        <div class="vibespot-working-overlay__spinner"></div>
-        <div class="vibespot-working-overlay__text"></div>
-      `;
-      el.appendChild(overlay);
-
-      // Scroll to first working module
-      if (name === moduleNames[0]) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-
-      // Start message carousel
-      const textEl = overlay.querySelector(".vibespot-working-overlay__text");
-      let idx = Math.floor(Math.random() * WORKING_MESSAGES.length);
-      textEl.textContent = WORKING_MESSAGES[idx];
-
-      const interval = setInterval(() => {
-        textEl.classList.add("fade");
-        setTimeout(() => {
-          idx = (idx + 1) % WORKING_MESSAGES.length;
-          textEl.textContent = WORKING_MESSAGES[idx];
-          textEl.classList.remove("fade");
-        }, 500);
-      }, 3500);
-      workingIntervals.set(name, interval);
-    }
-  } catch { /* cross-origin */ }
+  sendPreviewCommand("vs:mark-working", { modules: moduleNames });
 }
 
 /**
  * Clear working overlay from a specific module (when it completes).
  */
 function clearModuleWorking(moduleName) {
-  const interval = workingIntervals.get(moduleName);
-  if (interval) { clearInterval(interval); workingIntervals.delete(moduleName); }
-
-  try {
-    const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
-    if (!doc) return;
-    const el = doc.querySelector(`[data-module="${moduleName}"]`);
-    if (!el) return;
-    el.classList.remove("vibespot-module--working");
-    const overlay = el.querySelector(".vibespot-working-overlay");
-    if (overlay) overlay.remove();
-  } catch { /* cross-origin */ }
+  sendPreviewCommand("vs:clear-working", { modules: [moduleName] });
 }
 
 /**
  * Clear all working overlays.
  */
 function clearAllModulesWorking() {
-  for (const [name, interval] of workingIntervals) {
-    clearInterval(interval);
-  }
-  workingIntervals.clear();
-
-  try {
-    const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
-    if (!doc) return;
-    doc.querySelectorAll(".vibespot-module--working").forEach((el) => {
-      el.classList.remove("vibespot-module--working");
-      const overlay = el.querySelector(".vibespot-working-overlay");
-      if (overlay) overlay.remove();
-    });
-  } catch { /* cross-origin */ }
+  sendPreviewCommand("vs:clear-working", {});
 }
 
 // Preview refresh is triggered by setup.js after a session is created.
-// Do NOT auto-refresh here.
-
-// Select/edit mode has been unified into interact mode (inline-edit.js)
+// Do NOT auto-refresh here — but resolve the preview origin early so the
+// first refresh doesn't pay the round-trip.
+fetchPreviewOriginInfo();
 
 // ---------------------------------------------------------------------------
 // HubL validity badge — aggregates per-module checks reported by chat.js into
