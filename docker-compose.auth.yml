@@ -24,3 +24,10 @@ services:
       VIBESPOT_UPSTREAM: oauth2-proxy:4180
     depends_on:
       - oauth2-proxy
+
+  # With the Entra gate in the request path, the app's own token gate is
+  # redundant for browser traffic and would double-prompt — turn it off.
+  # oauth2-proxy is the sole authenticator in this topology (VIB-1889).
+  vibespot:
+    environment:
+      VIBESPOT_DISABLE_AUTH: "1"

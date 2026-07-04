@@ -38,7 +38,14 @@ docker run -d --name vibespot \
   ghcr.io/borismichel/vibespot:latest
 ```
 
-Open `http://<host-ip>:4200` in a browser. Swap the engine/key pair for whichever provider you use (see [AI engine](#ai-engine)).
+The container binds beyond loopback, so the server requires a shared-secret token (VIB-1889). Grab the tokenized URL from the logs:
+
+```bash
+docker logs vibespot | grep token
+#  v http://localhost:4200/?token=<48-hex-secret>
+```
+
+Open `http://<host-ip>:4200/?token=<secret>` in a browser — the token is exchanged for a session cookie on first load. Pin a stable secret with `-e VIBESPOT_AUTH_TOKEN=$(openssl rand -hex 24)`. Swap the engine/key pair for whichever provider you use (see [AI engine](#ai-engine)).
 
 The two `-v` volumes keep your config and generated themes across restarts — see [Persistence](#persistence).
 
@@ -183,6 +190,9 @@ HTTPS works automatically on ports 80/443. The `@websockets` block is required �
 |----------|---------|-------------|
 | `VIBESPOT_PORT` | `4200` | Port the vibeSpot server listens on inside the container |
 | `VIBESPOT_NO_OPEN` | `1` (in Docker) | Suppress auto-open browser on startup |
+| `VIBESPOT_HOST` | `0.0.0.0` (in Docker), `127.0.0.1` otherwise | Bind address. Any non-loopback bind turns on token auth |
+| `VIBESPOT_AUTH_TOKEN` | generated at boot | Shared-secret access token for the UI, API and WebSocket. Empty → a random one is generated and printed in the container logs as part of the URL |
+| `VIBESPOT_DISABLE_AUTH` | — | Set `1` **only** when a trusted auth proxy (e.g. the Entra SSO overlay) fronts vibeSpot. Turns off the built-in token gate |
 
 ### AI engine
 

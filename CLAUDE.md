@@ -183,6 +183,10 @@ The default command (`vibespot` or `npx vibespot`) starts a local HTTP server an
 - Hash-based routing (#/app/themeName)
 - Version history via git commits (auto-commit after each AI generation)
 
+### Server security (`src/server/security.ts`, VIB-1889)
+
+The local server defaults to a `127.0.0.1` bind (`VIBESPOT_HOST` overrides; the Docker image sets `0.0.0.0`). Every route except `/healthz` passes an auth gate in `handleRequest`; the WebSocket upgrade enforces the same gate **plus** an Origin allow-list via `verifyClient` (browsers don't apply CORS to WebSockets). Policy: loopback requests with a local `Host` header are trusted (the Host check defeats DNS rebinding); any non-loopback bind requires a shared-secret token (`VIBESPOT_AUTH_TOKEN` or generated at boot, printed in the URL) accepted as Bearer / `X-Vibespot-Token` / `?token=` / session cookie — the `?token=` page load sets the cookie and redirects, so the UI needs no auth code. `VIBESPOT_DISABLE_AUTH=1` is for deploys behind their own gate (docker-compose.auth.yml sets it). State-changing API requests with a disallowed browser Origin get 403. `readBody` (route-helpers) caps buffered bodies at 5 MB → 413. Client-facing error messages go through `publicErrorMessage()` (errors.ts), which redacts home-directory paths. Tests: `test/security.test.ts`.
+
 ### AI Response Parsing (`ai-handler.ts`)
 
 In single-call mode, the AI outputs modules in a ````vibespot-modules` JSON code block. The parser:

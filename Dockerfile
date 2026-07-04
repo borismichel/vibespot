@@ -48,9 +48,13 @@ RUN mkdir -p /home/vibespot/.vibespot /workspace \
 
 USER vibespot
 
+# VIBESPOT_HOST=0.0.0.0: a container must bind beyond loopback to be reachable
+# from the compose network / port mapping. This makes token auth mandatory
+# (VIB-1889) — set VIBESPOT_AUTH_TOKEN, or read the generated URL from logs.
 ENV NODE_ENV=production \
     VIBESPOT_PORT=4200 \
     VIBESPOT_NO_OPEN=1 \
+    VIBESPOT_HOST=0.0.0.0 \
     HOME=/home/vibespot
 
 EXPOSE 4200
