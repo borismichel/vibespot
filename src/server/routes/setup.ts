@@ -5,7 +5,7 @@
 import { publicErrorMessage } from "../errors.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, readdirSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, basename, resolve } from "node:path";
 import { homedir } from "node:os";
 import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
 
@@ -23,6 +23,7 @@ import {
   saveSession,
   loadSession,
   listSessions,
+  findLatestSessionIdForThemePath,
   writeModulesToDisk,
 } from "../session.js";
 import { addTemplate } from "../session/templates.js";
@@ -348,6 +349,36 @@ export function handleSetupOpenRoute(req: IncomingMessage, res: ServerResponse):
       }
 
       const themeName = basename(fullPath);
+
+      // Field edits live only in the session store (updateFieldValue never
+      // writes back to the theme dir), so rescanning from disk here would
+      // silently discard them. Resume the existing session when one exists —
+      // same semantics as the setup screen's "continue" card (VIB-1935).
+      const active = getSession();
+      if (active && resolve(active.themePath) === resolve(fullPath)) {
+        jsonResponse(res, 200, {
+          ok: true,
+          themeName: active.themeName,
+          themePath: active.themePath,
+          moduleCount: active.modules.length,
+          resumed: true,
+        });
+        return;
+      }
+
+      const savedSessionId = findLatestSessionIdForThemePath(fullPath);
+      const resumedSession = savedSessionId ? loadSession(savedSessionId) : null;
+      if (resumedSession) {
+        jsonResponse(res, 200, {
+          ok: true,
+          themeName: resumedSession.themeName,
+          themePath: resumedSession.themePath,
+          moduleCount: resumedSession.modules.length,
+          resumed: true,
+        });
+        return;
+      }
+
       createSession(fullPath, themeName);
       scanThemeFromDisk(fullPath);
       saveSession();
@@ -357,6 +388,7 @@ export function handleSetupOpenRoute(req: IncomingMessage, res: ServerResponse):
         themeName,
         themePath: fullPath,
         moduleCount: getSession()?.modules.length || 0,
+        resumed: false,
       });
     } catch (err) {
       jsonResponse(res, 500, { error: publicErrorMessage(err) });
