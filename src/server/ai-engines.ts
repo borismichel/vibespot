@@ -807,7 +807,8 @@ export function spawnCLI(
   prompt: string,
   onChunk?: (chunk: string) => void,
   timeout?: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  spawnOpts?: { cwd?: string; shell?: boolean }
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     // Barge-in (VIB-1895): don't spawn at all if the run is already cancelled.
@@ -822,6 +823,8 @@ export function spawnCLI(
     const child = spawn(bin, args, {
       stdio: ["pipe", "pipe", "pipe"],
       env,
+      ...(spawnOpts?.cwd ? { cwd: spawnOpts.cwd } : {}),
+      ...(spawnOpts?.shell ? { shell: true } : {}),
     });
 
     let stdout = "";
