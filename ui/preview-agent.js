@@ -14,6 +14,12 @@
  * protocol's tiny write vocabulary (field edits only), not from hiding state.
  * Still, the handshake token is scrubbed from the URL and config block before
  * AI code runs so it can't leak into rendered output.
+ *
+ * Pointer scope (VIB-1921): all in-frame chrome (hover labels, inline editors,
+ * section toolbar/popovers) is desktop-pointer-only by design — it is
+ * hover-driven with small targets. Touch/mobile users edit through the chat
+ * and field-editor panels instead. Touch-first affordances are tracked
+ * separately; do not bolt tap handlers onto the hover paths here.
  */
 (() => {
   "use strict";
@@ -130,14 +136,31 @@
     send(OUT.EMPTY_STATE, { hasModules: !!document.querySelector("[data-module]") });
   });
 
+  // ---- chrome color tokens (VIB-1921) ---------------------------------------
+  // Single source of truth for the injected chrome palette, mirroring the app
+  // tokens in ui/styles.css: --vs-accent = app --accent (brand coral),
+  // --vs-edit = app --info (blue). The two-color split is deliberate —
+  // coral marks section-style / AI-selection chrome, blue marks "you are
+  // editing this content directly". The -rgb triplets feed rgba() variants.
+  function ensureTokenStyles() {
+    if (document.getElementById("vibespot-chrome-tokens-css")) return;
+    var style = document.createElement("style");
+    style.id = "vibespot-chrome-tokens-css";
+    style.textContent = ":root{" +
+      "--vs-accent:#e8613a;--vs-accent-hover:#d4522e;--vs-accent-rgb:232,97,58;" +
+      "--vs-edit:#3b82f6;--vs-edit-rgb:59,130,246}";
+    document.head.appendChild(style);
+  }
+
   // ---- change highlighting (ported from ui/preview.js) ---------------------
   function ensureHighlightStyles() {
     if (document.getElementById("vibespot-change-highlight-css")) return;
+    ensureTokenStyles();
     var style = document.createElement("style");
     style.id = "vibespot-change-highlight-css";
     style.textContent = "\n" +
-      "@keyframes vibespot-change-glow{0%{outline-color:rgba(232,97,58,.85);box-shadow:0 0 0 6px rgba(232,97,58,.18)}70%{outline-color:rgba(232,97,58,.55);box-shadow:0 0 0 4px rgba(232,97,58,.1)}100%{outline-color:rgba(232,97,58,0);box-shadow:0 0 0 0 rgba(232,97,58,0)}}\n" +
-      ".vibespot-module--changed{outline:2px solid rgba(232,97,58,.85);outline-offset:4px;border-radius:2px;animation:vibespot-change-glow 2s ease-out forwards}\n" +
+      "@keyframes vibespot-change-glow{0%{outline-color:rgba(var(--vs-accent-rgb),.85);box-shadow:0 0 0 6px rgba(var(--vs-accent-rgb),.18)}70%{outline-color:rgba(var(--vs-accent-rgb),.55);box-shadow:0 0 0 4px rgba(var(--vs-accent-rgb),.1)}100%{outline-color:rgba(var(--vs-accent-rgb),0);box-shadow:0 0 0 0 rgba(var(--vs-accent-rgb),0)}}\n" +
+      ".vibespot-module--changed{outline:2px solid rgba(var(--vs-accent-rgb),.85);outline-offset:4px;border-radius:2px;animation:vibespot-change-glow 2s ease-out forwards}\n" +
       "@keyframes vibespot-module-slide-in{0%{opacity:0;transform:translateY(24px)}100%{opacity:1;transform:translateY(0)}}\n" +
       ".vibespot-module--new{animation:vibespot-module-slide-in .6s cubic-bezier(.2,.8,.2,1) both}\n" +
       "@media (prefers-reduced-motion:reduce){.vibespot-module--changed,.vibespot-module--new{animation:none}.vibespot-module--changed{outline-color:transparent}}";
@@ -169,7 +192,7 @@
     var el = moduleEl(name);
     if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "start" });
-    el.style.outline = "2px solid #e8613a";
+    el.style.outline = "2px solid var(--vs-accent, #e8613a)";
     el.style.outlineOffset = "4px";
     el.style.transition = "outline-color 0.5s ease";
     setTimeout(function () {
@@ -190,13 +213,14 @@
 
   function ensureOverlayStyles() {
     if (document.getElementById("vibespot-working-css")) return;
+    ensureTokenStyles();
     var style = document.createElement("style");
     style.id = "vibespot-working-css";
     style.textContent = "\n" +
       ".vibespot-module--working{position:relative}\n" +
       ".vibespot-module--working > *:not(.vibespot-working-overlay){filter:blur(3px) saturate(.4);opacity:.5;transition:filter .4s ease,opacity .4s ease;pointer-events:none}\n" +
       ".vibespot-working-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;pointer-events:none}\n" +
-      ".vibespot-working-overlay__spinner{width:36px;height:36px;border:3px solid rgba(232,97,58,.15);border-top-color:rgba(232,97,58,.8);border-radius:50%;animation:vw-spin .8s linear infinite;margin-bottom:12px}\n" +
+      ".vibespot-working-overlay__spinner{width:36px;height:36px;border:3px solid rgba(var(--vs-accent-rgb),.15);border-top-color:rgba(var(--vs-accent-rgb),.8);border-radius:50%;animation:vw-spin .8s linear infinite;margin-bottom:12px}\n" +
       ".vibespot-working-overlay__text{font-family:system-ui,-apple-system,sans-serif;font-size:14px;font-weight:500;color:rgba(255,255,255,.7);text-align:center;max-width:280px;transition:opacity .5s ease}\n" +
       ".vibespot-working-overlay__text.fade{opacity:0}\n" +
       "@keyframes vw-spin{to{transform:rotate(360deg)}}";
@@ -277,25 +301,26 @@
 
   function ensureInteractStyles() {
     if (document.getElementById("vibespot-interact-css")) return;
+    ensureTokenStyles();
     var style = document.createElement("style");
     style.id = "vibespot-interact-css";
     style.textContent = "\n" +
       "html.vibespot-interact-mode{cursor:default}\n" +
-      ".vibespot-editable-hover{outline:2px dashed rgba(59,130,246,.6)!important;outline-offset:2px!important;cursor:text!important}\n" +
+      ".vibespot-editable-hover{outline:2px dashed rgba(var(--vs-edit-rgb),.6)!important;outline-offset:2px!important;cursor:text!important}\n" +
       '.vibespot-editable-hover[data-edit-type="image"]{cursor:pointer!important}\n' +
-      '.vibespot-editable-hover[data-edit-type="select"]{outline-color:#e8613a!important;outline-style:solid!important;background-color:rgba(232,97,58,.08)!important;cursor:crosshair!important}\n' +
-      ".vibespot-editing{outline:2px solid rgba(59,130,246,.9)!important;outline-offset:2px!important;background-color:rgba(59,130,246,.04)!important;min-height:1em}\n" +
+      '.vibespot-editable-hover[data-edit-type="select"]{outline-color:var(--vs-accent)!important;outline-style:solid!important;background-color:rgba(var(--vs-accent-rgb),.08)!important;cursor:crosshair!important}\n' +
+      ".vibespot-editing{outline:2px solid rgba(var(--vs-edit-rgb),.9)!important;outline-offset:2px!important;background-color:rgba(var(--vs-edit-rgb),.04)!important;min-height:1em}\n" +
       '.vibespot-edit-label{position:fixed;z-index:2147483647;pointer-events:none;font:500 11px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#fff;padding:2px 7px;border-radius:3px;box-shadow:0 2px 6px rgba(0,0,0,.2);white-space:nowrap}\n' +
-      ".vibespot-edit-label--edit{background:#3b82f6}\n" +
-      ".vibespot-edit-label--select{background:#e8613a}\n" +
-      ".vibespot-image-edit-input{position:fixed;z-index:2147483647;font:13px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;padding:6px 10px;border:2px solid #3b82f6;border-radius:6px;background:#1c1917;color:#fff;width:320px;outline:none}\n" +
+      ".vibespot-edit-label--edit{background:var(--vs-edit)}\n" +
+      ".vibespot-edit-label--select{background:var(--vs-accent)}\n" +
+      ".vibespot-image-edit-input{position:fixed;z-index:2147483647;font:13px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;padding:6px 10px;border:2px solid var(--vs-edit);border-radius:6px;background:#1c1917;color:#fff;width:320px;outline:none}\n" +
       ".vibespot-link-edit-popup{position:fixed;z-index:2147483647;background:#1c1917;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px;box-shadow:0 4px 16px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:6px}\n" +
       ".vibespot-link-edit-popup label{font:500 11px/1.4 -apple-system,sans-serif;color:rgba(255,255,255,.6)}\n" +
       ".vibespot-link-edit-popup input{font:13px/1.4 -apple-system,sans-serif;padding:5px 8px;border:1px solid rgba(255,255,255,.2);border-radius:4px;background:#0c0a09;color:#fff;outline:none;width:260px}\n" +
-      ".vibespot-link-edit-popup input:focus{border-color:#3b82f6}\n" +
+      ".vibespot-link-edit-popup input:focus{border-color:var(--vs-edit)}\n" +
       ".vibespot-link-edit-popup .vibespot-link-edit-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:4px}\n" +
       ".vibespot-link-edit-popup button{font:500 12px/1 -apple-system,sans-serif;padding:5px 12px;border:none;border-radius:4px;cursor:pointer}\n" +
-      ".vibespot-link-edit-popup .vibespot-btn-save{background:#3b82f6;color:#fff}\n" +
+      ".vibespot-link-edit-popup .vibespot-btn-save{background:var(--vs-edit);color:#fff}\n" +
       ".vibespot-link-edit-popup .vibespot-btn-cancel{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7)}";
     document.head.appendChild(style);
   }
@@ -980,6 +1005,7 @@
 
     function ensureSectionStyles() {
       if (document.getElementById("vs-section-controls-css")) return;
+      ensureTokenStyles();
       var s = document.createElement("style");
       s.id = "vs-section-controls-css";
       s.textContent = "\n" +
@@ -998,16 +1024,16 @@
         ".vs-sc-color-picker::-webkit-color-swatch{border:1px solid rgba(255,255,255,.2);border-radius:4px}\n" +
         ".vs-sc-color-picker::-moz-color-swatch{border:1px solid rgba(255,255,255,.2);border-radius:4px}\n" +
         ".vs-sc-hex{flex:1;font:12px/1.4 -apple-system,sans-serif;padding:4px 6px;border:1px solid rgba(255,255,255,.15);border-radius:4px;background:rgba(0,0,0,.3);color:#fff;outline:none;width:80px}\n" +
-        ".vs-sc-hex:focus{border-color:#e8613a}\n" +
+        ".vs-sc-hex:focus{border-color:var(--vs-accent)}\n" +
         ".vs-sc-slider-row{display:flex;align-items:center;gap:8px}\n" +
         ".vs-sc-slider{flex:1;height:4px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,.15);border-radius:2px;outline:none;cursor:pointer}\n" +
-        ".vs-sc-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#e8613a;border:2px solid #fff;cursor:pointer}\n" +
-        ".vs-sc-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#e8613a;border:2px solid #fff;cursor:pointer}\n" +
+        ".vs-sc-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--vs-accent);border:2px solid #fff;cursor:pointer}\n" +
+        ".vs-sc-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--vs-accent);border:2px solid #fff;cursor:pointer}\n" +
         ".vs-sc-slider-val{font:500 12px/1 -apple-system,sans-serif;color:rgba(255,255,255,.7);min-width:36px;text-align:right}\n" +
         ".vs-sc-url-input{width:100%;font:12px/1.4 -apple-system,sans-serif;padding:6px 8px;border:1px solid rgba(255,255,255,.15);border-radius:5px;background:rgba(0,0,0,.3);color:#fff;outline:none;margin-bottom:6px;box-sizing:border-box}\n" +
-        ".vs-sc-url-input:focus{border-color:#e8613a}\n" +
-        ".vs-sc-apply-btn{display:block;width:100%;font:500 12px/1 -apple-system,sans-serif;padding:6px 12px;border:none;border-radius:5px;background:#e8613a;color:#fff;cursor:pointer;transition:background .15s}\n" +
-        ".vs-sc-apply-btn:hover{background:#d4522e}\n" +
+        ".vs-sc-url-input:focus{border-color:var(--vs-accent)}\n" +
+        ".vs-sc-apply-btn{display:block;width:100%;font:500 12px/1 -apple-system,sans-serif;padding:6px 12px;border:none;border-radius:5px;background:var(--vs-accent);color:#fff;cursor:pointer;transition:background .15s}\n" +
+        ".vs-sc-apply-btn:hover{background:var(--vs-accent-hover)}\n" +
         "@media (prefers-reduced-motion:reduce){.vs-sc-toolbar,.vs-sc-popover{animation:none}}";
       document.head.appendChild(s);
     }

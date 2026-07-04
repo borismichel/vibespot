@@ -43,6 +43,7 @@ All notable changes to vibeSpot are documented here.
 
 ### Fixed
 
+- **In-preview chrome polish from the VIB-1920 UX review** ([VIB-1921](/VIB/issues/VIB-1921)) — the in-preview chrome palette is now tokenized (`--vs-accent` = brand coral for section-style/AI-selection chrome, `--vs-edit` = the app's info blue for direct content editing — a deliberate two-color split mirroring the app's `--accent`/`--info` tokens, replacing scattered hardcoded hex values), and the pointer scope is documented: in-frame editing chrome is desktop-pointer-only by design; touch users edit via chat and the field editor. (The companion fix — the section toolbar no longer bleeding into interact mode — landed with the trust-boundary PR itself.)
 - **Parked checkpoints now survive a full server restart** ([VIB-1883](/VIB/issues/VIB-1883)) — completing the durability story from 1.7.6. The resume state behind a parked gate (plan, design system, blueprint, shared CSS/JS, your message) is now persisted onto the session (`pendingCheckpoint.resumeState`) and written to disk, so killing and restarting the server while you're at a design / structure / brand-intake checkpoint no longer drops it. On reconnect, resolving the checkpoint rehydrates the server's in-memory state from disk and the build continues instead of erroring "this checkpoint has expired." The persisted state stays server-side (it's stripped from the payload sent to the browser).
 
 ---
