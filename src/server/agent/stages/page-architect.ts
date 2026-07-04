@@ -66,6 +66,7 @@ export async function runDesignSystem(
   apiKey: string,
   model: string,
   onEvent: (event: PipelineEvent) => void,
+  signal?: AbortSignal,
 ): Promise<DesignSystemOutput & { sharedCss: string }> {
   const isEmail = plan.contentType === "email";
 
@@ -107,6 +108,7 @@ export async function runDesignSystem(
       // Email uses a non-registry builder (email-architect) — link only the
       // registry-managed page-mode prompt (VIB-1861).
       ...(isEmail ? {} : { prompt: stagePromptLink("design-system") }),
+      signal,
     }),
   );
 
@@ -169,6 +171,7 @@ export async function runPageArchitect(
   apiKey: string,
   model: string,
   onEvent: (event: PipelineEvent) => void,
+  signal?: AbortSignal,
 ): Promise<PageBlueprint> {
   const isEmail = plan.contentType === "email";
 
@@ -214,6 +217,7 @@ export async function runPageArchitect(
       // Email uses a non-registry builder (email-architect) — link only the
       // registry-managed page-mode prompt (VIB-1861).
       ...(isEmail ? {} : { prompt: stagePromptLink("design-system") }),
+      signal,
     }),
   );
 
@@ -352,6 +356,7 @@ export async function runPageArchitect(
       maxTokens: 8000,
       ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
       ...(isEmail ? {} : { prompt: stagePromptLink("module-planner") }),
+      signal,
     }),
   );
 
@@ -433,6 +438,7 @@ export async function runModulePlanner(
   apiKey: string,
   model: string,
   onEvent: (event: PipelineEvent) => void,
+  signal?: AbortSignal,
 ): Promise<PageBlueprint> {
   const isEmail = plan.contentType === "email";
   const vars = designSystem.cssVariables;
@@ -494,6 +500,7 @@ export async function runModulePlanner(
       maxTokens: 8000,
       ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
       ...(isEmail ? {} : { prompt: stagePromptLink("module-planner") }),
+      signal,
     }),
   );
 

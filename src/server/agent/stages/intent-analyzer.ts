@@ -25,6 +25,7 @@ export async function runIntentAnalyzer(
   model: string,
   onEvent: (event: PipelineEvent) => void,
   libraryModules: { name: string; usedIn: string[] }[],
+  signal?: AbortSignal,
 ): Promise<PipelinePlan> {
   onEvent({
     type: "agent_step",
@@ -72,6 +73,7 @@ export async function runIntentAnalyzer(
       },
       maxTokens: 2000,
       prompt: stagePromptLink("intent-analyzer"),
+      signal,
     }),
   );
 
@@ -118,10 +120,15 @@ export async function runIntentAnalyzer(
       .filter((n) => n.length > 0);
   }
   plan.guidesNeeded = plan.guidesNeeded || [];
-  if (snapshot.contentMode === "email") {
-    plan.contentType = "email";
+  if (snapshot.contentMode === "email" || snapshot.contentMode === "blog") {
+    plan.contentType = snapshot.contentMode;
   } else {
-    plan.contentType = plan.contentType === "email" ? "email" : "page";
+    // Normalize to the known content types. "blog" must survive here — it
+    // selects the blog prompts/schema/validator downstream (VIB-1895).
+    plan.contentType =
+      plan.contentType === "email" || plan.contentType === "blog"
+        ? plan.contentType
+        : "page";
   }
 
   log.info("intent-analyzer", "Plan", {

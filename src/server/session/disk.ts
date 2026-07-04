@@ -100,7 +100,11 @@ function parseTemplateFile(filePath: string, filename: string): ParsedTemplate |
   if (isEmail) {
     pageType = "module_only";
     contentMode = "email";
-  } else if (id.startsWith("bp-")) pageType = "blog_post";
+  } else if (id.startsWith("bp-") || /templateType:\s*blog_post\b/i.test(content)) {
+    // The annotation check keeps pipeline-created blog templates (whose ids
+    // don't carry the bp- prefix) round-tripping as blog posts (VIB-1895).
+    pageType = "blog_post";
+  }
   else if (id.startsWith("wp-")) pageType = "website_page";
   else if (id.startsWith("mo-")) pageType = "module_only";
 

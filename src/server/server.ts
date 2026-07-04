@@ -21,6 +21,7 @@ import {
 import { commitThemeState, commitTemplateState, isGitAvailable } from "./project-git.js";
 import { buildPreviewHtml, buildModulePreviewHtml } from "./preview.js";
 import { handleGenerateStream, handleAgenticGenerate, handleAgenticResume, handleFigmaImport, applyPipelineResult, shouldUseAgenticMode, setParseWarningCallback, resolveAgenticEngine, handlePlanModeStream, isPlanModeActive, isGenerating, cancelActiveGeneration } from "./ai-handler.js";
+import { discardCheckpoint } from "./agent/pipeline.js";
 import type { PipelineResult } from "./agent/types.js";
 import type { CheckpointResolution, CheckpointAction } from "./agent/types.js";
 import { handlePlanEditRoute, handlePlanDiscardRoute, handlePlanTemplatesRoute, handlePlanTemplateRoute, savePlan, clearPlan } from "./routes/plan.js";
@@ -240,19 +241,6 @@ function sendGenerationCost(result: import("./agent/types.js").PipelineResult): 
     cost,
     projectTotal: sess?.costTotal,
   });
-}
-
-/**
- * Wait for any in-flight agentic generation to unwind (barge-in, VIB-1880).
- * Used after `cancelActiveGeneration()` so a replacement run never overlaps the
- * one it superseded. Resolves early once `isGenerating()` clears; gives up after
- * `timeoutMs` (the new run uses its own controller, so a slow unwind is safe).
- */
-async function waitForGenerationIdle(timeoutMs = 10000): Promise<void> {
-  const start = Date.now();
-  while (isGenerating() && Date.now() - start < timeoutMs) {
-    await new Promise((r) => setTimeout(r, 50));
-  }
 }
 
 /**
@@ -1076,20 +1064,22 @@ function handleWsConnection(ws: WebSocket): void {
         const fileIds = Array.isArray(msg.fileIds) ? msg.fileIds as string[] : undefined;
 
         // Barge-in (VIB-1880): a message that arrives mid-build supersedes the
-        // running generation. Cancel it (cancel-and-replan) and wait for it to
-        // unwind before starting fresh, so the two runs never overlap. A
-        // non-cancellable op (e.g. Figma import) just makes us wait for it.
-        if (isGenerating()) {
-          if (cancelActiveGeneration()) {
-            sendToClient({ type: "generation_superseded" });
-          }
-          await waitForGenerationIdle();
+        // running generation. Cancel it (cancel-and-replan); the replacement
+        // run serializes behind it on the per-session generation lock in
+        // ai-handler (VIB-1895) — no timed wait that could give up and let two
+        // pipelines mutate the same session.
+        if (isGenerating() && cancelActiveGeneration()) {
+          sendToClient({ type: "generation_superseded" });
         }
 
-        // A fresh chat supersedes any parked checkpoint gate (VIB-1877).
+        // A fresh chat supersedes any parked checkpoint gate (VIB-1877). Also
+        // drop its in-memory resume state — otherwise every superseded gate
+        // leaks its entry in the resume store for the life of the process
+        // (VIB-1895). No-op for "plan" gates (they never enter the store).
         {
           const sess = getSession();
           if (sess?.pendingCheckpoint) {
+            discardCheckpoint(sess.pendingCheckpoint.resumeToken);
             sess.pendingCheckpoint = undefined;
             saveSession();
           }

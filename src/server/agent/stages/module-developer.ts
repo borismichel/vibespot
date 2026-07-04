@@ -173,10 +173,12 @@ export async function runModuleDeveloper(
   // than returning a half-built page that the pipeline would try to assemble.
   if (signal?.aborted) throw new PipelineAbortError();
 
-  return results.map((r) => {
+  // `promises` maps 1:1 onto `specs`, so a rejected task can name the module
+  // it was building instead of "unknown" (VIB-1895).
+  return results.map((r, i) => {
     if (r.status === "fulfilled") return r.value;
     return {
-      moduleName: "unknown",
+      moduleName: specs[i].name,
       error: r.reason instanceof Error ? r.reason.message : String(r.reason),
     };
   });

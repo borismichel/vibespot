@@ -26,6 +26,7 @@ import type {
   CheckpointResumeState,
   DesignCheckpointState,
   StructureCheckpointState,
+  LibraryModuleEntry,
 } from "./types.js";
 import { PipelineAbortError } from "./types.js";
 import { runIntentAnalyzer } from "./stages/intent-analyzer.js";
@@ -102,7 +103,7 @@ export async function runAgentPipeline(
   model: string,
   concurrency: number,
   onEvent: (event: PipelineEvent) => void,
-  libraryModules: { name: string; usedIn: string[] }[],
+  libraryModules: LibraryModuleEntry[],
   checkpointsEnabled = false,
   signal?: AbortSignal,
 ): Promise<PipelineResult> {
@@ -141,6 +142,7 @@ export async function runAgentPipeline(
     model,
     onEvent,
     libraryModules,
+    signal,
   );
 
   // Barge-in (VIB-1880): a newer message may have aborted this run while the
@@ -233,6 +235,7 @@ export async function runAgentPipeline(
         apiKey,
         model,
         onEvent,
+        signal,
       );
       return parkAtDesignCheckpoint(
         { kind: "design", userMessage, plan, designSystem: ds, sharedCss: ds.sharedCss, sharedJs: ds.sharedJs || sharedJs, startTime, libraryModules },
@@ -252,6 +255,7 @@ export async function runAgentPipeline(
       apiKey,
       model,
       onEvent,
+      signal,
     );
     if (plan.contentType !== "email") {
       sharedCss = blueprint.designSystem.sharedCss || sharedCss;
@@ -429,6 +433,7 @@ async function resumeBrandIntake(
   apiKey: string,
   model: string,
   onEvent: (event: PipelineEvent) => void,
+  signal?: AbortSignal,
 ): Promise<PipelineResult> {
   discardCheckpoint(resumeToken);
 
@@ -486,6 +491,7 @@ async function resumeBrandIntake(
     apiKey,
     model,
     onEvent,
+    signal,
   );
 
   // Guarantee the brand `:root` is honored regardless of the model's output:
@@ -578,7 +584,7 @@ export async function resumeAgentPipeline(
   // `:root` so the design checkpoint renders it.
   // -------------------------------------------------------------------------
   if (state.kind === "brand_intake") {
-    return resumeBrandIntake(resumeToken, state, resolution, snapshot, engine, apiKey, model, onEvent);
+    return resumeBrandIntake(resumeToken, state, resolution, snapshot, engine, apiKey, model, onEvent, signal);
   }
 
   // -------------------------------------------------------------------------
@@ -603,6 +609,7 @@ export async function resumeAgentPipeline(
         apiKey,
         model,
         onEvent,
+        signal,
       );
       return parkAtStructureCheckpoint(
         { ...state, userMessage: steeredMessage, blueprint },
@@ -656,6 +663,7 @@ export async function resumeAgentPipeline(
       apiKey,
       model,
       onEvent,
+      signal,
     );
     return parkAtDesignCheckpoint(
       { ...state, userMessage: steeredMessage, designSystem: ds, sharedCss: ds.sharedCss, sharedJs: ds.sharedJs || state.sharedJs },
@@ -683,6 +691,7 @@ export async function resumeAgentPipeline(
     apiKey,
     model,
     onEvent,
+    signal,
   );
 
   const sharedCss = state.plan.contentType !== "email" ? (blueprint.designSystem.sharedCss || state.sharedCss) : state.sharedCss;
@@ -750,7 +759,7 @@ async function runBuildPhase(
   model: string,
   effectiveConcurrency: number,
   onEvent: (event: PipelineEvent) => void,
-  libraryModules: { name: string; usedIn: string[] }[],
+  libraryModules: LibraryModuleEntry[],
   startTime: number,
   signal?: AbortSignal,
 ): Promise<PipelineResult> {
@@ -1066,6 +1075,7 @@ async function runMultiPageFlow(
     apiKey,
     model,
     onEvent,
+    signal,
   );
 
   const sharedCss = designSystem.sharedCss || snapshot.sharedCss;
@@ -1088,6 +1098,7 @@ async function runMultiPageFlow(
     apiKey,
     model,
     onEvent,
+    signal,
   );
 
   // Stage 3: Module Developer (parallel across all pages + shared)
@@ -1399,7 +1410,7 @@ function assembleModuleList(
   plan: { unchangedModules: string[]; reuseModules?: { name: string; sourceTemplate: string; position: number }[] },
   generatedModules: ModuleFiles[],
   blueprint: PageBlueprint | null,
-  libraryModules: { name: string; usedIn: string[]; module?: ModuleFiles }[],
+  libraryModules: LibraryModuleEntry[],
 ): ModuleFiles[] {
   const result: ModuleFiles[] = [];
   const added = new Set<string>();
@@ -1420,16 +1431,21 @@ function assembleModuleList(
     }
   }
 
-  // Add reused modules from library
+  // Add reused modules from library. The handler populates `module` (VIB-1895)
+  // — a reuse whose payload is missing is logged instead of silently vanishing
+  // from the page after buildModuleOrder's existence filter.
   if (plan.reuseModules) {
     for (const reuse of plan.reuseModules) {
       if (added.has(reuse.name)) continue;
-      const libEntry = libraryModules.find(
-        (l) => l.name === reuse.name && (l as { module?: ModuleFiles }).module,
-      );
-      if (libEntry && (libEntry as { module?: ModuleFiles }).module) {
-        result.push((libEntry as { module: ModuleFiles }).module);
+      const libEntry = libraryModules.find((l) => l.name === reuse.name && l.module);
+      if (libEntry?.module) {
+        result.push(libEntry.module);
         added.add(reuse.name);
+      } else {
+        log.warn(
+          "pipeline",
+          `Reuse of "${reuse.name}" requested but no library payload found — skipping`,
+        );
       }
     }
   }

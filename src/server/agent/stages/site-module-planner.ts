@@ -37,6 +37,7 @@ export async function runSiteModulePlanner(
   apiKey: string,
   model: string,
   onEvent: (event: PipelineEvent) => void,
+  signal?: AbortSignal,
 ): Promise<SiteBlueprint> {
   onEvent({
     type: "agent_step",
@@ -69,6 +70,7 @@ export async function runSiteModulePlanner(
       maxTokens: 16000,
       ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
       prompt: stagePromptLink("site-module-planner"),
+      signal,
     }),
   );
 

@@ -129,6 +129,18 @@ export interface CheckpointPreview {
 }
 
 /**
+ * A module available for reuse from another template (VIB-1895). The intent
+ * analyzer only reads name/usedIn; `module` carries the actual files so
+ * `assembleModuleList` can copy a reused module into the page. All fields are
+ * JSON-serializable (rides checkpoint resume state to disk).
+ */
+export interface LibraryModuleEntry {
+  name: string;
+  usedIn: string[];
+  module?: ModuleFiles;
+}
+
+/**
  * Resume state for a pipeline parked at the design or brand-intake gate. The
  * `brand_intake` gate (VIB-1878) reuses this shape and sits in front of `design`
  * (VIB-1877): resolving brand intake builds a design system and re-parks at the
@@ -147,7 +159,7 @@ export interface DesignCheckpointState {
   sharedCss: string;
   sharedJs: string;
   startTime: number;
-  libraryModules: { name: string; usedIn: string[] }[];
+  libraryModules: LibraryModuleEntry[];
 }
 
 /**
@@ -165,7 +177,7 @@ export interface StructureCheckpointState {
   sharedCss: string;
   sharedJs: string;
   startTime: number;
-  libraryModules: { name: string; usedIn: string[] }[];
+  libraryModules: LibraryModuleEntry[];
 }
 
 /** Union of every gate's resume state. All members are JSON-serializable. */

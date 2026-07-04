@@ -4,6 +4,10 @@
   "changelogUrl": "https://github.com/borismichel/vibespot/blob/main/CHANGELOG.md",
   "highlights": [
     {
+      "title": "In-preview chrome polish from the VIB-1920 UX review",
+      "body": "the in-preview chrome palette is now tokenized (--vs-accent = brand coral for section-style/AI-selection chrome, --vs-edit = the app's info blue for direct content editing — a deliberate two-color…"
+    },
+    {
       "title": "Parked checkpoints now survive a full server restart",
       "body": "completing the durability story from 1.7.6."
     }
