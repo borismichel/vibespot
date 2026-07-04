@@ -142,117 +142,6 @@ export async function runDesignSystem(
     }
   }
 
-  const tokenCount = Object.keys(vars || {}).length;
-  const decisionParts = isEmail
-    ? [`Email design tokens: ${designSystem.aesthetic || "created"} | ${tokenCount} tokens`]
-    : [`Design system: ${designSystem.aesthetic || "created"} | ${tokenCount} variables, ${sharedCss.length} chars CSS`];
-
-  onEvent({
-    type: "agent_decision",
-    step: "designing",
-    decision: decisionParts.join("\n"),
-  });
-
-  onEvent({
-    type: "design_system_ready",
-    sharedCss,
-    sharedJs: designSystem.sharedJs || "",
-    aesthetic: designSystem.aesthetic || "",
-  });
-
-  return { ...designSystem, sharedCss };
-}
-
-export async function runPageArchitect(
-  userMessage: string,
-  plan: PipelinePlan,
-  snapshot: SessionSnapshot,
-  engine: AgentEngine,
-  apiKey: string,
-  model: string,
-  onEvent: (event: PipelineEvent) => void,
-  signal?: AbortSignal,
-): Promise<PageBlueprint> {
-  const isEmail = plan.contentType === "email";
-
-  // -------------------------------------------------------------------------
-  // Stage 2a: Design System (or Email Design Tokens)
-  // -------------------------------------------------------------------------
-
-  onEvent({
-    type: "agent_step",
-    step: "designing",
-    label: isEmail ? "Creating email design tokens..." : "Creating design system...",
-  });
-
-  const isAnthropicEngine = engine === "anthropic-api" || engine === "claude-oauth";
-
-  const designPrompt = isEmail
-    ? buildEmailDesignSystemPrompt(snapshot.themeName, snapshot.brandAssets)
-    : buildDesignSystemPrompt(snapshot.themeName, snapshot.brandAssets);
-  const designBlocks = isAnthropicEngine
-    ? (isEmail
-        ? buildEmailDesignSystemPromptBlocks(snapshot.themeName, snapshot.brandAssets)
-        : buildDesignSystemPromptBlocks(snapshot.themeName, snapshot.brandAssets))
-    : undefined;
-
-  let designUserContent = `## User Request\n${userMessage}`;
-  if (snapshot.modules.length > 0 && plan.designSystemChanges) {
-    designUserContent += `\n\n## Current Shared CSS (update this)\n\`\`\`css\n${snapshot.sharedCss}\n\`\`\``;
-  }
-
-  const thinkingBudget = resolveThinkingBudget(engine);
-  const designSchema = isEmail ? EMAIL_DESIGN_SYSTEM_SCHEMA : DESIGN_SYSTEM_SCHEMA;
-  const designResult = await runWithSpan("design-system", () =>
-    callAgent(engine, apiKey, model, {
-      systemPrompt: designPrompt,
-      systemBlocks: designBlocks,
-      messages: [{ role: "user", content: designUserContent }],
-      structuredOutput: {
-        schema: designSchema as unknown as Record<string, unknown>,
-        name: "design_system",
-      },
-      maxTokens: 16000,
-      ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
-      // Email uses a non-registry builder (email-architect) — link only the
-      // registry-managed page-mode prompt (VIB-1861).
-      ...(isEmail ? {} : { prompt: stagePromptLink("design-system") }),
-      signal,
-    }),
-  );
-
-  let designSystem: DesignSystemOutput;
-
-  if (designResult.type !== "structured") {
-    log.warn("page-architect", "Design system: did not get structured output, using fallback");
-    designSystem = {
-      cssVariables: {},
-      sharedCss: snapshot.sharedCss || "",
-      sharedJs: snapshot.sharedJs || "",
-      aesthetic: "default",
-    };
-  } else {
-    designSystem = designResult.data as DesignSystemOutput;
-    log.info("page-architect", "Design system created", {
-      aesthetic: designSystem.aesthetic,
-      varCount: Object.keys(designSystem.cssVariables || {}).length,
-      cssLength: designSystem.sharedCss?.length || 0,
-    });
-  }
-
-  // For email: no CSS at all — tokens are used inline by module developers.
-  // For pages: ensure :root block exists in sharedCss.
-  let sharedCss = isEmail ? "" : (designSystem.sharedCss || "");
-  const vars = designSystem.cssVariables;
-  if (!isEmail && vars && typeof vars === "object" && Object.keys(vars).length > 0) {
-    if (!sharedCss.includes(":root")) {
-      const varLines = Object.entries(vars)
-        .map(([k, v]) => `  ${k.startsWith("--") ? k : `--${k}`}: ${v};`)
-        .join("\n");
-      sharedCss = `:root {\n${varLines}\n}\n\n${sharedCss}`;
-    }
-  }
-
   // Detect if the user requested web fonts that couldn't be used
   const fontNotes: string[] = [];
   const webFontPattern = /\b(Montserrat|Inter|Poppins|Raleway|Playfair|Lato|Roboto|Open\s?Sans|Nunito|Merriweather|Oswald|Source\s?Sans|Fira\s?Sans|Work\s?Sans|Manrope|Plus\s?Jakarta)\b/gi;
@@ -283,7 +172,6 @@ export async function runPageArchitect(
     decision: decisionParts.join("\n"),
   });
 
-  // Emit design system ready so the preview can start showing themed placeholders
   onEvent({
     type: "design_system_ready",
     sharedCss,
@@ -291,142 +179,38 @@ export async function runPageArchitect(
     aesthetic: designSystem.aesthetic || "",
   });
 
-  // -------------------------------------------------------------------------
-  // Stage 2b: Module Planner
-  // -------------------------------------------------------------------------
+  return { ...designSystem, sharedCss };
+}
 
-  onEvent({
-    type: "agent_step",
-    step: "designing",
-    label: "Planning modules...",
-  });
-
-  const plannerPrompt = isEmail
-    ? buildEmailModulePlannerPrompt(
-        snapshot.themeName,
-        vars || {},
-        snapshot.brandAssets,
-        plan.guidesNeeded,
-      )
-    : buildModulePlannerPrompt(
-        snapshot.themeName,
-        sharedCss,
-        snapshot.brandAssets,
-        plan.guidesNeeded,
-      );
-
-  let plannerUserContent = `## User Request\n${userMessage}`;
-  if (plan.newModules.length > 0) {
-    plannerUserContent += `\n\n## Planned Modules\n${plan.newModules.map((m, i) => `${i + 1}. **${m.name}** — ${m.description}`).join("\n")}`;
-  }
-
-  // Always surface existing modules to the planner. Hiding them when the
-  // design system changes (the previous behavior) caused the planner to
-  // re-invent module names and produce duplicates instead of re-styling
-  // the existing ones. Split into two lists so the planner knows which
-  // names it MUST preserve vs which it may keep without re-planning.
-  if (snapshot.modules.length > 0) {
-    const affected = new Set(plan.affectedModules);
-    const modifying = snapshot.modules.filter((m) => affected.has(m.moduleName));
-    const keeping = snapshot.modules.filter((m) => !affected.has(m.moduleName));
-
-    if (modifying.length > 0) {
-      plannerUserContent +=
-        `\n\n## Existing Modules to Re-plan (PRESERVE THESE EXACT NAMES)\n` +
-        `These already exist and are being regenerated. Your output's module names MUST match these exactly — do NOT rename, retitle-case, or "improve" them. Their content/layout may change; their identifier must not.\n` +
-        modifying.map((m) => `- \`${m.moduleName}\``).join("\n");
-    }
-
-    if (keeping.length > 0) {
-      plannerUserContent +=
-        `\n\n## Existing Modules to Keep (do not re-plan)\n` +
-        `These stay as-is. Do NOT include them in your output. They will appear in the final \`moduleOrder\` (you can reference them by name when you list it).\n` +
-        keeping.map((m) => `- \`${m.moduleName}\``).join("\n");
-    }
-  }
-
-  const plannerResult = await runWithSpan("module-planner", () =>
-    callAgent(engine, apiKey, model, {
-      systemPrompt: plannerPrompt,
-      messages: [{ role: "user", content: plannerUserContent }],
-      structuredOutput: {
-        schema: MODULE_PLANNER_SCHEMA as unknown as Record<string, unknown>,
-        name: "module_plan",
-      },
-      maxTokens: 8000,
-      ...(thinkingBudget > 0 ? { thinkingBudgetTokens: thinkingBudget } : {}),
-      ...(isEmail ? {} : { prompt: stagePromptLink("module-planner") }),
-      signal,
-    }),
+/**
+ * Full Stage 2: Design System (2a) then Module Planner (2b) in one shot.
+ * Thin composition of `runDesignSystem` + `runModulePlanner` — the one-shot
+ * (no-checkpoint) path and the gated path now share the exact same stage
+ * implementations instead of maintaining a byte-duplicated monolith (VIB-1902).
+ */
+export async function runPageArchitect(
+  userMessage: string,
+  plan: PipelinePlan,
+  snapshot: SessionSnapshot,
+  engine: AgentEngine,
+  apiKey: string,
+  model: string,
+  onEvent: (event: PipelineEvent) => void,
+  signal?: AbortSignal,
+): Promise<PageBlueprint> {
+  const design = await runDesignSystem(
+    userMessage, plan, snapshot, engine, apiKey, model, onEvent, signal,
   );
-
-  let modulePlan: { modules: PageBlueprint["modules"]; moduleOrder: string[]; narrative: string };
-
-  const fallbackPlan = {
-    modules: plan.newModules.map((m) => ({
-      name: m.name,
-      description: m.description,
-      contentBrief: "Generate appropriate content",
-      layoutNotes: "Use responsive layout",
-    })),
-    moduleOrder: plan.newModules.map((m) => m.name),
-    narrative: "Page generated from user request",
-  };
-
-  if (plannerResult.type !== "structured") {
-    log.warn("page-architect", "Module planner: did not get structured output, using fallback");
-    modulePlan = fallbackPlan;
-  } else {
-    const raw = plannerResult.data as Record<string, unknown>;
-    // Validate expected shape — AI may return unexpected structures
-    if (Array.isArray(raw?.modules) && raw.modules.length > 0) {
-      modulePlan = raw as typeof modulePlan;
-      modulePlan.moduleOrder = modulePlan.moduleOrder || modulePlan.modules.map((m) => m.name);
-      modulePlan.narrative = modulePlan.narrative || "Page generated from user request";
-    } else {
-      log.warn("page-architect", "Module planner: structured output missing 'modules' array, using fallback", {
-        keys: raw ? Object.keys(raw) : [],
-      });
-      modulePlan = fallbackPlan;
-    }
-    log.info("page-architect", "Module plan", {
-      moduleCount: modulePlan.modules.length,
-    });
-  }
-
-  modulePlan = sanitizeModulePlanNames(
-    modulePlan,
-    new Set(snapshot.modules.map((m) => m.moduleName)),
+  return runModulePlanner(
+    userMessage, plan, snapshot, design, design.sharedCss, engine, apiKey, model, onEvent, signal,
   );
-
-  onEvent({
-    type: "agent_decision",
-    step: "designing",
-    decision: `Page: ${modulePlan.narrative} | ${modulePlan.modules.length} modules planned`,
-  });
-
-  // -------------------------------------------------------------------------
-  // Assemble full blueprint
-  // -------------------------------------------------------------------------
-
-  return {
-    designSystem: {
-      cssVariables: designSystem.cssVariables || {},
-      sharedCss,
-      sharedJs: designSystem.sharedJs,
-    },
-    modules: modulePlan.modules,
-    moduleOrder: modulePlan.moduleOrder,
-    narrative: modulePlan.narrative,
-  };
 }
 
 /**
  * Run ONLY the Module Planner half (Stage 2b) against an already-computed design
  * system. The checkpoint gate (VIB-1877) splits the architect at the design seam:
  * `runDesignSystem` (2a) runs before the gate, then this runs on resume with the
- * parked design. Mirrors the 2b block inside `runPageArchitect` so the one-shot
- * path stays byte-identical.
+ * parked design. `runPageArchitect` composes this after `runDesignSystem` for the one-shot path.
  */
 export async function runModulePlanner(
   userMessage: string,

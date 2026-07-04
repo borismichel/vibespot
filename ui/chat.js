@@ -2272,13 +2272,7 @@ function renderMarkdown(text) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+// escapeHtml comes from the shared ui/escape-html.js (VIB-1902).
 
 function scrollToBottom() {
   if (scrollScheduled) return;

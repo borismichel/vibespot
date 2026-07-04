@@ -164,9 +164,7 @@ The agentic pipeline uses `AgentEngine` type and `callAgent()` from `src/server/
 
 **Claude Code mode** (`src/ai/claude-code.ts`): Spawns `claude --print` as a subprocess. **Context isolation (VIB-1855):** every `claude` spawn passes `--strict-mcp-config` (zero MCP servers, ignoring the user's configs) and runs in a dedicated empty temp `cwd` (`getIsolatedClaudeCwd` in `ai-engines.ts`) so the CLI can't inherit the user's MCP tool schemas or an ambient project `CLAUDE.md` — otherwise both load on top of our payload and overflow the 200k window ("Prompt is too long"). `CLAUDE_ISOLATION_FLAGS` is the shared flag list, applied in both `engine-adapter.ts:resolveCLIBinary` (agentic) and `ai-engines.ts:generateWithClaudeCode` (single-call). `buildStateContext` (`ai-prompts.ts`) token-budgets injected page state; `mapClaudeCliError` maps the raw too-long string to an actionable message.
 
-**Gemini CLI mode**: Spawns `gemini` CLI as a subprocess.
-
-**Codex CLI mode**: Spawns `codex` CLI as a subprocess.
+**Gemini CLI mode / Codex CLI mode**: Both are thin configs over the shared `SimpleCLIEngine` (`src/ai/cli-engine.ts`, VIB-1902), which pipes the prompt via stdin through the maintained `spawnCLI` helper (strict exit-code handling, timer cleanup, abort support) and then scans the theme directory for generated files.
 
 ### Vibe Coding Mode
 

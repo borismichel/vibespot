@@ -9,6 +9,11 @@ All notable changes to vibeSpot are documented here.
 ### Changed
 
 - **server.ts split into router + WebSocket modules** ([VIB-1932](/VIB/issues/VIB-1932)) — internal refactor, no behavior change. The ~78-case `/api/*` switch is now a declarative route table + dispatcher (`src/server/routes/api-router.ts`, exact paths with per-verb 405s plus the two pattern routes), the WebSocket protocol (`chat`, `figma_import`, `extract_brand_assets`, `start_upload`, `upload_fix_with_ai`, `checkpoint_resolve` + plan aliases) lives in `src/server/ws-handler.ts`, and run-state (content mode, active preview origin) moved to `src/server/server-context.ts` so the extracted modules don't import `server.ts`. The VIB-1889 auth gate remains the single middleware seam in `server.ts:handleRequest`; the inline `/api/changelog` and `/api/preview-origin` handlers moved into `routes/`.
+- **Consolidated drifting duplication** ([VIB-1902](/VIB/issues/VIB-1902)) — four byte-duplicated code paths that had already produced real drift bugs are collapsed onto single implementations:
+  - `codex-cli.ts` / `gemini-cli.ts` (byte-identical, with lax exit-code handling and a leaked kill timer) are now thin configs over one shared `SimpleCLIEngine` (`src/ai/cli-engine.ts`) that runs through the maintained `spawnCLI` helper — strict non-zero-exit rejection, timer cleanup, and stdin backpressure now apply to the wizard's Codex/Gemini conversions too.
+  - `buildVibeSystemPrompt` no longer re-inlines the core instructions: it joins the block builder's output, so Anthropic and OpenAI/Gemini/CLI engines get identically-assembled system prompts (previously section order differed and the edit-mode section was always included for non-Anthropic engines).
+  - `runPageArchitect` is a thin composition of `runDesignSystem` + `runModulePlanner` instead of a ~250-line byte-duplicate; the font-drop notice (previously only in the monolith) now also fires on the checkpoint-gated path. The develop→validate→retry→re-validate core is shared between `runBuildPhase` and `runMultiPageFlow` (`developAndValidate`).
+  - The three `escapeHtml` clones in `chat.js`/`plan.js`/`email-preview.js` are replaced by one shared `ui/escape-html.js` (the email-preview copy didn't escape quotes, so it was unsafe in attribute context).
 
 ### Fixed
 

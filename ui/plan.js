@@ -208,13 +208,7 @@
     }
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
+  // escapeHtml comes from the shared ui/escape-html.js (VIB-1902).
 
   // Inline SVG icons keyed by the template's `icon` field. Anything else
   // falls back to a neutral document glyph so the picker still renders.

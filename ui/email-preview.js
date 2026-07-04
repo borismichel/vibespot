@@ -38,11 +38,7 @@
     }
   }
 
-  function escapeHtml(str) {
-    var div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
+  // escapeHtml comes from the shared ui/escape-html.js (VIB-1902).
 
   function openEmailPreview() {
     overlay.classList.remove("hidden");
