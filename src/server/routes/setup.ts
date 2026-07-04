@@ -31,6 +31,7 @@ import { detectEnvironment } from "../../utils/detect.js";
 import { saveConfig } from "../../utils/config.js";
 import { ensureDir } from "../../utils/fs.js";
 import { listStarters, getStarter } from "../starters.js";
+import { isSafeThemeName } from "../../utils/validate.js";
 import { getServerContentMode } from "../server.js";
 import { enrichImportedThemeBrandAssets } from "../brand-enrichment.js";
 
@@ -253,7 +254,15 @@ export function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse)
       ensureDir(WORKSPACE_DIR);
 
       if (config.hubspotUploadMode === "cli" || !pak) {
-        // CLI fallback
+        // CLI fallback — the name crosses a process boundary here, and on
+        // Windows the .cmd shim resolution involves a shell (VIB-1890).
+        // API mode below fetches over HTTPS instead, which is why the guard
+        // sits inside this branch: marketplace paths (@marketplace/Theme)
+        // stay fetchable via the API.
+        if (!isSafeThemeName(name)) {
+          jsonResponse(res, 400, { error: "Theme name contains unsupported characters and cannot be fetched via the HubSpot CLI." });
+          return;
+        }
         (async () => {
           execFileSync("hs", ["cms", "fetch", name, themePath], {
             encoding: "utf-8",

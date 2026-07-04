@@ -6,13 +6,35 @@
  * payloads through the helpers and assert they stay inert: the payload
  * arrives as a literal string and no side-effect command executes.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { EventEmitter } from "node:events";
 import { existsSync, rmSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { runFile } from "../src/utils/shell.js";
 import { isSafeThemeName } from "../src/utils/validate.js";
 import { startJobSafe, startStreamingJob, getJob } from "../src/server/process-manager.js";
+
+// Force the /api/setup/fetch route down its CLI branch (no PAK, CLI mode)
+// and stub the subprocess launcher so the test never needs a real `hs`.
+vi.mock("../src/utils/config.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/utils/config.js")>();
+  return {
+    ...actual,
+    loadConfig: () => ({ hubspotUploadMode: "cli" }),
+    getHubSpotPak: () => null,
+  };
+});
+const execFileSyncMock = vi.hoisted(() => vi.fn());
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  // Pass through by default so runFile/startJob* keep exercising the real
+  // thing; the fetch-route tests only inspect calls targeting `hs`.
+  execFileSyncMock.mockImplementation(actual.execFileSync as never);
+  return { ...actual, execFileSync: execFileSyncMock };
+});
+import { handleSetupFetchRoute } from "../src/server/routes/setup.js";
 
 const tmp = mkdtempSync(join(tmpdir(), "vibespot-inj-"));
 const marker = join(tmp, "pwned");
@@ -96,6 +118,59 @@ describe("startJobSafe / startStreamingJob (server job manager)", () => {
       expect(output).toBe(p);
       expect(existsSync(marker)).toBe(false);
     }
+  });
+});
+
+describe("handleSetupFetchRoute (POST /api/setup/fetch, CLI branch)", () => {
+  function fakeReq(body: string): IncomingMessage {
+    const req = new EventEmitter();
+    process.nextTick(() => {
+      req.emit("data", Buffer.from(body));
+      req.emit("end");
+    });
+    return req as unknown as IncomingMessage;
+  }
+
+  function fakeRes(): { res: ServerResponse; done: Promise<{ status: number; body: Record<string, unknown> }> } {
+    let status = 0;
+    let resolve!: (v: { status: number; body: Record<string, unknown> }) => void;
+    const done = new Promise<{ status: number; body: Record<string, unknown> }>((r) => (resolve = r));
+    const res = {
+      headersSent: false,
+      writeHead(s: number) { status = s; return res; },
+      end(data?: string) { resolve({ status, body: data ? JSON.parse(data) : {} }); },
+    };
+    return { res: res as unknown as ServerResponse, done };
+  }
+
+  const hsCalls = () => execFileSyncMock.mock.calls.filter((c) => c[0] === "hs");
+
+  afterEach(() => {
+    execFileSyncMock.mockClear();
+  });
+
+  it("rejects unsafe theme names with 400 and spawns nothing", async () => {
+    for (const p of payloads) {
+      const { res, done } = fakeRes();
+      handleSetupFetchRoute(fakeReq(JSON.stringify({ name: p })), res);
+      const result = await done;
+      expect(result.status).toBe(400);
+      expect(String(result.body.error)).toMatch(/unsupported characters/);
+      expect(hsCalls()).toHaveLength(0);
+      expect(existsSync(marker)).toBe(false);
+    }
+  });
+
+  it("passes a safe theme name to hs as literal argv", async () => {
+    execFileSyncMock.mockImplementationOnce(() => { throw new Error("hs not installed"); });
+    const { res, done } = fakeRes();
+    handleSetupFetchRoute(fakeReq(JSON.stringify({ name: "my-theme" })), res);
+    const result = await done;
+    expect(result.status).toBe(500);
+    expect(hsCalls()).toHaveLength(1);
+    const [cmd, args] = hsCalls()[0];
+    expect(cmd).toBe("hs");
+    expect(args.slice(0, 3)).toEqual(["cms", "fetch", "my-theme"]);
   });
 });
 
