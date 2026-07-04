@@ -158,7 +158,7 @@ export function isAllowedOrigin(origin: string | undefined, hostHeader: string |
 // Request authentication
 // ---------------------------------------------------------------------------
 
-function tokenMatches(provided: string, expected: string): boolean {
+export function tokenMatches(provided: string, expected: string): boolean {
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);

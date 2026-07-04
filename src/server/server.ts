@@ -41,6 +41,7 @@ import {
   AUTH_COOKIE,
   type SecurityConfig,
 } from "./security.js";
+import { startPreviewOrigin, type StartedPreviewOrigin } from "./preview-origin.js";
 import { getChangelog } from "../utils/fs.js";
 import { runWithTrace, runWithSpan } from "./langfuse.js";
 
@@ -435,6 +436,11 @@ export interface ServerOptions {
   contentMode?: "page" | "email";
   /** Bind address; defaults to VIBESPOT_HOST or 127.0.0.1 (VIB-1889). */
   host?: string;
+  /**
+   * Start the separate preview origin (VIB-1892). Default off until the UI
+   * iframe flips from `srcdoc` to the preview-origin `src`.
+   */
+  enablePreviewOrigin?: boolean;
 }
 
 export interface StartedServer {
@@ -442,6 +448,8 @@ export interface StartedServer {
   host: string;
   /** Shared-secret auth token, when token auth is active (VIB-1889). */
   authToken: string | null;
+  /** The separate preview origin when enabled, else null (VIB-1892). */
+  previewOrigin: StartedPreviewOrigin | null;
   close: () => void;
 }
 
@@ -487,19 +495,35 @@ export function startServer(opts: ServerOptions): Promise<StartedServer> {
   });
   wss.on("connection", (ws) => handleWsConnection(ws));
 
-  const started = (boundPort: number): StartedServer => ({
-    port: boundPort,
-    host: security.host,
-    authToken: security.authToken,
-    close: () => { server.close(); wss.close(); },
-  });
+  // The separate preview origin (VIB-1892): started alongside the app server
+  // so AI-generated preview code runs cross-origin to the app. `port + 1` is
+  // the app's own EADDRINUSE fallback, so the preview origin starts at
+  // `port + 2` (and walks forward itself if that is taken).
+  const started = async (boundPort: number): Promise<StartedServer> => {
+    let previewOrigin: StartedPreviewOrigin | null = null;
+    if (opts.enablePreviewOrigin) {
+      previewOrigin = await startPreviewOrigin({
+        port: boundPort + 2,
+        host: security.host,
+        frameAncestors: [`http://${security.host}:${boundPort}`],
+        uiDir,
+      });
+    }
+    return {
+      port: boundPort,
+      host: security.host,
+      authToken: security.authToken,
+      previewOrigin,
+      close: () => { server.close(); wss.close(); previewOrigin?.close(); },
+    };
+  };
 
   return new Promise((resolve, reject) => {
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") {
         // Try next port
         server.listen(port + 1, security.host, () => {
-          resolve(started(port + 1));
+          started(port + 1).then(resolve, reject);
         });
       } else {
         reject(err);
@@ -507,7 +531,7 @@ export function startServer(opts: ServerOptions): Promise<StartedServer> {
     });
 
     server.listen(port, security.host, () => {
-      resolve(started(port));
+      started(port).then(resolve, reject);
     });
   });
 }
