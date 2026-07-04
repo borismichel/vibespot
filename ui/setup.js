@@ -1077,7 +1077,7 @@ async function handleCliAction(engineId, action, btn) {
     const data = await res.json();
     if (data.jobId) {
       // Poll until complete
-      await pollJob(data.jobId);
+      await pollJobUntilDone(data.jobId);
     }
     // Refresh walkthrough to show updated status
     showWalkthrough();
@@ -1092,7 +1092,9 @@ async function handleCliAction(engineId, action, btn) {
 // success; throws on failure, on a vanished job (404 — the server restarted
 // or GC'd it, so it will never complete), and on timeout — so callers can't
 // spin forever on a dead job. Also used by upload-panel.js.
-async function pollJob(jobId, { timeoutMs = 5 * 60 * 1000, intervalMs = 2000 } = {}) {
+// NOT named pollJob: settings.js declares a legacy callback-style pollJob in
+// the same global scope and loads later, so that name gets shadowed (VIB-1931).
+async function pollJobUntilDone(jobId, { timeoutMs = 5 * 60 * 1000, intervalMs = 2000 } = {}) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, intervalMs));

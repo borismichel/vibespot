@@ -116,9 +116,9 @@ function showHubSpotSetupDialog(mode) {
           });
           const data = await res.json();
           if (data.jobId) {
-            // pollJob (setup.js) resolves on success and throws on
+            // pollJobUntilDone (setup.js) resolves on success and throws on
             // failure / lost job (404) / timeout.
-            await pollJob(data.jobId);
+            await pollJobUntilDone(data.jobId);
             close(true);
             return;
           }
