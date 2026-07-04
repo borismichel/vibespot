@@ -258,13 +258,21 @@
   // ---- interact mode (ported from ui/inline-edit.js) ------------------------
   var interactAttached = false;
   var interactState = null;
+  /** Set by the section-controls block; force-closes its toolbar/popover. */
+  var hideSectionChrome = null;
 
   function setMode(next) {
     if (next !== "view" && next !== "interact" && next !== "section") next = "view";
     if (next === mode) return;
     mode = next;
-    if (mode === "interact") attachInteract();
-    else detachInteract();
+    if (mode === "interact") {
+      // An already-open section toolbar would otherwise stack on top of the
+      // inline-edit affordances until the next mouse-out (VIB-1920 review).
+      if (hideSectionChrome) hideSectionChrome();
+      attachInteract();
+    } else {
+      detachInteract();
+    }
   }
 
   function ensureInteractStyles() {
@@ -725,6 +733,15 @@
       activeToolbar = null;
       activeModule = null;
     }
+
+    // Mode switches must clear section chrome even mid-popover (a pending
+    // change is still flushed by closePopover).
+    hideSectionChrome = function () {
+      clearTimeout(hideTimer);
+      closePopover();
+      interacting = false;
+      hideToolbar();
+    };
 
     function categorizeFields(fields, prefix) {
       var controls = [];
