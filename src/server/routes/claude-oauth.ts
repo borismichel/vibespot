@@ -3,6 +3,7 @@
  * Users obtain tokens via `claude setup-token` (Claude Code CLI).
  */
 
+import { publicErrorMessage } from "../errors.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { jsonResponse, readBody } from "../route-helpers.js";
 import { saveConfig, loadConfig } from "../../utils/config.js";
@@ -36,7 +37,7 @@ export function handleClaudeOAuthSaveRoute(req: IncomingMessage, res: ServerResp
 
       jsonResponse(res, 200, { ok: true });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -69,6 +70,6 @@ export function handleClaudeOAuthLogoutRoute(_req: IncomingMessage, res: ServerR
 
     jsonResponse(res, 200, { ok: true });
   } catch (err) {
-    jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+    jsonResponse(res, 500, { error: publicErrorMessage(err) });
   }
 }

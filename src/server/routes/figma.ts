@@ -2,6 +2,7 @@
  * HTTP routes for Figma design import.
  */
 
+import { publicErrorMessage } from "../errors.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync, copyFileSync } from "node:fs";
@@ -56,7 +57,7 @@ export function handleFigmaTestTokenRoute(req: IncomingMessage, res: ServerRespo
       const user = await testFigmaToken(token);
       jsonResponse(res, 200, { ok: true, user });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = publicErrorMessage(err);
       log.warn("figma", `Token test failed: ${msg}`);
       jsonResponse(res, 200, { ok: false, error: "Invalid or expired Figma token" });
     }
@@ -124,7 +125,7 @@ export function handleFigmaExtractRoute(req: IncomingMessage, res: ServerRespons
 
       sendEvent({ type: "complete", ok: true, extractionId, summary });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = publicErrorMessage(err);
       log.error("figma", `Extraction failed: ${msg}`);
 
       let error = msg;
@@ -358,7 +359,7 @@ export function handleFigmaGenerateRoute(req: IncomingMessage, res: ServerRespon
       sendEvent({ type: "progress", message: `Conversion complete — ${moduleNames.length} modules generated` });
       sendEvent({ type: "complete", ok: true, modules: moduleNames });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = publicErrorMessage(err);
       log.error("figma", `Generate failed: ${msg}`);
       sendEvent({ type: "complete", ok: false, error: msg });
     }

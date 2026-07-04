@@ -2,6 +2,7 @@
  * Module, field, import, session, upload, and history routes.
  */
 
+import { publicErrorMessage } from "../errors.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import { jsonResponse, readBody, readJsonBody } from "../route-helpers.js";
@@ -255,7 +256,7 @@ Read the React source files from ${analysis.sourceDir} and convert each componen
       jsonResponse(res, 200, summary);
     } catch (err) {
       jsonResponse(res, 500, {
-        error: err instanceof Error ? err.message : String(err),
+        error: publicErrorMessage(err),
       });
     }
   });
@@ -332,7 +333,7 @@ export function handleRollbackRoute(req: IncomingMessage, res: ServerResponse): 
         modules: getOrderedModules().map((m) => m.moduleName),
       });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }

@@ -6,6 +6,8 @@
  * to the correct HTTP status code.
  */
 
+import { homedir } from "node:os";
+
 export class AppError extends Error {
   readonly statusCode: number;
   readonly details?: Record<string, unknown>;
@@ -46,6 +48,20 @@ export class EngineError extends AppError {
   }
 }
 
+// Home-directory paths in raw error messages leak the OS username to any
+// client that can read an error response (VIB-1889).
+const HOME_PATH_RE = /(?:\/(?:home|Users)\/|[A-Za-z]:\\Users\\)[^\s/\\'")\]]+/g;
+
+/**
+ * Error message safe to echo to a client: underlying fs/OS messages with the
+ * home directory (and any /home/<user> or /Users/<user> prefix) redacted.
+ * Log the raw error server-side when the detail matters.
+ */
+export function publicErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  return raw.split(homedir()).join("~").replace(HOME_PATH_RE, "~");
+}
+
 /**
  * Convert any error to a safe JSON-serializable response.
  * Strips stack traces to avoid leaking internals.
@@ -53,15 +69,11 @@ export class EngineError extends AppError {
 export function toErrorResponse(err: unknown): { error: string; statusCode: number; details?: Record<string, unknown> } {
   if (err instanceof AppError) {
     return {
-      error: err.message,
+      error: publicErrorMessage(err),
       statusCode: err.statusCode,
       ...(err.details ? { details: err.details } : {}),
     };
   }
 
-  if (err instanceof Error) {
-    return { error: err.message, statusCode: 500 };
-  }
-
-  return { error: String(err), statusCode: 500 };
+  return { error: publicErrorMessage(err), statusCode: 500 };
 }
