@@ -9,6 +9,7 @@ import type { ChatMessage, TemplateEntry, SessionAsset, FieldDef, PageType } fro
 import { getSession, saveSession } from "./store.js";
 import { getActiveTemplate, addTemplate, setActiveTemplate } from "./templates.js";
 import { log } from "../log.js";
+import { resolveModuleDir } from "../../utils/path-safety.js";
 
 // ---------------------------------------------------------------------------
 // Flat-field sync helpers (exported for use by templates.ts)
@@ -236,10 +237,16 @@ export function removeModule(moduleName: string): void {
     tpl.moduleOrder = tpl.moduleOrder.filter((n) => n !== moduleName);
   }
 
-  // Delete module directory from disk
+  // Delete module directory from disk. `moduleName` can arrive from a client
+  // message — resolveModuleDir throws on traversal so a hostile name can never
+  // recursively delete outside modules/ (VIB-1891).
   if (activeSession.themePath) {
-    const modDir = join(activeSession.themePath, "modules", `${moduleName}.module`);
-    if (existsSync(modDir)) rmSync(modDir, { recursive: true, force: true });
+    try {
+      const modDir = resolveModuleDir(join(activeSession.themePath, "modules"), moduleName);
+      if (existsSync(modDir)) rmSync(modDir, { recursive: true, force: true });
+    } catch {
+      log.warn("session-state", "Refusing to delete module with unsafe name", { name: moduleName });
+    }
   }
 
   activeSession.updatedAt = Date.now();

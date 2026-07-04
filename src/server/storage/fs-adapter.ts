@@ -8,6 +8,7 @@ import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import type { StorageAdapter, FileEntry, ModuleOnDisk } from "./types.js";
 import type { VibeSession, SessionIndexEntry } from "../session/types.js";
+import { resolveModuleDir } from "../../utils/path-safety.js";
 
 export interface FileSystemStorageAdapterOptions {
   sessionsDir?: string;
@@ -138,7 +139,8 @@ export class FileSystemStorageAdapter implements StorageAdapter {
   // -------------------------------------------------------------------------
 
   async readModule(themePath: string, moduleName: string): Promise<ModuleOnDisk | null> {
-    const modDir = join(themePath, "modules", `${moduleName}.module`);
+    // resolveModuleDir throws on names that would escape modules/ (VIB-1891)
+    const modDir = resolveModuleDir(join(themePath, "modules"), moduleName);
     if (!existsSync(modDir)) return null;
 
     const fieldsJson = this.safeRead(join(modDir, "fields.json"));
@@ -155,7 +157,7 @@ export class FileSystemStorageAdapter implements StorageAdapter {
   }
 
   async writeModule(themePath: string, moduleName: string, files: ModuleOnDisk): Promise<void> {
-    const modDir = join(themePath, "modules", `${moduleName}.module`);
+    const modDir = resolveModuleDir(join(themePath, "modules"), moduleName);
     mkdirSync(modDir, { recursive: true });
     writeFileSync(join(modDir, "fields.json"), files.fieldsJson, "utf-8");
     writeFileSync(join(modDir, "meta.json"), files.metaJson, "utf-8");
@@ -167,7 +169,7 @@ export class FileSystemStorageAdapter implements StorageAdapter {
   }
 
   async deleteModule(themePath: string, moduleName: string): Promise<void> {
-    const modDir = join(themePath, "modules", `${moduleName}.module`);
+    const modDir = resolveModuleDir(join(themePath, "modules"), moduleName);
     if (existsSync(modDir)) {
       rmSync(modDir, { recursive: true, force: true });
     }

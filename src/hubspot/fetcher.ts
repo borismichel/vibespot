@@ -4,7 +4,8 @@
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { dirname } from "node:path";
+import { resolveContainedPath } from "../utils/path-safety.js";
 import { getMetadata, downloadFile, type FileMetadata } from "./api.js";
 
 // ---------------------------------------------------------------------------
@@ -105,7 +106,9 @@ export async function fetchTheme(
       ? remotePath.slice(themeName.length + 1)
       : remotePath;
 
-    const localPath = join(targetPath, relativePath);
+    // The relative path is built from server-supplied metadata (child.path /
+    // child.name) — refuse anything that resolves outside targetPath (zip-slip).
+    const localPath = resolveContainedPath(targetPath, relativePath);
 
     // Ensure directory exists
     mkdirSync(dirname(localPath), { recursive: true });

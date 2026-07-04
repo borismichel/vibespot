@@ -26,6 +26,7 @@ import {
 import { stagePromptLink } from "../prompts/registry.js";
 import { log } from "../../log.js";
 import { runWithSpan } from "../../langfuse.js";
+import { kebabModuleName } from "../../../utils/path-safety.js";
 
 export async function runSiteModulePlanner(
   userMessage: string,
@@ -85,22 +86,31 @@ export async function runSiteModulePlanner(
     return buildFallbackBlueprint(plan, sharedModuleNames, sharedCss);
   }
 
-  const sharedModuleSpecs = (raw.sharedModules as ModuleSpec[]).map((m) => ({
-    name: m.name,
-    description: m.description,
-    contentBrief: m.contentBrief,
-    layoutNotes: m.layoutNotes,
-  }));
-
-  const pageBlueprints: SitePageBlueprint[] = (raw.pages as SitePageBlueprint[]).map((p) => ({
-    pageId: p.pageId,
-    modules: (p.modules || []).map((m) => ({
-      name: m.name,
+  // Planner-supplied names/ids become path components downstream (module dirs,
+  // template filenames) — coerce structured output to the safe kebab charset
+  // before it enters the blueprint (VIB-1891).
+  const sharedModuleSpecs = (raw.sharedModules as ModuleSpec[])
+    .map((m) => ({
+      name: kebabModuleName(String(m.name ?? "")),
       description: m.description,
       contentBrief: m.contentBrief,
       layoutNotes: m.layoutNotes,
-    })),
-    moduleOrder: p.moduleOrder || [],
+    }))
+    .filter((m) => m.name.length > 0);
+
+  const pageBlueprints: SitePageBlueprint[] = (raw.pages as SitePageBlueprint[]).map((p) => ({
+    pageId: kebabModuleName(String(p.pageId ?? "")),
+    modules: (p.modules || [])
+      .map((m) => ({
+        name: kebabModuleName(String(m.name ?? "")),
+        description: m.description,
+        contentBrief: m.contentBrief,
+        layoutNotes: m.layoutNotes,
+      }))
+      .filter((m) => m.name.length > 0),
+    moduleOrder: (p.moduleOrder || [])
+      .map((n) => kebabModuleName(String(n ?? "")))
+      .filter((n) => n.length > 0),
   }));
 
   const totalModules = sharedModuleSpecs.length +
