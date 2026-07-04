@@ -58,6 +58,15 @@ window.deactivateSelectMode = deactivateInteractMode;
 // Agent messages: module select -> chat prefill; edit commits -> field saves
 // ---------------------------------------------------------------------------
 
+// The agent may *request* dropping back to view mode (Esc in-frame with no
+// editor open). Only the exit request is honoured — a compromised frame can
+// lower its privileges, never raise them — and the toolbar flip re-issues
+// vs:set-mode, so the parent stays authoritative over the mode.
+onPreviewMessage("vs:request-mode", (p) => {
+  if (!p || p.mode !== "view") return;
+  deactivateInteractMode();
+});
+
 onPreviewMessage("vs:select-module", (p) => {
   if (typeof p.prefill !== "string") return;
   if (typeof window.prefillChatInput === "function") {

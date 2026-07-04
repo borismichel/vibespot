@@ -26,7 +26,7 @@ const VS_PREVIEW_TO_PARENT = new Set([
   "vs:select-module",
   "vs:edit-commit",
   "vs:field-commit",
-  "vs:content-height",
+  "vs:request-mode",
 ]);
 
 /** { origin, token } once /api/preview-origin resolves; null while loading. */

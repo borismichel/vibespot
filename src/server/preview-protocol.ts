@@ -62,8 +62,14 @@ export const PREVIEW_TO_PARENT = {
   EDIT_COMMIT: "vs:edit-commit",
   /** Section-controls field change committed by the user. */
   FIELD_COMMIT: "vs:field-commit",
-  /** Optional: report the rendered content height for frame auto-size. */
-  CONTENT_HEIGHT: "vs:content-height",
+  /**
+   * Ask the parent to switch interaction mode (e.g. Esc to leave interact
+   * mode). Read-only: the parent stays authoritative — it validates the
+   * request, flips its own toolbar state, and answers with `vs:set-mode`.
+   * The parent only honours `{ mode: "view" }` (privilege can be dropped
+   * from in-frame, never raised).
+   */
+  REQUEST_MODE: "vs:request-mode",
 } as const;
 
 /** Valid interaction modes carried by `vs:init` / `vs:set-mode`. */
