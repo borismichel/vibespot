@@ -57,6 +57,7 @@
     SELECT_MODULE: "vs:select-module",
     EDIT_COMMIT: "vs:edit-commit",
     FIELD_COMMIT: "vs:field-commit",
+    REQUEST_MODE: "vs:request-mode",
   };
 
   /** Pinned on the first valid vs:init; later messages must match it. */
@@ -419,9 +420,10 @@
     };
 
     var closeActiveEditor = function () {
-      if (!activeEditor) return;
+      if (!activeEditor) return false;
       if (activeEditor.cleanup) activeEditor.cleanup();
       activeEditor = null;
+      return true;
     };
 
     var onMouseOver = function (e) {
@@ -651,9 +653,12 @@
     };
 
     var onKeyDown = function (e) {
-      // Escape closes any open editor; leaving interact mode is the parent
-      // toolbar button's job (no preview->parent verb widens for it).
-      if (e.key === "Escape") closeActiveEditor();
+      // Escape closes an open editor first; a second Escape asks the parent
+      // to leave interact mode. vs:request-mode is read-only — the parent
+      // validates it, flips its own toolbar state, and answers vs:set-mode.
+      if (e.key !== "Escape") return;
+      if (closeActiveEditor()) return;
+      send(OUT.REQUEST_MODE, { mode: "view" });
     };
 
     document.addEventListener("mouseover", onMouseOver, true);

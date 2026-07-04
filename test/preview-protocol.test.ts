@@ -83,6 +83,17 @@ describe("preview-protocol envelope", () => {
     }
   });
 
+  it("vs:request-mode flows preview->parent only (Esc-to-exit ask, no write)", () => {
+    // The agent may ask to drop back to view mode; the parent stays
+    // authoritative (it answers with vs:set-mode). Inbound for the parent:
+    const ask = parseEnvelope(makeEnvelope(PREVIEW_TO_PARENT.REQUEST_MODE, TOKEN, { mode: "view" }), asParent);
+    expect(ask.ok).toBe(true);
+    // ...but never legal parent->preview (that direction uses vs:set-mode).
+    const replay = parseEnvelope(makeEnvelope(PREVIEW_TO_PARENT.REQUEST_MODE, TOKEN), asPreview);
+    expect(replay.ok).toBe(false);
+    if (!replay.ok) expect(replay.reason).toBe("wrong-direction");
+  });
+
   it("validates preview modes", () => {
     expect(isPreviewMode("view")).toBe(true);
     expect(isPreviewMode("interact")).toBe(true);
