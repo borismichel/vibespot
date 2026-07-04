@@ -210,7 +210,7 @@ The bundle above runs two services:
 
 > **Mount the themes volume at exactly `/home/vibespot/vibespot-themes`.** That is where the app writes generated themes (`$HOME/vibespot-themes`). Mounting elsewhere means themes are lost when the container is recreated.
 
-> **Persistence is filesystem-only.** A Postgres storage adapter exists in the codebase but is not wired into the container startup path — `VIBESPOT_STORAGE` / `DATABASE_URL` have no effect today. Do not rely on them; use the named volumes above for durability.
+> **Persistence is filesystem-only.** `VIBESPOT_STORAGE` / `DATABASE_URL` are not supported by the container startup path. Use the named volumes above for durability.
 
 ---
 

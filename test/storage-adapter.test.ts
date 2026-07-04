@@ -1,17 +1,12 @@
 /**
- * Integration tests: verify CRUD parity between FileSystemStorageAdapter and
- * PostgresStorageAdapter.
- *
- * The filesystem tests always run.
- * Postgres tests run when VIBESPOT_TEST_PG_URL is set (e.g., postgres://localhost:5432/vibespot_test).
+ * Integration tests: verify CRUD behavior for the filesystem StorageAdapter.
  */
 
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { FileSystemStorageAdapter } from "../src/server/storage/fs-adapter.js";
-import { PostgresStorageAdapter } from "../src/server/storage/pg-adapter.js";
 import type { StorageAdapter, ModuleOnDisk } from "../src/server/storage/types.js";
 import type { VibeSession } from "../src/server/session/types.js";
 
@@ -239,44 +234,3 @@ adapterSuite("FileSystem", async () => {
     },
   };
 });
-
-// ---------------------------------------------------------------------------
-// Postgres adapter setup (conditional — requires VIBESPOT_TEST_PG_URL)
-// ---------------------------------------------------------------------------
-
-const pgUrl = process.env.VIBESPOT_TEST_PG_URL;
-
-if (pgUrl) {
-  let pgPool: any;
-
-  adapterSuite("Postgres", async () => {
-    const { default: pg } = await import("pg");
-    pgPool = new pg.Pool({ connectionString: pgUrl });
-
-    // Clean tables before each test
-    await pgPool.query("DROP TABLE IF EXISTS theme_files CASCADE");
-    await pgPool.query("DROP TABLE IF EXISTS sessions CASCADE");
-
-    const adapter = new PostgresStorageAdapter(pgPool);
-
-    return {
-      adapter,
-      makeSession: (overrides = {}) => {
-        const session = makeSession(overrides);
-        return { ...session, themePath: session.id };
-      },
-      cleanup: async () => {
-        await pgPool.query("DROP TABLE IF EXISTS theme_files CASCADE");
-        await pgPool.query("DROP TABLE IF EXISTS sessions CASCADE");
-      },
-    };
-  });
-
-  afterAll(async () => {
-    if (pgPool) await pgPool.end();
-  });
-} else {
-  describe("StorageAdapter — Postgres (SKIPPED)", () => {
-    it.skip("Set VIBESPOT_TEST_PG_URL to run Postgres tests", () => {});
-  });
-}
