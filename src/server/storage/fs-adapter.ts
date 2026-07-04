@@ -9,10 +9,25 @@ import { homedir } from "node:os";
 import type { StorageAdapter, FileEntry, ModuleOnDisk } from "./types.js";
 import type { VibeSession, SessionIndexEntry } from "../session/types.js";
 
-const SESSIONS_DIR = join(homedir(), ".vibespot", "sessions");
-const INDEX_PATH = join(SESSIONS_DIR, "_index.json");
+export interface FileSystemStorageAdapterOptions {
+  sessionsDir?: string;
+}
+
+function defaultSessionsDir(): string {
+  if (process.env.VIBESPOT_SESSIONS_DIR) return process.env.VIBESPOT_SESSIONS_DIR;
+  const baseDir = process.env.VIBESPOT_HOME || join(homedir(), ".vibespot");
+  return join(baseDir, "sessions");
+}
 
 export class FileSystemStorageAdapter implements StorageAdapter {
+  private readonly sessionsDir: string;
+  private readonly indexPath: string;
+
+  constructor(options: FileSystemStorageAdapterOptions = {}) {
+    this.sessionsDir = options.sessionsDir || defaultSessionsDir();
+    this.indexPath = join(this.sessionsDir, "_index.json");
+  }
+
   // -------------------------------------------------------------------------
   // Generic file I/O
   // -------------------------------------------------------------------------
@@ -58,14 +73,14 @@ export class FileSystemStorageAdapter implements StorageAdapter {
   // -------------------------------------------------------------------------
 
   async saveSession(session: VibeSession): Promise<void> {
-    mkdirSync(SESSIONS_DIR, { recursive: true });
-    const filePath = join(SESSIONS_DIR, `${session.id}.json`);
+    mkdirSync(this.sessionsDir, { recursive: true });
+    const filePath = join(this.sessionsDir, `${session.id}.json`);
     writeFileSync(filePath, JSON.stringify(session, null, 2), "utf-8");
     this.upsertIndex(session);
   }
 
   async loadSession(sessionId: string): Promise<VibeSession | null> {
-    const filePath = join(SESSIONS_DIR, `${sessionId}.json`);
+    const filePath = join(this.sessionsDir, `${sessionId}.json`);
     if (!existsSync(filePath)) return null;
     try {
       return JSON.parse(readFileSync(filePath, "utf-8"));
@@ -75,12 +90,12 @@ export class FileSystemStorageAdapter implements StorageAdapter {
   }
 
   async listSessions(): Promise<SessionIndexEntry[]> {
-    if (!existsSync(SESSIONS_DIR)) return [];
+    if (!existsSync(this.sessionsDir)) return [];
     return this.readIndex();
   }
 
   async deleteSession(sessionId: string, deleteFiles = false): Promise<void> {
-    const filePath = join(SESSIONS_DIR, `${sessionId}.json`);
+    const filePath = join(this.sessionsDir, `${sessionId}.json`);
     let themeName = "";
 
     if (existsSync(filePath)) {
@@ -102,15 +117,15 @@ export class FileSystemStorageAdapter implements StorageAdapter {
   }
 
   async deleteSessionsByTheme(themeName: string, deleteFiles = false): Promise<void> {
-    if (!existsSync(SESSIONS_DIR)) return;
-    for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith(".json") && f !== "_index.json")) {
+    if (!existsSync(this.sessionsDir)) return;
+    for (const f of readdirSync(this.sessionsDir).filter((f) => f.endsWith(".json") && f !== "_index.json")) {
       try {
-        const data = JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf-8"));
+        const data = JSON.parse(readFileSync(join(this.sessionsDir, f), "utf-8"));
         if (data.themeName === themeName) {
           if (deleteFiles && data.themePath && existsSync(data.themePath)) {
             rmSync(data.themePath, { recursive: true, force: true });
           }
-          rmSync(join(SESSIONS_DIR, f), { force: true });
+          rmSync(join(this.sessionsDir, f), { force: true });
         }
       } catch { /* ignore */ }
     }
@@ -225,8 +240,8 @@ export class FileSystemStorageAdapter implements StorageAdapter {
 
   private readIndex(): SessionIndexEntry[] {
     try {
-      if (!existsSync(INDEX_PATH)) return this.rebuildIndex();
-      return JSON.parse(readFileSync(INDEX_PATH, "utf-8"));
+      if (!existsSync(this.indexPath)) return this.rebuildIndex();
+      return JSON.parse(readFileSync(this.indexPath, "utf-8"));
     } catch {
       return this.rebuildIndex();
     }
@@ -234,17 +249,17 @@ export class FileSystemStorageAdapter implements StorageAdapter {
 
   private writeIndex(entries: SessionIndexEntry[]): void {
     try {
-      mkdirSync(SESSIONS_DIR, { recursive: true });
-      writeFileSync(INDEX_PATH, JSON.stringify(entries), "utf-8");
+      mkdirSync(this.sessionsDir, { recursive: true });
+      writeFileSync(this.indexPath, JSON.stringify(entries), "utf-8");
     } catch { /* non-critical */ }
   }
 
   private rebuildIndex(): SessionIndexEntry[] {
-    if (!existsSync(SESSIONS_DIR)) return [];
+    if (!existsSync(this.sessionsDir)) return [];
     const entries: SessionIndexEntry[] = [];
-    for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith(".json") && f !== "_index.json")) {
+    for (const f of readdirSync(this.sessionsDir).filter((f) => f.endsWith(".json") && f !== "_index.json")) {
       try {
-        const data = JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf-8"));
+        const data = JSON.parse(readFileSync(join(this.sessionsDir, f), "utf-8"));
         const templates = data.templates || [];
         entries.push({
           id: data.id,
