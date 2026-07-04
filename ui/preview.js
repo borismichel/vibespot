@@ -145,13 +145,18 @@ function refreshPreview(opts) {
     pendingChangedModules = opts.changedModules || null;
     pendingNewModules = opts.newModules || null;
   }
+  // The origin lookup is async — only the newest requested navigation may
+  // touch the frame, or a slow resolve clobbers a later refresh or the
+  // generating screen (VIB-1898).
+  previewLoadSeq += 1;
+  const nav = previewLoadSeq;
   fetchPreviewOriginInfo().then((info) => {
     if (!info) return;
+    if (nav !== previewLoadSeq) return; // superseded while resolving
     previewAgentReady = false;
-    previewLoadSeq += 1;
     // The `r` param defeats bfcache/no-op navigations; `t` is the access token.
     previewFrame.removeAttribute("srcdoc");
-    previewFrame.src = `${info.origin}/?t=${encodeURIComponent(info.token)}&r=${previewLoadSeq}`;
+    previewFrame.src = `${info.origin}/?t=${encodeURIComponent(info.token)}&r=${nav}`;
   });
 }
 
@@ -169,6 +174,9 @@ function scrollPreviewToModule(moduleName) {
 function showGeneratingPreview() {
   setPreviewEmptyState(false);
   previewAgentReady = false;
+  // Invalidate any refresh navigation still resolving its origin lookup so it
+  // can't replace this screen after we show it (VIB-1898).
+  previewLoadSeq += 1;
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>

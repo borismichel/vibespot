@@ -111,38 +111,49 @@ function findFieldByText(fields, originalText, tag, prefix = "") {
   return null;
 }
 
-function findImageField(fields, imgSrc, prefix = "") {
+function collectFieldsOfType(fields, type, prefix = "", out = []) {
   for (const field of fields) {
     const path = prefix ? `${prefix}.${field.name}` : field.name;
     if (field.type === "group" && field.children) {
-      const found = findImageField(field.children, imgSrc, path);
-      if (found) return found;
+      collectFieldsOfType(field.children, type, path, out);
+      continue;
     }
-    if (field.type === "image" && field.default?.src) {
-      return { path, field };
-    }
+    if (field.type === type) out.push({ path, field });
   }
-  return null;
+  return out;
 }
 
-function findLinkField(fields, href, prefix = "") {
-  for (const field of fields) {
-    const path = prefix ? `${prefix}.${field.name}` : field.name;
-    if (field.type === "group" && field.children) {
-      const found = findLinkField(field.children, href, path);
-      if (found) return found;
-    }
-    if (field.type === "link") return { path, field };
-  }
-  return null;
+// The agent reports the DOM's absolutized URL (possibly with a preview access
+// token in the query) while field defaults are often relative — compare
+// without query/hash and accept a suffix match either way.
+function urlLikeMatches(a, b) {
+  a = String(a || "").split(/[?#]/)[0];
+  b = String(b || "").split(/[?#]/)[0];
+  if (!a || !b) return false;
+  return a === b || a.endsWith(b) || b.endsWith(a);
 }
 
-async function postField(moduleName, fieldPath, value) {
-  await fetch("/api/field", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ moduleName, fieldPath, value }),
-  });
+/** Match the edited image by its pre-edit src so editing the 2nd image can't
+ * overwrite the 1st (VIB-1898). Falls back to a lone image field only. */
+function findImageField(fields, imgSrc) {
+  const candidates = collectFieldsOfType(fields, "image");
+  const bySrc = candidates.find((c) => urlLikeMatches(c.field.default?.src || "", imgSrc || ""));
+  if (bySrc) return bySrc;
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+/** Same per-href matching for link fields (VIB-1898). */
+function findLinkField(fields, href) {
+  const candidates = collectFieldsOfType(fields, "link");
+  const byHref = candidates.find((c) => urlLikeMatches(c.field.default?.url?.href || "", href || ""));
+  if (byHref) return byHref;
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+function postField(moduleName, fieldPath, value) {
+  // Unified save path (field-save.js); the commit handlers refresh the
+  // preview once per commit rather than once per POST.
+  return saveField(moduleName, fieldPath, value, { refresh: false });
 }
 
 /** p: { fieldPath?, originalText, tag, value } from vs:edit-commit. */
@@ -213,7 +224,9 @@ async function saveLinkChange(moduleName, p) {
   const data = await findModuleFields(moduleName);
   if (!data) { refreshPreview(); return; }
 
-  const match = findLinkField(data.fields, p.origHref || "");
+  // Only write the URL when the user actually changed it — a text-only edit
+  // must not blank the stored href (VIB-1898).
+  const match = newUrl && newUrl !== (p.origHref || "") ? findLinkField(data.fields, p.origHref || "") : null;
   if (match) {
     await postField(moduleName, match.path, {
       url: { href: newUrl, type: "EXTERNAL" },

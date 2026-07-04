@@ -14,18 +14,9 @@
     if (typeof p.fieldPath !== "string" || !p.fieldPath) return;
     if (p.value === undefined) return;
 
-    fetch("/api/field", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        moduleName: p.moduleName,
-        fieldPath: p.fieldPath,
-        value: p.value,
-      }),
-    }).then(() => {
-      // While a popover drag is in flight the agent asks us to hold the
-      // reload so the in-frame controls don't vanish mid-interaction.
-      if (p.refresh) refreshPreview();
-    }).catch(() => { /* field save failed — preview keeps optimistic state */ });
+    // Unified save path (field-save.js, VIB-1898). While a popover drag is in
+    // flight the agent asks us to hold the reload so the in-frame controls
+    // don't vanish mid-interaction.
+    saveField(p.moduleName, p.fieldPath, p.value, { refresh: !!p.refresh });
   });
 })();
