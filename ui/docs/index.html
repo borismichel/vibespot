@@ -399,6 +399,10 @@ vibespot</code></pre>
       <tr><td><code>VIBESPOT_AGENTIC_MODE</code></td><td>Set <code>true</code> to enable the multi-stage agentic pipeline</td></tr>
       <tr><td><code>VIBESPOT_PORT</code></td><td>Override the HTTP server port (default: <code>4200</code>)</td></tr>
       <tr><td><code>VIBESPOT_NO_OPEN</code></td><td>Set <code>1</code> to suppress auto-opening the browser on startup</td></tr>
+      <tr><td><code>VIBESPOT_HOST</code></td><td>Bind address (default: <code>127.0.0.1</code>, loopback only). Set <code>0.0.0.0</code> to reach vibeSpot from another device &mdash; a non-loopback bind requires the access token printed at boot (see "Access from another device" in the README)</td></tr>
+      <tr><td><code>VIBESPOT_AUTH_TOKEN</code></td><td>Pin the shared-secret access token used on non-loopback binds (otherwise a fresh one is generated at boot and printed in the startup URL)</td></tr>
+      <tr><td><code>VIBESPOT_DISABLE_AUTH</code></td><td>Set <code>1</code> to disable the auth gate. Only for deployments behind their own authenticating proxy; on a non-loopback bind this additionally requires <code>VIBESPOT_TRUST_PROXY=1</code></td></tr>
+      <tr><td><code>VIBESPOT_TRUST_PROXY</code></td><td>Set <code>1</code> to acknowledge that an authenticating reverse proxy is the sole ingress, allowing <code>VIBESPOT_DISABLE_AUTH=1</code> on a non-loopback bind</td></tr>
       <tr><td><code>LANGFUSE_ENABLED</code></td><td>Set <code>true</code> to send <a href="#langfuse">Langfuse traces</a>. Required &mdash; keys alone don't enable it.</td></tr>
       <tr><td><code>LANGFUSE_PUBLIC_KEY</code></td><td>Langfuse public key (<code>pk-lf-</code>)</td></tr>
       <tr><td><code>LANGFUSE_SECRET_KEY</code></td><td>Langfuse secret key (<code>sk-lf-</code>)</td></tr>
@@ -993,7 +997,7 @@ testimonial carousel, and a minimal footer with social links.</code></pre>
   <p>Each card also shows the <strong>estimated cost of the build it gates</strong>, computed from spend-so-far via the per-page <a href="#observability">cost tracker</a> &mdash; so you know what Approve will cost before you click it. (CLI engines report no usage, so the estimate is omitted for them.)</p>
   <div class="doc-callout doc-callout--tip">
     <div class="doc-callout__label">&#128268; Crash-safe by design</div>
-    <p>A parked checkpoint isn't a paused, open promise &mdash; the pipeline <em>returns</em> at the gate and your resolution re-enters it via a resume token. If the server restarts while a gate is open, the run is simply dropped and you re-send your prompt, rather than leaving a hung generation behind.</p>
+    <p>A parked checkpoint isn't a paused, open promise &mdash; the pipeline <em>returns</em> at the gate and your resolution re-enters it via a resume token. The resume state is persisted with the session, so an open gate even survives a server restart: reopen the theme and the parked card is still there &mdash; approve, steer, or skip it and the run continues where it left off.</p>
   </div>
 
   <h3 id="checkpoints-oneshot">One-Shot Escape Hatch</h3>

@@ -83,6 +83,7 @@ All notable changes to vibeSpot are documented here.
 ### Added
 
 - **A "What's new" dialog after you upgrade** ([VIB-1885](/VIB/issues/VIB-1885)) — the first time you open the builder on a new version, a dialog shows the release highlights with a link to the full changelog. Dismiss it (✕, "Got it", backdrop, or Esc) and it stays gone until the next release — one card per version, never a nag. The highlights are generated from this changelog at build time (`npm run whatsnew:gen`, wired into `npm run build`), so each release surfaces its own notes automatically. Dismissal is remembered per machine in `~/.vibespot/config.json` (`lastSeenVersion`).
+- **Expanded automated test coverage** ([VIB-1900](/VIB/issues/VIB-1900), [VIB-1913](/VIB/issues/VIB-1913)) — behavioral suites for previously untested subsystems: the HubSpot client and upload/settings routes, the agentic pipeline's checkpoint seams (park/resume, `applyStructureEdits`, abort), `src/utils/detect.ts`, the wizard step implementations, and a jsdom UI smoke harness covering chat-send, checkpoint resolution, and field saves. No behavior change — these lock in the fixes above.
 
 ---
 
