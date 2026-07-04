@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import type { IncomingMessage } from "node:http";
 import {
   resolveSecurityConfig,
+  checkDisabledAuthBind,
   checkRequestAuth,
   isAllowedOrigin,
   isLocalHostHeader,
@@ -33,7 +34,7 @@ function fakeReq(opts: {
   } as unknown as IncomingMessage;
 }
 
-const ENV_KEYS = ["VIBESPOT_HOST", "VIBESPOT_AUTH_TOKEN", "VIBESPOT_DISABLE_AUTH"];
+const ENV_KEYS = ["VIBESPOT_HOST", "VIBESPOT_AUTH_TOKEN", "VIBESPOT_DISABLE_AUTH", "VIBESPOT_TRUST_PROXY"];
 const saved: Record<string, string | undefined> = {};
 for (const k of ENV_KEYS) saved[k] = process.env[k];
 
@@ -74,6 +75,40 @@ describe("resolveSecurityConfig", () => {
     const cfg = resolveSecurityConfig("0.0.0.0");
     expect(cfg.authToken).toBeNull();
     expect(cfg.authDisabled).toBe(true);
+  });
+});
+
+describe("checkDisabledAuthBind (VIB-1906)", () => {
+  it("refuses a non-loopback bind with auth disabled and no acknowledgement", () => {
+    delete process.env.VIBESPOT_TRUST_PROXY;
+    process.env.VIBESPOT_DISABLE_AUTH = "1";
+    const gate = checkDisabledAuthBind(resolveSecurityConfig("0.0.0.0"));
+    expect(gate.severity).toBe("refuse");
+    expect(gate.message).toContain("VIBESPOT_TRUST_PROXY=1");
+    expect(gate.message).toContain("0.0.0.0");
+  });
+
+  it("downgrades to a loud warning when VIBESPOT_TRUST_PROXY=1 acknowledges the proxy", () => {
+    process.env.VIBESPOT_DISABLE_AUTH = "1";
+    process.env.VIBESPOT_TRUST_PROXY = "1";
+    const gate = checkDisabledAuthBind(resolveSecurityConfig("0.0.0.0"));
+    expect(gate.severity).toBe("warn");
+    expect(gate.message).toContain("AUTH IS DISABLED");
+  });
+
+  it("is silent for a loopback bind with auth disabled", () => {
+    delete process.env.VIBESPOT_TRUST_PROXY;
+    process.env.VIBESPOT_DISABLE_AUTH = "1";
+    const gate = checkDisabledAuthBind(resolveSecurityConfig("127.0.0.1"));
+    expect(gate.severity).toBe("none");
+    expect(gate.message).toBeNull();
+  });
+
+  it("is silent when auth is enabled, even on a networked bind", () => {
+    delete process.env.VIBESPOT_DISABLE_AUTH;
+    delete process.env.VIBESPOT_TRUST_PROXY;
+    const gate = checkDisabledAuthBind(resolveSecurityConfig("0.0.0.0"));
+    expect(gate.severity).toBe("none");
   });
 });
 

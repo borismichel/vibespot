@@ -193,6 +193,7 @@ HTTPS works automatically on ports 80/443. The `@websockets` block is required �
 | `VIBESPOT_HOST` | `0.0.0.0` (in Docker), `127.0.0.1` otherwise | Bind address. Any non-loopback bind turns on token auth |
 | `VIBESPOT_AUTH_TOKEN` | generated at boot | Shared-secret access token for the UI, API and WebSocket. Empty → a random one is generated and printed in the container logs as part of the URL |
 | `VIBESPOT_DISABLE_AUTH` | — | Set `1` **only** when a trusted auth proxy (e.g. the Entra SSO overlay) fronts vibeSpot. Turns off the built-in token gate |
+| `VIBESPOT_TRUST_PROXY` | — | Required alongside `VIBESPOT_DISABLE_AUTH=1` on a non-loopback bind: acknowledges that an authenticating proxy is the **only** ingress to the app port. Without it the server refuses to start (the Entra overlay sets it) |
 
 ### AI engine
 
@@ -372,6 +373,7 @@ Use an Ingress or Gateway API resource with TLS termination pointing at the Serv
 - **Network exposure** — without HTTPS, vibeSpot serves plain HTTP. Only expose port 4200 on trusted networks (LAN, VPN, Tailscale).
 - **CORS** — the server allows requests from `localhost`, `127.0.0.1`, and RFC 1918 / Tailscale IP ranges. Behind a same-origin reverse proxy, CORS is not a factor.
 - **No built-in app login** — vibeSpot itself has no user accounts. For internet-facing deployments, gate it with the bundled Entra SSO overlay below (or your own authenticating proxy — Authelia, Cloudflare Access, etc.).
+- **Disabled auth is guarded** — `VIBESPOT_DISABLE_AUTH=1` on a non-loopback bind makes the server refuse to start unless `VIBESPOT_TRUST_PROXY=1` also acknowledges that an authenticating proxy is the sole ingress; even then it warns at boot. Keep the app port `expose`-only (as the compose files do) — never `ports`-publish 4200 with auth disabled.
 
 ## Authentication gate — Azure Entra SSO (optional)
 

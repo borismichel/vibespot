@@ -34,9 +34,9 @@ import { jsonResponse } from "./route-helpers.js";
 import { publicErrorMessage } from "./errors.js";
 import {
   resolveSecurityConfig,
+  checkDisabledAuthBind,
   checkRequestAuth,
   isAllowedOrigin,
-  isLoopbackHost,
   AUTH_COOKIE,
   type SecurityConfig,
 } from "./security.js";
@@ -459,12 +459,17 @@ export function startServer(opts: ServerOptions): Promise<StartedServer> {
   serverContentMode = opts.contentMode || "page";
   security = resolveSecurityConfig(opts.host);
 
-  if (!isLoopbackHost(security.host) && !security.authToken) {
-    console.warn(
-      "  ! vibeSpot is bound to a non-loopback address with auth disabled.\n" +
-      "  ! Anyone who can reach the port can use your AI keys and HubSpot account.\n" +
-      "  ! Only do this behind a trusted auth proxy (see docker-compose.auth.yml)."
-    );
+  // VIB-1906: disabling auth on a non-loopback bind is refused outright unless
+  // VIBESPOT_TRUST_PROXY=1 acknowledges that an authenticating proxy is the
+  // sole ingress to the app port (and even then it warns loudly). The only way
+  // to reach a token-less non-loopback config is VIBESPOT_DISABLE_AUTH=1, so
+  // this gate subsumes the old soft warning.
+  const disabledAuthGate = checkDisabledAuthBind(security);
+  if (disabledAuthGate.severity === "refuse") {
+    throw new Error(disabledAuthGate.message!);
+  }
+  if (disabledAuthGate.severity === "warn") {
+    console.warn(disabledAuthGate.message);
   }
 
   const server = createServer((req, res) => handleRequest(req, res, uiDir));

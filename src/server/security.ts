@@ -69,6 +69,48 @@ export function resolveSecurityConfig(hostOverride?: string): SecurityConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Disabled-auth bind guard (VIB-1906)
+// ---------------------------------------------------------------------------
+
+export interface DisabledAuthGate {
+  severity: "none" | "warn" | "refuse";
+  message: string | null;
+}
+
+/**
+ * Guard the Entra/oauth2-proxy invariant: VIBESPOT_DISABLE_AUTH=1 on a
+ * non-loopback bind is only safe when an authenticating proxy is the sole
+ * ingress to the app port. Without VIBESPOT_TRUST_PROXY=1 acknowledging that
+ * topology, the server refuses to start rather than silently serving a fully
+ * unauthenticated surface (AI keys + HubSpot account behind it).
+ */
+export function checkDisabledAuthBind(cfg: SecurityConfig): DisabledAuthGate {
+  if (!cfg.authDisabled || isLoopbackHost(cfg.host)) {
+    return { severity: "none", message: null };
+  }
+  if (envFlag("VIBESPOT_TRUST_PROXY")) {
+    return {
+      severity: "warn",
+      message:
+        "  ! AUTH IS DISABLED on a non-loopback bind (VIBESPOT_DISABLE_AUTH=1 + VIBESPOT_TRUST_PROXY=1).\n" +
+        "  ! An authenticating proxy MUST be the only way to reach this server.\n" +
+        "  ! Never publish the app port directly (keep it expose-only, e.g. behind\n" +
+        "  ! the docker-compose.auth.yml Entra gate) — anyone who reaches it can\n" +
+        "  ! use your AI keys and HubSpot account.",
+    };
+  }
+  return {
+    severity: "refuse",
+    message:
+      `VIBESPOT_DISABLE_AUTH=1 with a non-loopback bind (${cfg.host}) would serve a fully ` +
+      "unauthenticated server — anyone who can reach the port could use your AI keys and " +
+      "HubSpot account. Refusing to start. If an authenticating proxy (e.g. the " +
+      "docker-compose.auth.yml Entra/oauth2-proxy gate) is the ONLY ingress to this port, " +
+      "set VIBESPOT_TRUST_PROXY=1 to acknowledge that and continue.",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Host / origin validation
 // ---------------------------------------------------------------------------
 
