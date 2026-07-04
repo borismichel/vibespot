@@ -3,6 +3,7 @@
  *
  *   GET  /api/whats-new          → { show, content, currentVersion }
  *   POST /api/whats-new/dismiss  → { ok } and persists lastSeenVersion
+ *   GET  /api/changelog          → { changelog }
  *
  * Content is read from assets/whats-new.json (generated from CHANGELOG.md at
  * build/release time by scripts/gen-whats-new.ts). `show` is true only when the
@@ -12,7 +13,7 @@
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
-import { resolveAsset, getVersion } from "../../utils/fs.js";
+import { resolveAsset, getVersion, getChangelog } from "../../utils/fs.js";
 import { loadConfig, saveConfig } from "../../utils/config.js";
 import { jsonResponse, readBody } from "../route-helpers.js";
 
@@ -72,4 +73,8 @@ export function handleWhatsNewDismissRoute(req: IncomingMessage, res: ServerResp
     saveConfig({ lastSeenVersion: version });
     jsonResponse(res, 200, { ok: true, lastSeenVersion: version });
   });
+}
+
+export function handleChangelogRoute(res: ServerResponse): void {
+  jsonResponse(res, 200, { changelog: getChangelog() });
 }
