@@ -116,16 +116,15 @@ function showHubSpotSetupDialog(mode) {
           });
           const data = await res.json();
           if (data.jobId) {
-            // Poll until done
-            for (let i = 0; i < 60; i++) {
-              await new Promise((r) => setTimeout(r, 2000));
-              const jr = await fetch("/api/settings/job/" + data.jobId).then((r) => r.json());
-              if (jr.status === "completed") { close(true); return; }
-              if (jr.status === "failed") { close(false); return; }
-            }
+            // pollJob (setup.js) resolves on success and throws on
+            // failure / lost job (404) / timeout.
+            await pollJob(data.jobId);
+            close(true);
+            return;
           }
           close(false);
-        } catch {
+        } catch (err) {
+          await vibeAlert("Install failed: " + (err.message || err), "Error");
           close(false);
         }
       });

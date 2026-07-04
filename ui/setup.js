@@ -136,19 +136,27 @@ async function initSetup() {
     // Show "Continue where you left off" cards above the create options
     populateRecentProjects(info);
 
-    // Auto-select engine if available but not yet chosen
+    // Auto-select engine if available but not yet chosen. Guarded on its own:
+    // a transient failure here just leaves the "no engine" alert visible —
+    // it must not abort the rest of setup rendering.
     if (info.availableEngines && info.availableEngines.length > 0 && !info.activeEngine) {
       const engine = info.availableEngines[0];
-      await fetch("/api/settings/engine", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ engine }),
-      });
-      info.activeEngine = engine;
-      info.aiAvailable = true;
-      // Update statusbar
-      const statusEngine = document.getElementById("status-engine");
-      if (statusEngine) statusEngine.textContent = ENGINE_DISPLAY_NAMES[engine] || engine;
+      try {
+        const engineRes = await fetch("/api/settings/engine", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ engine }),
+        });
+        if (engineRes.ok) {
+          info.activeEngine = engine;
+          info.aiAvailable = true;
+          // Update statusbar
+          const statusEngine = document.getElementById("status-engine");
+          if (statusEngine) statusEngine.textContent = ENGINE_DISPLAY_NAMES[engine] || engine;
+        }
+      } catch (err) {
+        console.warn("[setup] engine auto-select failed", err);
+      }
     }
 
     // Show environment alerts
@@ -1073,21 +1081,42 @@ async function handleCliAction(engineId, action, btn) {
     }
     // Refresh walkthrough to show updated status
     showWalkthrough();
-  } catch {
+  } catch (err) {
     btn.disabled = false;
     btn.textContent = origText;
+    await vibeAlert((action === "install" ? "Install failed: " : "Sign-in failed: ") + (err.message || err), "Error");
   }
 }
 
-async function pollJob(jobId) {
-  for (let i = 0; i < 60; i++) {
-    await new Promise((r) => setTimeout(r, 2000));
+// Poll a background job until it finishes. Resolves with the job payload on
+// success; throws on failure, on a vanished job (404 — the server restarted
+// or GC'd it, so it will never complete), and on timeout — so callers can't
+// spin forever on a dead job. Also used by upload-panel.js.
+async function pollJob(jobId, { timeoutMs = 5 * 60 * 1000, intervalMs = 2000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    let res;
     try {
-      const res = await fetch("/api/settings/job/" + jobId);
-      const data = await res.json();
-      if (data.status === "completed" || data.status === "failed") return;
-    } catch { return; }
+      res = await fetch("/api/settings/job/" + jobId);
+    } catch {
+      continue; // transient network error — keep polling until the deadline
+    }
+    if (res.status === 404) {
+      throw new Error("The background job was lost (server restarted?). Please try again.");
+    }
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      continue;
+    }
+    if (data.status === "completed") return data;
+    if (data.status === "failed") {
+      throw new Error(data.output ? String(data.output).slice(-500) : "The background job failed.");
+    }
   }
+  throw new Error("Timed out waiting for the job to finish. Please try again.");
 }
 
 // ---------------------------------------------------------------------------
@@ -2123,6 +2152,17 @@ document.getElementById("figma-extract-btn")?.addEventListener("click", async ()
       body: JSON.stringify({ url }),
     });
 
+    // Non-streaming failure (auth gate, 4xx/5xx JSON error) — surface it
+    // instead of letting getReader() throw an opaque TypeError.
+    if (!res.ok || !res.body) {
+      let msg = "Extraction failed (" + res.status + ")";
+      try {
+        const errData = await res.json();
+        if (errData.error) msg = errData.error;
+      } catch { /* non-JSON error body */ }
+      throw new Error(msg);
+    }
+
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -2279,6 +2319,17 @@ async function startFigmaImport(extractionId, themeName, useAssets = true) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ extractionId, themeName, useAssets }),
     });
+
+    // Non-streaming failure (auth gate, 4xx/5xx JSON error) — surface it
+    // instead of letting getReader() throw an opaque TypeError.
+    if (!res.ok || !res.body) {
+      let msg = "Conversion failed (" + res.status + ")";
+      try {
+        const errData = await res.json();
+        if (errData.error) msg = errData.error;
+      } catch { /* non-JSON error body */ }
+      throw new Error(msg);
+    }
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
