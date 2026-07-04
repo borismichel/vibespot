@@ -36,7 +36,9 @@
       s
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 
     // Pull out fenced code blocks first so we don't process their contents.
     const fences = [];
@@ -61,9 +63,10 @@
       // Italic (*text* or _text_)
       s = s.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, "$1<em>$2</em>");
       s = s.replace(/(^|[^_])_([^_]+)_(?!_)/g, "$1<em>$2</em>");
-      // Links [text](url)
+      // Links [text](url) — `u` was escaped above (incl. quotes), so it can't
+      // break out of the href attribute; the scheme check blocks javascript: etc.
       s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, t, u) => {
-        const safeUrl = /^(https?:|\/|#|mailto:)/i.test(u) ? u : "#";
+        const safeUrl = /^(https?:|\/|#|mailto:)/i.test(u.trim()) ? u.trim() : "#";
         return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${t}</a>`;
       });
       return s;
@@ -559,11 +562,20 @@
       alert("There's no plan to approve yet. Send a chat message first.");
       return;
     }
-    // Collapse plan sidebar so user watches modules generate.
-    hidePlanView();
     // Resolve the parked "plan" checkpoint — plan mode is unified onto the
     // checkpoint primitive (VIB-1880). Server flips planMode off + builds.
-    ws.send(JSON.stringify({ type: "checkpoint_resolve", kind: "plan", action: "approve" }));
+    // Only clear local UI state once the send actually went out — a throwing
+    // send would otherwise leave the server still parked while the UI thinks
+    // the plan was approved.
+    try {
+      ws.send(JSON.stringify({ type: "checkpoint_resolve", kind: "plan", action: "approve" }));
+    } catch (err) {
+      console.error("[plan] approve send failed", err);
+      alert("Connection lost — please refresh and approve again.");
+      return;
+    }
+    // Collapse plan sidebar so user watches modules generate.
+    hidePlanView();
     // Local state will be refreshed by the next init or modules_updated event.
     planModeActive = false;
     window.planModeActive = false;

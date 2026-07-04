@@ -8,6 +8,12 @@ All notable changes to vibeSpot are documented here.
 
 ### Fixed
 
+- **UI shell robustness: plan-renderer XSS, job-poll hangs, fetch guards, brand upload** ([VIB-1899](/VIB/issues/VIB-1899)):
+  - The plan pane's markdown renderer escapes double/single quotes and validates link URLs, closing an attribute-injection XSS reachable from AI-generated plan text (`[x](https://a" onmouseover="…)`); the brand-kit logo preview only assigns `http(s)` URLs to `img.src` (no more `javascript:`/`data:` from the free-text field) and recovers cleanly from a bad URL instead of wedging.
+  - Install/Sign-in job polling no longer hangs forever: a 404'd job (server restart/GC) is terminal, failures surface the job output, and a 5-minute deadline reports a timeout instead of a silent spinner (setup walkthrough + HubSpot CLI install dialog now share one `pollJob`).
+  - Figma extract/generate check `response.ok`/body before streaming, so a non-streaming error (auth gate, 4xx/5xx) shows the server's message instead of an opaque `TypeError` with a half-disabled button; the setup screen's engine auto-select failure no longer aborts the whole setup render.
+  - Brand-asset uploads go up as multipart with a 1 MB cap enforced client- and server-side, and the server rejects binary/UTF-16 content — a mis-picked large or binary file no longer hangs the tab or lands as mojibake (`accept=".md,.txt"` was bypassable).
+  - Dashboard refresh drops stale in-flight responses after a theme switch, and plan approve keeps the plan UI intact if the WebSocket send fails.
 - **UI editing data-loss fixes; the three field-save paths are unified** ([VIB-1898](/VIB/issues/VIB-1898)):
   - All three field-editing surfaces (field editor sidebar, inline interact-mode edits, section-controls commits) now persist through one shared save module (`ui/field-save.js`) with the debounce keyed **per field** — editing a second field within the 300ms window no longer cancels the first field's save (silent edit loss), saves to the same field are serialized so an older POST can't land after a newer one, and closing the field editor flushes (rather than drops) a pending edit.
   - Inline image/link edits map to the **right** field: `findImageField`/`findLinkField` previously ignored the edited element's src/href and always returned the module's *first* image/link field, so editing the 2nd image overwrote the 1st. They now match the pre-edit URL (tolerating relative-vs-absolutized forms) and fall back only to a lone candidate. A link-text-only edit no longer blanks the stored URL.

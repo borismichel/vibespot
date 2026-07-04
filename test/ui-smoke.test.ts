@@ -213,6 +213,39 @@ describe("UI smoke harness — boot", () => {
       expect(win.document.getElementById(id), `#${id}`).toBeTruthy();
     }
   });
+
+  it("keeps the promise-based job poller un-shadowed after the full script load order (VIB-1931)", () => {
+    const { win } = bootUi();
+    // setup.js's pollJobUntilDone must survive settings.js loading after it.
+    // (The original pollJob name was shadowed by settings.js's legacy
+    // callback-style pollJob, turning the VIB-1899 fix into dead code.)
+    expect(typeof win.pollJobUntilDone).toBe("function");
+    expect(win.pollJobUntilDone.constructor.name).toBe("AsyncFunction");
+    expect(win.pollJobUntilDone.length).toBe(1); // (jobId, opts = {})
+    // The legacy settings.js poller keeps its own name and shape.
+    expect(win.pollJob.length).toBe(3); // (jobId, onComplete, onError)
+  });
+
+  it("has no top-level function declared by two different scripts (last-loaded silently wins)", () => {
+    // All ui/*.js are classic scripts sharing one global scope, so a name
+    // declared in two files means the later file's version shadows the
+    // earlier one everywhere — exactly the VIB-1931 pollJob bug.
+    // Known-benign duplicates (equivalent HTML-escape helpers) are pinned;
+    // don't add to this list, rename the new function instead.
+    const allowed = new Set(["escHtml", "esc"]);
+    const owners = new Map<string, string>();
+    const collisions: string[] = [];
+    for (const { file, code } of scriptSources) {
+      for (const m of code.matchAll(/^(?:async )?function ([A-Za-z0-9_$]+)/gm)) {
+        const name = m[1];
+        if (allowed.has(name)) continue;
+        const prev = owners.get(name);
+        if (prev && prev !== file) collisions.push(`${name} (${prev} + ${file})`);
+        owners.set(name, file);
+      }
+    }
+    expect(collisions, collisions.join(", ")).toEqual([]);
+  });
 });
 
 describe("UI smoke harness — chat-send", () => {
