@@ -81,22 +81,59 @@ export function tryRepairTruncatedJSON(raw: string): Record<string, unknown> | n
   return tryParseJSON(jsonStr) as Record<string, unknown> | null;
 }
 
+/** Coerce a fields/meta value to a JSON string, or null when absent/unusable. */
+function coerceJsonString(value: unknown): string | null {
+  if (typeof value === "string") return value.trim() ? value : null;
+  if (value === undefined || value === null) return null;
+  return JSON.stringify(value, null, 2);
+}
+
 /**
  * Convert a raw module object from AI JSON into a ModuleFiles entry.
+ * Returns null when the module is malformed (empty name, missing
+ * fieldsJson/metaJson): persisting such a module poisons the session —
+ * the next writeModulesToDisk throws on the undefined file content and
+ * preview/upload crash-loop until the session is repaired by hand (VIB-1894).
  */
-function toModuleFiles(m: Record<string, unknown>): ModuleFiles {
+function toModuleFiles(m: Record<string, unknown>): ModuleFiles | null {
+  const moduleName = typeof m.moduleName === "string" ? m.moduleName.trim() : "";
+  const fieldsJson = coerceJsonString(m.fieldsJson);
+  const metaJson = coerceJsonString(m.metaJson);
+  if (!moduleName || fieldsJson === null || metaJson === null) return null;
   return {
-    moduleName: String(m.moduleName || ""),
-    fieldsJson: typeof m.fieldsJson === "string"
-      ? m.fieldsJson
-      : JSON.stringify(m.fieldsJson, null, 2),
-    metaJson: typeof m.metaJson === "string"
-      ? m.metaJson
-      : JSON.stringify(m.metaJson, null, 2),
+    moduleName,
+    fieldsJson,
+    metaJson,
     moduleHtml: String(m.moduleHtml || ""),
     moduleCss: String(m.moduleCss || ""),
     moduleJs: m.moduleJs ? String(m.moduleJs) : undefined,
   };
+}
+
+/**
+ * Map raw module objects to validated ModuleFiles, dropping (and logging)
+ * malformed entries instead of persisting them.
+ */
+function collectValidModules(
+  rawModules: unknown[],
+  onWarning?: (warning: string) => void
+): ModuleFiles[] {
+  const valid: ModuleFiles[] = [];
+  let dropped = 0;
+  for (const raw of rawModules) {
+    const mod = raw && typeof raw === "object" ? toModuleFiles(raw as Record<string, unknown>) : null;
+    if (mod) {
+      valid.push(mod);
+    } else {
+      dropped++;
+      const name = raw && typeof raw === "object" ? (raw as Record<string, unknown>).moduleName : undefined;
+      log.warn("parse", "Dropping malformed module (missing name/fieldsJson/metaJson)", { moduleName: name });
+    }
+  }
+  if (dropped > 0 && onWarning) {
+    onWarning(`${dropped} module(s) in the AI response were incomplete and skipped. Try sending your request again.`);
+  }
+  return valid;
 }
 
 /**
@@ -123,12 +160,15 @@ export function parseAndApplyModules(
 
       const obj = data as Record<string, unknown>;
       if (obj.modules && Array.isArray(obj.modules)) {
-        updateModules({
-          modules: obj.modules.map((m: Record<string, unknown>) => toModuleFiles(m)),
-          sharedCss: obj.sharedCss !== undefined ? String(obj.sharedCss) : undefined,
-          sharedJs: obj.sharedJs !== undefined ? String(obj.sharedJs) : undefined,
-        });
-        modulesApplied = true;
+        const validModules = collectValidModules(obj.modules, onWarning);
+        if (validModules.length > 0) {
+          updateModules({
+            modules: validModules,
+            sharedCss: obj.sharedCss !== undefined ? String(obj.sharedCss) : undefined,
+            sharedJs: obj.sharedJs !== undefined ? String(obj.sharedJs) : undefined,
+          });
+          modulesApplied = true;
+        }
       }
     } catch (err) {
       log.warn("parse", "Failed to parse vibespot-modules block", { error: err instanceof Error ? err.message : String(err) });
@@ -145,12 +185,15 @@ export function parseAndApplyModules(
         if (!data || typeof data !== "object") throw new Error("Invalid JSON after repair");
         const obj = data as Record<string, unknown>;
         if (obj.modules && Array.isArray(obj.modules)) {
-          updateModules({
-            modules: obj.modules.map((m: Record<string, unknown>) => toModuleFiles(m)),
-            sharedCss: obj.sharedCss !== undefined ? String(obj.sharedCss) : undefined,
-            sharedJs: obj.sharedJs !== undefined ? String(obj.sharedJs) : undefined,
-          });
-          modulesApplied = true;
+          const validModules = collectValidModules(obj.modules, onWarning);
+          if (validModules.length > 0) {
+            updateModules({
+              modules: validModules,
+              sharedCss: obj.sharedCss !== undefined ? String(obj.sharedCss) : undefined,
+              sharedJs: obj.sharedJs !== undefined ? String(obj.sharedJs) : undefined,
+            });
+            modulesApplied = true;
+          }
         }
       } catch (err) {
         log.warn("parse", "Failed to parse JSON module block", { error: err instanceof Error ? err.message : String(err) });
@@ -170,15 +213,18 @@ export function parseAndApplyModules(
       if (salvaged) {
         const obj = salvaged as Record<string, unknown>;
         if (obj.modules && Array.isArray(obj.modules) && obj.modules.length > 0) {
-          log.info("parse", "Salvaged modules from truncated response", { count: obj.modules.length });
-          updateModules({
-            modules: (obj.modules as Record<string, unknown>[]).map((m) => toModuleFiles(m)),
-            sharedCss: obj.sharedCss !== undefined ? String(obj.sharedCss) : undefined,
-            sharedJs: obj.sharedJs !== undefined ? String(obj.sharedJs) : undefined,
-          });
-          modulesApplied = true;
-          if (onWarning) {
-            onWarning("Response was truncated — some modules may be incomplete. Try sending your request again for the full set.");
+          const validModules = collectValidModules(obj.modules, onWarning);
+          if (validModules.length > 0) {
+            log.info("parse", "Salvaged modules from truncated response", { count: validModules.length });
+            updateModules({
+              modules: validModules,
+              sharedCss: obj.sharedCss !== undefined ? String(obj.sharedCss) : undefined,
+              sharedJs: obj.sharedJs !== undefined ? String(obj.sharedJs) : undefined,
+            });
+            modulesApplied = true;
+            if (onWarning) {
+              onWarning("Response was truncated — some modules may be incomplete. Try sending your request again for the full set.");
+            }
           }
         }
       }

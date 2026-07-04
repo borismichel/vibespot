@@ -31,6 +31,33 @@ async function getAnthropicSDK(): Promise<typeof import("@anthropic-ai/sdk").def
 }
 
 // ---------------------------------------------------------------------------
+// OpenAI completion-token caps (VIB-1894)
+// ---------------------------------------------------------------------------
+
+/**
+ * We want up to ~48k output tokens per generation, but each OpenAI-compatible
+ * model enforces its own completion cap and 400s any request above it (the
+ * default gpt-4o caps at 16384). Clamp the request to the model's documented
+ * cap; unknown models get the conservative default so the call never 400s.
+ */
+const OPENAI_REQUESTED_MAX_TOKENS = 48_000;
+const OPENAI_DEFAULT_TOKEN_CAP = 16_384;
+const OPENAI_MODEL_TOKEN_CAPS: Array<[RegExp, number]> = [
+  [/^gpt-5/i, 128_000],
+  [/^(o1|o3|o4)/i, 100_000],
+  [/^gpt-4\.1/i, 32_768],
+  [/^gpt-4o/i, 16_384],
+  [/^(gpt-4-turbo|gpt-4-\d|gpt-3\.5)/i, 4_096],
+];
+
+export function resolveOpenAIMaxTokens(model: string): number {
+  for (const [pattern, cap] of OPENAI_MODEL_TOKEN_CAPS) {
+    if (pattern.test(model)) return Math.min(OPENAI_REQUESTED_MAX_TOKENS, cap);
+  }
+  return OPENAI_DEFAULT_TOKEN_CAP;
+}
+
+// ---------------------------------------------------------------------------
 // File context helper (for CLI engines that don't support vision)
 // ---------------------------------------------------------------------------
 
@@ -284,7 +311,7 @@ export async function streamWithOpenAIAPI(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 48000,
+      max_tokens: resolveOpenAIMaxTokens(model),
       stream: true,
       // Ask for a final usage chunk (choices:[] + usage) so we can capture
       // token counts on the streaming path, same as the non-streaming adapter.
@@ -420,13 +447,20 @@ export async function streamWithGeminiAPI(
   contents.push({ role: "user", parts: userParts });
 
   const model = modelOverride || "gemini-2.5-flash";
+  // The default Google URL carries the key as a query param; a custom gateway
+  // URL (Langdock /google) does not, so the key must go in an auth header or
+  // every call 401s (VIB-1894). Langdock authenticates via Bearer.
+  const usingCustomUrl = Boolean(fetchURL);
   const url = fetchURL || `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
   const systemContent = buildVibeSystemPrompt(conversionGuide, themeName, editMode, ctx.pageType, ctx.brandAssets);
   const startTime = new Date();
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(usingCustomUrl ? { Authorization: `Bearer ${apiKey}` } : {}),
+    },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemContent }] },
       contents,

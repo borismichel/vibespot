@@ -6,6 +6,16 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- **AI pipeline correctness fixes** ([VIB-1894](/VIB/issues/VIB-1894)) — six defects across the generation pipeline:
+  - Single-call OpenAI chat requested `max_tokens: 48000`, above gpt-4o's 16384 completion cap, so every request 400'd. The budget is now clamped per model family (`resolveOpenAIMaxTokens`), keeping 48k where the model allows it.
+  - Langdock's `/google` gateway got no credentials — the Gemini adapters only put the key in the default Google URL's query string — so 100% of langdock-api+google calls returned 401. Custom gateway URLs now send `Authorization: Bearer`, on both the single-call streaming path and the agentic engine adapter.
+  - A malformed AI module (missing `fieldsJson`/`metaJson`, or an empty name) was persisted into the session, poisoning it: the next `writeModulesToDisk` threw and preview/upload crash-looped until manual repair. Malformed modules are now validated and dropped with a user-visible warning (single-call parser and legacy converter).
+  - The VIB-1855 context budget was applied per module instead of per emitted source block (each module emits up to 4, plus uncounted shared CSS/JS), letting 1-3 huge modules reach several times the 200k budget and bounce off the model's context window.
+  - Langfuse `flush()` had no request timeout and was awaited on the generation critical path — a black-holed telemetry endpoint stalled "generation complete" for minutes. The flush now carries a 10s `AbortSignal.timeout` and the pipeline no longer awaits it.
+  - Upload auto-fix matched error text case-sensitively (the color fix never triggered against "Color field…") and the `dnd_area_stylesheet` fix was shadowed by the generic `dnd` branch. Matching is now case-insensitive and the stylesheet branch is checked first.
+
 ### Security
 
 - **The live preview no longer runs AI-generated code on the app origin** ([VIB-1892](/VIB/issues/VIB-1892)) — the preview iframe used `srcdoc` with `sandbox="allow-scripts allow-same-origin"`, which on `srcdoc` inherits the app origin and neuters the sandbox: a `<script>` in generated (or prompt-injected / imported-theme) page code could reach the app's DOM and every `/api/*` route — rewrite the UI, flip settings, read the masked API-key state, drive uploads. Now:

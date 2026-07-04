@@ -129,18 +129,25 @@ export function applyAutoFixes(themePath: string): string[] {
 }
 
 export function autoFixError(themePath: string, error: UploadError): boolean {
-  if (error.message.includes("textarea")) return fixTextareaFields(themePath);
-  if (error.message.includes("reserved field name")) return fixReservedNames(themePath);
-  if (error.message.includes("now()")) return fixNowFunction(themePath);
-  if (error.message.includes("HubDB")) return fixHubDbTemplates(themePath);
-  if (error.message.includes("invalid default value") || error.message.includes("deserialization"))
+  // Match case-insensitively: our own parsers and the raw HubSpot API text
+  // disagree on casing (e.g. "Color field has invalid format" vs "color"),
+  // which silently disabled the color fix (VIB-1894).
+  const msg = error.message.toLowerCase();
+  if (msg.includes("textarea")) return fixTextareaFields(themePath);
+  if (msg.includes("reserved field name")) return fixReservedNames(themePath);
+  if (msg.includes("now()")) return fixNowFunction(themePath);
+  if (msg.includes("hubdb")) return fixHubDbTemplates(themePath);
+  if (msg.includes("invalid default value") || msg.includes("deserialization"))
     return fixLinkFieldDefaults(themePath);
-  if (error.message.includes("invalid format") && error.message.includes("color"))
+  if (msg.includes("color") && msg.includes("invalid"))
     return fixColorFieldDefaults(themePath);
-  if (error.message.includes("dnd") || error.message.includes("Dnd area"))
-    return fixEmailDndAreaName(themePath);
-  if (error.message.includes("dnd_area_stylesheet"))
+  // Check the stylesheet variant before the generic dnd match — every
+  // "dnd_area_stylesheet" message also contains "dnd", so the old order made
+  // this branch unreachable (VIB-1894).
+  if (msg.includes("dnd_area_stylesheet"))
     return fixEmailDndAreaStylesheet(themePath);
+  if (msg.includes("dnd"))
+    return fixEmailDndAreaName(themePath);
   return false;
 }
 

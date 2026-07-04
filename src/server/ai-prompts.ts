@@ -399,7 +399,7 @@ ${conversionGuide}` + formatReminder;
  * ~50k tokens so the guides + the model's own reasoning headroom always fit.
  * ≈4 chars/token, so 200k chars ≈ 50k tokens.
  */
-const STATE_CONTEXT_CHAR_BUDGET = 200_000;
+export const STATE_CONTEXT_CHAR_BUDGET = 200_000;
 
 /** Truncate a source block to `max` chars with a visible marker when clipped. */
 function clampSource(source: string, max: number): string {
@@ -428,8 +428,14 @@ export function buildStateContext(): string {
     parts.push("\n## Current Module State\n");
     let used = 0;
     let budgetExceeded = false;
-    // Per-block cap scales down with module count so no single module hogs the budget.
-    const perBlockCap = Math.max(2_000, Math.floor(STATE_CONTEXT_CHAR_BUDGET / Math.max(total, 1)));
+    // The cap must be per SOURCE, not per module: each module block emits up
+    // to 4 clamped sources (fields/html/css/js) and the shared CSS/JS append
+    // two more, so a per-module cap let 1-3 huge modules reach several times
+    // the budget and bounce off the model's context window (VIB-1894).
+    const SOURCES_PER_MODULE = 4;
+    const SHARED_SOURCE_BLOCKS = 2;
+    const totalSources = Math.max(total, 1) * SOURCES_PER_MODULE + SHARED_SOURCE_BLOCKS;
+    const perSourceCap = Math.max(2_000, Math.floor(STATE_CONTEXT_CHAR_BUDGET / totalSources));
     for (let i = 0; i < total; i++) {
       const mod = modules[i];
       if (budgetExceeded) {
@@ -438,19 +444,19 @@ export function buildStateContext(): string {
       }
       const block =
         `\n### ${i + 1}/${total}: ${mod.moduleName}.module\n` +
-        `**fields.json:**\n\`\`\`json\n${clampSource(mod.fieldsJson, perBlockCap)}\n\`\`\`\n` +
-        `**module.html:**\n\`\`\`html\n${clampSource(mod.moduleHtml, perBlockCap)}\n\`\`\`\n` +
-        `**module.css:**\n\`\`\`css\n${clampSource(mod.moduleCss, perBlockCap)}\n\`\`\`\n` +
-        (mod.moduleJs ? `**module.js:**\n\`\`\`js\n${clampSource(mod.moduleJs, perBlockCap)}\n\`\`\`\n` : "");
+        `**fields.json:**\n\`\`\`json\n${clampSource(mod.fieldsJson, perSourceCap)}\n\`\`\`\n` +
+        `**module.html:**\n\`\`\`html\n${clampSource(mod.moduleHtml, perSourceCap)}\n\`\`\`\n` +
+        `**module.css:**\n\`\`\`css\n${clampSource(mod.moduleCss, perSourceCap)}\n\`\`\`\n` +
+        (mod.moduleJs ? `**module.js:**\n\`\`\`js\n${clampSource(mod.moduleJs, perSourceCap)}\n\`\`\`\n` : "");
       used += block.length;
       parts.push(block);
       if (used > STATE_CONTEXT_CHAR_BUDGET) budgetExceeded = true;
     }
     if (session.sharedCss) {
-      parts.push(`\n### Shared CSS\n\`\`\`css\n${clampSource(session.sharedCss, perBlockCap)}\n\`\`\`\n`);
+      parts.push(`\n### Shared CSS\n\`\`\`css\n${clampSource(session.sharedCss, perSourceCap)}\n\`\`\`\n`);
     }
     if (session.sharedJs) {
-      parts.push(`\n### Shared JS\n\`\`\`js\n${clampSource(session.sharedJs, perBlockCap)}\n\`\`\`\n`);
+      parts.push(`\n### Shared JS\n\`\`\`js\n${clampSource(session.sharedJs, perSourceCap)}\n\`\`\`\n`);
     }
   }
 

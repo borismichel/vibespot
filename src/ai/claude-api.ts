@@ -92,14 +92,26 @@ export class ClaudeAPIEngine implements AIEngine {
 
       try {
         const parsed = JSON.parse(response);
+        // A response missing fieldsJson/metaJson must not reach disk:
+        // JSON.stringify(undefined) yields undefined and the writes below
+        // throw after partial files exist (VIB-1894). Skip the module instead.
+        const fieldsJson = typeof parsed.fieldsJson === "string"
+          ? parsed.fieldsJson
+          : parsed.fieldsJson != null
+            ? JSON.stringify(parsed.fieldsJson, null, 2)
+            : null;
+        const metaJson = typeof parsed.metaJson === "string"
+          ? parsed.metaJson
+          : parsed.metaJson != null
+            ? JSON.stringify(parsed.metaJson, null, 2)
+            : null;
+        if (!fieldsJson || !metaJson) {
+          throw new Error("Response is missing fieldsJson or metaJson");
+        }
         const mod: ModuleFiles = {
           moduleName,
-          fieldsJson: typeof parsed.fieldsJson === "string"
-            ? parsed.fieldsJson
-            : JSON.stringify(parsed.fieldsJson, null, 2),
-          metaJson: typeof parsed.metaJson === "string"
-            ? parsed.metaJson
-            : JSON.stringify(parsed.metaJson, null, 2),
+          fieldsJson,
+          metaJson,
           moduleHtml: parsed.moduleHtml || "",
           moduleCss: parsed.moduleCss || "",
           moduleJs: parsed.moduleJs || undefined,

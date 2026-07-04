@@ -557,11 +557,18 @@ async function callGemini(
     },
   };
 
+  // The default Google URL carries the key as a query param; a custom gateway
+  // URL (Langdock /google) does not, so the key must go in an auth header or
+  // every call 401s (VIB-1894). Langdock authenticates via Bearer.
+  const usingCustomUrl = Boolean(fetchURL);
   const url = fetchURL || `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(usingCustomUrl ? { Authorization: `Bearer ${apiKey}` } : {}),
+    },
     body: JSON.stringify(body),
     signal: opts.signal,
   });

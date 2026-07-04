@@ -184,7 +184,10 @@ export async function runWithTrace<T>(
   try {
     return await traceStore.run({ traceId, sessionId: meta.sessionId }, fn);
   } finally {
-    await flush();
+    // Fire-and-forget: this finally sits on the generation critical path, and
+    // awaiting a stalled ingestion endpoint held "generation complete" hostage
+    // for minutes (VIB-1894). flush() swallows its own errors.
+    void flush();
   }
 }
 
@@ -437,6 +440,12 @@ export function reportModelUsage(params: {
   });
 }
 
+/**
+ * Hard deadline on the telemetry POST so a black-holed endpoint can never
+ * stall a caller — telemetry must never block generation (VIB-1894).
+ */
+const FLUSH_TIMEOUT_MS = 10_000;
+
 /** POST any buffered events to Langfuse. Errors are logged, never thrown. */
 export async function flush(): Promise<void> {
   const settings = resolveSettings();
@@ -456,6 +465,7 @@ export async function flush(): Promise<void> {
         Authorization: `Basic ${auth}`,
       },
       body: JSON.stringify({ batch }),
+      signal: AbortSignal.timeout(FLUSH_TIMEOUT_MS),
     });
     if (!res.ok && res.status !== 207) {
       const text = await res.text().catch(() => "");
