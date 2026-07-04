@@ -97,6 +97,17 @@ describe("renderHubL — variables", () => {
     const c: RenderContext = { module: { text: "line1\\nline2" } };
     expect(renderHubL("{{ module.text }}", c)).toBe("line1 line2");
   });
+
+  it("escapes expression output by default", () => {
+    const c: RenderContext = {
+      module: {
+        text: `</script><script>window.pwned=1</script><img src=x onerror="alert('x')">`,
+      },
+    };
+    expect(renderHubL("<p>{{ module.text }}</p>", c)).toBe(
+      "<p>&lt;/script&gt;&lt;script&gt;window.pwned=1&lt;/script&gt;&lt;img src=x onerror=&quot;alert(&#39;x&#39;)&quot;&gt;</p>",
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -128,6 +139,11 @@ describe("renderHubL — filters", () => {
     expect(renderHubL("{{ module.html|escape }}", c)).toBe(
       "&lt;b&gt;&quot;hi&quot;&lt;/b&gt;",
     );
+  });
+
+  it("does not double-escape explicit |escape output", () => {
+    const c: RenderContext = { module: { html: "<b>hi</b>" } };
+    expect(renderHubL("{{ module.html|escape }}", c)).toBe("&lt;b&gt;hi&lt;/b&gt;");
   });
 
   it("applies |default(fallback) when value is empty", () => {
@@ -238,6 +254,33 @@ describe("renderHubL — conditionals", () => {
     expect(
       renderHubL("{% if module.count > 5 %}big{% endif %}", ctx),
     ).toBe("big");
+  });
+
+  it("selects elif branches without leaking else bodies", () => {
+    const ctx: RenderContext = { module: { tier: "pro" } };
+    const tpl = '{% if module.tier == "enterprise" %}enterprise{% elif module.tier == "pro" %}pro{% else %}basic{% endif %}';
+    expect(renderHubL(tpl, ctx)).toBe("pro");
+  });
+
+  it("keeps nested conditionals associated with their owning branch", () => {
+    const ctx: RenderContext = { module: { outer: false, inner: true, alt: true } };
+    const tpl = [
+      "{% if module.outer %}",
+      "outer",
+      "{% if module.inner %}inner{% else %}inner-else{% endif %}",
+      "{% elif module.alt %}",
+      "alt",
+      "{% else %}",
+      "fallback",
+      "{% endif %}",
+    ].join("");
+    expect(renderHubL(tpl, ctx)).toBe("alt");
+  });
+
+  it("handles comparison text inside a true branch", () => {
+    const ctx: RenderContext = { module: { count: 12 } };
+    const tpl = "{% if module.count > 10 %}<span>5 > 3</span>{% elif module.count > 5 %}mid{% else %}low{% endif %}";
+    expect(renderHubL(tpl, ctx)).toBe("<span>5 > 3</span>");
   });
 
   it("empty string is falsy", () => {
@@ -381,6 +424,21 @@ describe("assemblePreview", () => {
 
     expect(html).toContain("<div>hi</div>");
     expect(html).not.toContain("<style></style>");
+  });
+
+  it("does not allow CSS or JS to break out of preview tags", () => {
+    const html = assemblePreview({
+      renderedModules: ["<div>hi</div>"],
+      sharedCss: "body{color:red}</style><script>window.cssPwned=1</script>",
+      moduleCssArray: [],
+      sharedJs: "console.log('</script><script>window.jsPwned=1</script>')",
+      moduleJsArray: [],
+    });
+
+    expect(html).toContain("<\\/style><script>window.cssPwned=1</script>");
+    expect(html).toContain("<\\/script><script>window.jsPwned=1<\\/script>");
+    expect(html).not.toContain("</style><script>window.cssPwned=1</script>");
+    expect(html).not.toContain("</script><script>window.jsPwned=1</script>");
   });
 });
 

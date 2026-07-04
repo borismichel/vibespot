@@ -4,7 +4,7 @@
  * Supports the constructs that AI-generated HubSpot modules actually use:
  *   {{ module.field }}             — variable access
  *   {{ module.group.child }}       — nested access
- *   {% if module.field %}...{% endif %}     — conditionals (+ {% else %})
+ *   {% if module.field %}...{% endif %}     — conditionals (+ {% elif %}/{% else %})
  *   {% for item in module.list %}...{% endfor %} — loops
  *   {{ item.field }}               — loop variable access
  *
@@ -95,7 +95,7 @@ export function assemblePreview(opts: {
     ...opts.moduleCssArray,
   ]
     .filter(Boolean)
-    .map((css) => `<style>${css}</style>`)
+    .map((css) => `<style>${escapeStyleContent(css)}</style>`)
     .join("\n");
 
   const scriptBlocks = [
@@ -103,7 +103,7 @@ export function assemblePreview(opts: {
     ...opts.moduleJsArray,
   ]
     .filter(Boolean)
-    .map((js) => `<script>${js}</script>`)
+    .map((js) => `<script>${escapeScriptContent(js)}</script>`)
     .join("\n");
 
   const body = opts.renderedModules.join("\n");
@@ -170,9 +170,7 @@ const RE_MODULE_TAG = /\{%[-\s]*module\b.*?%\}/gs;
 const RE_TEMPLATE_TAGS = /\{%[-\s]*(extends|block|endblock|set)\b.*?%\}/gs;
 const RE_ANNOTATIONS = /\{#.*?#\}/gs;
 const RE_CONTENT_VARS = /\{\{[-\s]*content\.\w+.*?\}\}/gs;
-// Match only INNERMOST if/endif blocks (body must not contain other {% if %} tags).
-// The while-loop peels layers from inside out, resolving nested conditionals correctly.
-const RE_IF_PATTERN = /\{%[-\s]*if\s+(.*?)\s*-?%\}((?:(?!\{%[-\s]*if\s)[\s\S])*?)\{%[-\s]*endif\s*-?%\}/g;
+const RE_CONDITIONAL_TAG = /\{%[-\s]*(if\s+([\s\S]*?)|elif\s+([\s\S]*?)|else|endif)\s*-?%\}/g;
 
 /**
  * Strip HubSpot-specific directives that have no meaning in local preview.
@@ -274,47 +272,86 @@ function findOutermostFor(tpl: string): { varName: string; iterExpr: string; bod
  * Supports {% elif %} as well.
  */
 function processConditionals(tpl: string, context: RenderContext): string {
-  // Process from innermost out
   let result = tpl;
   let safety = 0;
 
-  while (RE_IF_PATTERN.test(result) && safety < 50) {
+  while (safety < 50) {
     safety++;
-    result = result.replace(RE_IF_PATTERN, (_match, condition: string, body: string) => {
-      // Split on {% else %} and {% elif %}
-      const elseMatch = body.split(/\{%[-\s]*else\s*-?%\}/);
-      const ifBody = elseMatch[0];
-      const elseBody = elseMatch[1] || "";
+    const block = findInnermostIfBlock(result);
+    if (!block) break;
 
-      // Check for {% elif %} (treat as nested if-else)
-      const elifParts = ifBody.split(/\{%[-\s]*elif\s+(.*?)\s*-?%\}/);
-
-      if (elifParts.length > 1) {
-        // Has elif branches
-        if (evaluateCondition(condition, context)) {
-          return elifParts[0];
-        }
-        // Check elif branches
-        for (let i = 1; i < elifParts.length; i += 2) {
-          const elifCondition = elifParts[i];
-          const elifBody = elifParts[i + 1] || "";
-          if (evaluateCondition(elifCondition, context)) {
-            return elifBody;
-          }
-        }
-        return elseBody;
-      }
-
-      if (evaluateCondition(condition, context)) {
-        return ifBody;
-      }
-      return elseBody;
-    });
-
-    RE_IF_PATTERN.lastIndex = 0;
+    const rendered = renderConditionalBlock(block.condition, block.body, context);
+    result = result.slice(0, block.start) + rendered + result.slice(block.end);
   }
 
   return result;
+}
+
+function findInnermostIfBlock(tpl: string): { condition: string; body: string; start: number; end: number } | null {
+  const stack: { condition: string; start: number; bodyStart: number }[] = [];
+  RE_CONDITIONAL_TAG.lastIndex = 0;
+
+  let match: RegExpExecArray | null;
+  while ((match = RE_CONDITIONAL_TAG.exec(tpl)) !== null) {
+    const tag = match[1].trim();
+
+    if (tag.startsWith("if ")) {
+      stack.push({
+        condition: match[2].trim(),
+        start: match.index,
+        bodyStart: match.index + match[0].length,
+      });
+    } else if (tag === "endif" && stack.length > 0) {
+      const open = stack.pop()!;
+      return {
+        condition: open.condition,
+        body: tpl.slice(open.bodyStart, match.index),
+        start: open.start,
+        end: match.index + match[0].length,
+      };
+    }
+  }
+
+  return null;
+}
+
+function renderConditionalBlock(condition: string, body: string, context: RenderContext): string {
+  const branches: { condition: string | null; body: string }[] = [];
+  let branchCondition: string | null = condition;
+  let branchStart = 0;
+  let nestedDepth = 0;
+
+  RE_CONDITIONAL_TAG.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = RE_CONDITIONAL_TAG.exec(body)) !== null) {
+    const tag = match[1].trim();
+
+    if (tag.startsWith("if ")) {
+      nestedDepth++;
+      continue;
+    }
+    if (tag === "endif") {
+      nestedDepth = Math.max(0, nestedDepth - 1);
+      continue;
+    }
+    if (nestedDepth > 0) continue;
+
+    if (tag.startsWith("elif ") || tag === "else") {
+      branches.push({ condition: branchCondition, body: body.slice(branchStart, match.index) });
+      branchCondition = tag === "else" ? null : match[3].trim();
+      branchStart = match.index + match[0].length;
+    }
+  }
+
+  branches.push({ condition: branchCondition, body: body.slice(branchStart) });
+
+  for (const branch of branches) {
+    if (branch.condition === null || evaluateCondition(branch.condition, context)) {
+      return branch.body;
+    }
+  }
+
+  return "";
 }
 
 /**
@@ -329,18 +366,23 @@ function resolveExpressions(tpl: string, context: RenderContext): string {
     const path = filterParts[0].trim();
 
     let value = resolveValueExpr(context, path);
+    let escapedByFilter = false;
 
     // Apply basic filters
     for (let i = 1; i < filterParts.length; i++) {
-      value = applyFilter(value, filterParts[i].trim());
+      const filter = filterParts[i].trim();
+      value = applyFilter(value, filter);
+      if (getFilterName(filter) === "escape" || getFilterName(filter) === "e") {
+        escapedByFilter = true;
+      }
     }
 
     if (value === null || value === undefined) return "";
-    if (typeof value === "object") return JSON.stringify(value);
+    if (typeof value === "object") value = JSON.stringify(value);
     // Strip literal \n sequences that AI sometimes puts in field defaults
     let str = String(value);
     str = str.replace(/\\n/g, " ").replace(/\n/g, " ");
-    return str;
+    return escapedByFilter ? str : escapeHtml(str);
   });
 }
 
@@ -520,7 +562,7 @@ function applyFilter(value: unknown, filter: string): unknown {
   switch (filterName) {
     case "escape":
     case "e":
-      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      return escapeHtml(str);
     case "lower":
       return str.toLowerCase();
     case "upper":
@@ -561,6 +603,28 @@ function applyFilter(value: unknown, filter: string): unknown {
       // Unknown filter — pass through
       return value;
   }
+}
+
+function getFilterName(filter: string): string {
+  const match = filter.match(/^(\w+)(?:\(.*\))?$/);
+  return match ? match[1] : filter;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function escapeStyleContent(value: string): string {
+  return value.replace(/<\/style/gi, "<\\/style");
+}
+
+function escapeScriptContent(value: string): string {
+  return value.replace(/<\/script/gi, "<\\/script");
 }
 
 /**
