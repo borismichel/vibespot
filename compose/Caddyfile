@@ -5,7 +5,12 @@
 #   Let's Encrypt certificate when $VIBESPOT_TLS_EMAIL is set.
 
 {
-	email {$VIBESPOT_TLS_EMAIL}
+	# Placeholder default keeps the Caddyfile parseable when the email is
+	# unset (VIB-1933) — `email` with an empty argument is a parse error, which
+	# crash-looped Caddy in the documented VIBESPOT_DOMAIN=localhost flow. The
+	# fallback address is only ever sent to an ACME CA, i.e. never in
+	# local-only mode; set VIBESPOT_TLS_EMAIL for real domains.
+	email {$VIBESPOT_TLS_EMAIL:admin@invalid.localhost}
 }
 
 {$VIBESPOT_DOMAIN} {
@@ -18,6 +23,25 @@
 	reverse_proxy @websockets {$VIBESPOT_UPSTREAM}
 
 	reverse_proxy {$VIBESPOT_UPSTREAM} {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
+
+# Live-preview origin (VIB-1933). The app serves the preview iframe from a
+# *separate origin* (in-container port 4202, VIB-1892) so AI-generated page
+# code stays cross-origin to the app; this site block gives that origin a
+# public https hostname. It deliberately proxies straight to the vibespot
+# container — never through oauth2-proxy in the auth overlay — because an
+# iframe load cannot complete an OIDC redirect; the origin is instead gated
+# by its per-boot access token (?t=) and its CSP pins frame-ancestors to the
+# app origin, so only the authenticated app UI can embed or address it.
+{$VIBESPOT_PREVIEW_DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy {$VIBESPOT_PREVIEW_UPSTREAM} {
 		header_up Host {host}
 		header_up X-Real-IP {remote_host}
 		header_up X-Forwarded-For {remote_host}

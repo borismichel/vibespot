@@ -29,6 +29,14 @@ services:
       # Shared-secret access token (VIB-1889). Leave empty to have the server
       # generate one at boot — grab the tokenized URL from `docker logs vibespot`.
       VIBESPOT_AUTH_TOKEN: ${VIBESPOT_AUTH_TOKEN:-}
+      # Browser-facing URLs behind Caddy (VIB-1933). The live preview runs on
+      # a separate origin (app port + 2 → 4202 in-container, VIB-1892); Caddy
+      # proxies it under its own hostname and the app announces that public
+      # https URL via /api/preview-origin instead of synthesizing an
+      # unreachable http://<host>:4202. VIBESPOT_PUBLIC_ORIGIN additionally
+      # pins the preview's frame-ancestors CSP to the app origin (not `*`).
+      VIBESPOT_PUBLIC_ORIGIN: "https://${VIBESPOT_DOMAIN:-localhost}"
+      VIBESPOT_PREVIEW_PUBLIC_ORIGIN: "https://${VIBESPOT_PREVIEW_DOMAIN:-preview.${VIBESPOT_DOMAIN:-localhost}}"
       NODE_ENV: production
       # AI provider keys — at least one must be set for end-to-end generation.
       VIBESPOT_AI_ENGINE: ${VIBESPOT_AI_ENGINE:-langdock-api}
@@ -45,6 +53,9 @@ services:
       - vibespot-workspace:/workspace
     expose:
       - "4200"
+      # Live-preview origin (VIB-1892/VIB-1933) — compose-network only, Caddy
+      # fronts it under the preview hostname; never publish it to the host.
+      - "4202"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4200/healthz"]
       interval: 30s
@@ -113,8 +124,18 @@ services:
       - "443:443"
     environment:
       VIBESPOT_DOMAIN: ${VIBESPOT_DOMAIN:-localhost}
-      VIBESPOT_TLS_EMAIL: ${VIBESPOT_TLS_EMAIL:-}
+      # Non-empty default (VIB-1933): `email` with an empty argument is a
+      # Caddyfile parse error that crash-looped Caddy in the localhost flow.
+      # The fallback is only ever sent to an ACME CA — set a real address
+      # when deploying on a public domain.
+      VIBESPOT_TLS_EMAIL: ${VIBESPOT_TLS_EMAIL:-admin@invalid.localhost}
       VIBESPOT_UPSTREAM: ${VIBESPOT_UPSTREAM:-vibespot:4200}
+      # Second site: the live-preview origin (VIB-1933). Defaults to a
+      # `preview.` subdomain of the app domain — point DNS at the host for it
+      # too when using a real domain. Must match VIBESPOT_PREVIEW_PUBLIC_ORIGIN
+      # announced by the vibespot service above.
+      VIBESPOT_PREVIEW_DOMAIN: ${VIBESPOT_PREVIEW_DOMAIN:-preview.${VIBESPOT_DOMAIN:-localhost}}
+      VIBESPOT_PREVIEW_UPSTREAM: ${VIBESPOT_PREVIEW_UPSTREAM:-vibespot:4202}
     volumes:
       - ./compose/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

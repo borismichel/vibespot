@@ -14,7 +14,7 @@ Everything here works from the **public container image** (`ghcr.io/borismichel/
 │                                                         │
 │  ┌──────────┐         ┌───────────────┐                 │
 │  │  Caddy   │────────▶│   vibeSpot    │                 │
-│  │  :80/443 │         │   :4200       │                 │
+│  │  :80/443 │         │ :4200 / :4202 │                 │
 │  └──────────┘         └───────┬───────┘                 │
 │                               │                         │
 └───────────────────────────────┼─────────────────────────┘
@@ -67,11 +67,17 @@ services:
       LANGDOCK_API_KEY: ${LANGDOCK_API_KEY:-}
       LANGDOCK_BASE_URL: ${LANGDOCK_BASE_URL:-}
       HUBSPOT_PERSONAL_ACCESS_KEY: ${HUBSPOT_PERSONAL_ACCESS_KEY:-}
+      # Public URLs behind Caddy (VIB-1933): the live preview is a separate
+      # origin at app port + 2 (4202), served by the second Caddyfile site
+      # block below. Must match your domains.
+      VIBESPOT_PUBLIC_ORIGIN: https://vibespot.example.com
+      VIBESPOT_PREVIEW_PUBLIC_ORIGIN: https://preview.vibespot.example.com
     volumes:
       - vibespot-config:/home/vibespot/.vibespot
       - vibespot-themes:/home/vibespot/vibespot-themes
     expose:
       - "4200"
+      - "4202"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4200/healthz"]
       interval: 30s
@@ -123,6 +129,15 @@ vibespot.example.com {
 		header_up X-Forwarded-Proto {scheme}
 	}
 }
+
+# Live-preview origin (VIB-1933): the preview iframe loads from a separate
+# origin at app port + 2. It needs its own HTTPS hostname (point a DNS record
+# at the host for it too) — a plain-http preview inside an https page is
+# blocked as mixed content.
+preview.vibespot.example.com {
+	encode zstd gzip
+	reverse_proxy vibespot:4202
+}
 ```
 
 **3.** `.env` with the secrets (Compose reads it automatically):
@@ -140,7 +155,7 @@ docker compose up -d
 
 Open `https://vibespot.example.com` (or `http://localhost` for local testing). The vibe-coding UI loads.
 
-> **Skip Caddy for LAN-only:** if you don't need HTTPS, drop the `caddy` service, give `vibespot` a `ports: ["4200:4200"]` mapping instead of `expose`, and reach it at `http://<host-ip>:4200`.
+> **Skip Caddy for LAN-only:** if you don't need HTTPS, drop the `caddy` service and the two `VIBESPOT_*_ORIGIN` variables, give `vibespot` a `ports: ["4200:4200", "4202:4202"]` mapping instead of `expose`, and reach it at `http://<host-ip>:4200`. Port `4202` is the live-preview origin (app port + 2) — without it the preview pane is disabled.
 
 ---
 
@@ -184,7 +199,9 @@ All variables are set in `.env` and passed to the vibeSpot container.
 | `LANGDOCK_BASE_URL` | `https://api.langdock.com/anthropic` | Override for self-hosted Langdock |
 | `LANGDOCK_API_MODEL` | `claude-sonnet-4-20250514` | Override the Claude model |
 | `VIBESPOT_AGENTIC_MODE` | `true` | Multi-stage agentic pipeline (recommended; set `false` for single-call mode) |
-| `VIBESPOT_PORT` | `4200` | Internal container port |
+| `VIBESPOT_PORT` | `4200` | Internal container port (the live-preview origin listens at this + 2, i.e. `4202`) |
+| `VIBESPOT_PREVIEW_PUBLIC_ORIGIN` | derived from `Host` header | Browser-facing URL of the live-preview origin behind a proxy (VIB-1933), e.g. `https://preview.vibespot.example.com`. Required for the HTTPS/Caddy topology — unset, the app announces `http://<host>:4202`, which is unreachable behind Caddy |
+| `VIBESPOT_PUBLIC_ORIGIN` | — | Browser-facing URL of the app, e.g. `https://vibespot.example.com`. Pins the preview's `frame-ancestors` CSP to the app origin; set together with `VIBESPOT_PREVIEW_PUBLIC_ORIGIN` |
 
 TLS is configured directly in the `Caddyfile` (domain + email), not via environment variables.
 
@@ -216,8 +233,8 @@ The bundle above runs two services:
 
 ## Production deployment
 
-1. Point your DNS A record at the host; ports 80 and 443 must be reachable from the public internet.
-2. Set your real domain and contact email in the `Caddyfile`.
+1. Point DNS A records for **both** hostnames (`vibespot.example.com` and `preview.vibespot.example.com`) at the host; ports 80 and 443 must be reachable from the public internet.
+2. Set your real domains and contact email in the `Caddyfile`, and the matching `VIBESPOT_PUBLIC_ORIGIN` / `VIBESPOT_PREVIEW_PUBLIC_ORIGIN` in the compose file.
 3. Put secrets in `.env`:
 
 ```bash
@@ -256,7 +273,7 @@ If your host runs behind a corporate firewall or in a locked-down VPC, allow out
 | GHCR | `ghcr.io` | One-time image pull (and on upgrades) |
 | Let's Encrypt | `acme-v02.api.letsencrypt.org` | Only if using Caddy's auto-TLS on a public domain |
 
-Inbound: only 80/443 to Caddy (or just 4200 if you skip Caddy).
+Inbound: only 80/443 to Caddy (or 4200 + 4202 if you skip Caddy — 4202 is the live-preview origin).
 
 ---
 
@@ -281,3 +298,4 @@ docker exec vibespot wget -qO- http://localhost:4200/healthz
 | Container unhealthy | Check `docker logs vibespot`. Common cause: port conflict or missing env vars. |
 | Generated themes disappear after restart | Themes volume not mounted at `/home/vibespot/vibespot-themes`. Verify the volume path. |
 | WebSocket disconnects / chat hangs | Reverse proxy not forwarding `Upgrade`/`Connection` headers. The bundled Caddyfile handles this; custom proxies need the `@websockets` rule. |
+| Preview pane blank / "live preview disabled" | The preview origin (port 4202) isn't routed: add the `preview.` Caddyfile site block + `expose: "4202"` + `VIBESPOT_PREVIEW_PUBLIC_ORIGIN`, and check DNS for the preview hostname. LAN-only: publish `4202:4202`. |

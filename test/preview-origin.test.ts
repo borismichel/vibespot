@@ -1,13 +1,17 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   startPreviewOrigin,
   injectPreviewAgent,
+  normalizePublicOrigin,
   rewriteThemeAssetUrls,
   type StartedPreviewOrigin,
 } from "../src/server/preview-origin.js";
+import { handlePreviewOriginRoute } from "../src/server/routes/preview-origin.js";
+import { setActivePreviewOrigin } from "../src/server/server-context.js";
 
 const TOKEN = "test-preview-token-0123456789abcdef";
 
@@ -140,6 +144,35 @@ describe("preview doc composition helpers", () => {
     expect(evil).not.toContain("</script><script>alert(1)");
   });
 
+  it("normalizes a valid public origin and rejects everything else (VIB-1933)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(normalizePublicOrigin("https://preview.vibespot.example.com")).toBe(
+        "https://preview.vibespot.example.com"
+      );
+      // Trailing slash, default ports, and host case are canonicalized away.
+      expect(normalizePublicOrigin("HTTPS://Preview.Example.com:443/")).toBe("https://preview.example.com");
+      expect(normalizePublicOrigin("http://192.168.1.10:4202")).toBe("http://192.168.1.10:4202");
+      // Unset/blank → null without warning.
+      expect(normalizePublicOrigin(undefined)).toBeNull();
+      expect(normalizePublicOrigin("  ")).toBeNull();
+      expect(warn).not.toHaveBeenCalled();
+      // Invalid values → null + warning, never a broken announced URL.
+      for (const bad of [
+        "preview.example.com", // no scheme
+        "ftp://preview.example.com",
+        "https://preview.example.com/path",
+        "https://preview.example.com/?q=1",
+        "https://user:pw@preview.example.com",
+      ]) {
+        expect(normalizePublicOrigin(bad, "VIBESPOT_PREVIEW_PUBLIC_ORIGIN"), bad).toBeNull();
+      }
+      expect(warn).toHaveBeenCalledTimes(5);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("rewrites theme-asset URLs to carry the access token", () => {
     const html = '<img src="/theme-assets/hero.png"> <div style="background:url(/theme-assets/bg.jpg)">';
     const out = rewriteThemeAssetUrls(html, "tok");
@@ -149,5 +182,59 @@ describe("preview doc composition helpers", () => {
     expect(rewriteThemeAssetUrls('<img src="https://cdn.example.com/x.png">', "tok")).toContain(
       "https://cdn.example.com/x.png"
     );
+  });
+});
+
+describe("/api/preview-origin route (VIB-1933)", () => {
+  afterEach(() => setActivePreviewOrigin(null));
+
+  function callRoute(hostHeader?: string): { status: number; body: any } {
+    const req = { headers: hostHeader ? { host: hostHeader } : {} } as IncomingMessage;
+    let status = 0;
+    let body = "";
+    const res = {
+      writeHead(code: number) {
+        status = code;
+      },
+      end(chunk?: string) {
+        body = chunk || "";
+      },
+    } as unknown as ServerResponse;
+    handlePreviewOriginRoute(req, res);
+    return { status, body: JSON.parse(body) };
+  }
+
+  it("returns the configured public origin verbatim when one is set", () => {
+    setActivePreviewOrigin({
+      port: 4202,
+      host: "0.0.0.0",
+      token: TOKEN,
+      publicOrigin: "https://preview.vibespot.example.com",
+      close: () => {},
+    });
+    // The Host header must NOT leak into the answer in configured mode —
+    // that synthesized `http://<host>:4202` URL is exactly what is dead
+    // behind a Docker/HTTPS reverse proxy.
+    const { status, body } = callRoute("vibespot.example.com");
+    expect(status).toBe(200);
+    expect(body).toEqual({ origin: "https://preview.vibespot.example.com", token: TOKEN });
+  });
+
+  it("still derives the origin from the Host header when unconfigured", () => {
+    setActivePreviewOrigin({
+      port: 4202,
+      host: "127.0.0.1",
+      token: TOKEN,
+      publicOrigin: null,
+      close: () => {},
+    });
+    const { body } = callRoute("localhost:4200");
+    expect(body).toEqual({ origin: "http://localhost:4202", token: TOKEN });
+  });
+
+  it("reports no origin when the preview server is off", () => {
+    const { status, body } = callRoute("localhost:4200");
+    expect(status).toBe(200);
+    expect(body).toEqual({ origin: null });
   });
 });

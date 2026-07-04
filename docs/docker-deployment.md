@@ -30,6 +30,7 @@ The fastest way to get a single instance up:
 ```bash
 docker run -d --name vibespot \
   -p 4200:4200 \
+  -p 4202:4202 \
   -e VIBESPOT_AI_ENGINE=anthropic-api \
   -e VIBESPOT_AGENTIC_MODE=true \
   -e ANTHROPIC_API_KEY=sk-ant-... \
@@ -37,6 +38,8 @@ docker run -d --name vibespot \
   -v vibespot-themes:/home/vibespot/vibespot-themes \
   ghcr.io/borismichel/vibespot:latest
 ```
+
+Port `4202` is the **live-preview origin** (VIB-1892): the preview iframe loads from a separate origin at app port + 2 so AI-generated page code stays cross-origin to the app. Without that mapping the UI works but the preview pane reports "live preview disabled".
 
 The container binds beyond loopback, so the server requires a shared-secret token (VIB-1889). Grab the tokenized URL from the logs:
 
@@ -61,6 +64,9 @@ services:
     restart: unless-stopped
     ports:
       - "4200:4200"
+      # Live-preview origin (VIB-1892) — the preview iframe loads from app
+      # port + 2; without this mapping the live preview is disabled.
+      - "4202:4202"
     environment:
       VIBESPOT_AI_ENGINE: ${VIBESPOT_AI_ENGINE:-anthropic-api}
       VIBESPOT_AGENTIC_MODE: ${VIBESPOT_AGENTIC_MODE:-true}
@@ -132,6 +138,14 @@ vibespot.example.com {
 		header_up X-Forwarded-Proto {scheme}
 	}
 }
+
+# Live-preview origin (VIB-1892/VIB-1933): the preview iframe loads from a
+# separate origin (app port + 2). Give it its own hostname so it gets HTTPS
+# too — a plain-http preview inside an https page is blocked as mixed content.
+preview.vibespot.example.com {
+	encode zstd gzip
+	reverse_proxy vibespot:4202
+}
 ```
 
 **2.** Use this `docker-compose.yml` instead (vibeSpot is no longer published directly — only Caddy is):
@@ -147,11 +161,17 @@ services:
       VIBESPOT_AGENTIC_MODE: ${VIBESPOT_AGENTIC_MODE:-true}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       HUBSPOT_PERSONAL_ACCESS_KEY: ${HUBSPOT_PERSONAL_ACCESS_KEY:-}
+      # Behind the proxy the preview's in-container port is unreachable, so
+      # tell the app which public URLs the browser uses (VIB-1933). These must
+      # match the two Caddyfile site blocks above.
+      VIBESPOT_PUBLIC_ORIGIN: https://vibespot.example.com
+      VIBESPOT_PREVIEW_PUBLIC_ORIGIN: https://preview.vibespot.example.com
     volumes:
       - vibespot-config:/home/vibespot/.vibespot
       - vibespot-themes:/home/vibespot/vibespot-themes
     expose:
       - "4200"
+      - "4202"
 
   caddy:
     image: caddy:2-alpine
@@ -174,7 +194,7 @@ volumes:
   caddy-config:
 ```
 
-**3.** Point your DNS A record at the host, set the domain + email in the `Caddyfile`, then:
+**3.** Point DNS A records for **both** hostnames (`vibespot.example.com` and `preview.vibespot.example.com`) at the host, set the domains + email in the `Caddyfile`, then:
 
 ```bash
 docker compose up -d
@@ -194,6 +214,8 @@ HTTPS works automatically on ports 80/443. The `@websockets` block is required �
 | `VIBESPOT_AUTH_TOKEN` | generated at boot | Shared-secret access token for the UI, API and WebSocket. Empty → a random one is generated and printed in the container logs as part of the URL |
 | `VIBESPOT_DISABLE_AUTH` | — | Set `1` **only** when a trusted auth proxy (e.g. the Entra SSO overlay) fronts vibeSpot. Turns off the built-in token gate |
 | `VIBESPOT_TRUST_PROXY` | — | Required alongside `VIBESPOT_DISABLE_AUTH=1` on a non-loopback bind: acknowledges that an authenticating proxy is the **only** ingress to the app port. Without it the server refuses to start (the Entra overlay sets it) |
+| `VIBESPOT_PREVIEW_PUBLIC_ORIGIN` | derived from `Host` header | Browser-facing URL of the live-preview origin when a reverse proxy fronts it (VIB-1933), e.g. `https://preview.vibespot.example.com`. Unset, the app announces `http://<host>:<app port + 2>` — correct for direct/LAN access, dead behind a proxy |
+| `VIBESPOT_PUBLIC_ORIGIN` | — | Browser-facing URL of the app itself, e.g. `https://vibespot.example.com`. Pins the preview origin's `frame-ancestors` CSP to the app origin instead of `*` — set it whenever `VIBESPOT_PREVIEW_PUBLIC_ORIGIN` is set |
 
 ### AI engine
 
@@ -278,11 +300,29 @@ server {
 }
 ```
 
+```nginx
+# Second server block: the live-preview origin (VIB-1933). Route a dedicated
+# hostname to port 4202 and set VIBESPOT_PREVIEW_PUBLIC_ORIGIN (+
+# VIBESPOT_PUBLIC_ORIGIN) on the vibespot container to match.
+server {
+    listen 443 ssl;
+    server_name preview.vibespot.example.com;
+
+    ssl_certificate     /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://vibespot:4202;
+    }
+}
+```
+
 Key points for any reverse proxy:
 
 - **WebSocket upgrade** is required — the chat, pipeline progress, and upload UI all use a persistent WebSocket connection.
 - **Timeout > 120s** — agentic AI generation can run for several minutes. Set read/send timeouts to at least 300s.
 - **No buffering** — for streaming AI responses, disable proxy buffering (`proxy_buffering off` in nginx).
+- **Route the preview origin too** — the live preview is a *separate origin* at app port + 2 (`4202`). Give it its own HTTPS hostname, proxy it to `vibespot:4202`, and set `VIBESPOT_PREVIEW_PUBLIC_ORIGIN` / `VIBESPOT_PUBLIC_ORIGIN` accordingly; otherwise the preview pane is disabled. Do **not** route it through an authenticating proxy (oauth2-proxy etc.) — an iframe load cannot complete a login redirect; the origin is gated by its own per-boot token.
 
 ### Kubernetes
 
@@ -308,6 +348,8 @@ spec:
           image: ghcr.io/borismichel/vibespot:latest
           ports:
             - containerPort: 4200
+            # Live-preview origin (VIB-1892) — app port + 2.
+            - containerPort: 4202
           envFrom:
             - secretRef:
                 name: vibespot-secrets
@@ -344,8 +386,12 @@ spec:
   selector:
     app: vibespot
   ports:
-    - port: 80
+    - name: app
+      port: 80
       targetPort: 4200
+    - name: preview
+      port: 81
+      targetPort: 4202
 ```
 
 Create a Secret for your API keys:
@@ -357,7 +403,7 @@ kubectl create secret generic vibespot-secrets \
   --from-literal=VIBESPOT_AGENTIC_MODE=true
 ```
 
-Use an Ingress or Gateway API resource with TLS termination pointing at the Service.
+Use an Ingress or Gateway API resource with TLS termination pointing at the Service — one host rule for the app (`→ port 80`) and one for the preview origin (`preview.<host>` `→ port 81`), with `VIBESPOT_PUBLIC_ORIGIN` / `VIBESPOT_PREVIEW_PUBLIC_ORIGIN` in the Secret (or env) matching those hostnames (VIB-1933).
 
 ## Architecture notes
 
@@ -370,7 +416,7 @@ Use an Ingress or Gateway API resource with TLS termination pointing at the Serv
 ## Security considerations
 
 - **API keys** — never bake keys into a custom image. Pass them via `.env`, `-e` flags, or k8s Secrets.
-- **Network exposure** — without HTTPS, vibeSpot serves plain HTTP. Only expose port 4200 on trusted networks (LAN, VPN, Tailscale).
+- **Network exposure** — without HTTPS, vibeSpot serves plain HTTP. Only expose ports 4200/4202 on trusted networks (LAN, VPN, Tailscale). The preview origin (4202) is token-gated and serves only the composed preview document — it has no `/api/*` — but it is still generated page content; treat it with the same exposure policy as the app.
 - **CORS** — the server allows requests from `localhost`, `127.0.0.1`, and RFC 1918 / Tailscale IP ranges. Behind a same-origin reverse proxy, CORS is not a factor.
 - **No built-in app login** — vibeSpot itself has no user accounts. For internet-facing deployments, gate it with the bundled Entra SSO overlay below (or your own authenticating proxy — Authelia, Cloudflare Access, etc.).
 - **Disabled auth is guarded** — `VIBESPOT_DISABLE_AUTH=1` on a non-loopback bind makes the server refuse to start unless `VIBESPOT_TRUST_PROXY=1` also acknowledges that an authenticating proxy is the sole ingress; even then it warns at boot. Keep the app port `expose`-only (as the compose files do) — never `ports`-publish 4200 with auth disabled.
