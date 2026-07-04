@@ -6,6 +6,17 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### Security
+
+- **The local server is no longer an open door** ([VIB-1889](/VIB/issues/VIB-1889)) — previously the HTTP API and chat WebSocket bound to `0.0.0.0` with no authentication, so anyone who could reach the port could spend your AI credits, push to your connected HubSpot portal, and browse local directories. Now:
+  - The server binds to `127.0.0.1` by default; set `VIBESPOT_HOST=0.0.0.0` (Docker does this) to expose it.
+  - Any non-loopback bind requires a shared-secret token (`VIBESPOT_AUTH_TOKEN`, or one generated at boot). The printed URL carries it once; a session cookie takes over from there, including for the WebSocket. `VIBESPOT_DISABLE_AUTH=1` opts out for deploys behind their own auth gate (e.g. the Entra SSO overlay, which now sets it automatically).
+  - Disabling auth on a non-loopback bind is refused at boot unless `VIBESPOT_TRUST_PROXY=1` acknowledges that an authenticating proxy is the sole ingress — and even then the server warns loudly ([VIB-1906](/VIB/issues/VIB-1906)). The Entra overlay sets both flags.
+  - The WebSocket upgrade verifies the browser `Origin` (cross-site WebSocket hijacking) and state-changing API requests reject foreign origins.
+  - Loopback trust validates the `Host` header, closing DNS-rebinding attacks against `localhost`.
+  - JSON request bodies are capped at 5 MB (previously unbounded → memory-exhaustion DoS).
+  - Error responses no longer echo raw filesystem paths/usernames from underlying OS errors.
+
 ### Added
 
 - **A "What's new" dialog after you upgrade** ([VIB-1885](/VIB/issues/VIB-1885)) — the first time you open the builder on a new version, a dialog shows the release highlights with a link to the full changelog. Dismiss it (✕, "Got it", backdrop, or Esc) and it stays gone until the next release — one card per version, never a nag. The highlights are generated from this changelog at build time (`npm run whatsnew:gen`, wired into `npm run build`), so each release surfaces its own notes automatically. Dismissal is remembered per machine in `~/.vibespot/config.json` (`lastSeenVersion`).

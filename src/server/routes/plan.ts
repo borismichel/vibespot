@@ -12,6 +12,7 @@
  * `plan_approve` WebSocket message.
  */
 
+import { publicErrorMessage } from "../errors.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -47,7 +48,7 @@ export function savePlan(markdown: string): string | null {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(planFilePath(session.themePath), markdown, "utf-8");
   } catch (err) {
-    log.warn("plan", `Failed to write plan.md: ${err instanceof Error ? err.message : String(err)}`);
+    log.warn("plan", `Failed to write plan.md: ${publicErrorMessage(err)}`);
   }
 
   saveSession();
@@ -72,7 +73,7 @@ export function clearPlan(): void {
     const path = planFilePath(session.themePath);
     if (existsSync(path)) rmSync(path);
   } catch (err) {
-    log.warn("plan", `Failed to remove plan.md: ${err instanceof Error ? err.message : String(err)}`);
+    log.warn("plan", `Failed to remove plan.md: ${publicErrorMessage(err)}`);
   }
 
   saveSession();

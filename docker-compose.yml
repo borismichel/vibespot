@@ -24,6 +24,12 @@ services:
     environment:
       VIBESPOT_PORT: "4200"
       VIBESPOT_NO_OPEN: "1"
+      # In-container bind must be 0.0.0.0 so Caddy can reach it; the port is
+      # only `expose`d to the compose network, never published to the host.
+      VIBESPOT_HOST: "0.0.0.0"
+      # Shared-secret access token (VIB-1889). Leave empty to have the server
+      # generate one at boot — grab the tokenized URL from `docker logs vibespot`.
+      VIBESPOT_AUTH_TOKEN: ${VIBESPOT_AUTH_TOKEN:-}
       NODE_ENV: production
       # AI provider keys — at least one must be set for end-to-end generation.
       VIBESPOT_AI_ENGINE: ${VIBESPOT_AI_ENGINE:-langdock-api}

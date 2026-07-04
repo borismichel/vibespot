@@ -33,10 +33,16 @@ export async function vibeCommand(): Promise<void> {
   const requestedPort = parseInt(process.env.VIBESPOT_PORT || "", 10) || DEFAULT_PORT;
 
   try {
-    const { port, close } = await startServer({ port: requestedPort, uiDir });
-    const url = `http://localhost:${port}`;
+    const { port, host, authToken, close } = await startServer({ port: requestedPort, uiDir });
+    // Non-loopback binds get a shared-secret token (VIB-1889); the URL must
+    // carry it once so the browser can pick up the session cookie.
+    const displayHost = host === "0.0.0.0" || host === "::" ? "localhost" : host;
+    const url = `http://${displayHost}:${port}${authToken ? `/?token=${authToken}` : ""}`;
 
     console.log(accent(`  v ${url}`));
+    if (authToken) {
+      console.log(dim("  Access requires this exact URL — the token is your auth secret."));
+    }
     console.log(dim("  Press Ctrl+C to stop\n"));
 
     // Auto-open browser (skip in containers / headless environments)

@@ -2,6 +2,7 @@
  * Settings routes — environment management, API keys, tool install, auth.
  */
 
+import { publicErrorMessage } from "../errors.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, readFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
@@ -430,7 +431,7 @@ export function handleSettingsEngineRoute(req: IncomingMessage, res: ServerRespo
       saveConfig(configUpdate as any);
       jsonResponse(res, 200, { ok: true, engine });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -498,7 +499,7 @@ export function handleSettingsApiKeyRoute(req: IncomingMessage, res: ServerRespo
 
       jsonResponse(res, 200, { ok: true, provider, autoSelectedEngine });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -525,7 +526,7 @@ export function handleSettingsInstallRoute(req: IncomingMessage, res: ServerResp
       const jobId = startJob(config.cmd, config.desc, { timeout: 120_000 });
       jsonResponse(res, 200, { ok: true, jobId });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -549,7 +550,7 @@ export function handleSettingsHsAuthRoute(req: IncomingMessage, res: ServerRespo
               dataCenter: info.dataCenter,
             });
           }).catch((err) => {
-            jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+            jsonResponse(res, 400, { error: publicErrorMessage(err) });
           });
           return;
         } else {
@@ -612,7 +613,7 @@ export function handleSettingsHsAuthRoute(req: IncomingMessage, res: ServerRespo
         ],
       });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -655,7 +656,7 @@ export function handleSettingsGhAuthRoute(req: IncomingMessage, res: ServerRespo
       );
       jsonResponse(res, 200, { ok: true, jobId, browserAuthRequired: true });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -706,7 +707,7 @@ export function handleSettingsHsSwitchRoute(req: IncomingMessage, res: ServerRes
 
       jsonResponse(res, 400, { error: "portalId required" });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -783,7 +784,7 @@ export function handleSettingsCLIAuthRoute(req: IncomingMessage, res: ServerResp
           jsonResponse(res, 400, { error: `Unknown CLI: ${cli}` });
       }
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -803,7 +804,7 @@ export function handleSettingsHsModeRoute(req: IncomingMessage, res: ServerRespo
       saveConfig({ hubspotUploadMode: mode } as any);
       jsonResponse(res, 200, { ok: true, mode });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -823,7 +824,7 @@ export function handleSettingsCliToggleRoute(req: IncomingMessage, res: ServerRe
       setCliToolEnabled(toolId, enabled);
       jsonResponse(res, 200, { ok: true, toolId, enabled });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -893,7 +894,7 @@ export function handleSettingsGenericRoute(req: IncomingMessage, res: ServerResp
       saveConfig(update as import("../../utils/config.js").VibeSpotConfig);
       jsonResponse(res, 200, { ok: true, updated: Object.keys(update) });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }

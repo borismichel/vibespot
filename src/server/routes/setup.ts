@@ -2,6 +2,7 @@
  * Setup routes — onboarding flow in the browser.
  */
 
+import { publicErrorMessage } from "../errors.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, readdirSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, basename } from "node:path";
@@ -151,7 +152,7 @@ export function handleSetupCreateRoute(req: IncomingMessage, res: ServerResponse
         starterId: starterId || undefined,
       });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -270,7 +271,7 @@ export function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse)
           });
         })().catch((err) => {
           jsonResponse(res, 500, {
-            error: err instanceof Error ? err.message : String(err),
+            error: publicErrorMessage(err),
           });
         });
       } else {
@@ -288,13 +289,13 @@ export function handleSetupFetchRoute(req: IncomingMessage, res: ServerResponse)
           })
           .catch((err) => {
             jsonResponse(res, 500, {
-              error: err instanceof Error ? err.message : String(err),
+              error: publicErrorMessage(err),
             });
           });
       }
     } catch (err) {
       jsonResponse(res, 500, {
-        error: err instanceof Error ? err.message : String(err),
+        error: publicErrorMessage(err),
       });
     }
   });
@@ -358,7 +359,7 @@ export function handleSetupOpenRoute(req: IncomingMessage, res: ServerResponse):
         moduleCount: getSession()?.modules.length || 0,
       });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -387,7 +388,7 @@ export function handleSetupResumeRoute(req: IncomingMessage, res: ServerResponse
         messageCount: session.messages.length,
       });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -404,7 +405,7 @@ export function handleSetupApiKeyRoute(req: IncomingMessage, res: ServerResponse
       saveConfig({ anthropicApiKey: apiKey });
       jsonResponse(res, 200, { ok: true });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -456,7 +457,7 @@ export function handleSetupRemoteThemesRoute(res: ServerResponse): void {
   })().catch((err) => {
     jsonResponse(res, 200, {
       themes: [],
-      error: err instanceof Error ? err.message : String(err),
+      error: publicErrorMessage(err),
     });
   });
 }
