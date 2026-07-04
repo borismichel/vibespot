@@ -7,6 +7,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join, basename, relative, sep } from "node:path";
 import JSZip from "jszip";
+import Busboy from "busboy";
 
 import { jsonResponse, readBody } from "../route-helpers.js";
 import { log } from "../log.js";
@@ -370,6 +371,14 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
   }
 
   if (method === "POST") {
+    // File uploads come in as multipart (ui/dashboard.js) so the file is
+    // streamed with a size cap instead of being JSON-stringified client-side.
+    const contentType = req.headers["content-type"] || "";
+    if (contentType.includes("multipart/form-data")) {
+      handleBrandAssetUpload(session, req, res);
+      return;
+    }
+
     readBody(req, (body) => {
       try {
         const { type, content } = JSON.parse(body);
@@ -378,9 +387,8 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
           return;
         }
 
-        if (!session.brandAssets) session.brandAssets = {};
-
         if (type === "humanify") {
+          if (!session.brandAssets) session.brandAssets = {};
           session.brandAssets.humanify = content === "on";
           session.updatedAt = Date.now();
           saveSession();
@@ -392,27 +400,12 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
           jsonResponse(res, 400, { error: "content is required" });
           return;
         }
-        if (type !== "styleguide" && type !== "brandvoice" && type !== "themeContext") {
+        if (!isBrandAssetKey(type)) {
           jsonResponse(res, 400, { error: `Invalid type: ${type}. Must be "styleguide", "brandvoice", or "themeContext"` });
           return;
         }
-        const assetKey = type as "styleguide" | "brandvoice" | "themeContext";
 
-        const filename = assetKey === "themeContext" ? "theme-context.md" : `${assetKey}.md`;
-        session.brandAssets[assetKey] = content;
-        session.updatedAt = Date.now();
-
-        const assetDir = join(session.themePath, ".vibespot");
-        ensureDir(assetDir);
-        writeFile(join(assetDir, filename), content);
-
-        let syncedKit: import("../session/types.js").BrandKit | null = null;
-        if (assetKey === "styleguide") {
-          syncedKit = syncBrandKitFromStyleguide(session, content);
-        }
-
-        saveSession();
-        jsonResponse(res, 200, { ok: true, brandKit: syncedKit });
+        applyBrandAsset(session, type, content, res);
       } catch (err) {
         jsonResponse(res, 500, { error: publicErrorMessage(err) });
       }
@@ -449,6 +442,121 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
   }
 
   jsonResponse(res, 405, { error: "Method not allowed" });
+}
+
+// ---------------------------------------------------------------------------
+// Brand-asset helpers
+// ---------------------------------------------------------------------------
+
+type ActiveSession = NonNullable<ReturnType<typeof getSession>>;
+type BrandAssetKey = "styleguide" | "brandvoice" | "themeContext";
+
+// Matches the client-side cap in ui/dashboard.js — brand assets are prose
+// fed into AI prompts, so 1 MB is already generous.
+const MAX_BRAND_ASSET_BYTES = 1024 * 1024;
+
+function isBrandAssetKey(type: unknown): type is BrandAssetKey {
+  return type === "styleguide" || type === "brandvoice" || type === "themeContext";
+}
+
+/** Persist a brand asset to the session + theme dir and respond. Shared by the JSON and multipart POST paths. */
+function applyBrandAsset(session: ActiveSession, assetKey: BrandAssetKey, content: string, res: ServerResponse): void {
+  if (!session.brandAssets) session.brandAssets = {};
+
+  const filename = assetKey === "themeContext" ? "theme-context.md" : `${assetKey}.md`;
+  session.brandAssets[assetKey] = content;
+  session.updatedAt = Date.now();
+
+  const assetDir = join(session.themePath, ".vibespot");
+  ensureDir(assetDir);
+  writeFile(join(assetDir, filename), content);
+
+  let syncedKit: import("../session/types.js").BrandKit | null = null;
+  if (assetKey === "styleguide") {
+    syncedKit = syncBrandKitFromStyleguide(session, content);
+  }
+
+  saveSession();
+  jsonResponse(res, 200, { ok: true, brandKit: syncedKit });
+}
+
+/** Multipart brand-asset upload: streamed with a hard size cap, text-only. */
+function handleBrandAssetUpload(session: ActiveSession, req: IncomingMessage, res: ServerResponse): void {
+  let bb: ReturnType<typeof Busboy>;
+  try {
+    bb = Busboy({ headers: req.headers, limits: { fileSize: MAX_BRAND_ASSET_BYTES, files: 1, fields: 5 } });
+  } catch {
+    jsonResponse(res, 400, { error: "Malformed upload" });
+    return;
+  }
+
+  let type = "";
+  const chunks: Buffer[] = [];
+  let fileSeen = false;
+  let tooLarge = false;
+  let responded = false;
+  const fail = (status: number, error: string) => {
+    if (responded) return;
+    responded = true;
+    jsonResponse(res, status, { error });
+  };
+
+  bb.on("field", (name, value) => {
+    if (name === "type") type = value;
+  });
+
+  bb.on("file", (_name, stream) => {
+    fileSeen = true;
+    stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+    stream.on("limit", () => {
+      tooLarge = true;
+      stream.resume(); // drain so busboy still finishes
+    });
+  });
+
+  bb.on("finish", () => {
+    if (responded) return;
+    try {
+      if (!isBrandAssetKey(type)) {
+        fail(400, `Invalid type: ${type || "(missing)"}. Must be "styleguide", "brandvoice", or "themeContext"`);
+        return;
+      }
+      if (!fileSeen) {
+        fail(400, "file is required");
+        return;
+      }
+      if (tooLarge) {
+        fail(413, "File too large — brand assets are text files up to 1 MB.");
+        return;
+      }
+      const buffer = Buffer.concat(chunks);
+      if (buffer.length === 0) {
+        fail(400, "content is required");
+        return;
+      }
+      // Brand assets are markdown/plain text. A NUL byte means binary or
+      // UTF-16 (which would render as mojibake); invalid UTF-8 means binary.
+      if (buffer.includes(0)) {
+        fail(400, "File doesn't look like plain text. Please upload a UTF-8 .md or .txt file.");
+        return;
+      }
+      let content: string;
+      try {
+        content = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+      } catch {
+        fail(400, "File is not valid UTF-8 text. Please upload a UTF-8 .md or .txt file.");
+        return;
+      }
+      responded = true;
+      applyBrandAsset(session, type, content, res);
+    } catch (err) {
+      fail(500, publicErrorMessage(err));
+    }
+  });
+
+  bb.on("error", () => fail(400, "Upload failed"));
+
+  req.pipe(bb);
 }
 
 // ---------------------------------------------------------------------------

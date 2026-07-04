@@ -78,9 +78,16 @@ function hideDashboard() {
 // ---------------------------------------------------------------------------
 
 async function refreshDashboard() {
+  // Guard against a stale in-flight response rendering after the user
+  // switched to another theme (or left the dashboard) mid-fetch.
+  const themeAtStart = currentDashboardTheme;
+  const sessionAtStart = currentDashboardSessionId;
   try {
     const res = await fetch("/api/dashboard");
     const data = await res.json();
+    if (currentDashboardTheme !== themeAtStart || currentDashboardSessionId !== sessionAtStart) {
+      return;
+    }
     if (data.error) {
       console.warn("Dashboard load error:", data.error);
       return;
@@ -673,7 +680,9 @@ document.getElementById("dashboard-brand-assets")?.addEventListener("change", (e
   if (e.target.type !== "file") return;
   const card = e.target.closest(".brand-asset-card");
   if (!card || !e.target.files[0]) return;
-  handleBrandFileSelected(card.dataset.asset, e.target.files[0]);
+  const file = e.target.files[0];
+  e.target.value = ""; // allow re-selecting the same file after an error
+  handleBrandFileSelected(card.dataset.asset, file);
 });
 
 // ---------------------------------------------------------------------------
@@ -785,25 +794,41 @@ function updateBrandPreview() {
   const logoImg = document.getElementById("brand-preview-logo");
   const logoPlaceholder = document.getElementById("brand-preview-logo-placeholder");
   if (logoImg && logoPlaceholder) {
-    if (logoUrl) {
-      logoImg.src = logoUrl;
-      logoImg.hidden = false;
-      logoPlaceholder.hidden = true;
+    const safeLogoUrl = logoUrl ? safeImageUrl(logoUrl) : null;
+    if (safeLogoUrl) {
+      // Attach handlers before setting src so a fast (cached) result can't
+      // race past them and wedge the preview in a stale state.
       logoImg.onerror = () => {
         logoImg.hidden = true;
+        logoImg.removeAttribute("src");
         logoPlaceholder.hidden = false;
         logoPlaceholder.textContent = "Bad URL";
       };
       logoImg.onload = () => {
+        logoImg.hidden = false;
+        logoPlaceholder.hidden = true;
         logoPlaceholder.textContent = "No logo";
       };
+      logoImg.src = safeLogoUrl;
+      logoImg.hidden = false;
+      logoPlaceholder.hidden = true;
     } else {
       logoImg.hidden = true;
       logoImg.removeAttribute("src");
       logoPlaceholder.hidden = false;
-      logoPlaceholder.textContent = "No logo";
+      logoPlaceholder.textContent = logoUrl ? "Bad URL" : "No logo";
     }
   }
+}
+
+// Only http(s) URLs (or paths that resolve to them) may reach img.src —
+// blocks javascript:, data:, file: etc. from the free-text logo field.
+function safeImageUrl(url) {
+  try {
+    const parsed = new URL(url, window.location.href);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return parsed.href;
+  } catch { /* unparseable */ }
+  return null;
 }
 
 for (const id of [
@@ -1026,15 +1051,31 @@ async function uploadBrandAsset(type) {
   fileInput.click();
 }
 
+// Brand assets are prose fed into AI prompts — 1 MB of markdown is already
+// far beyond useful; anything bigger is a mis-picked file.
+const MAX_BRAND_ASSET_BYTES = 1024 * 1024;
+
 async function handleBrandFileSelected(type, file) {
-  const content = await file.text();
+  if (file.size > MAX_BRAND_ASSET_BYTES) {
+    await vibeAlert(
+      `File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Brand assets are text files up to 1 MB.`,
+      "Error",
+    );
+    return;
+  }
+  if (!/\.(md|markdown|txt)$/i.test(file.name || "")) {
+    await vibeAlert("Only .md and .txt files are supported.", "Error");
+    return;
+  }
 
   try {
-    const res = await fetch("/api/brand-assets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, content }),
-    });
+    // Multipart keeps the file out of a JSON string (no UTF-16/binary
+    // mangling, no full-file JSON.stringify); the server enforces the same
+    // size cap and rejects non-text content.
+    const form = new FormData();
+    form.append("type", type);
+    form.append("file", file, file.name);
+    const res = await fetch("/api/brand-assets", { method: "POST", body: form });
     const data = await res.json();
     if (data.error) {
       await vibeAlert(data.error, "Error");

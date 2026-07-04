@@ -39,7 +39,9 @@ async function openFieldEditor(moduleName) {
 }
 
 function closeFieldEditor() {
-  if (updateTimer) { clearTimeout(updateTimer); updateTimer = null; }
+  // Fire (not drop) any debounced edit still pending — closing the editor
+  // right after typing must not lose the change (VIB-1898).
+  flushPendingFieldSaves();
   currentEditModule = null;
   if (typeof showModuleListView === "function") {
     showModuleListView();
@@ -281,18 +283,10 @@ function createFieldInput(field, moduleName, fullPath) {
 // Update field and refresh preview
 // ---------------------------------------------------------------------------
 
-let updateTimer = null;
-
 function updateField(moduleName, fieldPath, value) {
-  // Debounce updates
-  clearTimeout(updateTimer);
-  updateTimer = setTimeout(() => {
-    fetch("/api/field", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ moduleName, fieldPath, value }),
-    }).then(() => refreshPreview());
-  }, 300);
+  // Debounced per field via the shared save module (field-save.js) — editing
+  // a second field no longer cancels the first field's save (VIB-1898).
+  saveFieldDebounced(moduleName, fieldPath, value);
 }
 
 // ---------------------------------------------------------------------------

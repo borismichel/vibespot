@@ -93,12 +93,6 @@ registration, redirect URI, client secret, tenant-scoped issuer, restricting
 to your org) is in
 [docs/docker-deployment.md → Authentication gate](docker-deployment.md#authentication-gate--azure-entra-sso-optional).
 
-### Switch to Postgres storage
-
-Set `VIBESPOT_STORAGE=postgres` in `.env`. The bundled `postgres` service is
-always up; the env var tells vibespot to use the hosted storage adapter
-instead of the filesystem default.
-
 ## Building locally
 
 ```bash
@@ -114,9 +108,10 @@ image strips dev dependencies via `npm prune --omit=dev`.
 - **Healthcheck.** The container exposes `GET /healthz` (returns
   `{"status":"ok"}`). Docker uses it for the built-in `HEALTHCHECK`, and the
   CI smoke test polls it on every push.
-- **Persistence.** Three named volumes are created by compose:
+- **Persistence.** Two named volumes are created by compose:
   `vibespot-config` (`~/.vibespot/` — API keys, sessions, project state),
-  `vibespot-workspace` (theme working dirs), and `postgres-data`.
+  and `vibespot-workspace` (theme working dirs). Postgres storage is not
+  supported by this image; `VIBESPOT_STORAGE` and `DATABASE_URL` are ignored.
 - **Ports.** Caddy publishes `:80` and `:443`. The vibespot service itself
   is internal-only when running via compose. For direct access without
   Caddy, expose `4200` on the `vibespot` service.
