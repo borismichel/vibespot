@@ -12,6 +12,10 @@ let isStreaming = false;
 // which a new message barges in to cancel-and-replan (VIB-1880). False when
 // parked at a checkpoint gate or running single-call mode.
 let agenticRunning = false;
+// True while a checkpoint gate card is parked awaiting the user's decision.
+// finishStreaming() clears isStreaming at the gate, so this flag is what
+// actually locks the composer (VIB-1898).
+let checkpointGateActive = false;
 // Softened barge-in (VIB-1876): a message sent during an active build is QUEUED
 // by default and dispatched when the build finishes. The queued chip carries an
 // "Interrupt now" button that triggers the old cancel-and-replan barge-in.
@@ -750,6 +754,9 @@ function handleWsMessage(msg) {
       resetPipelineState();
       appendAssistantError(msg.message);
       setStatus("Error");
+      // The run this message was queued behind is over — dispatch it rather
+      // than stranding the chip forever (VIB-1898).
+      flushQueuedMessage();
       break;
 
     case "pong":
@@ -1785,6 +1792,10 @@ async function sendMessage(text, opts = {}) {
   const hasFiles = pendingFiles.length > 0;
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   if (!text.trim() && !hasFiles) return;
+  // A parked checkpoint gate must be resolved through its card. Only the send
+  // buttons were locked before — Enter still reached here (the streaming flags
+  // are reset at the gate) and started a second run mid-park (VIB-1898).
+  if (checkpointGateActive) return;
   // Block sends while busy — EXCEPT during an active agentic build. There, a new
   // message is QUEUED by default and runs when the build finishes (VIB-1876);
   // an explicit Interrupt (opts.interrupt) triggers the cancel-and-replan
@@ -2078,6 +2089,9 @@ function interruptWithQueued() {
 // Dispatch the queued message once the current build has finished.
 function flushQueuedMessage() {
   if (!queuedMessage) return;
+  // A parked gate blocks sendMessage — keep the message queued; the gate's
+  // resolution path flushes again (VIB-1898).
+  if (checkpointGateActive) return;
   const { text, opts } = queuedMessage;
   clearQueuedMessage();
   // Defer so the just-finished run's UI settles before the next one starts.
@@ -2122,6 +2136,7 @@ function supersedeCurrentRun() {
     }
   }
   removeCheckpointCard();
+  checkpointGateActive = false;
   isStreaming = false;
   agenticRunning = false;
   streamingMsgEl = null;
@@ -2540,13 +2555,16 @@ function handleCheckpointRequested(msg) {
   messagesEl.appendChild(checkpointCardEl);
   scrollToBottom();
 
-  // Hold the send buttons until the gate is resolved.
+  // Hold the composer until the gate is resolved — buttons AND the Enter path
+  // through sendMessage (VIB-1898).
+  checkpointGateActive = true;
   setSendDisabled(true);
   setStatus("Awaiting your call");
 }
 
 function handleCheckpointCancelled() {
   removeCheckpointCard();
+  checkpointGateActive = false;
   setSendDisabled(false);
   appendSystemMessage("Cancelled — nothing was built.");
   flushQueuedMessage();
@@ -2554,6 +2572,7 @@ function handleCheckpointCancelled() {
 
 function resolveCheckpoint(action, note, extra) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  checkpointGateActive = false;
   // Leave the decision in the transcript (card → one-line record), not an empty
   // bubble (VIB-1876).
   finalizeCheckpointCard(action, note, extra);
