@@ -29,6 +29,7 @@ import { loadConfig, saveConfig, getHubSpotPak, getActiveHubSpotAccount } from "
 import { detectHubSpotAuth, detectDataCenter, detectHubSpotAuthFromConfig } from "../utils/detect.js";
 import { applyAutoFixes, parseUploadErrors, parseApiErrors } from "./auto-fix.js";
 import { startStreamingJob, startJobSafe, getJob, addJobListener, removeJobListener } from "./process-manager.js";
+import { isSafeThemeName } from "../utils/validate.js";
 import { uploadTheme, type UploadFileError } from "../hubspot/uploader.js";
 import { jsonResponse } from "./route-helpers.js";
 import { publicErrorMessage } from "./errors.js";
@@ -1415,8 +1416,16 @@ function handleWsConnection(ws: WebSocket): void {
             }
           } else {
             // --- CLI mode: legacy hs cms upload subprocess ---
+            if (!isSafeThemeName(session.themeName)) {
+              ws.send(JSON.stringify({
+                type: "upload_failed",
+                output: "Theme name contains unsupported characters and cannot be uploaded via the HubSpot CLI.",
+                errors: [{ file: "", message: "Unsafe theme name", fixable: false }],
+              }));
+              break;
+            }
             const jobId = startStreamingJob(
-              `hs cms upload "${session.themePath}" "${session.themeName}"`,
+              "hs", ["cms", "upload", session.themePath, session.themeName],
               "Uploading to HubSpot",
               { cwd: join(session.themePath, ".."), timeout: 180_000 }
             );

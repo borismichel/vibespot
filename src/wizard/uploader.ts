@@ -1,5 +1,5 @@
 import { join, basename } from "node:path";
-import { run } from "../utils/shell.js";
+import { runFile } from "../utils/shell.js";
 import * as ui from "../prompts/prompter.js";
 import { theme } from "../cli/theme.js";
 import {
@@ -50,8 +50,8 @@ export async function runUpload(themePath: string): Promise<boolean> {
         uploadedCount = result.uploaded;
       }
     } else {
-      // CLI mode
-      const result = run(`hs cms upload "${themePath}" "${themeName}"`, {
+      // CLI mode — argv array, never a shell-interpolated string
+      const result = runFile("hs", ["cms", "upload", themePath, themeName], {
         cwd: join(themePath, ".."),
       });
       const fullOutput = [result.stdout, result.stderr].filter(Boolean).join("\n");
@@ -132,7 +132,7 @@ export async function runUpload(themePath: string): Promise<boolean> {
       if (useApi) {
         try { await deleteFile(pak!, `${themeName}/modules`); } catch { /* ignore */ }
       } else {
-        run(`hs cms delete "${themeName}/modules"`, { cwd: join(themePath, "..") });
+        runFile("hs", ["cms", "delete", `${themeName}/modules`], { cwd: join(themePath, "..") });
       }
       s.stop("Cleaned up modules, retrying...");
     }
