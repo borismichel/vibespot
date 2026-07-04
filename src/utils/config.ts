@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { chmodSync } from "node:fs";
-import { readFile, writeFile, fileExists } from "./fs.js";
+import { chmodSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { readFile, fileExists } from "./fs.js";
 
 export type AIEngineType =
   | "claude-code"
@@ -75,12 +75,21 @@ export interface VibeSpotConfig {
 
 const CONFIG_DIR = join(homedir(), ".vibespot");
 const CONFIG_PATH = join(CONFIG_DIR, "config.json");
+const CONFIG_FILE_MODE = 0o600;
+const CONFIG_DIR_MODE = 0o700;
+
+function hardenConfigPermissions(): void {
+  if (process.platform === "win32") return;
+  try { chmodSync(CONFIG_DIR, CONFIG_DIR_MODE); } catch { /* ignore */ }
+  try { chmodSync(CONFIG_PATH, CONFIG_FILE_MODE); } catch { /* ignore */ }
+}
 
 export function loadConfig(): VibeSpotConfig {
   let config: VibeSpotConfig = {};
 
   if (fileExists(CONFIG_PATH)) {
     try {
+      hardenConfigPermissions();
       config = JSON.parse(readFile(CONFIG_PATH));
       if (config.aiEngine === "api") {
         config.aiEngine = "anthropic-api";
@@ -166,11 +175,18 @@ export function maskApiKey(key: string): string {
 export function saveConfig(config: VibeSpotConfig): void {
   const existing = loadConfig();
   const merged = { ...existing, ...config };
-  writeFile(CONFIG_PATH, JSON.stringify(merged, null, 2));
-  // Restrict file permissions — config contains API keys
+  const content = JSON.stringify(merged, null, 2);
+
+  mkdirSync(CONFIG_DIR, { recursive: true, mode: CONFIG_DIR_MODE });
+  hardenConfigPermissions();
+
+  const tmpPath = join(CONFIG_DIR, `.config.json.${process.pid}.${Date.now()}.tmp`);
+  writeFileSync(tmpPath, content, { encoding: "utf-8", mode: CONFIG_FILE_MODE, flag: "w" });
   if (process.platform !== "win32") {
-    try { chmodSync(CONFIG_PATH, 0o600); } catch { /* ignore */ }
+    try { chmodSync(tmpPath, CONFIG_FILE_MODE); } catch { /* ignore */ }
   }
+  renameSync(tmpPath, CONFIG_PATH);
+  hardenConfigPermissions();
 }
 
 export function getConfigDir(): string {
