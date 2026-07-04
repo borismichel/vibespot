@@ -1,5 +1,5 @@
 /**
- * StorageAdapter interface — the pivot point between CLI (filesystem) and SaaS (Postgres).
+ * StorageAdapter interface for filesystem-backed theme and session data.
  *
  * Three layers:
  * 1. Generic file operations (read/write/delete/list) for theme files
