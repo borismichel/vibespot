@@ -41,67 +41,95 @@ export function setParseWarningCallback(cb: ((warning: string) => void) | null):
 }
 
 // ---------------------------------------------------------------------------
-// Generation lock — prevents session switching while AI is generating
+// Generation lock — prevents session switching while AI is generating, and
+// serializes generations per session (VIB-1895).
+//
+// The old scheme was a single global `generatingSessionId` flag plus a 10s
+// "wait then start anyway" poll in server.ts — under a slow unwind, a second
+// (and third) pipeline could start against the same session and the first
+// run's `finally` cleared the flag out from under the newer run. Now each
+// handler acquires a per-session promise-chain mutex: a replacement run waits
+// (indefinitely — its predecessor was already aborted, so the wait is short)
+// instead of overlapping.
 // ---------------------------------------------------------------------------
 
-let generatingSessionId: string | null = null;
+const generatingSessions = new Set<string>();
 
 export function isGenerating(): boolean {
-  return generatingSessionId !== null;
+  return generatingSessions.size > 0;
+}
+
+/** Tail of the lock queue per session id. */
+const sessionLockTails = new Map<string, Promise<void>>();
+
+/**
+ * Acquire the generation lock for a session. Resolves (FIFO) once every
+ * earlier holder has released; returns the release function.
+ */
+async function acquireSessionLock(sessionId: string): Promise<() => void> {
+  const prev = sessionLockTails.get(sessionId) || Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((r) => { release = r; });
+  const tail = prev.then(() => current);
+  sessionLockTails.set(sessionId, tail);
+  await prev;
+  return () => {
+    release();
+    // Drop the map entry once no newer waiter has replaced the tail.
+    if (sessionLockTails.get(sessionId) === tail) sessionLockTails.delete(sessionId);
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Barge-in cancellation (VIB-1880)
 //
-// The active agentic run registers an AbortController here. A chat message that
-// arrives mid-build calls `cancelActiveGeneration()` to abort it (cancel-and-
-// replan); the signal threads down through the pipeline → concurrency limiter →
-// provider requests so in-flight generation stops spending immediately. Each
-// run is tagged with a monotonic id so a settling old run never clears a newer
-// run's controller.
+// Every cancellable run registers an AbortController here — including runs
+// still queued on the session lock. A chat message that arrives mid-build
+// calls `cancelActiveGeneration()` to abort ALL of them (cancel-and-replan):
+// the newest message wins, the active run stops spending, and any run still
+// waiting for the lock bails when it wakes instead of building a stale page.
 // ---------------------------------------------------------------------------
 
 interface ActiveRun {
-  id: number;
   abort: AbortController;
 }
-let activeRun: ActiveRun | null = null;
-let runCounter = 0;
+const activeRuns = new Set<ActiveRun>();
 
 /** Begin tracking a cancellable run. Returns the run handle + its signal. */
 function beginCancellableRun(): { run: ActiveRun; signal: AbortSignal } {
-  const run: ActiveRun = { id: ++runCounter, abort: new AbortController() };
-  activeRun = run;
+  const run: ActiveRun = { abort: new AbortController() };
+  activeRuns.add(run);
   return { run, signal: run.abort.signal };
 }
 
-/** Stop tracking a run, but only if it's still the current one. */
+/** Stop tracking a run. */
 function endCancellableRun(run: ActiveRun): void {
-  if (activeRun === run) activeRun = null;
+  activeRuns.delete(run);
 }
 
 /**
- * Abort the in-flight agentic run, if any (barge-in). Returns true if a run was
- * actually signalled. The run unwinds on its own; callers should wait for
- * `isGenerating()` to clear before starting a replacement.
+ * Abort every in-flight or lock-queued agentic run (barge-in). Returns true if
+ * any run was actually signalled. The runs unwind on their own; a replacement
+ * run serializes behind them via the per-session generation lock.
  */
 export function cancelActiveGeneration(): boolean {
-  if (!activeRun) return false;
-  activeRun.abort.abort();
-  return true;
+  let cancelled = false;
+  for (const run of activeRuns) {
+    run.abort.abort();
+    cancelled = true;
+  }
+  return cancelled;
 }
 
 // ---------------------------------------------------------------------------
 // Finish response — save message and parse modules
 // ---------------------------------------------------------------------------
 
-function finishResponse(fullResponse: string): void {
-  if (generatingSessionId) {
-    const current = getSession();
-    if (!current || current.id !== generatingSessionId) {
-      log.warn("ai-handler", "Session changed during generation — discarding AI output");
-      return;
-    }
+function finishResponse(capturedSessionId: string, fullResponse: string): void {
+  const current = getSession();
+  if (!current || current.id !== capturedSessionId) {
+    log.warn("ai-handler", "Session changed during generation — discarding AI output");
+    return;
   }
   addMessage("assistant", fullResponse);
   parseAndApplyModules(fullResponse, parseWarningCallback || undefined);
@@ -127,7 +155,9 @@ export async function handleGenerateStream(
   if (!session) throw new Error("No active session");
 
   const capturedSessionId = session.id;
-  generatingSessionId = capturedSessionId;
+  const releaseLock = await acquireSessionLock(capturedSessionId);
+  generatingSessions.add(capturedSessionId);
+  const onFinish = (fullResponse: string) => finishResponse(capturedSessionId, fullResponse);
 
   // Load file contexts for any attached files
   const fileContexts = fileIds?.length ? getFileContexts(fileIds) : undefined;
@@ -142,35 +172,35 @@ export async function handleGenerateStream(
         const apiKey = getApiKeyForEngine("anthropic-api", config);
         if (!apiKey) throw new Error("Anthropic API key not configured. Open Settings to add one.");
         await streamWithAnthropicAPI(userMessage, apiKey, session.themeName,
-          config.anthropicApiModel || "claude-sonnet-4-6", onChunk, onStatus, finishResponse, fileContexts);
+          config.anthropicApiModel || "claude-sonnet-4-6", onChunk, onStatus, onFinish, fileContexts);
         break;
       }
       case "claude-oauth": {
         await streamWithClaudeOAuth(userMessage, session.themeName,
-          config.anthropicApiModel || "claude-sonnet-4-6", onChunk, onStatus, finishResponse, fileContexts);
+          config.anthropicApiModel || "claude-sonnet-4-6", onChunk, onStatus, onFinish, fileContexts);
         break;
       }
       case "openai-api": {
         const apiKey = getApiKeyForEngine("openai-api", config);
         if (!apiKey) throw new Error("OpenAI API key not configured. Open Settings to add one.");
         await streamWithOpenAIAPI(userMessage, apiKey, session.themeName,
-          config.openaiApiModel || "gpt-4o", onChunk, onStatus, finishResponse, fileContexts);
+          config.openaiApiModel || "gpt-4o", onChunk, onStatus, onFinish, fileContexts);
         break;
       }
       case "gemini-api": {
         const apiKey = getApiKeyForEngine("gemini-api", config);
         if (!apiKey) throw new Error("Gemini API key not configured. Open Settings to add one.");
-        await streamWithGeminiAPI(userMessage, apiKey, session.themeName, onChunk, onStatus, finishResponse, fileContexts);
+        await streamWithGeminiAPI(userMessage, apiKey, session.themeName, onChunk, onStatus, onFinish, fileContexts);
         break;
       }
       case "claude-code":
-        await generateWithClaudeCode(userMessage, session.themeName, onChunk, onStatus, finishResponse, fileContexts);
+        await generateWithClaudeCode(userMessage, session.themeName, onChunk, onStatus, onFinish, fileContexts);
         break;
       case "gemini-cli":
-        await generateWithCLI("gemini", userMessage, session.themeName, onChunk, onStatus, finishResponse, fileContexts);
+        await generateWithCLI("gemini", userMessage, session.themeName, onChunk, onStatus, onFinish, fileContexts);
         break;
       case "codex-cli":
-        await generateWithCLI("codex", userMessage, session.themeName, onChunk, onStatus, finishResponse, fileContexts);
+        await generateWithCLI("codex", userMessage, session.themeName, onChunk, onStatus, onFinish, fileContexts);
         break;
       case "langdock-api": {
         const langdockKey = getApiKeyForEngine("langdock-api", config);
@@ -188,18 +218,18 @@ export async function handleGenerateStream(
           case "openai":
           case "mistral":
             await streamWithOpenAIAPI(userMessage, langdockKey, session.themeName,
-              ldModel || "gpt-4.1", onChunk, onStatus, finishResponse, fileContexts,
+              ldModel || "gpt-4.1", onChunk, onStatus, onFinish, fileContexts,
               `${base}/v1/chat/completions`);
             break;
           case "google":
-            await streamWithGeminiAPI(userMessage, langdockKey, session.themeName, onChunk, onStatus, finishResponse, fileContexts,
+            await streamWithGeminiAPI(userMessage, langdockKey, session.themeName, onChunk, onStatus, onFinish, fileContexts,
               `${base}/v1beta/models/${ldModel || "gemini-2.5-flash"}:streamGenerateContent?alt=sse`,
               ldModel);
             break;
           case "anthropic":
           default:
             await streamWithAnthropicAPI(userMessage, langdockKey, session.themeName,
-              ldModel || "claude-sonnet-4-6", onChunk, onStatus, finishResponse, fileContexts, base);
+              ldModel || "claude-sonnet-4-6", onChunk, onStatus, onFinish, fileContexts, base);
             break;
         }
         break;
@@ -208,8 +238,9 @@ export async function handleGenerateStream(
         throw new Error(`Unknown AI engine: ${engine}. Open Settings to configure one.`);
     }
   } finally {
-    generatingSessionId = null;
+    generatingSessions.delete(capturedSessionId);
     parseWarningCallback = null;
+    releaseLock();
   }
 }
 
@@ -385,10 +416,19 @@ export async function handleAgenticGenerate(
   if (!session) throw new Error("No active session");
 
   const capturedSessionId = session.id;
-  generatingSessionId = capturedSessionId;
+  // Register the controller BEFORE waiting on the lock so a barge-in that
+  // arrives while this run is still queued cancels it too (VIB-1895).
   const { run, signal } = beginCancellableRun();
+  const releaseLock = await acquireSessionLock(capturedSessionId);
 
   try {
+    // Superseded while waiting for the lock — bail without building.
+    if (signal.aborted) {
+      log.info("ai-handler", "Agentic run cancelled before start (barge-in)");
+      return canceledPipelineResult(takeSnapshot());
+    }
+    generatingSessions.add(capturedSessionId);
+
     const config = loadConfig();
     const { engine, apiKey, model } = resolveAgenticEngine(config);
     const concurrency = config.agenticConcurrency || 20;
@@ -416,14 +456,17 @@ export async function handleAgenticGenerate(
       }
     }
 
-    // Build library module list for intent analyzer
+    // Build library module list for intent analyzer + reuse. The `module`
+    // payload MUST ride along: `assembleModuleList` copies it into the page
+    // when the plan says "reuse" — without it the reuse silently no-ops and
+    // the final order filter drops the module (VIB-1895).
     const library = getModuleLibrary();
     const currentModuleNames = new Set(
       snapshot.modules.map((m) => m.moduleName),
     );
     const libraryModules = library
       .filter((e) => !currentModuleNames.has(e.module.moduleName))
-      .map((e) => ({ name: e.module.moduleName, usedIn: e.usedIn }));
+      .map((e) => ({ name: e.module.moduleName, usedIn: e.usedIn, module: e.module }));
 
     // Wrap in a cost-tracking scope so every model call's usage accumulates
     // into one per-page total (VIB-1770). Independent of Langfuse — works in
@@ -476,8 +519,9 @@ export async function handleAgenticGenerate(
 
     return result;
   } finally {
-    generatingSessionId = null;
+    generatingSessions.delete(capturedSessionId);
     endCancellableRun(run);
+    releaseLock();
   }
 }
 
@@ -512,10 +556,19 @@ export async function handleAgenticResume(
   if (!session) throw new Error("No active session");
 
   const capturedSessionId = session.id;
-  generatingSessionId = capturedSessionId;
+  // Register the controller BEFORE waiting on the lock so a barge-in that
+  // arrives while this resume is still queued cancels it too (VIB-1895).
   const { run, signal } = beginCancellableRun();
+  const releaseLock = await acquireSessionLock(capturedSessionId);
 
   try {
+    // Superseded while waiting for the lock — bail without building.
+    if (signal.aborted) {
+      log.info("ai-handler", "Checkpoint resume cancelled before start (barge-in)");
+      return canceledPipelineResult(takeSnapshot());
+    }
+    generatingSessions.add(capturedSessionId);
+
     const config = loadConfig();
     const { engine, apiKey, model } = resolveAgenticEngine(config);
     const concurrency = config.agenticConcurrency || 20;
@@ -579,8 +632,9 @@ export async function handleAgenticResume(
 
     return result;
   } finally {
-    generatingSessionId = null;
+    generatingSessions.delete(capturedSessionId);
     endCancellableRun(run);
+    releaseLock();
   }
 }
 
@@ -600,7 +654,8 @@ export async function handleFigmaImport(
   if (!session) throw new Error("No active session");
 
   const capturedSessionId = session.id;
-  generatingSessionId = capturedSessionId;
+  const releaseLock = await acquireSessionLock(capturedSessionId);
+  generatingSessions.add(capturedSessionId);
 
   try {
     const { runFigmaConversion } = await import("./agent/figma-pipeline.js");
@@ -647,7 +702,8 @@ export async function handleFigmaImport(
 
     return result;
   } finally {
-    generatingSessionId = null;
+    generatingSessions.delete(capturedSessionId);
+    releaseLock();
   }
 }
 
@@ -688,6 +744,15 @@ export function applyPipelineResult(result: PipelineResult, pipelineMeta?: Pipel
       const tpl = getActiveTemplate();
       if (tpl && !tpl.contentMode) {
         tpl.contentMode = "email";
+      }
+    } else if (ct === "blog") {
+      // Blog wiring (VIB-1895): mark the template so disk writes emit a
+      // blog_post template (+ listing) and follow-up requests keep using the
+      // blog prompts/validator, mirroring the email pattern above.
+      const tpl = getActiveTemplate();
+      if (tpl) {
+        if (!tpl.contentMode) tpl.contentMode = "blog";
+        if (tpl.pageType !== "blog_post") tpl.pageType = "blog_post";
       }
     }
   }

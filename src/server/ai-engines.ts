@@ -644,8 +644,15 @@ export function spawnClaudeCodeStreamJSON(
   prompt: string,
   handlers: ClaudeCodeStreamHandlers = {},
   timeout?: number,
+  signal?: AbortSignal,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
+    // Barge-in (VIB-1895): don't spawn at all if the run is already cancelled.
+    if (signal?.aborted) {
+      reject(makeSpawnAbortError("claude"));
+      return;
+    }
+
     const env = { ...process.env };
     delete env.CLAUDECODE;
 
@@ -763,8 +770,31 @@ export function spawnClaudeCodeStreamJSON(
         `Partial output (${assistantText.length} chars): ${assistantText.slice(0, 500)}`,
       )));
     }, timeoutMs);
-    child.on("close", () => clearTimeout(timer));
+
+    // Barge-in (VIB-1895): a cancelled run kills the subprocess immediately
+    // instead of letting it burn tokens until the timeout.
+    const onAbort = () => {
+      child.kill();
+      settle(() => reject(makeSpawnAbortError("claude")));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    child.on("close", () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    });
   });
+}
+
+/**
+ * Error used when a CLI subprocess is killed by a barge-in cancellation.
+ * Named "AbortError" so the pipeline's `isAbortError` treats it like a
+ * provider-level abort (clean "superseded", not a generation failure).
+ */
+function makeSpawnAbortError(bin: string): Error {
+  const err = new Error(`${bin} aborted (generation cancelled)`);
+  err.name = "AbortError";
+  return err;
 }
 
 // ---------------------------------------------------------------------------
@@ -776,9 +806,16 @@ export function spawnCLI(
   args: string[],
   prompt: string,
   onChunk?: (chunk: string) => void,
-  timeout?: number
+  timeout?: number,
+  signal?: AbortSignal
 ): Promise<string> {
   return new Promise((resolve, reject) => {
+    // Barge-in (VIB-1895): don't spawn at all if the run is already cancelled.
+    if (signal?.aborted) {
+      reject(makeSpawnAbortError(bin));
+      return;
+    }
+
     const env = { ...process.env };
     delete env.CLAUDECODE;
 
@@ -843,8 +880,19 @@ export function spawnCLI(
       )));
     }, timeoutMs);
 
-    // Clear timeout when process exits normally
-    child.on("close", () => clearTimeout(timer));
+    // Barge-in (VIB-1895): a cancelled run kills the subprocess immediately
+    // instead of letting it burn tokens until the timeout.
+    const onAbort = () => {
+      child.kill();
+      settle(() => reject(makeSpawnAbortError(bin)));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    // Clear timeout + abort listener when process exits
+    child.on("close", () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    });
   });
 }
 

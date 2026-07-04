@@ -126,9 +126,25 @@ const LANGDOCK_DEFAULT_BASE_URL = LANGDOCK_BASE_URLS.anthropic;
 
 const RATE_LIMIT_DELAYS = [10, 20, 40, 60, 120]; // seconds
 
+/** Sleep that wakes early when `signal` aborts (barge-in during a backoff). */
+function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 async function withRateLimitRetry<T>(
   fn: () => Promise<T>,
   onStatus?: (status: string) => void,
+  signal?: AbortSignal,
 ): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -149,7 +165,9 @@ async function withRateLimitRetry<T>(
         `Rate limited (429), attempt ${attempt + 1}/${RATE_LIMIT_DELAYS.length} — waiting ${wait}s`,
       );
       if (onStatus) onStatus(`Rate limited — retrying in ${wait}s...`);
-      await new Promise((r) => setTimeout(r, wait * 1000));
+      await abortableSleep(wait * 1000, signal);
+      // Don't burn another attempt after a barge-in cancelled the run.
+      if (signal?.aborted) throw new PipelineAbortError();
       if (onStatus) onStatus("Retrying...");
     }
   }
@@ -259,7 +277,7 @@ async function callAnthropic(
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map((b) => b.text);
       return { type: "text" as const, text: textParts.join(""), usage };
-    }, opts.onStatus);
+    }, opts.onStatus, opts.signal);
   }
 
   // Non-structured: regular text generation. Optionally attach the
@@ -297,7 +315,7 @@ async function callAnthropic(
       /* usage is best-effort */
     }
     return { type: "text" as const, text: fullText, usage };
-  }, opts.onStatus);
+  }, opts.onStatus, opts.signal);
 }
 
 /**
@@ -363,7 +381,7 @@ async function callAnthropicOAuth(
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map((b) => b.text);
       return { type: "text" as const, text: textParts.join(""), usage };
-    }, opts.onStatus);
+    }, opts.onStatus, opts.signal);
   }
 
   return withRateLimitRetry(async () => {
@@ -395,7 +413,7 @@ async function callAnthropicOAuth(
       /* usage is best-effort */
     }
     return { type: "text" as const, text: fullText, usage };
-  }, opts.onStatus);
+  }, opts.onStatus, opts.signal);
 }
 
 // ---------------------------------------------------------------------------
@@ -480,46 +498,51 @@ async function callOpenAI(
   }
 
   const url = fetchURL || "https://api.openai.com/v1/chat/completions";
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-    signal: opts.signal,
-  });
 
-  if (!response.ok) {
-    const err = await response.text();
-    const status = response.status;
-    if (status === 429) {
-      const error = new Error(`OpenAI rate limit: ${err}`);
-      (error as unknown as { status: number }).status = 429;
-      throw error;
+  // Backoff-retry on 429 like the Anthropic path (VIB-1895) — the status=429
+  // error thrown below is consumed here, not surfaced as an instant failure.
+  return withRateLimitRetry(async () => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      const status = response.status;
+      if (status === 429) {
+        const error = new Error(`OpenAI rate limit: ${err}`);
+        (error as unknown as { status: number }).status = 429;
+        throw error;
+      }
+      throw new Error(`OpenAI API error (${status}): ${err}`);
     }
-    throw new Error(`OpenAI API error (${status}): ${err}`);
-  }
 
-  const json = await response.json();
-  const content = json.choices?.[0]?.message?.content || "";
+    const json = await response.json();
+    const content = json.choices?.[0]?.message?.content || "";
 
-  const usage = mapOpenAIUsage(json.usage);
+    const usage = mapOpenAIUsage(json.usage);
 
-  if (opts.structuredOutput) {
-    try {
-      return {
-        type: "structured",
-        data: stringifyJsonFields(JSON.parse(content)),
-        usage,
-      };
-    } catch {
-      log.warn("agent-adapter", "OpenAI structured output parse failed, returning raw text");
-      return { type: "text", text: content, usage };
+    if (opts.structuredOutput) {
+      try {
+        return {
+          type: "structured" as const,
+          data: stringifyJsonFields(JSON.parse(content)),
+          usage,
+        };
+      } catch {
+        log.warn("agent-adapter", "OpenAI structured output parse failed, returning raw text");
+        return { type: "text" as const, text: content, usage };
+      }
     }
-  }
 
-  return { type: "text", text: content, usage };
+    return { type: "text" as const, text: content, usage };
+  }, opts.onStatus, opts.signal);
 }
 
 // ---------------------------------------------------------------------------
@@ -563,46 +586,49 @@ async function callGemini(
   const usingCustomUrl = Boolean(fetchURL);
   const url = fetchURL || `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(usingCustomUrl ? { Authorization: `Bearer ${apiKey}` } : {}),
-    },
-    body: JSON.stringify(body),
-    signal: opts.signal,
-  });
+  // Backoff-retry on 429 like the Anthropic path (VIB-1895).
+  return withRateLimitRetry(async () => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(usingCustomUrl ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
 
-  if (!response.ok) {
-    const err = await response.text();
-    const status = response.status;
-    if (status === 429) {
-      const error = new Error(`Gemini rate limit: ${err}`);
-      (error as unknown as { status: number }).status = 429;
-      throw error;
+    if (!response.ok) {
+      const err = await response.text();
+      const status = response.status;
+      if (status === 429) {
+        const error = new Error(`Gemini rate limit: ${err}`);
+        (error as unknown as { status: number }).status = 429;
+        throw error;
+      }
+      throw new Error(`Gemini API error (${status}): ${err}`);
     }
-    throw new Error(`Gemini API error (${status}): ${err}`);
-  }
 
-  const json = await response.json();
-  const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const json = await response.json();
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-  const usage = mapGeminiUsage(json.usageMetadata);
+    const usage = mapGeminiUsage(json.usageMetadata);
 
-  if (opts.structuredOutput) {
-    try {
-      return {
-        type: "structured",
-        data: stringifyJsonFields(JSON.parse(text)),
-        usage,
-      };
-    } catch {
-      log.warn("agent-adapter", "Gemini structured output parse failed, returning raw text");
-      return { type: "text", text, usage };
+    if (opts.structuredOutput) {
+      try {
+        return {
+          type: "structured" as const,
+          data: stringifyJsonFields(JSON.parse(text)),
+          usage,
+        };
+      } catch {
+        log.warn("agent-adapter", "Gemini structured output parse failed, returning raw text");
+        return { type: "text" as const, text, usage };
+      }
     }
-  }
 
-  return { type: "text", text, usage };
+    return { type: "text" as const, text, usage };
+  }, opts.onStatus, opts.signal);
 }
 
 // ---------------------------------------------------------------------------
@@ -757,6 +783,10 @@ async function callAgentCLI(
   // text deltas, tool calls, final result) instead of raw concatenated
   // text. Tool-use events are surfaced via onStatus so the pipeline UI
   // can show what the agent is doing.
+  //
+  // Barge-in (VIB-1895): the abort signal threads into the spawn helpers,
+  // which kill the subprocess — a cancelled run stops burning CLI tokens
+  // instead of running to the 10-minute timeout.
   let rawOutput: string;
   if (engine === "claude-code") {
     const streamArgs = [
@@ -772,9 +802,9 @@ async function callAgentCLI(
         const summary = summarizeToolUse(toolName, input);
         opts.onStatus(summary);
       },
-    });
+    }, undefined, opts.signal);
   } else {
-    rawOutput = await spawnCLI(bin, args, prompt, opts.onChunk);
+    rawOutput = await spawnCLI(bin, args, prompt, opts.onChunk, undefined, opts.signal);
   }
 
   if (!opts.structuredOutput) {
