@@ -5,6 +5,7 @@
 
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
+import { createHash } from "node:crypto";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,6 +50,7 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 /** Refresh access token 5 minutes before expiry. */
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
+const MAX_TOKEN_CACHE_ENTRIES = 25;
 
 // ---------------------------------------------------------------------------
 // Token exchange — PAKs are exchanged for short-lived access tokens
@@ -63,9 +65,39 @@ interface CachedToken {
 
 const tokenCache = new Map<string, CachedToken>();
 
+function tokenCacheKey(pak: string): string {
+  return createHash("sha256").update(pak).digest("hex");
+}
+
+function evictExpiredCachedTokens(now = Date.now()): void {
+  for (const [key, token] of tokenCache) {
+    if (token.expiresAt - now <= TOKEN_REFRESH_BUFFER_MS) {
+      tokenCache.delete(key);
+    }
+  }
+}
+
+function evictOldestCachedTokens(): void {
+  while (tokenCache.size > MAX_TOKEN_CACHE_ENTRIES) {
+    const oldestKey = tokenCache.keys().next().value;
+    if (!oldestKey) return;
+    tokenCache.delete(oldestKey);
+  }
+}
+
+export function clearHubSpotTokenCacheForTest(): void {
+  if (process.env.NODE_ENV === "test") tokenCache.clear();
+}
+
+export function getHubSpotTokenCacheKeysForTest(): string[] {
+  return process.env.NODE_ENV === "test" ? [...tokenCache.keys()] : [];
+}
+
 /** Exchange a PAK for a short-lived OAuth access token via HubSpot's localdevauth endpoint. */
 async function exchangePakForToken(pak: string): Promise<CachedToken> {
-  const cached = tokenCache.get(pak);
+  evictExpiredCachedTokens();
+  const cacheKey = tokenCacheKey(pak);
+  const cached = tokenCache.get(cacheKey);
   if (cached && cached.expiresAt - Date.now() > TOKEN_REFRESH_BUFFER_MS) {
     return cached;
   }
@@ -86,14 +118,25 @@ async function exchangePakForToken(pak: string): Promise<CachedToken> {
   }
 
   const data = await resp.json() as Record<string, unknown>;
+  if (
+    typeof data.oauthAccessToken !== "string" ||
+    !data.oauthAccessToken ||
+    typeof data.expiresAtMillis !== "number" ||
+    !Number.isFinite(data.expiresAtMillis) ||
+    data.expiresAtMillis <= Date.now()
+  ) {
+    throw new Error("Token exchange returned an invalid token payload");
+  }
+
   const token: CachedToken = {
-    accessToken: data.oauthAccessToken as string,
-    expiresAt: data.expiresAtMillis as number,
-    hubId: data.hubId as number,
-    hubName: (data.hubName as string) || "",
+    accessToken: data.oauthAccessToken,
+    expiresAt: data.expiresAtMillis,
+    hubId: typeof data.hubId === "number" ? data.hubId : Number(data.hubId || 0),
+    hubName: typeof data.hubName === "string" ? data.hubName : "",
   };
 
-  tokenCache.set(pak, token);
+  tokenCache.set(cacheKey, token);
+  evictOldestCachedTokens();
   return token;
 }
 

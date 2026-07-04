@@ -10,8 +10,8 @@
 
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { chmodSync, unlinkSync } from "node:fs";
-import { readFile, writeFile, fileExists } from "./fs.js";
+import { chmodSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { readFile, fileExists } from "./fs.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -19,8 +19,11 @@ import { readFile, writeFile, fileExists } from "./fs.js";
 
 const CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const TOKEN_ENDPOINT = "https://console.anthropic.com/v1/oauth/token";
-const TOKEN_FILE = join(homedir(), ".vibespot", "claude-oauth.json");
+const TOKEN_DIR = join(homedir(), ".vibespot");
+const TOKEN_FILE = join(TOKEN_DIR, "claude-oauth.json");
 const REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
+const TOKEN_FILE_MODE = 0o600;
+const TOKEN_DIR_MODE = 0o700;
 
 // ---------------------------------------------------------------------------
 // OAuth headers required for OAT tokens on every API call
@@ -49,20 +52,42 @@ interface OAuthTokens {
 // Token persistence
 // ---------------------------------------------------------------------------
 
+function hardenTokenFilePermissions(): void {
+  if (process.platform === "win32") return;
+  try { chmodSync(TOKEN_DIR, TOKEN_DIR_MODE); } catch { /* ignore */ }
+  try { chmodSync(TOKEN_FILE, TOKEN_FILE_MODE); } catch { /* ignore */ }
+}
+
+function parseTokens(value: unknown): OAuthTokens | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Partial<OAuthTokens>;
+  if (typeof v.access_token !== "string" || !v.access_token) return null;
+  if (typeof v.refresh_token !== "string") return null;
+  if (typeof v.expires_at !== "number" || !Number.isFinite(v.expires_at)) return null;
+  return { access_token: v.access_token, refresh_token: v.refresh_token, expires_at: v.expires_at };
+}
+
 function loadTokens(): OAuthTokens | null {
   if (!fileExists(TOKEN_FILE)) return null;
   try {
-    return JSON.parse(readFile(TOKEN_FILE));
+    hardenTokenFilePermissions();
+    return parseTokens(JSON.parse(readFile(TOKEN_FILE)));
   } catch {
     return null;
   }
 }
 
 function saveTokens(tokens: OAuthTokens): void {
-  writeFile(TOKEN_FILE, JSON.stringify(tokens, null, 2));
+  mkdirSync(TOKEN_DIR, { recursive: true, mode: TOKEN_DIR_MODE });
+  hardenTokenFilePermissions();
+
+  const tmpPath = join(TOKEN_DIR, `.claude-oauth.json.${process.pid}.${Date.now()}.tmp`);
+  writeFileSync(tmpPath, JSON.stringify(tokens, null, 2), { encoding: "utf-8", mode: TOKEN_FILE_MODE, flag: "w" });
   if (process.platform !== "win32") {
-    try { chmodSync(TOKEN_FILE, 0o600); } catch { /* ignore */ }
+    try { chmodSync(tmpPath, TOKEN_FILE_MODE); } catch { /* ignore */ }
   }
+  renameSync(tmpPath, TOKEN_FILE);
+  hardenTokenFilePermissions();
 }
 
 // ---------------------------------------------------------------------------
@@ -87,11 +112,16 @@ async function refreshAccessToken(refresh_token: string): Promise<void> {
     throw new Error("Claude OAuth session expired. Please re-authenticate in Settings.");
   }
 
-  const data = await resp.json();
+  const data = await resp.json() as Record<string, unknown>;
+  if (typeof data.access_token !== "string" || !data.access_token) {
+    clearOAuthTokens();
+    throw new Error("Claude OAuth refresh returned an invalid token payload. Please re-authenticate in Settings.");
+  }
+  const expiresIn = typeof data.expires_in === "number" && Number.isFinite(data.expires_in) ? data.expires_in : 28800;
   saveTokens({
     access_token: data.access_token,
-    refresh_token: data.refresh_token || refresh_token,
-    expires_at: Date.now() + (data.expires_in || 28800) * 1000,
+    refresh_token: typeof data.refresh_token === "string" ? data.refresh_token : refresh_token,
+    expires_at: Date.now() + expiresIn * 1000,
   });
 }
 
