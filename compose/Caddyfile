@@ -5,7 +5,12 @@
 #   Let's Encrypt certificate when $VIBESPOT_TLS_EMAIL is set.
 
 {
-	email {$VIBESPOT_TLS_EMAIL}
+	# Placeholder default keeps the Caddyfile parseable when the email is
+	# unset (VIB-1933) — `email` with an empty argument is a parse error, which
+	# crash-looped Caddy in the documented VIBESPOT_DOMAIN=localhost flow. The
+	# fallback address is only ever sent to an ACME CA, i.e. never in
+	# local-only mode; set VIBESPOT_TLS_EMAIL for real domains.
+	email {$VIBESPOT_TLS_EMAIL:admin@invalid.localhost}
 }
 
 {$VIBESPOT_DOMAIN} {

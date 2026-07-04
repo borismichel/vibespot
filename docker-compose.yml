@@ -124,7 +124,11 @@ services:
       - "443:443"
     environment:
       VIBESPOT_DOMAIN: ${VIBESPOT_DOMAIN:-localhost}
-      VIBESPOT_TLS_EMAIL: ${VIBESPOT_TLS_EMAIL:-}
+      # Non-empty default (VIB-1933): `email` with an empty argument is a
+      # Caddyfile parse error that crash-looped Caddy in the localhost flow.
+      # The fallback is only ever sent to an ACME CA — set a real address
+      # when deploying on a public domain.
+      VIBESPOT_TLS_EMAIL: ${VIBESPOT_TLS_EMAIL:-admin@invalid.localhost}
       VIBESPOT_UPSTREAM: ${VIBESPOT_UPSTREAM:-vibespot:4200}
       # Second site: the live-preview origin (VIB-1933). Defaults to a
       # `preview.` subdomain of the app domain — point DNS at the host for it
