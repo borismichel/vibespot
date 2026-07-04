@@ -8,6 +8,8 @@ All notable changes to vibeSpot are documented here.
 
 ### Changed
 
+- **Dead Postgres storage backend removed** ([VIB-1903](/VIB/issues/VIB-1903)) — the never-wired `pg` adapter, its deps, and the unused compose Postgres service are gone; Docker/compose docs now consistently describe filesystem-only persistence ([VIB-1930](/VIB/issues/VIB-1930)); non-runtime screenshot/readme image trees are excluded from the npm package.
+
 - **server.ts split into router + WebSocket modules** ([VIB-1932](/VIB/issues/VIB-1932)) — internal refactor, no behavior change. The ~78-case `/api/*` switch is now a declarative route table + dispatcher (`src/server/routes/api-router.ts`, exact paths with per-verb 405s plus the two pattern routes), the WebSocket protocol (`chat`, `figma_import`, `extract_brand_assets`, `start_upload`, `upload_fix_with_ai`, `checkpoint_resolve` + plan aliases) lives in `src/server/ws-handler.ts`, and run-state (content mode, active preview origin) moved to `src/server/server-context.ts` so the extracted modules don't import `server.ts`. The VIB-1889 auth gate remains the single middleware seam in `server.ts:handleRequest`; the inline `/api/changelog` and `/api/preview-origin` handlers moved into `routes/`.
 - **Consolidated drifting duplication** ([VIB-1902](/VIB/issues/VIB-1902)) — four byte-duplicated code paths that had already produced real drift bugs are collapsed onto single implementations:
   - `codex-cli.ts` / `gemini-cli.ts` (byte-identical, with lax exit-code handling and a leaked kill timer) are now thin configs over one shared `SimpleCLIEngine` (`src/ai/cli-engine.ts`) that runs through the maintained `spawnCLI` helper — strict non-zero-exit rejection, timer cleanup, and stdin backpressure now apply to the wizard's Codex/Gemini conversions too.
@@ -16,6 +18,8 @@ All notable changes to vibeSpot are documented here.
   - The three `escapeHtml` clones in `chat.js`/`plan.js`/`email-preview.js` are replaced by one shared `ui/escape-html.js` (the email-preview copy didn't escape quotes, so it was unsafe in attribute context).
 
 ### Fixed
+
+- **CI runs again on every push/PR; the test suite no longer mutates the developer's real `~/.vibespot`** ([VIB-1893](/VIB/issues/VIB-1893)) — the `push`/`pull_request` triggers disabled in VIB-1759 are restored (plus a `typecheck` step), and the storage tests write to an injected temp dir (`VIBESPOT_SESSIONS_DIR`/`VIBESPOT_HOME`) instead of the real session store; the pg suite is skipped unless `VIBESPOT_TEST_PG_URL` is set.
 
 - **Interact mode: link-edit popup Save/Cancel buttons work** ([VIB-1926](/VIB/issues/VIB-1926)) — the interact-mode capture-phase document click handler ran `preventDefault`/`stopPropagation` on every click, including clicks inside the agent's own link-edit popup, so Save (and Enter, which synthesizes the same click) silently discarded the edit and Cancel never ran its own handler. Clicks inside the agent's edit UI (link popup, image URL input) now early-return before interception, letting the popup's buttons receive them. Link editing now commits end-to-end (`vs:edit-commit` → `POST /api/field`).
 - **UI shell robustness: plan-renderer XSS, job-poll hangs, fetch guards, brand upload** ([VIB-1899](/VIB/issues/VIB-1899)):
@@ -46,6 +50,9 @@ All notable changes to vibeSpot are documented here.
   - Upload auto-fix matched error text case-sensitively (the color fix never triggered against "Color field…") and the `dnd_area_stylesheet` fix was shadowed by the generic `dnd` branch. Matching is now case-insensitive and the stylesheet branch is checked first.
 
 ### Security
+
+- **HubL preview output is escaped; stored XSS closed** ([VIB-1896](/VIB/issues/VIB-1896)) — the local HubL renderer emitted field values into the preview DOM unescaped, so a crafted field value (typed, imported with a theme, or AI-generated) executed script in the preview; variable output is now HTML-escaped by default (with an explicit safe-list for the renderer's own composed markup), and `elif`/`else` branches are associated with the correct enclosing `if` instead of the nearest tag.
+- **Credential files, PAK token cache, and Figma import hardened** ([VIB-1897](/VIB/issues/VIB-1897)) — `~/.vibespot/config.json`, the Claude OAuth token file, and the HubSpot PAK access-token cache are written `0600` with `O_EXCL`-style creation (no world-readable window); cached PAK bearer tokens are keyed and invalidated correctly; and the Figma import URL is validated against an allow-listed host with DNS/private-address checks, closing an SSRF where a crafted "Figma" URL could probe internal services.
 
 - **The live preview no longer runs AI-generated code on the app origin** ([VIB-1892](/VIB/issues/VIB-1892)) — the preview iframe used `srcdoc` with `sandbox="allow-scripts allow-same-origin"`, which on `srcdoc` inherits the app origin and neuters the sandbox: a `<script>` in generated (or prompt-injected / imported-theme) page code could reach the app's DOM and every `/api/*` route — rewrite the UI, flip settings, read the masked API-key state, drive uploads. Now:
   - The preview loads from a **separate origin** (`src/server/preview-origin.ts`, app port + 2) whose entire surface is the composed preview doc, the trusted in-frame agent script, and token-gated theme assets — `/api/*` does not exist there. Generated code is cross-origin to the app; the browser's same-origin policy is the boundary.
