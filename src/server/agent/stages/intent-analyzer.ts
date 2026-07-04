@@ -15,6 +15,7 @@ import {
 import { stagePromptLink } from "../prompts/registry.js";
 import { log } from "../../log.js";
 import { runWithSpan } from "../../langfuse.js";
+import { kebabModuleName } from "../../../utils/path-safety.js";
 
 export async function runIntentAnalyzer(
   userMessage: string,
@@ -94,6 +95,28 @@ export async function runIntentAnalyzer(
   plan.affectedModules = plan.affectedModules || [];
   plan.unchangedModules = plan.unchangedModules || [];
   plan.newModules = plan.newModules || [];
+  // New-module names become path components (`modules/<name>.module`) — coerce
+  // structured output to the safe kebab charset before anything downstream
+  // touches the filesystem (VIB-1891). Names that coerce to nothing are dropped.
+  plan.newModules = plan.newModules
+    .map((m) => ({ ...m, name: kebabModuleName(String(m.name ?? "")) }))
+    .filter((m) => m.name.length > 0);
+  // Same treatment for multi-page plans: page ids/slugs become template
+  // filenames, shared module names become module dirs.
+  if (plan.pages) {
+    plan.pages = plan.pages
+      .map((p) => ({
+        ...p,
+        id: kebabModuleName(String(p.id ?? "")),
+        slug: kebabModuleName(String(p.slug ?? "")),
+      }))
+      .filter((p) => p.id.length > 0);
+  }
+  if (plan.sharedModules) {
+    plan.sharedModules = plan.sharedModules
+      .map((n) => kebabModuleName(String(n ?? "")))
+      .filter((n) => n.length > 0);
+  }
   plan.guidesNeeded = plan.guidesNeeded || [];
   if (snapshot.contentMode === "email") {
     plan.contentType = "email";

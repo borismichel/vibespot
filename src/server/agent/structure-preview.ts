@@ -14,6 +14,7 @@ import type {
   PageBlueprint,
   StructureOutlineItem,
 } from "./types.js";
+import { kebabModuleName } from "../../utils/path-safety.js";
 
 export interface StructureOutlineEntry {
   name: string;
@@ -27,20 +28,10 @@ export interface StructurePreviewData {
   modules: StructureOutlineEntry[];
 }
 
-/**
- * Coerce free-typed module names back to the kebab-case the pipeline requires
- * (see CLAUDE.md "Module names"). Empty/garbage falls back to the caller's
- * default. Mirrors what `updateModules` enforces, applied up front so a renamed
- * or added section never breaks Stage 3.
- */
-export function kebabModuleName(raw: string): string {
-  return String(raw || "")
-    .trim()
-    .toLowerCase()
-    .replace(/['"]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+// Canonical implementation lives in utils/path-safety.ts (VIB-1891) — it is
+// both the naming convention and a security boundary (module names become
+// path components). Re-exported here for existing importers.
+export { kebabModuleName };
 
 /**
  * Build the structure-checkpoint card payload from the blueprint. Modules are

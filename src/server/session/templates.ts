@@ -8,6 +8,7 @@ import type { ModuleFiles } from "../../ai/engine.js";
 import type { VibeSession, TemplateEntry, PageType, ContentMode } from "./types.js";
 import { getSession } from "./store.js";
 import { syncFlatFieldsFromTemplate } from "./state.js";
+import { resolveModuleDir } from "../../utils/path-safety.js";
 
 // ---------------------------------------------------------------------------
 // Template management
@@ -238,7 +239,13 @@ export function removeTemplate(templateId: string, deleteModules = false): boole
     if (activeSession.themePath && exclusiveModules.length > 0) {
       const modulesDir = join(activeSession.themePath, "modules");
       for (const name of exclusiveModules) {
-        const modDir = join(modulesDir, `${name}.module`);
+        // Containment guard: never rm -rf outside modules/ (VIB-1891)
+        let modDir: string;
+        try {
+          modDir = resolveModuleDir(modulesDir, name);
+        } catch {
+          continue;
+        }
         if (existsSync(modDir)) rmSync(modDir, { recursive: true, force: true });
       }
     }

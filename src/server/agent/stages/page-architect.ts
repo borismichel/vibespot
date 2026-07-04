@@ -28,6 +28,31 @@ import {
 import { stagePromptLink } from "../prompts/registry.js";
 import { log } from "../../log.js";
 import { runWithSpan } from "../../langfuse.js";
+import { kebabModuleName, isSafePathSegment } from "../../../utils/path-safety.js";
+
+/**
+ * Sanitize planner-supplied module names before they enter the blueprint —
+ * they become path components downstream (`modules/<name>.module`), so a
+ * hostile structured output must never carry traversal sequences (VIB-1891).
+ * Names that exactly match an existing module are kept verbatim (imported
+ * themes may have non-kebab names; the modify path needs exact matches),
+ * everything else is kebab-coerced. Empty results are dropped.
+ */
+function sanitizeModulePlanNames<
+  T extends { modules: PageBlueprint["modules"]; moduleOrder: string[] },
+>(modulePlan: T, existingNames: Set<string>): T {
+  const safeName = (raw: unknown): string => {
+    const name = String(raw ?? "");
+    return existingNames.has(name) && isSafePathSegment(name) ? name : kebabModuleName(name);
+  };
+  const modules = modulePlan.modules
+    .map((m) => ({ ...m, name: safeName(m.name) }))
+    .filter((m) => m.name.length > 0);
+  const moduleOrder = (modulePlan.moduleOrder || [])
+    .map((n) => safeName(n))
+    .filter((n) => n.length > 0);
+  return { ...modulePlan, modules, moduleOrder };
+}
 
 /**
  * Run only the Design System stage (2a) without the Module Planner.
@@ -364,6 +389,11 @@ export async function runPageArchitect(
     });
   }
 
+  modulePlan = sanitizeModulePlanNames(
+    modulePlan,
+    new Set(snapshot.modules.map((m) => m.moduleName)),
+  );
+
   onEvent({
     type: "agent_decision",
     step: "designing",
@@ -499,6 +529,11 @@ export async function runModulePlanner(
       moduleCount: modulePlan.modules.length,
     });
   }
+
+  modulePlan = sanitizeModulePlanNames(
+    modulePlan,
+    new Set(snapshot.modules.map((m) => m.moduleName)),
+  );
 
   onEvent({
     type: "agent_decision",

@@ -10,6 +10,8 @@ import { getSession } from "./store.js";
 import { getOrderedModules, syncFlatFieldsFromTemplate, syncFlatFieldsToTemplate, loadChatFromTheme } from "./state.js";
 import { getActiveTemplate, migrateSession } from "./templates.js";
 import { ensureGitRepo } from "../project-git.js";
+import { log } from "../log.js";
+import { resolveModuleDir } from "../../utils/path-safety.js";
 import {
   extractDesignTokens,
   buildRootCssFromTokens,
@@ -318,15 +320,25 @@ export function writeModulesToDisk(): void {
     allModules.set(mod.moduleName, mod);
   }
 
-  // Pre-create all module directories in one pass
+  // Refuse names that would resolve outside modules/ (traversal via a
+  // poisoned session, VIB-1891); skip so one bad name doesn't block the rest.
   const modulesBaseDir = join(themePath, "modules");
-  mkdirSync(modulesBaseDir, { recursive: true });
+  const safeModules: { mod: ModuleFiles; modDir: string }[] = [];
   for (const mod of allModules.values()) {
-    mkdirSync(join(modulesBaseDir, `${mod.moduleName}.module`), { recursive: true });
+    try {
+      safeModules.push({ mod, modDir: resolveModuleDir(modulesBaseDir, mod.moduleName) });
+    } catch {
+      log.warn("session-disk", "Skipping module with unsafe name", { name: mod.moduleName });
+    }
   }
 
-  for (const mod of allModules.values()) {
-    const modDir = join(modulesBaseDir, `${mod.moduleName}.module`);
+  // Pre-create all module directories in one pass
+  mkdirSync(modulesBaseDir, { recursive: true });
+  for (const { modDir } of safeModules) {
+    mkdirSync(modDir, { recursive: true });
+  }
+
+  for (const { mod, modDir } of safeModules) {
     writeFileSync(join(modDir, "fields.json"), mod.fieldsJson, "utf-8");
     writeFileSync(join(modDir, "meta.json"), mod.metaJson, "utf-8");
     writeFileSync(join(modDir, "module.html"), mod.moduleHtml, "utf-8");
@@ -463,7 +475,13 @@ export function reloadActiveTemplateFromDisk(): void {
   // Reload modules that belong to this template
   tpl.modules = [];
   for (const name of tpl.moduleOrder) {
-    const modDir = join(modulesDir, `${name}.module`);
+    let modDir: string;
+    try {
+      modDir = resolveModuleDir(modulesDir, name);
+    } catch {
+      log.warn("session-disk", "Skipping module with unsafe name", { name });
+      continue;
+    }
     if (!existsSync(modDir)) continue;
     const mod: ModuleFiles = {
       moduleName: name,
