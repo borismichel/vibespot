@@ -35,7 +35,7 @@ jobs:
 
       - name: Boot container
         run: |
-          docker run -d --name vibespot-smoke -p 4200:4200 vibespot:ci
+          docker run -d --name vibespot-smoke -p 4200:4200 -e VIBESPOT_AUTH_TOKEN=vibespot-ci-smoke-token vibespot:ci
           echo "::group::wait for /healthz"
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:4200/healthz > /tmp/healthz.json; then
@@ -55,7 +55,7 @@ jobs:
 
       - name: Verify bundled assets via /api/starters
         run: |
-          curl -fsS http://127.0.0.1:4200/api/starters > /tmp/starters.json
+          curl -fsS -H "Authorization: Bearer vibespot-ci-smoke-token" http://127.0.0.1:4200/api/starters > /tmp/starters.json
           count=$(jq '.starters | length' /tmp/starters.json 2>/dev/null || echo 0)
           echo "starters count: $count"
           if [ "$count" -lt 5 ]; then
