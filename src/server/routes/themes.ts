@@ -2,6 +2,7 @@
  * Theme routes — list, switch, delete, rename themes.
  */
 
+import { publicErrorMessage } from "../errors.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -39,7 +40,7 @@ export function handleThemesRoute(method: string, req: IncomingMessage, res: Ser
         deleteSession(sessionId, deleteFiles);
         jsonResponse(res, 200, { ok: true });
       } catch (err) {
-        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+        jsonResponse(res, 500, { error: publicErrorMessage(err) });
       }
     });
     return;
@@ -64,7 +65,7 @@ export function handleThemeSwitchRoute(req: IncomingMessage, res: ServerResponse
         themePath: session.themePath,
       });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -89,7 +90,7 @@ export function handleDeleteLocalThemeRoute(req: IncomingMessage, res: ServerRes
       rmSync(themePath, { recursive: true, force: true });
       jsonResponse(res, 200, { ok: true });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -114,7 +115,7 @@ export function handleRenameThemeRoute(req: IncomingMessage, res: ServerResponse
         jsonResponse(res, 400, { error: result.error });
       }
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -134,7 +135,7 @@ export function handleDuplicateThemeRoute(req: IncomingMessage, res: ServerRespo
         jsonResponse(res, 400, { error: result.error });
       }
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }

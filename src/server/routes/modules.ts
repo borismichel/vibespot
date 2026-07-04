@@ -2,6 +2,7 @@
  * Module, field, import, session, upload, and history routes.
  */
 
+import { publicErrorMessage } from "../errors.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import { jsonResponse, readBody, readJsonBody } from "../route-helpers.js";
@@ -23,6 +24,7 @@ import {
 import { isGenerating } from "../ai-handler.js";
 import { applyAutoFixes } from "../auto-fix.js";
 import { startStreamingJob } from "../process-manager.js";
+import { isSafeThemeName } from "../../utils/validate.js";
 import { analyzeSource } from "../../wizard/source.js";
 import { commitThemeState, commitTemplateState, getHistory, getTemplateHistory, rollbackToCommit, rollbackTemplateToCommit, isGitAvailable } from "../project-git.js";
 
@@ -185,8 +187,13 @@ export async function handleUploadRoute(res: ServerResponse): Promise<void> {
     writeModulesToDisk();
     const fixes = applyAutoFixes(session.themePath);
 
+    if (!isSafeThemeName(session.themeName)) {
+      jsonResponse(res, 400, { error: "Theme name contains unsupported characters and cannot be uploaded via the HubSpot CLI." });
+      return;
+    }
+
     const jobId = startStreamingJob(
-      `hs cms upload "${session.themePath}" "${session.themeName}"`,
+      "hs", ["cms", "upload", session.themePath, session.themeName],
       "Uploading to HubSpot",
       { cwd: join(session.themePath, ".."), timeout: 180_000 }
     );
@@ -255,7 +262,7 @@ Read the React source files from ${analysis.sourceDir} and convert each componen
       jsonResponse(res, 200, summary);
     } catch (err) {
       jsonResponse(res, 500, {
-        error: err instanceof Error ? err.message : String(err),
+        error: publicErrorMessage(err),
       });
     }
   });
@@ -332,7 +339,7 @@ export function handleRollbackRoute(req: IncomingMessage, res: ServerResponse): 
         modules: getOrderedModules().map((m) => m.moduleName),
       });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }

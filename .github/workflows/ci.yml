@@ -1,9 +1,9 @@
 name: CI
 
-# Automatic triggers disabled until June 1 2025 — GitHub Actions
-# minutes exhausted. See VIB-1759. Restore push/pull_request triggers
-# when minutes reset.
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -24,5 +24,6 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run typecheck
       - run: npm run build
       - run: npm test

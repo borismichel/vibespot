@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { FileSystemStorageAdapter } from "../src/server/storage/fs-adapter.js";
@@ -64,15 +64,23 @@ const testModule: ModuleOnDisk = {
 // Shared test suite — runs against any adapter
 // ---------------------------------------------------------------------------
 
-function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: StorageAdapter; cleanup: () => Promise<void> }>) {
+type AdapterSetup = {
+  adapter: StorageAdapter;
+  cleanup: () => Promise<void>;
+  makeSession?: (overrides?: Partial<VibeSession>) => VibeSession;
+};
+
+function adapterSuite(name: string, getAdapter: () => Promise<AdapterSetup>) {
   describe(`StorageAdapter — ${name}`, () => {
     let adapter: StorageAdapter;
     let cleanup: () => Promise<void>;
+    let makeAdapterSession: (overrides?: Partial<VibeSession>) => VibeSession;
 
     beforeEach(async () => {
       const setup = await getAdapter();
       adapter = setup.adapter;
       cleanup = setup.cleanup;
+      makeAdapterSession = setup.makeSession || makeSession;
     });
 
     afterEach(async () => {
@@ -82,7 +90,7 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
     // --- Session CRUD ---
 
     it("saves and loads a session", async () => {
-      const session = makeSession();
+      const session = makeAdapterSession();
       await adapter.saveSession(session);
       const loaded = await adapter.loadSession(session.id);
       expect(loaded).not.toBeNull();
@@ -93,8 +101,8 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
     });
 
     it("lists sessions after save", async () => {
-      const s1 = makeSession({ themeName: "alpha" });
-      const s2 = makeSession({ themeName: "beta" });
+      const s1 = makeAdapterSession({ themeName: "alpha" });
+      const s2 = makeAdapterSession({ themeName: "beta" });
       await adapter.saveSession(s1);
       await adapter.saveSession(s2);
       const list = await adapter.listSessions();
@@ -104,7 +112,7 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
     });
 
     it("deletes a session", async () => {
-      const session = makeSession();
+      const session = makeAdapterSession();
       await adapter.saveSession(session);
       await adapter.deleteSession(session.id);
       const loaded = await adapter.loadSession(session.id);
@@ -112,9 +120,9 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
     });
 
     it("deletes sessions by theme name", async () => {
-      const s1 = makeSession({ themeName: "duplicate" });
-      const s2 = makeSession({ themeName: "duplicate" });
-      const s3 = makeSession({ themeName: "keep-me" });
+      const s1 = makeAdapterSession({ themeName: "duplicate" });
+      const s2 = makeAdapterSession({ themeName: "duplicate" });
+      const s3 = makeAdapterSession({ themeName: "keep-me" });
       await adapter.saveSession(s1);
       await adapter.saveSession(s2);
       await adapter.saveSession(s3);
@@ -125,7 +133,7 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
     });
 
     it("updates an existing session (upsert)", async () => {
-      const session = makeSession();
+      const session = makeAdapterSession();
       await adapter.saveSession(session);
       session.themeName = "updated-name";
       session.updatedAt = Date.now();
@@ -137,7 +145,7 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
     // --- Module I/O ---
 
     it("writes and reads a module", async () => {
-      const session = makeSession();
+      const session = makeAdapterSession();
       await adapter.saveSession(session);
       const themePath = session.themePath;
 
@@ -151,7 +159,7 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
     });
 
     it("lists modules", async () => {
-      const session = makeSession();
+      const session = makeAdapterSession();
       await adapter.saveSession(session);
       const themePath = session.themePath;
 
@@ -162,7 +170,7 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
     });
 
     it("deletes a module", async () => {
-      const session = makeSession();
+      const session = makeAdapterSession();
       await adapter.saveSession(session);
       const themePath = session.themePath;
 
@@ -175,7 +183,7 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
     // --- Shared CSS/JS ---
 
     it("writes and reads shared CSS", async () => {
-      const session = makeSession();
+      const session = makeAdapterSession();
       await adapter.saveSession(session);
       const css = ":root { --accent: blue; }";
       await adapter.writeSharedCss(session.themePath, session.themeName, css);
@@ -184,7 +192,7 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
     });
 
     it("writes and reads shared JS", async () => {
-      const session = makeSession();
+      const session = makeAdapterSession();
       await adapter.saveSession(session);
       const js = "document.addEventListener('DOMContentLoaded', () => {});";
       await adapter.writeSharedJs(session.themePath, session.themeName, js);
@@ -195,7 +203,7 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
     // --- Brand assets ---
 
     it("writes and reads brand assets", async () => {
-      const session = makeSession();
+      const session = makeAdapterSession();
       await adapter.saveSession(session);
       await adapter.writeBrandAsset(session.themePath, "styleguide.md", "# Style Guide");
       const loaded = await adapter.readBrandAsset(session.themePath, "styleguide.md");
@@ -203,7 +211,7 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
     });
 
     it("deletes a brand asset", async () => {
-      const session = makeSession();
+      const session = makeAdapterSession();
       await adapter.saveSession(session);
       await adapter.writeBrandAsset(session.themePath, "plan.md", "# Plan");
       await adapter.deleteBrandAsset(session.themePath, "plan.md");
@@ -219,19 +227,15 @@ function adapterSuite(name: string, getAdapter: () => Promise<{ adapter: Storage
 
 adapterSuite("FileSystem", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "vibespot-test-"));
-  const adapter = new FileSystemStorageAdapter();
-
-  // Override the sessions dir for isolation — we patch the homedir paths
-  // by setting the session's themePath to a temp location
-  const themePath = join(tempDir, "test-theme");
-
-  // Monkey-patch makeSession for this test run
-  const origThemePath = "/tmp/test-theme";
+  const sessionsDir = join(tempDir, "sessions");
+  const adapter = new FileSystemStorageAdapter({ sessionsDir });
 
   return {
     adapter,
+    makeSession: (overrides = {}) => makeSession({ themePath: join(tempDir, "test-theme"), ...overrides }),
     cleanup: async () => {
       rmSync(tempDir, { recursive: true, force: true });
+      expect(existsSync(sessionsDir)).toBe(false);
     },
   };
 });
@@ -257,6 +261,10 @@ if (pgUrl) {
 
     return {
       adapter,
+      makeSession: (overrides = {}) => {
+        const session = makeSession(overrides);
+        return { ...session, themePath: session.id };
+      },
       cleanup: async () => {
         await pgPool.query("DROP TABLE IF EXISTS theme_files CASCADE");
         await pgPool.query("DROP TABLE IF EXISTS sessions CASCADE");

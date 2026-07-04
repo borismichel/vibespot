@@ -92,7 +92,8 @@ export class ClaudeCodeEngine implements AIEngine {
           cwd: themePath,
           stdio: ["pipe", "pipe", "pipe"],
           env,
-          shell: true,
+          // Windows needs shell to resolve .cmd shims from PATH; args are static
+          shell: process.platform === "win32",
         });
 
         child.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });

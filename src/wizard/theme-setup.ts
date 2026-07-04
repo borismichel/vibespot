@@ -1,5 +1,6 @@
 import { join } from "node:path";
-import { run } from "../utils/shell.js";
+import { runFile } from "../utils/shell.js";
+import { isSafeThemeName } from "../utils/validate.js";
 import { fileExists, readFile, writeFile, ensureDir } from "../utils/fs.js";
 import * as ui from "../prompts/prompter.js";
 import { theme } from "../cli/theme.js";
@@ -41,9 +42,14 @@ export async function setupTheme(): Promise<ThemeInfo> {
     themeName = await ui.text({
       message: "What's your theme name in HubSpot?",
       placeholder: "My-Company-Theme",
-      validate: (v) =>
-        v.trim() ? undefined : "Theme name is required",
+      validate: (v) => {
+        if (!v.trim()) return "Theme name is required";
+        if (!isSafeThemeName(v.trim()))
+          return "Use only letters, numbers, spaces, dots, underscores, and hyphens";
+        return undefined;
+      },
     });
+    themeName = themeName.trim();
 
     themePath = join(workspaceDir, themeName);
 
@@ -54,8 +60,8 @@ export async function setupTheme(): Promise<ThemeInfo> {
     const pak = getHubSpotPak();
 
     if (config.hubspotUploadMode === "cli" || !pak) {
-      // CLI fallback
-      const result = run(`hs cms fetch "${themeName}" "${themePath}"`);
+      // CLI fallback — argv array, never a shell-interpolated string
+      const result = runFile("hs", ["cms", "fetch", themeName, themePath]);
       if (!result.success) {
         s.stop("Fetch failed");
         ui.logError(

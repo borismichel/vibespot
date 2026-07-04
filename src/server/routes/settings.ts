@@ -2,6 +2,7 @@
  * Settings routes — environment management, API keys, tool install, auth.
  */
 
+import { publicErrorMessage } from "../errors.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, readFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
@@ -13,7 +14,7 @@ import { getLocalThemes } from "./setup.js";
 import { detectEnvironment, detectEnvironmentLite, detectAITools, detectPlatformTools, detectHubSpotCLI, detectHubSpotAuth, detectGitHubCLI, detectGitHubAuth } from "../../utils/detect.js";
 import { validatePak } from "../../hubspot/api.js";
 import { getVersion } from "../../utils/fs.js";
-import { startJob, startJobSafe, getJob } from "../process-manager.js";
+import { startJobSafe, getJob } from "../process-manager.js";
 
 // ---------------------------------------------------------------------------
 // Live model catalog — fetched from provider APIs, cached 10 minutes
@@ -430,7 +431,7 @@ export function handleSettingsEngineRoute(req: IncomingMessage, res: ServerRespo
       saveConfig(configUpdate as any);
       jsonResponse(res, 200, { ok: true, engine });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -498,7 +499,7 @@ export function handleSettingsApiKeyRoute(req: IncomingMessage, res: ServerRespo
 
       jsonResponse(res, 200, { ok: true, provider, autoSelectedEngine });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -508,12 +509,16 @@ export function handleSettingsInstallRoute(req: IncomingMessage, res: ServerResp
     try {
       const { tool } = JSON.parse(body);
 
-      const installCommands: Record<string, { cmd: string; desc: string }> = {
-        hubspot: { cmd: "npm install -g @hubspot/cli", desc: "Installing HubSpot CLI" },
-        claude: { cmd: "npm install -g @anthropic-ai/claude-code", desc: "Installing Claude Code" },
-        gemini: { cmd: "npm install -g @google/gemini-cli", desc: "Installing Gemini CLI" },
-        codex: { cmd: process.platform === "darwin" ? "brew install --cask codex" : "npm install -g @openai/codex", desc: "Installing OpenAI Codex" },
-        gh: { cmd: process.platform === "darwin" ? "brew install gh" : "npm install -g @cli/gh", desc: "Installing GitHub CLI" },
+      const installCommands: Record<string, { cmd: string; args: string[]; desc: string }> = {
+        hubspot: { cmd: "npm", args: ["install", "-g", "@hubspot/cli"], desc: "Installing HubSpot CLI" },
+        claude: { cmd: "npm", args: ["install", "-g", "@anthropic-ai/claude-code"], desc: "Installing Claude Code" },
+        gemini: { cmd: "npm", args: ["install", "-g", "@google/gemini-cli"], desc: "Installing Gemini CLI" },
+        codex: process.platform === "darwin"
+          ? { cmd: "brew", args: ["install", "--cask", "codex"], desc: "Installing OpenAI Codex" }
+          : { cmd: "npm", args: ["install", "-g", "@openai/codex"], desc: "Installing OpenAI Codex" },
+        gh: process.platform === "darwin"
+          ? { cmd: "brew", args: ["install", "gh"], desc: "Installing GitHub CLI" }
+          : { cmd: "npm", args: ["install", "-g", "@cli/gh"], desc: "Installing GitHub CLI" },
       };
 
       const config = installCommands[tool];
@@ -522,10 +527,10 @@ export function handleSettingsInstallRoute(req: IncomingMessage, res: ServerResp
         return;
       }
 
-      const jobId = startJob(config.cmd, config.desc, { timeout: 120_000 });
+      const jobId = startJobSafe(config.cmd, config.args, config.desc, { timeout: 120_000 });
       jsonResponse(res, 200, { ok: true, jobId });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -549,7 +554,7 @@ export function handleSettingsHsAuthRoute(req: IncomingMessage, res: ServerRespo
               dataCenter: info.dataCenter,
             });
           }).catch((err) => {
-            jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+            jsonResponse(res, 400, { error: publicErrorMessage(err) });
           });
           return;
         } else {
@@ -612,7 +617,7 @@ export function handleSettingsHsAuthRoute(req: IncomingMessage, res: ServerRespo
         ],
       });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -648,14 +653,14 @@ export function handleSettingsGhAuthRoute(req: IncomingMessage, res: ServerRespo
         return;
       }
 
-      const jobId = startJob(
-        "gh auth login --web --git-protocol https",
+      const jobId = startJobSafe(
+        "gh", ["auth", "login", "--web", "--git-protocol", "https"],
         "GitHub authentication (check your browser)",
         { timeout: 300_000 }
       );
       jsonResponse(res, 200, { ok: true, jobId, browserAuthRequired: true });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -706,14 +711,14 @@ export function handleSettingsHsSwitchRoute(req: IncomingMessage, res: ServerRes
 
       jsonResponse(res, 400, { error: "portalId required" });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
 
 export function handleSettingsGhLogoutRoute(res: ServerResponse): void {
-  const jobId = startJob(
-    "gh auth logout --hostname github.com -y",
+  const jobId = startJobSafe(
+    "gh", ["auth", "logout", "--hostname", "github.com", "-y"],
     "Logging out of GitHub",
     { timeout: 15_000 }
   );
@@ -727,17 +732,19 @@ export function handleSettingsCLIAuthRoute(req: IncomingMessage, res: ServerResp
 
       switch (cli) {
         case "claude": {
-          const jobId = startJob(
-            "CLAUDECODE= claude --print -p 'reply OK'",
+          // CLAUDECODE is cleared via env (was a shell prefix) to allow running
+          // from inside a Claude Code session
+          const jobId = startJobSafe(
+            "claude", ["--print", "-p", "reply OK"],
             "Authenticating Claude Code (check your browser if prompted)",
-            { timeout: 120_000 }
+            { timeout: 120_000, env: { CLAUDECODE: "" } }
           );
           jsonResponse(res, 200, { ok: true, jobId, hint: "If Claude Code opens a browser window, complete the sign-in there." });
           break;
         }
         case "gemini": {
-          const jobId = startJob(
-            "gemini -p 'reply OK'",
+          const jobId = startJobSafe(
+            "gemini", ["-p", "reply OK"],
             "Authenticating Gemini CLI (check your browser if prompted)",
             { timeout: 120_000 }
           );
@@ -770,8 +777,8 @@ export function handleSettingsCLIAuthRoute(req: IncomingMessage, res: ServerResp
             }
             jsonResponse(res, 200, { ok: true, message: "API key saved" });
           } else {
-            const jobId = startJob(
-              "codex login",
+            const jobId = startJobSafe(
+              "codex", ["login"],
               "Authenticating Codex CLI (check your browser if prompted)",
               { timeout: 120_000 }
             );
@@ -783,7 +790,7 @@ export function handleSettingsCLIAuthRoute(req: IncomingMessage, res: ServerResp
           jsonResponse(res, 400, { error: `Unknown CLI: ${cli}` });
       }
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -803,7 +810,7 @@ export function handleSettingsHsModeRoute(req: IncomingMessage, res: ServerRespo
       saveConfig({ hubspotUploadMode: mode } as any);
       jsonResponse(res, 200, { ok: true, mode });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -823,7 +830,7 @@ export function handleSettingsCliToggleRoute(req: IncomingMessage, res: ServerRe
       setCliToolEnabled(toolId, enabled);
       jsonResponse(res, 200, { ok: true, toolId, enabled });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -893,7 +900,7 @@ export function handleSettingsGenericRoute(req: IncomingMessage, res: ServerResp
       saveConfig(update as import("../../utils/config.js").VibeSpotConfig);
       jsonResponse(res, 200, { ok: true, updated: Object.keys(update) });
     } catch (err) {
-      jsonResponse(res, 400, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 400, { error: publicErrorMessage(err) });
     }
   });
 }

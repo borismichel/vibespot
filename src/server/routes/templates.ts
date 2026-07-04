@@ -2,6 +2,7 @@
  * Dashboard & template routes — CRUD, activate, rename, module library, brand assets, download.
  */
 
+import { publicErrorMessage } from "../errors.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join, basename, relative, sep } from "node:path";
@@ -175,7 +176,7 @@ export function handleTemplatesRoute(method: string, req: IncomingMessage, res: 
           },
         });
       } catch (err) {
-        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+        jsonResponse(res, 500, { error: publicErrorMessage(err) });
       }
     });
     return;
@@ -197,7 +198,7 @@ export function handleTemplatesRoute(method: string, req: IncomingMessage, res: 
         saveSession();
         jsonResponse(res, 200, { ok: true });
       } catch (err) {
-        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+        jsonResponse(res, 500, { error: publicErrorMessage(err) });
       }
     });
     return;
@@ -227,7 +228,7 @@ export function handleTemplateActivateRoute(req: IncomingMessage, res: ServerRes
         messageCount: session?.messages.length || 0,
       });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -248,7 +249,7 @@ export function handleTemplateRenameRoute(req: IncomingMessage, res: ServerRespo
       saveSession();
       jsonResponse(res, 200, { ok: true, newLabel: newLabel.trim() });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -269,7 +270,7 @@ export function handleTemplateReorderRoute(req: IncomingMessage, res: ServerResp
       saveSession();
       jsonResponse(res, 200, { ok: true });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -298,7 +299,7 @@ export function handleTemplateCloneRoute(req: IncomingMessage, res: ServerRespon
         },
       });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -347,7 +348,7 @@ export function handleAddModuleToTemplateRoute(path: string, req: IncomingMessag
       saveSession();
       jsonResponse(res, 200, { ok: true });
     } catch (err) {
-      jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      jsonResponse(res, 500, { error: publicErrorMessage(err) });
     }
   });
 }
@@ -413,7 +414,7 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
         saveSession();
         jsonResponse(res, 200, { ok: true, brandKit: syncedKit });
       } catch (err) {
-        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+        jsonResponse(res, 500, { error: publicErrorMessage(err) });
       }
     });
     return;
@@ -441,7 +442,7 @@ export function handleBrandAssetsRoute(method: string, req: IncomingMessage, res
         saveSession();
         jsonResponse(res, 200, { ok: true });
       } catch (err) {
-        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+        jsonResponse(res, 500, { error: publicErrorMessage(err) });
       }
     });
     return;
@@ -654,7 +655,7 @@ export function handleBrandKitRoute(method: string, req: IncomingMessage, res: S
         saveSession();
         jsonResponse(res, 200, { ok: true, brandKit: cleaned });
       } catch (err) {
-        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+        jsonResponse(res, 500, { error: publicErrorMessage(err) });
       }
     });
     return;
@@ -813,7 +814,7 @@ export function handleDesignExtractRoute(req: IncomingMessage, res: ServerRespon
         saveSession();
         jsonResponse(res, 200, { ok: true, type, content, brandKit: syncedKit });
       } catch (err) {
-        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+        jsonResponse(res, 500, { error: publicErrorMessage(err) });
       }
     })();
   });
@@ -903,7 +904,7 @@ export function handleReferenceImportRoute(req: IncomingMessage, res: ServerResp
         saveSession();
         jsonResponse(res, 200, { ok: true, styleguide, source: sourcePath });
       } catch (err) {
-        jsonResponse(res, 500, { error: err instanceof Error ? err.message : String(err) });
+        jsonResponse(res, 500, { error: publicErrorMessage(err) });
       }
     })();
   });

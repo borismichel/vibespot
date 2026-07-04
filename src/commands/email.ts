@@ -30,10 +30,14 @@ export async function emailCommand(): Promise<void> {
   }
 
   try {
-    const { port, close } = await startServer({ port: DEFAULT_PORT, uiDir, contentMode: "email" });
-    const url = `http://localhost:${port}`;
+    const { port, host, authToken, close } = await startServer({ port: DEFAULT_PORT, uiDir, contentMode: "email" });
+    const displayHost = host === "0.0.0.0" || host === "::" ? "localhost" : host;
+    const url = `http://${displayHost}:${port}${authToken ? `/?token=${authToken}` : ""}`;
 
     console.log(accent(`  v ${url}`));
+    if (authToken) {
+      console.log(dim("  Access requires this exact URL — the token is your auth secret."));
+    }
     console.log(dim("  Email template mode — Press Ctrl+C to stop\n"));
 
     try {
