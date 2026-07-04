@@ -13,6 +13,7 @@ RUN npm ci
 COPY tsconfig.json tsup.config.ts ./
 COPY src ./src
 COPY bin ./bin
+COPY scripts ./scripts
 COPY assets ./assets
 COPY ui ./ui
 COPY starters ./starters
