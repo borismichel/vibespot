@@ -3,7 +3,7 @@
  */
 
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, rmSync, renameSync, cpSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { homedir } from "node:os";
 import { ensureGitRepo } from "../project-git.js";
 import type { VibeSession, SessionIndexEntry } from "./types.js";
@@ -165,6 +165,30 @@ export function loadSession(sessionId: string): VibeSession | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Find the most recently updated saved session for a theme directory.
+ * The index doesn't carry themePath, so this reads the session files;
+ * paths are resolved before comparison to tolerate trailing slashes etc.
+ */
+export function findLatestSessionIdForThemePath(themePath: string): string | null {
+  if (!existsSync(SESSIONS_DIR)) return null;
+  const target = resolve(themePath);
+  let bestId: string | null = null;
+  let bestUpdatedAt = -1;
+  for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith(".json") && f !== "_index.json")) {
+    try {
+      const data = JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf-8"));
+      if (!data.id || !data.themePath || resolve(data.themePath) !== target) continue;
+      const updatedAt = typeof data.updatedAt === "number" ? data.updatedAt : 0;
+      if (updatedAt > bestUpdatedAt) {
+        bestUpdatedAt = updatedAt;
+        bestId = data.id;
+      }
+    } catch { /* skip corrupt files */ }
+  }
+  return bestId;
 }
 
 export function listSessions(): SessionIndexEntry[] {
