@@ -768,16 +768,317 @@ function escapeScriptExpression(value: string): string {
     .replace(/\u2029/g, "\\u2029");
 }
 
+interface HtmlTagToken {
+  tagName: string;
+  closing: boolean;
+  attrs: HtmlAttribute[];
+}
+
+interface HtmlAttribute {
+  name: string;
+  value: string | null;
+}
+
+const RAW_TEXT_BLOCKED_TAGS = new Set(["script", "style", "iframe", "object", "embed"]);
+const ALLOWED_HTML_TAGS = new Set([
+  "a",
+  "abbr",
+  "b",
+  "blockquote",
+  "br",
+  "cite",
+  "code",
+  "dd",
+  "del",
+  "details",
+  "div",
+  "dl",
+  "dt",
+  "em",
+  "figcaption",
+  "figure",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "hr",
+  "i",
+  "img",
+  "ins",
+  "li",
+  "mark",
+  "ol",
+  "p",
+  "pre",
+  "q",
+  "s",
+  "small",
+  "span",
+  "strong",
+  "sub",
+  "summary",
+  "sup",
+  "table",
+  "tbody",
+  "td",
+  "tfoot",
+  "th",
+  "thead",
+  "tr",
+  "u",
+  "ul",
+]);
+
+const GLOBAL_HTML_ATTRS = new Set([
+  "class",
+  "dir",
+  "id",
+  "lang",
+  "role",
+  "title",
+]);
+
+const TAG_HTML_ATTRS: Record<string, Set<string>> = {
+  a: new Set(["href", "name", "rel", "target"]),
+  blockquote: new Set(["cite"]),
+  del: new Set(["cite", "datetime"]),
+  details: new Set(["open"]),
+  img: new Set(["alt", "decoding", "height", "loading", "src", "title", "width"]),
+  ins: new Set(["cite", "datetime"]),
+  q: new Set(["cite"]),
+  td: new Set(["colspan", "headers", "rowspan"]),
+  th: new Set(["colspan", "headers", "rowspan", "scope"]),
+};
+
+const URL_HTML_ATTRS = new Set(["cite", "href", "src"]);
+const VOID_HTML_TAGS = new Set(["br", "hr", "img"]);
+
 function sanitizeTrustedHtml(value: string): string {
-  return value
-    .replace(/<\s*(script|style|iframe|object|embed)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
-    .replace(/<\s*\/?\s*(script|style|iframe|object|embed|link|meta)\b[^>]*>/gi, "")
-    .replace(/\s+on[\w:-]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/\s+(href|src|xlink:href|formaction)\s*=\s*"\s*(javascript:|data:text\/html)[^"]*"/gi, (_match, attr: string) => ` ${attr}="#"`)
-    .replace(/\s+(href|src|xlink:href|formaction)\s*=\s*'\s*(javascript:|data:text\/html)[^']*'/gi, (_match, attr: string) => ` ${attr}="#"`)
-    .replace(/\s+(href|src|xlink:href|formaction)\s*=\s*(javascript:|data:text\/html)[^\s>]*/gi, (_match, attr: string) => ` ${attr}="#"`)
+  let sanitized = "";
+  let index = 0;
+  let skipRawTextTag: string | null = null;
+
+  while (index < value.length) {
+    const nextTagStart = value.indexOf("<", index);
+    if (nextTagStart === -1) {
+      if (!skipRawTextTag) sanitized += value.slice(index);
+      break;
+    }
+
+    if (!skipRawTextTag) sanitized += value.slice(index, nextTagStart);
+
+    const tagEnd = findHtmlTagEnd(value, nextTagStart);
+    if (tagEnd === -1) {
+      if (!skipRawTextTag) sanitized += "&lt;";
+      index = nextTagStart + 1;
+      continue;
+    }
+
+    const rawTag = value.slice(nextTagStart, tagEnd + 1);
+    const token = parseHtmlTag(rawTag);
+    index = tagEnd + 1;
+
+    if (!token) continue;
+
+    if (skipRawTextTag) {
+      if (token.closing && token.tagName === skipRawTextTag) {
+        skipRawTextTag = null;
+      }
+      continue;
+    }
+
+    if (RAW_TEXT_BLOCKED_TAGS.has(token.tagName)) {
+      if (!token.closing) skipRawTextTag = token.tagName;
+      continue;
+    }
+
+    if (!ALLOWED_HTML_TAGS.has(token.tagName)) continue;
+
+    if (token.closing) {
+      if (!VOID_HTML_TAGS.has(token.tagName)) sanitized += `</${token.tagName}>`;
+      continue;
+    }
+
+    sanitized += renderSanitizedOpeningTag(token);
+  }
+
+  return sanitized
     .replace(/<\/style/gi, "<\\/style")
     .replace(/<\/script/gi, "<\\/script");
+}
+
+function findHtmlTagEnd(value: string, start: number): number {
+  let quote: string | null = null;
+
+  for (let i = start + 1; i < value.length; i++) {
+    const char = value[i];
+    if (quote) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === ">") return i;
+  }
+
+  return -1;
+}
+
+function parseHtmlTag(rawTag: string): HtmlTagToken | null {
+  if (rawTag.startsWith("<!--")) return null;
+
+  let inner = rawTag.slice(1, -1).trim();
+  if (!inner || inner.startsWith("!") || inner.startsWith("?")) return null;
+
+  const closing = inner.startsWith("/");
+  if (closing) inner = inner.slice(1).trimStart();
+
+  const tagNameMatch = inner.match(/^([A-Za-z][A-Za-z0-9:-]*)/);
+  if (!tagNameMatch) return null;
+
+  const tagName = tagNameMatch[1].toLowerCase();
+  const attrs = closing ? [] : parseHtmlAttributes(inner.slice(tagNameMatch[0].length));
+  return { tagName, closing, attrs };
+}
+
+function parseHtmlAttributes(input: string): HtmlAttribute[] {
+  const attrs: HtmlAttribute[] = [];
+  let index = 0;
+
+  while (index < input.length) {
+    while (index < input.length && /[\s/]/.test(input[index])) index++;
+    if (index >= input.length) break;
+
+    const nameStart = index;
+    while (index < input.length && !/[\s/=]/.test(input[index])) index++;
+    const rawName = input.slice(nameStart, index);
+    if (!rawName) {
+      index++;
+      continue;
+    }
+
+    while (index < input.length && /\s/.test(input[index])) index++;
+
+    let value: string | null = null;
+    if (input[index] === "=") {
+      index++;
+      while (index < input.length && /\s/.test(input[index])) index++;
+
+      const quote = input[index];
+      if (quote === '"' || quote === "'") {
+        index++;
+        const valueStart = index;
+        while (index < input.length && input[index] !== quote) index++;
+        value = input.slice(valueStart, index);
+        if (input[index] === quote) index++;
+      } else {
+        const valueStart = index;
+        while (index < input.length && !/\s/.test(input[index])) index++;
+        value = input.slice(valueStart, index);
+      }
+    }
+
+    attrs.push({ name: rawName.toLowerCase(), value });
+  }
+
+  return attrs;
+}
+
+function renderSanitizedOpeningTag(token: HtmlTagToken): string {
+  const attrs = token.attrs
+    .map((attr) => sanitizeHtmlAttribute(token.tagName, attr))
+    .filter((attr): attr is HtmlAttribute => Boolean(attr))
+    .map((attr) => {
+      if (attr.value === null) return attr.name;
+      return `${attr.name}="${escapeHtml(attr.value)}"`;
+    })
+    .join(" ");
+
+  return attrs ? `<${token.tagName} ${attrs}>` : `<${token.tagName}>`;
+}
+
+function sanitizeHtmlAttribute(tagName: string, attr: HtmlAttribute): HtmlAttribute | null {
+  const attrName = attr.name;
+  if (!attrName) return null;
+  if (attrName.startsWith("on")) return null;
+  if (attrName === "style") return null;
+
+  const allowedForTag = TAG_HTML_ATTRS[tagName];
+  const isAllowed =
+    GLOBAL_HTML_ATTRS.has(attrName) ||
+    attrName.startsWith("aria-") ||
+    attrName.startsWith("data-") ||
+    Boolean(allowedForTag?.has(attrName));
+
+  if (!isAllowed) return null;
+
+  if (URL_HTML_ATTRS.has(attrName) && attr.value !== null && !isSafeHtmlUrl(attr.value)) {
+    return { name: attrName, value: "#" };
+  }
+
+  if (tagName === "a" && attrName === "target" && attr.value === "_blank") {
+    return attr;
+  }
+
+  if (attrName === "target") return null;
+
+  return attr;
+}
+
+function isSafeHtmlUrl(value: string): boolean {
+  const decoded = decodeHtmlEntities(value).trim();
+  const normalized = decoded.replace(/[\u0000-\u001F\u007F\s]+/g, "").toLowerCase();
+
+  if (
+    normalized.startsWith("#") ||
+    normalized.startsWith("/") ||
+    normalized.startsWith("./") ||
+    normalized.startsWith("../")
+  ) {
+    return true;
+  }
+
+  if (normalized.startsWith("data:")) {
+    return /^data:image\/(?:gif|jpe?g|png|webp);/i.test(normalized);
+  }
+
+  const schemeMatch = normalized.match(/^([a-z][a-z0-9+.-]*):/);
+  if (!schemeMatch) return true;
+
+  return ["http", "https", "mailto", "tel"].includes(schemeMatch[1]);
+}
+
+function decodeHtmlEntities(value: string): string {
+  const namedEntities: Record<string, string> = {
+    amp: "&",
+    colon: ":",
+    gt: ">",
+    lt: "<",
+    newline: "\n",
+    quot: '"',
+    tab: "\t",
+  };
+
+  return value.replace(/&(#x[\da-f]+|#\d+|[a-z]+);?/gi, (entity, body: string) => {
+    const lower = body.toLowerCase();
+    if (lower.startsWith("#x")) {
+      const codePoint = parseInt(lower.slice(2), 16);
+      return isValidCodePoint(codePoint) ? String.fromCodePoint(codePoint) : entity;
+    }
+    if (lower.startsWith("#")) {
+      const codePoint = parseInt(lower.slice(1), 10);
+      return isValidCodePoint(codePoint) ? String.fromCodePoint(codePoint) : entity;
+    }
+    return namedEntities[lower] ?? entity;
+  });
+}
+
+function isValidCodePoint(value: number): boolean {
+  return Number.isInteger(value) && value >= 0 && value <= 0x10ffff;
 }
 
 /**

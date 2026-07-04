@@ -120,8 +120,34 @@ describe("renderHubL — variables", () => {
     const ctx: RenderContext = { module: buildContextFromFields(fields) };
 
     expect(renderHubL('<div class="bio">{{ module.bio_text }}</div>', ctx)).toBe(
-      '<div class="bio"><p>I\'m a designer.</p><img src=x></div>',
+      '<div class="bio"><p>I\'m a designer.</p><img src="x"></div>',
     );
+  });
+
+  it("strips slash-separated event handlers from richtext field defaults", () => {
+    const fields: FieldDef[] = [
+      {
+        name: "bio_text",
+        type: "richtext",
+        default: [
+          '<img/src="x"/onerror="window.imgPwned=1">',
+          '<svg/onload="window.svgPwned=1"></svg>',
+          '<body/onpageshow="window.bodyPwned=1">copy</body>',
+          '<details/open/ontoggle="window.detailsPwned=1"><summary>More</summary></details>',
+        ].join(""),
+      },
+    ];
+    const ctx: RenderContext = { module: buildContextFromFields(fields) };
+
+    const rendered = renderHubL("{{ module.bio_text }}", ctx);
+
+    expect(rendered).toBe(
+      '<img src="x">copy<details open><summary>More</summary></details>',
+    );
+    expect(rendered).not.toContain("onerror");
+    expect(rendered).not.toContain("onload");
+    expect(rendered).not.toContain("onpageshow");
+    expect(rendered).not.toContain("ontoggle");
   });
 
   it("escapes richtext fields when rendered inside HTML attributes", () => {
@@ -221,6 +247,32 @@ describe("renderHubL — filters", () => {
     expect(renderHubL("{{ module.html|safe }}", c)).toBe(
       '<p>Safe copy</p><a href="#">link</a>',
     );
+  });
+
+  it("decodes URL entities before checking |safe href schemes", () => {
+    const c: RenderContext = {
+      module: {
+        html: '<a href="java&#x73;cript:alert(1)">hex</a><a href="java&Tab;script&colon;alert(2)">named</a>',
+      },
+    };
+
+    expect(renderHubL("{{ module.html|safe }}", c)).toBe(
+      '<a href="#">hex</a><a href="#">named</a>',
+    );
+  });
+
+  it("strips slash-separated event handlers from |safe output", () => {
+    const c: RenderContext = {
+      module: {
+        html: '<svg/onload="window.svgPwned=1"></svg><details/open/ontoggle="window.detailsPwned=1">Details</details>',
+      },
+    };
+
+    const rendered = renderHubL("{{ module.html|safe }}", c);
+
+    expect(rendered).toBe("<details open>Details</details>");
+    expect(rendered).not.toContain("onload");
+    expect(rendered).not.toContain("ontoggle");
   });
 });
 
