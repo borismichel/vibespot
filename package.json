@@ -55,7 +55,9 @@
   "devDependencies": {
     "@types/busboy": "^1.5.4",
     "@types/node": "^25.6.0",
+    "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
+    "pg": "^8.22.0",
     "tsup": "^8.4.0",
     "tsx": "^4.19.0",
     "typescript": "^6.0.3",
