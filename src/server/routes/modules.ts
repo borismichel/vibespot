@@ -24,6 +24,7 @@ import {
 import { isGenerating } from "../ai-handler.js";
 import { applyAutoFixes } from "../auto-fix.js";
 import { startStreamingJob } from "../process-manager.js";
+import { isSafeThemeName } from "../../utils/validate.js";
 import { analyzeSource } from "../../wizard/source.js";
 import { commitThemeState, commitTemplateState, getHistory, getTemplateHistory, rollbackToCommit, rollbackTemplateToCommit, isGitAvailable } from "../project-git.js";
 
@@ -186,8 +187,13 @@ export async function handleUploadRoute(res: ServerResponse): Promise<void> {
     writeModulesToDisk();
     const fixes = applyAutoFixes(session.themePath);
 
+    if (!isSafeThemeName(session.themeName)) {
+      jsonResponse(res, 400, { error: "Theme name contains unsupported characters and cannot be uploaded via the HubSpot CLI." });
+      return;
+    }
+
     const jobId = startStreamingJob(
-      `hs cms upload "${session.themePath}" "${session.themeName}"`,
+      "hs", ["cms", "upload", session.themePath, session.themeName],
       "Uploading to HubSpot",
       { cwd: join(session.themePath, ".."), timeout: 180_000 }
     );

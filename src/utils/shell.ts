@@ -57,6 +57,36 @@ export function runGit(
   }
 }
 
+/**
+ * Run a command with arguments passed as an array — never via a shell on
+ * POSIX. Use this for any subprocess that takes user-controlled input
+ * (theme names, paths): each entry in `args` is forwarded as a literal
+ * argv, so shell metacharacters cannot be interpreted. On Windows a shell
+ * is required to resolve npm .cmd shims from PATH, so user-controlled
+ * values must additionally be validated upstream (see isSafeThemeName).
+ */
+export function runFile(
+  cmd: string,
+  args: string[],
+  options: ExecSyncOptions = {}
+): ShellResult {
+  try {
+    const out = execFileSync(cmd, args, {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 120_000,
+      shell: process.platform === "win32",
+      ...options,
+    });
+    return { stdout: out.toString().trim(), stderr: "", success: true };
+  } catch (err: unknown) {
+    const e = err as { stdout?: Buffer | string; stderr?: Buffer | string };
+    const stdout = (e.stdout ?? "").toString().trim();
+    const stderr = (e.stderr ?? "").toString().trim();
+    return { stdout, stderr, success: false };
+  }
+}
+
 export function runOrThrow(
   command: string,
   options: ExecSyncOptions = {}

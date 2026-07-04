@@ -126,7 +126,8 @@ function spawnCLIForExtraction(bin: string, args: string[], prompt: string): Pro
     const child = spawn(bin, args, {
       stdio: ["pipe", "pipe", "pipe"],
       env,
-      shell: true,
+      // Windows needs shell to resolve .cmd shims from PATH; prompt goes via stdin
+      shell: process.platform === "win32",
     });
 
     let stdout = "";

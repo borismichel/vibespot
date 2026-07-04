@@ -19,13 +19,16 @@ export class CodexCLIEngine implements AIEngine {
 
     onProgress("convert", "Running OpenAI Codex (this may take a few minutes)...");
 
-    // Use async spawn so the event loop stays free for spinner animation
+    // Use async spawn so the event loop stays free for spinner animation.
+    // Prompt goes via stdin (same as the agentic spawnCLI path) — passing it
+    // as a shell-interpreted arg let backticks/newlines in the prompt execute.
     await new Promise<void>((resolve, reject) => {
-      const child = spawn("codex", ["exec", "--full-auto", prompt], {
+      const child = spawn("codex", ["exec", "--full-auto"], {
         cwd: themePath,
         stdio: ["pipe", "pipe", "pipe"],
         env: { ...process.env },
-        shell: true,
+        // Windows needs shell to resolve .cmd shims from PATH; args are static
+        shell: process.platform === "win32",
       });
 
       let stdout = "";
@@ -41,6 +44,11 @@ export class CodexCLIEngine implements AIEngine {
           resolve();
         }
       });
+
+      // EPIPE if the CLI exits before the prompt is fully written
+      child.stdin.on("error", () => {});
+      child.stdin.write(prompt);
+      child.stdin.end();
 
       setTimeout(() => {
         child.kill();
