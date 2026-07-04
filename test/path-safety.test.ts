@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readdirSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import {
@@ -150,5 +150,103 @@ describe("fetchTheme zip-slip guard", () => {
 
     await fetchTheme("pak", "theme", target);
     expect(readdirSync(join(target, "modules", "hero.module"))).toContain("module.html");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Template-file sinks in session/disk.ts (VIB-1912) — a poisoned persisted
+// session must not turn `tpl.templateFile` / `tpl.id` into a write outside
+// templates/ or a read outside the theme.
+// ---------------------------------------------------------------------------
+
+import { createSession, writeModulesToDisk, reloadActiveTemplateFromDisk } from "../src/server/session.js";
+import type { TemplateEntry } from "../src/server/session/types.js";
+import type { ModuleFiles } from "../src/ai/engine.js";
+
+describe("session/disk template-file containment (VIB-1912)", () => {
+  let wrapper = "";
+
+  afterEach(() => {
+    if (wrapper) rmSync(wrapper, { recursive: true, force: true });
+    wrapper = "";
+  });
+
+  function makeTheme(): string {
+    wrapper = mkdtempSync(join(tmpdir(), "vibespot-tpl-safety-"));
+    const themePath = join(wrapper, "theme");
+    mkdirSync(themePath, { recursive: true });
+    return themePath;
+  }
+
+  function makeModule(name: string): ModuleFiles {
+    return { moduleName: name, fieldsJson: "[]", metaJson: "{}", moduleHtml: "<div></div>", moduleCss: "" };
+  }
+
+  function makeTemplate(overrides: Partial<TemplateEntry>): TemplateEntry {
+    return {
+      id: "lp-main",
+      label: "Main",
+      pageType: "landing_page",
+      templateFile: "templates/lp-main.html",
+      modules: [makeModule("hero")],
+      moduleOrder: ["hero"],
+      sharedCss: "",
+      sharedJs: "",
+      template: "",
+      messages: [],
+      ...overrides,
+    };
+  }
+
+  it("refuses an email templateFile that escapes templates/, still writes safe ones", () => {
+    const themePath = makeTheme();
+    const session = createSession(themePath, "tpl-safety");
+    session.templates = [
+      makeTemplate({
+        id: "email-evil",
+        contentMode: "email",
+        pageType: "module_only",
+        templateFile: "templates/../../email-canary.html",
+      }),
+      makeTemplate({
+        id: "email-ok",
+        contentMode: "email",
+        pageType: "module_only",
+        templateFile: "templates/email-ok.html",
+      }),
+    ];
+
+    writeModulesToDisk();
+
+    expect(existsSync(join(wrapper, "email-canary.html"))).toBe(false);
+    expect(existsSync(join(themePath, "templates", "email-ok.html"))).toBe(true);
+  });
+
+  it("refuses page and blog-listing template ids with traversal sequences", () => {
+    const themePath = makeTheme();
+    const session = createSession(themePath, "tpl-safety");
+    session.templates = [
+      makeTemplate({ id: "../../page-canary", pageType: "blog_post" }),
+    ];
+
+    writeModulesToDisk();
+
+    expect(existsSync(join(wrapper, "page-canary.html"))).toBe(false);
+    expect(existsSync(join(wrapper, "page-canary-listing.html"))).toBe(false);
+    expect(readdirSync(join(themePath, "templates")).filter((f) => f.endsWith(".html"))).toEqual([]);
+  });
+
+  it("does not read files outside the theme into session state on reload", () => {
+    const themePath = makeTheme();
+    writeFileSync(join(wrapper, "secret.txt"), "TOP-SECRET", "utf-8");
+    const session = createSession(themePath, "tpl-safety");
+    session.templates = [
+      makeTemplate({ id: "t1", templateFile: "templates/../../secret.txt", moduleOrder: [], modules: [] }),
+    ];
+    session.activeTemplateId = "t1";
+
+    reloadActiveTemplateFromDisk();
+
+    expect(session.templates[0].template).toBe("");
   });
 });

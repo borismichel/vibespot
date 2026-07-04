@@ -11,7 +11,7 @@ import { getOrderedModules, syncFlatFieldsFromTemplate, syncFlatFieldsToTemplate
 import { getActiveTemplate, migrateSession } from "./templates.js";
 import { ensureGitRepo } from "../project-git.js";
 import { log } from "../log.js";
-import { resolveModuleDir } from "../../utils/path-safety.js";
+import { resolveModuleDir, isSafePathSegment, resolveContainedPath } from "../../utils/path-safety.js";
 import {
   extractDesignTokens,
   buildRootCssFromTokens,
@@ -29,6 +29,22 @@ function safeRead(filePath: string): string {
   } catch {
     return "";
   }
+}
+
+/**
+ * Join a computed template filename under templates/, refusing any name that
+ * isn't a plain path segment — a poisoned persisted session could otherwise
+ * traverse out of the theme via `tpl.id` or `tpl.templateFile` (VIB-1912,
+ * same threat model as the module-sink guards from VIB-1891). Returns null
+ * on unsafe names so callers can skip-and-warn like writeModulesToDisk does
+ * for modules.
+ */
+function safeTemplatePath(templatesDir: string, filename: string): string | null {
+  if (!isSafePathSegment(filename)) {
+    log.warn("session-disk", "Skipping template with unsafe filename", { filename });
+    return null;
+  }
+  return join(templatesDir, filename);
 }
 
 /**
@@ -393,7 +409,9 @@ export function writeModulesToDisk(): void {
         if (tpl.modules.length === 0) continue;
         const emailContent = generateEmailTemplateForEntry(tpl);
         const filename = tpl.templateFile ? tpl.templateFile.replace("templates/", "") : "email.html";
-        writeFileSync(join(templatesDir, filename), emailContent, "utf-8");
+        const emailPath = safeTemplatePath(templatesDir, filename);
+        if (!emailPath) continue;
+        writeFileSync(emailPath, emailContent, "utf-8");
         activeTemplateFiles.add(filename);
         continue;
       }
@@ -404,7 +422,9 @@ export function writeModulesToDisk(): void {
       const templateContent = tpl.template || generateTemplateForEntry(tpl);
       const annotated = ensureTemplateAnnotations(templateContent, tpl.label, tpl.pageType);
       const filename = `${tpl.id}.html`;
-      writeFileSync(join(templatesDir, filename), annotated, "utf-8");
+      const pagePath = safeTemplatePath(templatesDir, filename);
+      if (!pagePath) continue;
+      writeFileSync(pagePath, annotated, "utf-8");
       activeTemplateFiles.add(filename);
 
       // For blog posts, also generate a listing template
@@ -418,8 +438,11 @@ export function writeModulesToDisk(): void {
     const template = activeSession.template || generateTemplateFromModules();
     const annotated = ensureTemplateAnnotations(template, `${activeSession.themeName} Landing Page`);
     const filename = `lp-${activeSession.themeName}.html`;
-    writeFileSync(join(templatesDir, filename), annotated, "utf-8");
-    activeTemplateFiles.add(filename);
+    const legacyPath = safeTemplatePath(templatesDir, filename);
+    if (legacyPath) {
+      writeFileSync(legacyPath, annotated, "utf-8");
+      activeTemplateFiles.add(filename);
+    }
   }
 
   // Clean up stale lp-*.html template files that are no longer in the session
@@ -496,11 +519,16 @@ export function reloadActiveTemplateFromDisk(): void {
     }
   }
 
-  // Reload template file
+  // Reload template file — refuse a templateFile that resolves outside the
+  // theme, which would be an arbitrary read into session state (VIB-1912).
   if (tpl.templateFile) {
-    const tplPath = join(themePath, tpl.templateFile);
-    if (existsSync(tplPath)) {
-      tpl.template = safeRead(tplPath);
+    try {
+      const tplPath = resolveContainedPath(themePath, tpl.templateFile);
+      if (existsSync(tplPath)) {
+        tpl.template = safeRead(tplPath);
+      }
+    } catch {
+      log.warn("session-disk", "Skipping template file outside theme", { templateFile: tpl.templateFile });
     }
   }
 
@@ -726,11 +754,9 @@ function writeBlogListingTemplate(templatesDir: string, tpl: TemplateEntry): voi
 </div>
 {% endblock body %}
 `;
-  writeFileSync(
-    join(templatesDir, `${tpl.id}-listing.html`),
-    listingContent,
-    "utf-8"
-  );
+  const listingPath = safeTemplatePath(templatesDir, `${tpl.id}-listing.html`);
+  if (!listingPath) return;
+  writeFileSync(listingPath, listingContent, "utf-8");
 }
 
 /**
