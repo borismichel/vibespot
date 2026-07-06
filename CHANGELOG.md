@@ -6,6 +6,8 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+## 1.8.0 — 2026-07-06
+
 ### Changed
 
 - **Dead Postgres storage backend removed** ([VIB-1903](/VIB/issues/VIB-1903)) — the never-wired `pg` adapter, its deps, and the unused compose Postgres service are gone; Docker/compose docs now consistently describe filesystem-only persistence ([VIB-1930](/VIB/issues/VIB-1930)); non-runtime screenshot/readme image trees are excluded from the npm package.

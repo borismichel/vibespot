@@ -1,15 +1,27 @@
 {
-  "version": "1.7.7",
-  "date": "2026-06-27",
+  "version": "1.8.0",
+  "date": "2026-07-06",
   "changelogUrl": "https://github.com/borismichel/vibespot/blob/main/CHANGELOG.md",
   "highlights": [
     {
-      "title": "In-preview chrome polish from the VIB-1920 UX review",
-      "body": "the in-preview chrome palette is now tokenized (--vs-accent = brand coral for section-style/AI-selection chrome, --vs-edit = the app's info blue for direct content editing — a deliberate two-color…"
+      "title": "Dead Postgres storage backend removed",
+      "body": "the never-wired pg adapter, its deps, and the unused compose Postgres service are gone; Docker/compose docs now consistently describe filesystem-only persistence ; non-runtime screenshot/readme image…"
     },
     {
-      "title": "Parked checkpoints now survive a full server restart",
-      "body": "completing the durability story from 1.7.6."
+      "title": "server.ts split into router + WebSocket modules",
+      "body": "internal refactor, no behavior change. The ~78-case /api/ switch is now a declarative route table + dispatcher (src/server/routes/api-router.ts, exact paths with per-verb 405s plus the two pattern…"
+    },
+    {
+      "title": "Consolidated drifting duplication",
+      "body": "four byte-duplicated code paths that had already produced real drift bugs are collapsed onto single implementations:"
+    },
+    {
+      "title": "Editor URL reload no longer discards inline field edits",
+      "body": "reloading the tab (or navigating to #/app/<theme>) hits POST /api/setup/open, which always rebuilt a fresh session from the theme folder on disk."
+    },
+    {
+      "title": "Docker/HTTPS deployments: the live preview works again",
+      "body": "since VIB-1892 the preview loads from a separate origin at app port + 2, but the compose bundle neither exposed port 4202 nor proxied it, so /api/preview-origin announced an unreachable (and, on…"
     }
   ]
 }
