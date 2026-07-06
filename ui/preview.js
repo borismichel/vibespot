@@ -151,8 +151,14 @@ function refreshPreview(opts) {
   previewLoadSeq += 1;
   const nav = previewLoadSeq;
   fetchPreviewOriginInfo().then((info) => {
-    if (!info) return;
     if (nav !== previewLoadSeq) return; // superseded while resolving
+    if (!info) {
+      // The preview origin never resolved (stale cached client hitting a
+      // moved route, the origin process not running, or the port blocked).
+      // Surface a self-diagnosing message instead of a silent blank frame.
+      showPreviewUnavailable();
+      return;
+    }
     previewAgentReady = false;
     // The `r` param defeats bfcache/no-op navigations; `t` is the access token.
     previewFrame.removeAttribute("srcdoc");
@@ -251,6 +257,106 @@ function showGeneratingPreview() {
     }, 600);
   }, 4000);
 <\/script>
+</body>
+</html>`;
+  previewFrame.removeAttribute("src");
+  previewFrame.srcdoc = html;
+}
+
+/**
+ * Show a visible in-frame fallback when the preview origin can't be resolved
+ * (`/api/preview-origin` returned `{origin:null}` or the fetch failed). Without
+ * this the frame just stays blank and the failure is invisible — the classic
+ * symptom of a stale cached `ui/preview.js` running against an upgraded server,
+ * or the preview origin process not being reachable (VIB-1937). Trusted static
+ * content (no AI code), so srcdoc is fine here.
+ */
+function showPreviewUnavailable() {
+  previewAgentReady = false;
+  // Compute the expected preview port (app port + 2) so the hint is concrete.
+  const appPort = Number(
+    window.location.port || (window.location.protocol === "https:" ? 443 : 80)
+  );
+  const previewPort = Number.isFinite(appPort) ? appPort + 2 : null;
+  const portHint = previewPort
+    ? `the preview port (<code>${previewPort}</code>, i.e. app port + 2)`
+    : "the preview port (app port + 2)";
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0c0a09;
+    color: rgba(255,255,255,0.62);
+    padding: 2rem;
+  }
+  .unavail {
+    text-align: center;
+    max-width: 460px;
+  }
+  .unavail .icon {
+    font-size: 2.2rem;
+    margin-bottom: 1rem;
+    opacity: 0.7;
+  }
+  .unavail h1 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 0.75rem;
+  }
+  .unavail p {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 0.6rem;
+  }
+  .unavail ul {
+    text-align: left;
+    display: inline-block;
+    margin: 0.4rem auto 0;
+    padding-left: 1.1rem;
+    font-size: 0.9rem;
+    line-height: 1.7;
+  }
+  .unavail code {
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    background: rgba(255,255,255,0.08);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    color: rgba(232, 97, 58, 0.95);
+  }
+  .unavail kbd {
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.8em;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-bottom-width: 2px;
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="unavail">
+  <div class="icon">&#9888;</div>
+  <h1>Live preview unavailable</h1>
+  <p>The editor couldn't reach the preview server, so the page can't render here yet.</p>
+  <p>Two things usually fix it:</p>
+  <ul>
+    <li>Hard-refresh this page (<kbd>Cmd/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>) to load the latest editor after an upgrade.</li>
+    <li>Make sure ${portHint} is free and reachable.</li>
+  </ul>
+</div>
 </body>
 </html>`;
   previewFrame.removeAttribute("src");
