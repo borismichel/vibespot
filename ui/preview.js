@@ -273,6 +273,10 @@ function showGeneratingPreview() {
  */
 function showPreviewUnavailable() {
   previewAgentReady = false;
+  // Hide the opaque empty-state overlay — it defaults to visible (aria-hidden
+  // false, solid background) and otherwise paints on top of the fallback card
+  // rendered into the iframe below, masking it (VIB-1938).
+  setPreviewEmptyState(false);
   // Compute the expected preview port (app port + 2) so the hint is concrete.
   const appPort = Number(
     window.location.port || (window.location.protocol === "https:" ? 443 : 80)

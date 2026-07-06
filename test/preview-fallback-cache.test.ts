@@ -85,4 +85,19 @@ describe("VIB-1937 preview fallback + stale-cache defeat", () => {
     );
     expect(refreshBody).toContain("showPreviewUnavailable()");
   });
+
+  it("hides the opaque empty-state overlay so the fallback card is not masked", () => {
+    // VIB-1938 regression: the fallback card is rendered into the iframe, but
+    // the #preview-empty-state overlay defaults to visible (aria-hidden false,
+    // solid background, opacity 1) and paints on top of the frame. Unless
+    // showPreviewUnavailable() hides it, the user sees the generic "Your page
+    // will appear here" empty state instead of the fallback. Lock the un-mask.
+    const src = readFileSync(join(uiDir, "preview.js"), "utf8");
+    const start = src.indexOf("function showPreviewUnavailable(");
+    const fallbackBody = src.slice(
+      start,
+      src.indexOf("function ", start + 1)
+    );
+    expect(fallbackBody).toContain("setPreviewEmptyState(false)");
+  });
 });
