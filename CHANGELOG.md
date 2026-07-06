@@ -6,6 +6,10 @@ All notable changes to vibeSpot are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- **Stale build after `git pull` now warns at boot instead of failing with cryptic `/api/*` 404s** ([VIB-1939](/VIB/issues/VIB-1939)) — `bin/vibespot.mjs` runs the tsup-built `dist/index.js`, but `ui/*` is served straight from disk, so a `git pull` updates the client immediately while the server's route table only changes after `npm run build`. Restarting without rebuilding served the new `ui/` against an old bundle — new routes like `/api/preview-origin` and `/api/whats-new` 404'd and the live preview went dark with no explanation. The `vibespot vibe` boot path now compares mtimes (`src/utils/build-check.ts`): if any file under `src/` (or `package.json`) is newer than `dist/index.js`, it prints a loud, actionable warning — *"⚠ Your build is older than the source you pulled … Run `npm run build` and restart."* Guarded so it never fires for npm-installed users (who ship `dist/` but no `src/`) or `npm run dev` (tsx on `src/`, which never touches `dist/`). Complements the in-app preview fallback from [VIB-1937](/VIB/issues/VIB-1937) by catching the skew at its source. Covered by `test/build-check.test.ts`.
+
 ## 1.8.0 — 2026-07-06
 
 ### Changed
