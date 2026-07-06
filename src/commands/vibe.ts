@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import chalk from "chalk";
 import { startServer } from "../server/server.js";
 import { saveSession } from "../server/session.js";
+import { warnIfBuildStale } from "../utils/build-check.js";
 
 const DEFAULT_PORT = 4200;
 
@@ -23,6 +24,11 @@ export async function vibeCommand(): Promise<void> {
   console.log("");
   console.log(accent("  v vibeSpot"));
   console.log(dim("  Starting...\n"));
+
+  // Warn loudly if the built server bundle is older than the source that was
+  // pulled — otherwise the new ui/ serves against an old route table and the
+  // preview 404s silently (VIB-1939). No-op for npm installs and dev runs.
+  warnIfBuildStale((msg) => console.warn(chalk.yellow(msg)));
 
   const uiDir = resolveUiDir();
   if (!uiDir) {
