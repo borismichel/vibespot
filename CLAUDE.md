@@ -276,6 +276,19 @@ When a feature or fix ships, update the relevant docs before merging:
 | `ui/docs/index.html` | Affects documented features or workflows |
 | `CLAUDE.md` | Architecture, constraints, or key behaviors change |
 
+## Release Checklist (mandatory)
+
+Cutting a release is more than a version bump. **Every release updates the four "what changed" surfaces, then builds, tags, and publishes** — see [`RELEASE.md`](RELEASE.md) for the full runbook (the `release` skill in `.claude/skills/release/` is the same procedure, surfaced automatically). The non-negotiable part:
+
+| # | Surface | What |
+|---|---------|------|
+| 1 | `CHANGELOG.md` | New `## <version> — <date>` section. Bullets are `- **Bold user-facing title** (VIB-xxxx) — body` — **the bold title + body are shown verbatim in the "What's new" modal**, so write them for users. |
+| 2 | `README.md` | "What's new" list + any tour/feature/command/setup change. |
+| 3 | `ui/docs/index.html` | Document every new feature / changed workflow (section **and** nav link). |
+| 4 | "What's new" modal | `assets/whats-new.json`, regenerated from the CHANGELOG by `npm run whatsnew:gen` (inside `npm run build`). Verify `version` matches and highlights read well. |
+
+For each `VIB-xxxx` merged since the last tag (`git log $(git describe --tags --abbrev=0)..origin/main --oneline`), confirm it's in the CHANGELOG and — if user-facing — in `ui/docs` and the README. A feature that's in the code but not the docs is the default failure mode; this gate exists to catch it.
+
 ## Related Projects
 
 - **MPMX-2026** (`../MPMX-2026/`) — HubSpot CMS theme where conversion patterns were developed

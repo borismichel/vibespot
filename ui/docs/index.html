@@ -90,6 +90,7 @@
     <a class="doc-nav__link doc-nav__link--sub" href="#checkpoints-seams">The Three Seams</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#checkpoints-card">The Checkpoint Card</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#checkpoints-oneshot">One-Shot Escape Hatch</a>
+    <a class="doc-nav__link doc-nav__link--sub" href="#checkpoints-bargein">Messaging Mid-Build</a>
     <a class="doc-nav__link" href="#plan-mode">Plan Mode</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#plan-mode-when">When to Use</a>
     <a class="doc-nav__link doc-nav__link--sub" href="#plan-mode-flow">The Flow</a>
@@ -1002,6 +1003,10 @@ testimonial carousel, and a minimal footer with social links.</code></pre>
 
   <h3 id="checkpoints-oneshot">One-Shot Escape Hatch</h3>
   <p>Checkpoints are <strong>on by default</strong> for from-scratch page generation. When you already know what you want and don't need to review, the <strong>one-shot</strong> button next to send runs the whole pipeline in one go &mdash; the previous one-call behaviour, no gates. It's a per-message choice: tap one-shot for this prompt, or hit send to go through the checkpoints.</p>
+
+  <h3 id="checkpoints-bargein">Messaging Mid-Build</h3>
+  <p>The chat input stays live while a build runs, so you can react the moment you see something you'd change. A message sent during a build is <strong>queued by default</strong> rather than tearing down the run: a <strong>"Queued &mdash; runs next"</strong> chip appears and your message is dispatched automatically when the current build finishes. Less destructive than cancelling, and you don't have to wait for the build to end before typing.</p>
+  <p>When you <em>do</em> want to change course immediately, the chip's <strong>Interrupt now</strong> button cancels the running build and replans with your new message (a <strong>barge-in</strong>); in-flight model calls stop spending. A <strong>&times; Cancel</strong> on the chip just drops the queued message and lets the build finish as planned. Streaming single-call chat and a parked <a href="#checkpoints-card">checkpoint card</a> are left alone &mdash; queueing applies to an active module build.</p>
 </div>
 
 <!-- ============================================================
